@@ -1,27 +1,31 @@
-function [Factors] = sample_lambda( Ytil,Factors, resid,genetic_effects,eig_ZAZ )
-%Sample factor loadings (Factors.Lambda) while marginalizing over residual
-%genetic effects: Y - Z_2W = FL' + E, vec(E)~N(0,kron(Psi_E,In) + kron(Psi_U, ZAZ^T))
-%note: conditioning on W, but marginalizing over U.
+function [Lambda] = sample_Lambda( Wtil,F,resid_W_prec, E_a_prec,Plam,invert_aI_bZAZ )
+%Sample factor loadings Lambda while marginalizing over residual
+%genetic effects: Y - Z_2W = F*Lambda' + E, vec(E)~N(0,kron(Psi_E,In) + kron(Psi_U, ZAZ^T))
+%note: conditioning on F, but marginalizing over E_a.
 %sampling is done separately by trait because each column of Lambda is
 %independent in the conditional posterior
-%note: eig_ZAZ has parameters that diagonalize aI + bZAZ for fast
-%inversion: inv(aI + bZAZ) = 1/b*Ur*diag(1./(eta+a/b))*Ur'
+%note: invert_aI_bZAZ has parameters that diagonalize aI + bZAZ for fast
+%inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
 
-p=resid.p;
-k=Factors.k;
+p=size(resid_W_prec,1);
+k=size(F,2);
 
-Ur = eig_ZAZ.vectors;
-eta = eig_ZAZ.values;
-FtU = Factors.scores*Ur;
-UtY = Ur'*Ytil';
+U = invert_aI_bZAZ.U;
+s = invert_aI_bZAZ.s;
+FtU = F'*U;
+UtY = U'*Wtil;
 
-Zlams = normrnd(0,1,k,p);
+Zlams = randn(k,p);
+Lambda = zeros(p,k);
 for j = 1:p,
-    FUDi = genetic_effects.ps(j)*bsxfun(@times,FtU,1./(eta' + genetic_effects.ps(j)/resid.ps(j)));
+    FUDi = E_a_prec(j)*bsxfun(@times,FtU,1./(s' + E_a_prec(j)/resid_W_prec(j)));
     means = FUDi*UtY(:,j);
-    Qlam = FUDi*FtU' + diag(Factors.Plam(j,:)); 
+    Qlam = FUDi*FtU' + diag(Plam(j,:)); 
     Llam = chol(Qlam,'lower');
     vlam = Llam\means; mlam = Llam'\vlam; ylam = Llam'\Zlams(:,j);
-    Factors.Lambda(j,:) = (ylam + mlam);
+    Lambda(j,:) = (ylam + mlam);
 end
+
+
+% save('sample_Lambda_data')
 end

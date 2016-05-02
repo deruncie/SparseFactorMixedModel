@@ -1,42 +1,34 @@
-function [ Posterior ] =save_posterior_samples( sp_num,params, ...
-      Posterior,resid,fixed_effects,genetic_effects,Factors,interaction_effects)
-%save posteriors. Re-scale samples back to original variances.
-  
-%save factors
-sp = params.sp;
-VY = params.VY;       
-Lambda = bsxfun(@times,Factors.Lambda,sqrt(VY'));     %re-scale by Y variances
-G_h2 = Factors.h2;
-U = genetic_effects.U;     
-delta = Factors.delta;
-genetic_ps = genetic_effects.ps./VY';
-resid_ps = resid.ps./VY';
+function [ Posterior ] = save_posterior_samples( sp_num,~, ...
+      Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec)
+%save posteriors. Full traces are kept of the more interesting parameters.
+%Only the posterior means are kept of less interesting parameters. These
+%should be correctly calculated over several re-starts of the sampler.
+
+sp = size(Posterior.Lambda,2);
 
 %save factor samples
-Lambda = Lambda(:,1:Factors.k);
 if numel(Lambda) > size(Posterior.Lambda,1),
     %expand factor sample matrix if necessary
     Posterior.Lambda = [Posterior.Lambda; zeros(numel(Lambda)-size(Posterior.Lambda,1),sp)];
-    Posterior.U = [Posterior.U; zeros(numel(U)-size(Posterior.U,1),sp)];
+    Posterior.F   = [Posterior.F; zeros(numel(F)-size(Posterior.F,1),sp)];
+    Posterior.F_a = [Posterior.F_a; zeros(numel(F_a)-size(Posterior.F_a,1),sp)];
     Posterior.delta = [Posterior.delta; zeros(numel(delta)-size(Posterior.delta,1),sp)];
-    Posterior.G_h2 = [Posterior.G_h2; zeros(numel(G_h2)-size(Posterior.G_h2,1),sp)];
+    Posterior.F_h2 = [Posterior.F_h2; zeros(numel(F_h2)-size(Posterior.F_h2,1),sp)];
 end                
 Posterior.Lambda(1:numel(Lambda),sp_num) = Lambda(:);
+Posterior.F(1:numel(F),sp_num)     = F(:);
+Posterior.F_a(1:numel(F_a),sp_num) = F_a(:);
 Posterior.delta(1:numel(delta),sp_num) = delta;
-Posterior.G_h2(1:numel(G_h2),sp_num) = G_h2;
-Posterior.U(1:numel(U),sp_num) = U(:);
+Posterior.F_h2(1:numel(F_h2),sp_num) = F_h2;
 
-Posterior.ps(:,sp_num) = genetic_ps;
-Posterior.resid_ps(:,sp_num) = resid_ps;
+Posterior.resid_Y_prec(:,sp_num) = resid_Y_prec;
+Posterior.E_a_prec(:,sp_num) = E_a_prec;
+Posterior.W_prec(:,sp_num) = W_prec;
 
 %save B,U,W
-Posterior.B = (Posterior.B*(sp_num-1) + bsxfun(@times,fixed_effects.B,sqrt(VY')))./sp_num;
-Posterior.d = (Posterior.d*(sp_num-1) + bsxfun(@times,genetic_effects.d,sqrt(VY')))./sp_num;
-Posterior.W = (Posterior.W*(sp_num-1) + bsxfun(@times,interaction_effects.W,sqrt(VY')))./sp_num;
-
-if mod(sp_num,100)==0
-    save('Posterior','Posterior','params')
-end
+Posterior.B = (Posterior.B*(sp_num-1) + B)./sp_num;
+Posterior.E_a = (Posterior.E_a*(sp_num-1) + E_a)./sp_num;
+Posterior.W = (Posterior.W*(sp_num-1) + W)./sp_num;
 
 end
 
