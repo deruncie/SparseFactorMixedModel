@@ -1,29 +1,19 @@
-function draw_simulation_diagnostics(~,sp_num,params,Factors,genetic_effects,resid,...
-        Posterior,gen_factor_Lambda,error_factor_Lambda,G,R,h2)
+function draw_simulation_diagnostics(sp_num,params,Posterior,Lambda,F_h2,E_a_prec,resid_Y_prec,gen_factor_Lambda,error_factor_Lambda,G_act,E_act,h2)
+% Factors,genetic_effects,resid,...
+%         Posterior,gen_factor_Lambda,error_factor_Lambda,G,R,h2)
 %draw some diagnostic plots    
     
-VY = params.VY;
 p = params.p;
-Lambda = Factors.Lambda;
-G_h2s = Factors.h2';
-E_h2s = 1-G_h2s;
-G_Lambda = bsxfun(@times,Factors.Lambda,sqrt(G_h2s));
-E_Lambda = bsxfun(@times,Factors.Lambda,sqrt(E_h2s));
-actual_G_Lambda = bsxfun(@times,gen_factor_Lambda,1./sqrt(VY'));
-actual_E_Lambda = bsxfun(@times,error_factor_Lambda,1./sqrt(VY'));
+E_h2 = 1-F_h2;
+G_Lambda = bsxfun(@times,Lambda,sqrt(F_h2'));
+E_Lambda = bsxfun(@times,Lambda,sqrt(E_h2'));
+actual_G_Lambda = gen_factor_Lambda;
+actual_E_Lambda = error_factor_Lambda;
 
-G_est = G_Lambda*G_Lambda' + diag(1./genetic_effects.ps);
-% G_act = actual_G_Lambda*actual_G_Lambda';
-G_act = G;
-G_act = G_act./sqrt(VY'*VY);
+G_est = G_Lambda*G_Lambda' + diag(1./E_a_prec);
 
-E_est = E_Lambda*E_Lambda' + diag(1./resid.ps);
-% E_act = actual_E_Lambda*actual_E_Lambda';
-E_act = R;
-E_act = E_act./sqrt(VY'*VY);
-%E_act = E_act - diag(diag(E_act));
-
-delta=Factors.delta;         
+E_est = E_Lambda*E_Lambda' + diag(1./resid_Y_prec);
+ 
 
 fig1=figure(1);
 f1_row=3;
@@ -51,11 +41,7 @@ if sp_num <= 1,
         max_cors(j) = find(cors(j,:) == max(cors(j,:)));
     end
     [~,o]=sort(max_cors);
-    % figure(5)
-    % plot(Lambda(:,o),actual_E_Lambda,'.')
     L=Lambda(:,o);
-    % a=(actual_E_Lambda'*actual_E_Lambda)\actual_E_Lambda'*Lambda;
-    % plot(max(abs(a)))
 
     figure(6)
     for j=1:min(k,5*5),
@@ -112,10 +98,10 @@ line(xlim,xlim)
 
 %plot 9: Plot of factor heritabilities
 subplot(f1_row,f1_col,9)
-plot(G_h2s,'Color','r');
+plot(F_h2,'Color','r');
 ylim([0 1])
 hold on
-plot(E_h2s,'Color','b');
+plot(E_h2,'Color','b');
 hold off
 
 if sp_num>1,
@@ -138,8 +124,8 @@ if sp_num>1,
     clf
     f4_row=8;
     f4_col=4;
-    for k=1:min(2*f4_row,size(Posterior.G_h2,1))
-        h2s = Posterior.G_h2(k,1:sp_num);
+    for k=1:min(2*f4_row,size(Posterior.F_h2,1))
+        h2s = Posterior.F_h2(k,1:sp_num);
         if sum(h2s(~isnan(h2s)))==0
             continue
         end
@@ -158,28 +144,26 @@ if sp_num>1,
     clf;      
 
     k = size(Posterior.Lambda,1)/p;
-    h2s = Posterior.G_h2(:,1:sp_num);     
+    h2s = Posterior.F_h2(:,1:sp_num);     
     G_Lambdas = zeros(size(Posterior.Lambda));
     Lambda_est = zeros(p,k);
     G_est = zeros(p,p);
     E_est = zeros(p,p);
     for j=1:sp_num
-        Lj = bsxfun(@times,reshape(Posterior.Lambda(:,j),p,k),1./sqrt(VY'));
-        h2j = Posterior.G_h2(:,j);
+        Lj = reshape(Posterior.Lambda(:,j),p,k);
+        h2j = Posterior.F_h2(:,j);
         G_Lj = Lj * diag(sqrt(h2j));
         G_Lambdas(:,j) = G_Lj(:);
-        Gj = G_Lj * G_Lj' + diag(1./(VY'.*Posterior.ps(:,j)));
+        Gj = G_Lj * G_Lj' + diag(1./Posterior.E_a_prec(:,j));
         G_est = G_est + Gj./sp_num;
         
-        E_Lj = Lj * diag(1-h2j)* Lj' + diag(1./(VY'.*Posterior.resid_ps(:,j)));
+        E_Lj = Lj * diag(1-h2j)* Lj' + diag(1./Posterior.resid_Y_prec(:,j));
         E_est = E_est + E_Lj./sp_num;
         Lambda_est = Lambda_est + reshape(Posterior.Lambda(:,j),p,k)./sp_num;
     end
-%     G_est = 4*G_est;
     G_Lambda = reshape(mean(G_Lambdas,2),p,k);
-%     Lambda = bsxfun(@times,Lambda,sqrt(VY'));
     
-    %plot 1: visualize estimated genetic factor loading matrix
+    %plot 1: visualize estimated genetic covariance matrix (as correlation matrix).
     subplot(f1_row,f1_col,1)
     clims=[-1 1];
     imagesc(CovToCor(G_est),clims)
@@ -222,6 +206,9 @@ if sp_num>1,
     cors=[cors;max(cors)];
     cors=[cors max(cors')'];
     
+
+    %plot estimated factor loadings against actual factor loadings for matched factors
+    figure(6)
     k=min(size(actual_E_Lambda,2),size(Lambda_est,2));
     max_cors = zeros(k,1);
     cors = cors(1:end-1,1:end-1);
@@ -229,13 +216,8 @@ if sp_num>1,
         max_cors(j) = find(cors(:,j) == max(cors(:,j)));
     end
     [~,o]=sort(max_cors);
-    % figure(5)
-    % plot(Lambda(:,o),actual_E_Lambda,'.')
     L=error_factor_Lambda(:,o);
-    % a=(actual_E_Lambda'*actual_E_Lambda)\actual_E_Lambda'*Lambda;
-    % plot(max(abs(a)))
 
-    figure(6)
     for j=1:min(k,5*5),
         subplot(5,5,j)
         plot(L(:,j),Lambda_est(:,j),'.')
