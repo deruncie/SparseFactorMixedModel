@@ -371,9 +371,9 @@ for i = 1:nrun
     n = size(Y,1);
     resid.ps=gamrnd(resid.as + 0.5*n,1./(resid.bs+0.5*sum(Ytil.^2,2)));  %model residual precision
     n = genetic_effects.n;
-    genetic_effects.ps=gamrnd(genetic_effects.as + 0.5*n,1./(genetic_effects.bs+0.5*sum(genetic_effects.d.^2,2))); %random effect 1 (D) residual precision
+    genetic_effects.ps=gamrnd(genetic_effects.as + 0.5*n,1./(genetic_effects.bs+0.5*diag(genetic_effects.d * Ainv * genetic_effects.d'))); %random effect 1 (D) residual precision
     n = interaction_effects.n;
-    interaction_effects.ps=gamrnd(interaction_effects.as + 0.5*n,1./(interaction_effects.bs+0.5*sum(interaction_effects.W.^2,2))); %random effect 2 (W) residual precision
+    interaction_effects.ps=gamrnd(interaction_effects.as + 0.5*n,1./(interaction_effects.bs+0.5*diag(interaction_effects.W * A_2_inv * interaction_effects.W'))); %random effect 2 (W) residual precision
  
   %------Update delta & tauh------%
     [delta,tauh] = sample_delta( Factors,Lambda2 );

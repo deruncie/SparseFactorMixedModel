@@ -42,6 +42,7 @@ CovToCor=function(x) diag(1/sqrt(diag(x))) %*% x %*% diag(1/sqrt(diag(x)))
 
 
 counter = 0
+set.seed(1)
 
 #sample_size simulations
 num_reps = 10		# number of simulations to run
