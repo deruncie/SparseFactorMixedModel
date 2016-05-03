@@ -15,9 +15,14 @@ on website: [](http://www2.stat.duke.edu/~sayan/bfgr/index.shtml)
 #### V1.1
 - Fixed calculation of genetic and interaction specific effects. The calculation and corresponding text of the paper missed $A^{-1}$. This should not greatly affect the results of the analyses presented in the paper, but will need to check. It doesn't affect Ayroles analysis.
 
-#### V2
+#### V2.0
 Nearly complete re-write of the model code, but should maintain identical function (I believe)
 - variables have been re-named to more closely correspond to the paper
 - sampler function has been re-written to only sample.
 - A new function initializes the sampler, only run once
 - sampler function starts where the previous run left off (including maintaining the random number generator), so should be the same as running one continuous chain
+
+#### R_BSFG V2.0
+R clone of V2.0 Matlab code
+- Functionality should be identical. Worth checking. Note that the RNG is different.
+- embeded in the Gibbs sampler are two versions of each sampler function, a native R version, and a Rcpp version. They should be identical (up to RNG differences). The Rcpp function has the same name and arguments, but with "_c" appended to the function name.
