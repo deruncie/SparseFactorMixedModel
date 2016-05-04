@@ -31,9 +31,12 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
 # ----------------------- #
 # ------read data-------- #
 # ----------------------- #
-    # load('../setup.RData')
-    setup = readMat('../setup.mat')
-    for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
+    if(file.exists('../setup.RData')) {
+        load('../setup.RData')
+    } else{
+        setup = readMat('../setup.mat')
+        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
+    }
 	Y       = setup$Y
 	U_act   = setup$U_act
 	E_act   = setup$E_act
@@ -52,7 +55,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     	print('simulated data')
     	run_parameters$setup = setup
     }
-   	run_parameters$simulation = simulation
+	    run_parameters$simulation = simulation
 
     #normalize Y to have zero mean and unit variances among observed values,
     #allowing for NaNs.
