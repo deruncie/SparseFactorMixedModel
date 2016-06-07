@@ -13,7 +13,11 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
 
     devices = dev.list()
     while(length(devices) < 4){
-    	quartz()
+        if(.Platform$OS.type != "windows") {
+    	   quartz()
+        } else {
+            windows()
+        }
     	devices = dev.list()
     }
 
@@ -137,7 +141,11 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
 draw_results_diagnostics = function(sp_num,params,Lambda, F_h2, Posterior){
     devices = dev.list()
     while(length(devices) < 4){
-        quartz()
+        if(.Platform$OS.type != "windows") {
+           quartz()
+        } else {
+            windows()
+        }
         devices = dev.list()
     }
 

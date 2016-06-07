@@ -1,4 +1,4 @@
-library(R.matlab)
+
 fast_BSFG_sampler_init = function(priors,run_parameters){
 	# require(PEIP)
 	require(Matrix)
@@ -34,6 +34,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     if(file.exists('../setup.RData')) {
         load('../setup.RData')
     } else{
+        require(R.matlab)
         setup = readMat('../setup.mat')
         for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
     }
@@ -63,6 +64,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     p = ncol(Y)
     r = ncol(Z_1)
 
+    Y_missing = is.na(Y)        # matrix recording missing data in Y
     Mean_Y = colMeans(Y,na.rm=T)
     VY = apply(Y,2,var,na.rm=T)
     # Don't remove the mean and standardize the variance if it's a
@@ -75,9 +77,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     	Y = sweep(Y,2,Mean_Y,'-')
     	Y = sweep(Y,2,sqrt(VY),'/')
     }
-    
-    Y_full = Y
-    
+       
     
     #determine if a design matrix (X) exists (is loaded from setup.mat). If
     #not, make a dummy X-matrix with no columns.
@@ -99,10 +99,11 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
 
 
     data_matrices = list(
-		    Y_full    = Y_full,
+		    Y         = Y,
 		    Z_1       = Z_1,
 		    Z_2       = Z_2,
-		    X         = X
+		    X         = X,
+            Y_missing = Y_missing
     		)
     
     #fixed effect priors

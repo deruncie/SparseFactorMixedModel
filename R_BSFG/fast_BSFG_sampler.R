@@ -20,7 +20,7 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	# as possible.
 	#
 	# All input and initialization functions are carried out by the function
-	# MA_sampler_init. See the documentation of that function for details.
+	# fast_BSFG_sampler_init See the documentation of that function for details.
 	# 
 	# The sampler is designed to do a short-medium length run and then return
 	# the state of the chain. After assessing the progress of the chain,
@@ -30,10 +30,11 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	# 
 	# This function takes the following inputs:
 	#     data_matrices: struct holding the (should be imutable) data, design and incidence matrices:
-	#          Y_full: Full probe data, may include NaNs. n x p
-	#          Z_Y:    Incidence matrix for transcripts -> probes. g x p
-	#          Z_W:    Incidence matrix for lines -> replicates. n x r
-	#          X_W:    Fixed effect design matrix. n x p
+	#          Y:  		Full phenotype data. n x p
+	# 		   X: 		Fixed effect design matrix. n x b
+	#          Z_1:     Random effect 1 incidence matrix. n x r1
+	#          Z_2:     Random effect 2 incidence matrix. n x r2
+	#          Y_missing: incidence matrix of missing data in Y
 	#     start_i: iteration number of the end of the last run.
 	#     draw_iter: frequency of updating diagnostic plots
 	#     burn: number of burnin samples
@@ -65,10 +66,11 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	# ----------------Load data matrices------------- #
 	# ----------------------------------------------- #
 
-	Y_full  = data_matrices$Y_full
-	Z_1     = data_matrices$Z_1
-	Z_2     = data_matrices$Z_2
-	X       = data_matrices$X
+	Y  			= data_matrices$Y
+	Z_1     	= data_matrices$Z_1
+	Z_2     	= data_matrices$Z_2
+	X       	= data_matrices$X
+	Y_missing 	= data_matrices$Y_missing
 
 	p   = run_variables$p
 	n   = run_variables$n
@@ -175,12 +177,10 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	   
 	 # -----fill in missing phenotypes----- #
 		#conditioning on everything else
-		Y = Y_full
-		phenMissing = is.na(Y_full)
-		if(sum(phenMissing)>0) {
+		if(sum(Y_missing)>0) {
 			meanTraits = X %*% B + F %*% t(Lambda) + Z_1 %*% E_a + Z_2 %*% W
 			resids = matrix(rnorm(p*n,0,sqrt(1/resid_Y_prec)),nr = n,nc = p,byrow=T)
-			Y(phenMissing) = meanTraits(phenMissing) + resids(phenMissing)
+			Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
 		}
 		# recover()
 		  

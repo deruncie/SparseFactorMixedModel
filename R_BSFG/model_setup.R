@@ -10,21 +10,23 @@ library(RcppArmadillo)
 sourceCpp(paste(model_path,'BSFG_functions_c.cpp',sep='/'))
 
 
-setwd('Example_simulation')
+# set the directory to the location of the setup.RData or setup.mat file
+#setwd('Example_simulation')
 setwd('Sim_1')
 
-seed = 1234
+# choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that 
+# you can repeat the MCMC exactly
+seed = sample(1:1e3,1)
 set.seed(seed)
 
+# create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
 rep = 2
 folder = sprintf('R_rep_%d',rep)
 try(dir.create(folder))
 setwd(folder)
 
+
 # initialize priors
-
-
-
 run_parameters = list(
     b0           = 1,
     b1           = 0.0005,
