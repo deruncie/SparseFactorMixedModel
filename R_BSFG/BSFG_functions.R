@@ -2,12 +2,11 @@ library(R.matlab)
 
 require(pracma)
 
-
+#change
 cholcov = function(X){
 	# calculates a matrix U such that t(U) %*% U == X for X that is not PD
 	E = svd(X)
-	cols = E$d > 1e-14
-	U = E$u[,cols] %*% diag(sqrt(E$d[cols]))
+	U = E$u %*% diag(sqrt(E$d))
 	return(t(U))
 }
 
