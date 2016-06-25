@@ -2,7 +2,7 @@ library(R.matlab)
 
 require(pracma)
 
-
+#change
 cholcov = function(X){
 	# calculates a matrix U such that t(U) %*% U == X for X that is not PD
 	E = svd(X)
