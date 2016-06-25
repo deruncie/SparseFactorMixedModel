@@ -39,6 +39,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
         for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
     }
 	Y       = setup$Y
+	Y       = as.matrix(Y)
 	U_act   = setup$U_act
 	E_act   = setup$E_act
 	B_act   = setup$B_act
