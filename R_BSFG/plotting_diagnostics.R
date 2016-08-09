@@ -323,7 +323,7 @@ plot_diagnostics = function(BSFG_state){
 # load("BSFG_state.RData")
 # plot_diagnostics(BSFG_state)
 
-#
+# test
 ComparingGMatrix_plot = function(target){
   #load data from the original population
   load("BSFG_state.RData")
