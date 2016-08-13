@@ -170,14 +170,15 @@ draw_results_diagnostics = function(sp_num,params,run_variables,Lambda, F_h2, Po
     image(CovToCor(E_est),zlim=c(-1,1),main = "E_est")
 
     # plot 4: Factor heritablities
-    plot(F_h2,type='l',ylim=c(0,1), main = "F_h2 vs E_h2")
-    lines(E_h2,col=2)
-  
+    plot(F_h2,type='l',ylim=c(0,1), main = "F_h2 vs E_h2",col="blue")
+    lines(E_h2,col="red")
+    legend("topright",legend = c("F_h2","E_h2"),col = c("blue","red"),text.col = c("blue","red"),bty = "n",pch = 1)
+    
     if(sp_num>1){
 
         dev.set(devices[2])
         # Figure of trace plots of the largest elements of each column of the factor loading matrix
-        f2_row=2;
+        f2_row=4;
         f2_col=4;
         par(mfrow=c(f2_row,f2_col))
         # for(k in 0:(min(2*f2_row,nrow(Posterior$Lambda)/p)-1)) {
@@ -247,8 +248,9 @@ draw_results_diagnostics = function(sp_num,params,run_variables,Lambda, F_h2, Po
         # plot 4: posterior mean factor heritabilities
         F_h2 = rowMeans(Posterior$F_h2[,1:sp_num])
         E_h2 = 1-F_h2
-        plot(F_h2,type='l',ylim=c(0,1),main = "F_h2 vs E_h2")
-        lines(E_h2,col=2)
+        plot(F_h2,type='l',ylim=c(0,1),main = "F_h2 vs E_h2",col="blue")
+        lines(E_h2,col="red")
+        legend("topright",legend = c("F_h2","E_h2"),col = c("blue","red"),text.col = c("blue","red"),bty = "n",pch = 1)
         
         #plot 5: trace plot of G_est
         dev.set(devices[5])
@@ -323,7 +325,6 @@ plot_diagnostics = function(BSFG_state){
 # load("BSFG_state.RData")
 # plot_diagnostics(BSFG_state)
 
-# test
 ComparingGMatrix_plot = function(target){
   #load data from the original population
   load("BSFG_state.RData")
