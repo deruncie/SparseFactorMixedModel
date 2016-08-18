@@ -38,8 +38,7 @@ setup_pedigree = function(data=data,LineCode){
   reg=lm(as.matrix(Y)~X)
   B_act = reg$coefficients
   
-  
-  traitnames = names(data)[7:ncol(Y)]
+  traitnames = names(data)[7:ncol(data)]
   setup = list(Y,A,Z_1,X,B_act,traitnames)
   names(setup) = c("Y","A","Z_1","X","B_act","traitnames")
   save(setup,file=sprintf("setup_LineCode%d.RData",LineCode))
