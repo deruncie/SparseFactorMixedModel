@@ -3,7 +3,7 @@ setup_pedigree = function(data=data,LineCode){
   # we use individuals from lines (F1 to F3 generation) and the parental ind.
   linecode_pos = which(data$LineCode==0|data$LineCode==LineCode)
   ped = data[linecode_pos, 1:3]
-  Y = data[linecode_pos,-(1:6)]
+  Y = apply(data[linecode_pos,-(1:6)],2,as.numeric)
   n = nrow(Y)
   Z_1 = diag(1,n,n)
   
@@ -35,7 +35,9 @@ setup_pedigree = function(data=data,LineCode){
   X = model.matrix(~X)
   #reg1=lm(as.matrix(Y)~X)
   #B_act_1 = reg1$coefficients
-  reg=lm(as.matrix(Y)~X)
+  reg=lm(as.matrix(Y)~0+X)
+  #Y = as.matrix(Y)
+  #B_act = solve(t(X)%*%X)%*%t(X)%*%Y
   B_act = reg$coefficients
   
   traitnames = names(data)[7:ncol(data)]
