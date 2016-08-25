@@ -64,12 +64,12 @@ F_a_new3 = matrix(F_a_new3[,ncol(F_a_new3)],nr=n_new3)
 #=======================================================
 factor_3Dplot = function(x1,x2,x3){
   
-  if(exist('n_new3')){
+  if(exists('n_new3')){
     df = data.frame(rbind(cbind(F_a_old[,x1],F_a_old[,x2],F_a_old[,x3]),
                           cbind(F_a_new2[,x1],F_a_new2[,x2],F_a_new2[,x3]),
                           cbind(F_a_new3[,x1],F_a_new3[,x2],F_a_new3[,x3])))
-    df$factor = factor(c(rep("green",n_old),rep("yellow",n_new2),
-                         rep("pink",n_new3)))
+    df$factor = factor(c(rep("black",n_old),rep("red",n_new2),
+                         rep("blue",n_new3)))
   }else{
     df = data.frame(rbind(cbind(F_a_old[,x1],F_a_old[,x2],F_a_old[,x3]),
                           cbind(F_a_new2[,x1],F_a_new2[,x2],F_a_new2[,x3])))
@@ -91,15 +91,15 @@ factor_3Dplot = function(x1,x2,x3){
   
   aspect3d(1,1,1)
  #create a movie 3d
-  movie3d(spin3d(axis = c(0, 0, 1)), duration = 3,dir = getwd())
+  movie3d(spin3d(axis = c(0, 0, 1)), duration = 10,dir = getwd())
 }
 
 #-------------------------------------------
 #plot~~~~~
 #latent factor we choose
-x1=4
+x1=1
 x2=2
-x3=5
+x3=10
 factor_3Dplot(x1,x2,x3)
 
 #How much contribution for each of these factors
@@ -110,3 +110,5 @@ Lambda = BSFG_state$Posterior$Lambda
 Lambda = matrix(Lambda[,ncol(Lambda)],nr=p)
 
 #the size of x1, x2, x3 columns
+
+
