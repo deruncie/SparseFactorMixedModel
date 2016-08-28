@@ -98,7 +98,7 @@ factor_3Dplot = function(x1,x2,x3){
 #plot~~~~~
 #latent factor we choose
 x1=1
-x2=2
+x2=5
 x3=10
 factor_3Dplot(x1,x2,x3)
 
@@ -110,5 +110,11 @@ Lambda = BSFG_state$Posterior$Lambda
 Lambda = matrix(Lambda[,ncol(Lambda)],nr=p)
 
 #the size of x1, x2, x3 columns
-
-
+Lambda_x1 = t(Lambda[,x1])%*%Lambda[,x1]
+Lambda_x2 = t(Lambda[,x2])%*%Lambda[,x2]
+Lambda_x3 = t(Lambda[,x3])%*%Lambda[,x3]
+S = sum(diag(G_est))
+#The proportion of total sample variance explained by the i-th factor
+Lambda_x1/S
+Lambda_x2/S
+Lambda_x3/S
