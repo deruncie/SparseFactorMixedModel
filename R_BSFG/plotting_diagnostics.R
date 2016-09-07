@@ -4,8 +4,13 @@ CovToCor = function(X){
     return(corX)
 }
 
-trace_plot = function(data,main = NULL){
-	plot(NA,NA,xlim = c(0,ncol(data)),ylim = range(data),main= main)
+trace_plot = function(data,main = NULL,ylim = NULL){
+    if(is.null(ylim)) {
+        range_y = range(data)
+        max_range = max(abs(range_y))
+        ylim = c(-max_range,max_range)
+    }
+	plot(NA,NA,xlim = c(0,ncol(data)),ylim = ylim,main= main)
 	for(i in 1:nrow(data)) lines(data[i,],col=i)
 }
 
