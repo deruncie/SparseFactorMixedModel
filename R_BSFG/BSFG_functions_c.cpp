@@ -162,6 +162,35 @@ mat sample_factors_scores_c(mat Y_tilde,
 	return(F);
 }
 
+// [[Rcpp::export()]]
+mat sample_px_factors_scores_c(mat Y_tilde,
+							mat Z_1,
+							mat Lambda_px,
+							vec resid_Y_prec,
+							mat F_a_px,
+							vec tau_e,
+							vec px_factor ) {
+//Sample factor scores given factor loadings (F_a), factor heritabilities (F_h2) and
+//phenotype residuals
+// as before, but px_factor gives the variance of the px_factor	
+
+	mat Lmsg = sweep_times(Lambda_px,1,resid_Y_prec);
+	// vec tau_e = 1.0 / (px_factor .* (1.0 - F_h2));
+	mat S = chol(Lambda_px.t() * Lmsg + diagmat(tau_e));
+	mat tS = S.t();
+
+	mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(Z_1 * F_a_px,2,tau_e))));
+
+	mat Zlams = randn(Meta.n_rows,Meta.n_cols);	
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
+	// vec z = as<vec>(rnorm(Meta.n_rows*Meta.n_cols));
+	// mat Zlams = reshape(z,Meta.n_rows,Meta.n_cols);
+
+	mat F_px = trans(solve(S,trans(Meta + Zlams)));
+
+	return(F_px);
+}
 
 // [[Rcpp::export()]]
 vec sample_h2s_discrete_c (mat F,
