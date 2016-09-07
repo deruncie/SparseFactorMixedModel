@@ -52,6 +52,9 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	#         draw_simulation_diagnostics.m: For simulated data with known true values
 	#         draw_results_diagnostics.m: Otherwise
 	#         
+	#    adding parameter expansion for Lambda 
+	#       - an additional coefficient px_factor for each column that is redundant (non-identified), and not used for inference but to improve mixing
+	#       - following Ghosh and Dunson 2012
 
 	data_matrices  = BSFG_state$data_matrices
 	params         = BSFG_state$params
@@ -94,6 +97,8 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	delta_1_rate       =   priors$delta_1_rate
 	delta_2_shape      =   priors$delta_2_shape
 	delta_2_rate       =   priors$delta_2_rate
+	px_shape    	   =   priors$px_shape
+	px_rate     	   =   priors$px_rate
 	h2_priors_factors  =   priors$h2_priors_factors
 
 
@@ -114,8 +119,11 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	F_h2         =   current_state$F_h2
 	F_a          =   current_state$F_a
 	B            =   current_state$B
+	px_factor    =   current_state$px_factor
+	F_px         =   current_state$F_px
 	start_i      =   current_state$nrun
 	k = ncol(F)
+	
 
 	# ----------------------------------------------- #
 	# -----------Reset Global Random Number Stream--- #
@@ -178,17 +186,27 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	 # -----fill in missing phenotypes----- #
 		#conditioning on everything else
 		if(sum(Y_missing)>0) {
-			meanTraits = X %*% B + F %*% t(Lambda) + Z_1 %*% E_a + Z_2 %*% W
+			meanTraits = X %*% B + F_px %*% t(Lambda_px) + Z_1 %*% E_a + Z_2 %*% W
 			resids = matrix(rnorm(p*n,0,sqrt(1/resid_Y_prec)),nr = n,nc = p,byrow=T)
 			Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
 		}
 		# recover()
-		  
-	 # -----Sample Lambda------------------ #
-		#conditioning on W, B, F, marginalizing over E_a
+	
+	
+	 # # -----Sample Lambda------------------ #
+		# #conditioning on W, B, F, marginalizing over E_a
+		# Y_tilde = Y - X %*% B - Z_2 %*% W
+		# # Lambda = sample_Lambda( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
+		# Lambda = sample_Lambda_c( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
+	
+	 # -----With PX ------------------ #
+	 #    # F*Lambda' = F * D * Lambda_PX' where D = diag(px_factor)
+	 #    # Lambda's precision Plam is modified by px_factor^2
 		Y_tilde = Y - X %*% B - Z_2 %*% W
+		# Plam_px = t(apply(Plam,1,'*',px_factor))
 		# Lambda = sample_Lambda( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
-		Lambda = sample_Lambda_c( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
+		Lambda_px = sample_Lambda_c( Y_tilde,F_px,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
+	
 
 	 # -----Sample resid_Y_prec ---------------- #
 		# should be able to sample this here marginalizing over E_a in the same way that E_a_prec is done below.
@@ -200,7 +218,7 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 		
 	 # -----Sample B and E_a--------------- #
 		#conditioning on W, F, Lambda
-		Y_tilde = Y - F %*% t(Lambda) - Z_2 %*% W
+		Y_tilde = Y - F_px %*% t(Lambda_px) - Z_2 %*% W
 		# location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
 		location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
 		B   = location_sample[1:b,]
@@ -209,7 +227,7 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	 # -----Sample W ---------------------- #
 		#conditioning on B, E_a, F, Lambda
 		if(ncol(Z_2) > 0) {
-			Y_tilde = Y - X %*% B - Z_1 %*% E_a - F %*% t(Lambda)
+			Y_tilde = Y - X %*% B - Z_1 %*% E_a - F_px %*% t(Lambda_px)
 			# location_sample = sample_means( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
 			location_sample = sample_means_c( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
 			W = location_sample
@@ -217,26 +235,42 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 		
 	 # -----Sample F_h2-------------------- #
 		#conditioning on F, marginalizing over F_a
+		F_temp = sweep(F_px,2,sqrt(px_factor),'/')
 		# F_h2 = sample_h2s_discrete(F,h2_divisions,h2_priors_factors,invert_aI_bZAZ)
-		F_h2 = sample_h2s_discrete_c(F,h2_divisions,h2_priors_factors,invert_aI_bZAZ)
+		F_h2 = sample_h2s_discrete_c(F_temp,h2_divisions,h2_priors_factors,invert_aI_bZAZ)
 		
 	 # -----Sample F_a--------------------- #
 		#conditioning on F, F_h2
 		# F_a = sample_F_a_c(F,Z_1,F_h2,invert_aZZt_Ainv)
-    	F_a = sample_F_a_c(F,Z_1,F_h2,invert_aZZt_Ainv);
+    	F_a = sample_F_a_c(F_temp,Z_1,F_h2,invert_aZZt_Ainv);
 			   
-	 # -----Sample F----------------------- #
+	 # -----Sample F_px----------------------- #
 		#conditioning on B,F_a,E_a,W,Lambda, F_h2
 		Y_tilde = Y - X %*% B - Z_1 %*% E_a - Z_2 %*% W
 		# F1 = sample_factors_scores( Y_tilde, Z_1,Lambda,resid_Y_prec,F_a,F_h2 )
-		F = sample_factors_scores_c( Y_tilde, Z_1,Lambda,resid_Y_prec,F_a,F_h2 )
+		# Lambda_px = t(apply(Lambda,1,'/',sqrt(px_factor)))
+		F_a_px = sweep(F_a,2,sqrt(px_factor),'*')
+	    tau_e = 1.0 / (px_factor * (1.0 - F_h2))
+		F_px = sample_px_factors_scores_c( Y_tilde, Z_1,Lambda_px,resid_Y_prec,F_a_px,tau_e,px_factor )
+
+		# F = sweep(F_px,2,sqrt(px_factor),'/')
+
+	 # -----Sample px_factor ------------------ #
+		# depends on F_px, F_a_px
+		# F_temp = t(apply(F_px,1,'/',sqrt(px_factor)))
+		F_px_resid = F_px - Z_1 %*% F_a_px
+		# px_factor = 1/rgamma(k,shape = 1/2 + n/2, rate = 1/4 + 1/2*colSums(F_px_resid^2)/(1-F_h2))
+		px_factor = 1/rgamma(k,shape = px_shape + n/2, rate = px_rate + 1/2*colSums(F_px_resid^2)/(1-F_h2))
+
 
 	 # -----Sample Lambda_prec------------- #
+		Lambda = sweep(Lambda_px,2,sqrt(px_factor),'*')
 		Lambda2 = Lambda^2
+		# Lambda2 = Lambda_px^2
 		Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 		
 	 # -----Sample resid_Y_prec------------ #
-		Y_tilde = Y - X %*% B - F %*% t(Lambda) - Z_1 %*% E_a - Z_2 %*% W
+		Y_tilde = Y - X %*% B - F_px %*% t(Lambda_px) - Z_1 %*% E_a - Z_2 %*% W
 		resid_Y_prec = rgamma(p,shape = resid_Y_prec_shape + n/2, rate = resid_Y_prec_rate+1/2*colSums(Y_tilde^2)) #model residual precision
 
 		
@@ -255,9 +289,15 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 		
 	 # -----Update Plam-------------------- #
 		Plam = sweep(Lambda_prec,2,tauh,'*')
+		Plam = sweep(Plam,2,px_factor,'/')
+
+	 # -----Calculate F and Lambda-------------------- #
+		# Lambda = sweep(Lambda_px,2,sqrt(px_factor),'*')
+		F = sweep(F_px,2,sqrt(px_factor),'/')
 
 	 # -- adapt number of factors to samples ---#
-		adapt_result = update_k( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_1,Lambda_df,delta_2_shape,delta_2_rate,b0,b1,i,epsilon,prop )
+		adapt_result = update_k( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,px_factor,F_px,
+								Z_1,Lambda_df,delta_2_shape,delta_2_rate,px_shape,px_rate,b0,b1,i,epsilon,prop )
 		F           = adapt_result$F
 		Lambda      = adapt_result$Lambda
 		F_a         = adapt_result$F_a
@@ -266,6 +306,8 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 		Plam        = adapt_result$Plam
 		delta       = adapt_result$delta
 		tauh        = adapt_result$tauh
+		px_factor   = adapt_result$px_factor
+		F_px 	    = adapt_result$F_px
 		k = ncol(F)
 
 	 # -- save sampled values (after thinning) -- #
@@ -275,7 +317,7 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 			
 			Posterior = save_posterior_samples( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec)
 			
-			if(sp_num %% save_freq == 0) save(Posterior,file='Posterior.RData')
+			if(sp_num %% save_freq == 0) save(Posterior,file='Posterior_px.RData')
 		}
 
 
@@ -310,7 +352,7 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	}
 	end_time = Sys.time()
 	print(end_time - start_time)
-	save(Posterior,file = 'Posterior.RData')
+	save(Posterior,file = 'Posterior_px.RData')
 
 
 	# ----------------------------------------------- #
@@ -331,9 +373,11 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	current_state$E_a           = E_a
 	current_state$B             = B
 	current_state$W             = W
+	current_state$px_factor     = px_factor
+	current_state$F_px     		= F_px
 	current_state$nrun 			= i
 
-	save(current_state,file='current_state.RData')
+	save(current_state,file='current_state_px.RData')
 
 
 	BSFG_state$current_state = current_state

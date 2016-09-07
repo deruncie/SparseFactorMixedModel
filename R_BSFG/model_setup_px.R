@@ -1,7 +1,7 @@
 model_path = '~/Box Sync/DER_projects/BSFG/R_BSFG'
-source(paste(model_path,'fast_BSFG_sampler_init.R',sep='/'))
-source(paste(model_path,'fast_BSFG_sampler.R',sep='/'))
-source(paste(model_path,'BSFG_functions.R',sep='/'))
+source(paste(model_path,'fast_BSFG_sampler_init_px.R',sep='/'))
+source(paste(model_path,'fast_BSFG_sampler_px.R',sep='/'))
+source(paste(model_path,'BSFG_functions_px.R',sep='/'))
 source(paste(model_path,'plotting_diagnostics.R',sep='/'))
 
 library(Rcpp)
@@ -52,6 +52,8 @@ priors = list(
     delta_1_rate        =   1/20,
     delta_2_shape       =   3,
     delta_2_rate        =   1,
+    px_shape            =   1/2,
+    px_rate             =   1/2,
     h2_priors_factors   =   c(run_parameters$h2_divisions-1,rep(1,run_parameters$h2_divisions-1))/(2*(run_parameters$h2_divisions-1))
 )
 
@@ -77,3 +79,22 @@ for(i  in 1:10) {
     BSFG_state = fast_BSFG_sampler(BSFG_state,n_samples)
     print(i)
 }
+
+BSFG_state = clear_Posterior(BSFG_state)
+
+
+# # optional: To load from end of previous run, run above code, then run these lines:
+# load('current_state')
+# load('Posterior')
+# load('Priors')
+# start_i = run_parameters$nrun;
+
+# Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
+# c1=fix(clock);
+n_samples = 200;
+for(i  in 1:10) {
+    print(sprintf('Run %d',i))
+    BSFG_state = fast_BSFG_sampler(BSFG_state,n_samples)
+    print(i)
+}
+

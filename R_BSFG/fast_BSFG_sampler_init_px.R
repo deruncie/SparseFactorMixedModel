@@ -27,6 +27,9 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
 #         B
 #         factor_h2s
 #         name
+#    adding parameter expansion for Lambda 
+#       - an additional coefficient px_factor for each column that is redundant (non-identified), and not used for inference but to improve mixing
+
 
 # ----------------------- #
 # ------read data-------- #
@@ -213,6 +216,12 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     #       sd = sqrt(1/fixed_effects_prec)
     B = matrix(rnorm(b*p),nr = b, nc = p)
 
+    # Parameter expansion coefficients
+     # Prior: Normal distribution for each element
+    px_factor = rgamma(k,shape = priors$px_shape,rate = priors$px_rate)
+    F_px = t(apply(F,1,'*',sqrt(px_factor)))
+
+
     
 # ----------------------- #
 # -Initialize Posterior-- #
@@ -247,7 +256,9 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     		F             = F,
     		E_a           = E_a,
     		B             = B,
-    		W             = W,
+            W             = W,
+            px_factor     = px_factor,
+            F_px          = F_px,
     		nrun 		  = 0
     	)
 

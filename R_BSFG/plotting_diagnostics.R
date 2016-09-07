@@ -4,8 +4,13 @@ CovToCor = function(X){
     return(corX)
 }
 
-trace_plot = function(data,main = NULL){
-	plot(NA,NA,xlim = c(0,ncol(data)),ylim = range(data),main= main)
+trace_plot = function(data,main = NULL,ylim = NULL){
+    if(is.null(ylim)) {
+        range_y = range(data)
+        max_range = max(abs(range_y))
+        ylim = c(-max_range,max_range)
+    }
+	plot(NA,NA,xlim = c(0,ncol(data)),ylim = ylim,main= main)
 	for(i in 1:nrow(data)) lines(data[i,],col=i)
 }
 
@@ -13,7 +18,11 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
 
     devices = dev.list()
     while(length(devices) < 4){
-    	quartz()
+        if(.Platform$OS.type != "windows") {
+    	   quartz()
+        } else {
+            windows()
+        }
     	devices = dev.list()
     }
 
@@ -36,28 +45,28 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
     cors = abs(cor(Lambda,actual_E_Lambda))
     cors=rbind(cors,apply(cors,2,max))
     cors = cbind(cors,apply(cors,1,max))
-    image(cors[,ncol(cors):1],zlim=c(0,1))
+    image(cors[,ncol(cors):1],zlim=c(0,1),main = "cor of Lambda vs act_E_lambda")
 
-    image(CovToCor(G_est),zlim=c(-1,1))
-    image(CovToCor(E_est),zlim=c(-1,1))
-
+    image(CovToCor(G_est),zlim=c(-1,1),main = "G_est")
+    image(CovToCor(E_est),zlim=c(-1,1), main = "E_est")
+    
     clim=max(0.1,min(.75,max(max(abs(G_Lambda)))))
     clims=c(-clim,clim)
-    image(t(G_Lambda),zlim=clims)
-
-    image(t(actual_G_Lambda),zlim=clims)
-
+    image(t(G_Lambda),zlim=clims,main = "G_Lambda")
+    
+    image(t(actual_G_Lambda),zlim=clims,main = "act_G_Lambda")
+    
     clim=max(0.1,min(.75,max(max(abs(E_Lambda)))))
     clims=c(-clim,clim)
-    image(t(E_Lambda),zlim=clims)
-
-    plot(c(G_est),c(G_act));abline(0,1)
-
-    plot(c(E_est),c(E_act));abline(0,1)
-
-    plot(F_h2,type='l',ylim=c(0,1))
+    image(t(E_Lambda),zlim=clims,main = "E_lambda")
+    
+    plot(c(G_est),c(G_act),main = "G_est vs G_act");abline(0,1)
+    
+    plot(c(E_est),c(E_act),main = "E_est vs E_act");abline(0,1)
+    
+    plot(F_h2,type='l',ylim=c(0,1),main = "F_h2 vs E_h2")
     lines(E_h2,col=2)
-
+    
     if(sp_num>1){
 
     	dev.set(devices[2])
@@ -82,8 +91,8 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
             if(sum(h2s[!is.na(h2s)])==0) {
                 next
             }
-            plot(h2s,type='l')
-            hist(h2s,breaks=100,xlim=c(-0.1,1))
+            plot(h2s,type='l',main = "plot of h2s")
+            hist(h2s,breaks=100,xlim=c(-0.1,1),main = "histogram of h2s")
         }
 
         k = nrow(Posterior$Lambda)/p;
@@ -110,34 +119,38 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
         cors = abs(cor(G_Lambda,actual_E_Lambda))
     	cors=rbind(cors,apply(cors,2,max))
     	cors = cbind(cors,apply(cors,1,max))
-    	image(cors[,ncol(cors):1],zlim=c(0,1))
-
-    	image(CovToCor(G_est),zlim=c(-1,1))
-    	image(CovToCor(E_est),zlim=c(-1,1))
-
+    	image(cors[,ncol(cors):1],zlim=c(0,1),main = "cor of G_lambda vs act_E_lambda")
+    	
+    	image(CovToCor(G_est),zlim=c(-1,1),main = "G_est")
+    	image(CovToCor(E_est),zlim=c(-1,1),main = "E_est")
+    	
     	clim=max(0.1,min(.75,max(max(abs(G_Lambda)))))
     	clims=c(-clim,clim)
-    	image(t(G_Lambda),zlim=clims)
-
-    	image(t(actual_G_Lambda),zlim=clims)
-
-    	plot(c(G_est),c(G_act));abline(0,1)
-        plot(c(E_est),c(E_act));abline(0,1)
-
-        plot(diag(G_est)/(diag(G_est)+diag(E_est)),h2s_act,xlim=c(0,1),ylim=c(0,1))
-        abline(0,1)
-
+    	image(t(G_Lambda),zlim=clims,main = "G_lambda")
+    	
+    	image(t(actual_G_Lambda),zlim=clims,main = "act_G_lambda")
+    	
+    	plot(c(G_est),c(G_act),main = "G_est vs G_act");abline(0,1)
+    	plot(c(E_est),c(E_act),main = "E_est vs E_act");abline(0,1)
+    	
+    	plot(diag(G_est)/(diag(G_est)+diag(E_est)),h2s_act,xlim=c(0,1),ylim=c(0,1),main = "h2s_est vs h2s_act")
+    	abline(0,1)
+    	
     	F_h2 = rowMeans(Posterior$F_h2[,1:sp_num])
     	E_h2 = 1-F_h2
-    	plot(F_h2,type='l',ylim=c(0,1))
+    	plot(F_h2,type='l',ylim=c(0,1),main = "F_h2 vs E_h2")
     	lines(E_h2,col=2)
     }
 }
 
-draw_results_diagnostics = function(sp_num,params,Lambda, F_h2, Posterior){
+draw_results_diagnostics = function(sp_num,params,run_variables,Lambda, F_h2, Posterior,E_a_prec,resid_Y_prec){
     devices = dev.list()
     while(length(devices) < 4){
-        quartz()
+        if(.Platform$OS.type != "windows") {
+           quartz()
+        } else {
+            windows()
+        }
         devices = dev.list()
     }
 
@@ -154,14 +167,14 @@ draw_results_diagnostics = function(sp_num,params,Lambda, F_h2, Posterior){
     # plot 1: estimated number of important factors   
     factor_variances = diag(t(Lambda) %*% Lambda)
     factor_variances = sort(factor_variances,decreasing=T)
-    plot(cumsum(factor_variances)/sum(factor_variances),type='l')
-
+    plot(cumsum(factor_variances)/sum(factor_variances),type='l',main = "cumsum importance of factor")
+    
     # plots 2-3: visualize current genetic and residual correlation matrices
-    image(CovToCor(G_est),zlim=c(-1,1))
-    image(CovToCor(E_est),zlim=c(-1,1))
-
+    image(CovToCor(G_est),zlim=c(-1,1), main = "G_est")
+    image(CovToCor(E_est),zlim=c(-1,1),main = "E_est")
+    
     # plot 4: Factor heritablities
-    plot(F_h2,type='l',ylim=c(0,1))
+    plot(F_h2,type='l',ylim=c(0,1), main = "F_h2 vs E_h2")
     lines(E_h2,col=2)
   
     if(sp_num>1){
@@ -174,7 +187,7 @@ draw_results_diagnostics = function(sp_num,params,Lambda, F_h2, Posterior){
         for(k in 0:(min(2*f2_row,nrow(Posterior$Lambda)/p)-1)) {
             o = order(-abs(rowMeans(Posterior$Lambda[(1:p)+k*p,max(1,sp_num-100):sp_num])))
             traces = Posterior$Lambda[o[1:5]+k*p,1:sp_num]
-            trace_plot(traces)
+            trace_plot(traces,main = sprintf('l_%d,.',k))
             
         }
 
@@ -188,8 +201,8 @@ draw_results_diagnostics = function(sp_num,params,Lambda, F_h2, Posterior){
             if(sum(h2s[!is.na(h2s)])==0) {
                 next
             }
-            plot(h2s,type='l')
-            hist(h2s,breaks=100,xlim=c(-0.1,1))
+            plot(h2s,type='l', main = "plot of h2s")
+            hist(h2s,breaks=100,xlim=c(-0.1,1),main = "histogram of h2s")
         }
 
         k = nrow(Posterior$Lambda)/p;
@@ -217,18 +230,18 @@ draw_results_diagnostics = function(sp_num,params,Lambda, F_h2, Posterior){
         par(mfrow=c(2,2))
         #plot 1-2: visualize posterior mean genetic and residual correlation matrices
 
-        image(CovToCor(G_est),zlim=c(-1,1))
-        image(CovToCor(E_est),zlim=c(-1,1))
-
+        image(CovToCor(G_est),zlim=c(-1,1),main = "G_est")
+        image(CovToCor(E_est),zlim=c(-1,1),main = "E_est")
+        
         # plot 3: Lambda matrix
         clim=max(0.1,min(.75,max(max(abs(Lambda)))))
         clims=c(-clim,clim)
-        image(t(Lambda),zlim=clims)
-
+        image(t(Lambda),zlim=clims, main="transpose of lambda")
+        
         # plot 4: posterior mean factor heritabilities
         F_h2 = rowMeans(Posterior$F_h2[,1:sp_num])
         E_h2 = 1-F_h2
-        plot(F_h2,type='l',ylim=c(0,1))
+        plot(F_h2,type='l',ylim=c(0,1),main = "F_h2 vs E_h2")
         lines(E_h2,col=2)
     }
 }

@@ -298,7 +298,8 @@ sample_delta = function( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta
 }
 
 
-update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_W,Lambda_df,delta_2_shape,delta_2_rate,b0,b1,i,epsilon,prop ) {
+update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,px_factor,F_px,
+					Z_W,Lambda_df,delta_2_shape,delta_2_rate,px_shape,px_rate,b0,b1,i,epsilon,prop ) {
 # adapt the number of factors by dropping factors with only small loadings
 # if they exist, or adding new factors sampled from the prior if all factors
 # appear important. The rate of adaptation decreases through the chain,
@@ -329,6 +330,8 @@ update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_W,Lambda_df
 			F_h2[k] = runif(1)
 			F_a = cbind(F_a,rnorm(r,0,sqrt(F_h2[k])))
 			F = cbind(F,rnorm(n,Z_W %*% F_a[,k],sqrt(1-F_h2[k])))
+			px_factor[k] = rgamma(1,shape = px_shape,rate = px_rate);
+			F_px = cbind(F_px,F[,k] * sqrt(px_factor[k]))
 		} else if(num > 0) { # drop redundant columns
 			nonred = which(vec == 0) # non-redundant loadings columns
 			Lambda = Lambda[,nonred]
@@ -345,6 +348,8 @@ update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_W,Lambda_df
 			Plam = sweep(Lambda_prec,2,tauh,'*')
 			F_h2 = F_h2[nonred]
 			F_a = F_a[,nonred]
+			px_factor = px_factor[nonred]
+			F_px = F_px[,nonred]
 		}
 	}
 
@@ -357,7 +362,9 @@ update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_W,Lambda_df
 		Lambda_prec = Lambda_prec,
 		Plam        = Plam,
 		delta       = delta,
-		tauh         = tauh
+		tauh        = tauh,
+		px_factor   = px_factor,
+		F_px	    = F_px
 		))
 }
 
