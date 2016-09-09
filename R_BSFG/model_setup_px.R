@@ -12,7 +12,7 @@ sourceCpp(paste(model_path,'BSFG_functions_c.cpp',sep='/'))
 
 # set the directory to the location of the setup.RData or setup.mat file
 #setwd('Example_simulation')
-setwd('Sim_1')
+# setwd('Sim_1')
 
 # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that 
 # you can repeat the MCMC exactly
@@ -20,10 +20,10 @@ seed = sample(1:1e3,1)
 set.seed(seed)
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
-rep = 2
-folder = sprintf('R_rep_%d',rep)
-try(dir.create(folder))
-setwd(folder)
+# rep = 2
+# folder = sprintf('R_rep_%d',rep)
+# try(dir.create(folder))
+# setwd(folder)
 
 
 # initialize priors
@@ -31,7 +31,7 @@ run_parameters = list(
     b0           = 1,
     b1           = 0.0005,
     epsilon      = 1e-2,
-    prop         = 1.00,
+    prop         = 0.98,
     h2_divisions = 50,
     save_freq    = 100,
     burn = 100,
@@ -52,8 +52,8 @@ priors = list(
     delta_1_rate        =   1/20,
     delta_2_shape       =   3,
     delta_2_rate        =   1,
-    px_shape            =   1/2,
-    px_rate             =   1/2,
+    px_shape            =   5,
+    px_rate             =   4,
     h2_priors_factors   =   c(run_parameters$h2_divisions-1,rep(1,run_parameters$h2_divisions-1))/(2*(run_parameters$h2_divisions-1))
 )
 

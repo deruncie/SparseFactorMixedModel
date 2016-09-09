@@ -253,21 +253,22 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	    tau_e = 1.0 / (px_factor * (1.0 - F_h2))
 		F_px = sample_px_factors_scores_c( Y_tilde, Z_1,Lambda_px,resid_Y_prec,F_a_px,tau_e,px_factor )
 
-		# F = sweep(F_px,2,sqrt(px_factor),'/')
-
+	 # -----Calculate F and Lambda-------------------- #
+		Lambda = sweep(Lambda_px,2,sqrt(px_factor),'*')
+		F = sweep(F_px,2,sqrt(px_factor),'/')
+		
 	 # -----Sample px_factor ------------------ #
 		# depends on F_px, F_a_px
 		# F_temp = t(apply(F_px,1,'/',sqrt(px_factor)))
 		F_px_resid = F_px - Z_1 %*% F_a_px
-		# px_factor = 1/rgamma(k,shape = 1/2 + n/2, rate = 1/4 + 1/2*colSums(F_px_resid^2)/(1-F_h2))
-		px_factor = 1/rgamma(k,shape = px_shape + n/2, rate = px_rate + 1/2*colSums(F_px_resid^2)/(1-F_h2))
-
-
+		std_sumsq_F_px_resid = colSums(F_px_resid^2)/(1-F_h2)
+		std_sumsq_F_a_px = colSums(F_a_px^2)/F_h2
+		std_sumsq_F_a_px[F_h2 == 0] = 0
+		px_factor = 1/rgamma(k,shape = px_shape + (n+r)/2, rate = px_rate + 1/2*(std_sumsq_F_px_resid + std_sumsq_F_a_px))
+		
 	 # -----Sample Lambda_prec------------- #
-		Lambda = sweep(Lambda_px,2,sqrt(px_factor),'*')
-		Lambda2 = Lambda^2
-		# Lambda2 = Lambda_px^2
-		Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
+		Lambda_px2 = Lambda_px^2
+		Lambda_px_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda_px2,2,tauh,'*'))/2),nr = p,nc = k)
 		
 	 # -----Sample resid_Y_prec------------ #
 		Y_tilde = Y - X %*% B - F_px %*% t(Lambda_px) - Z_1 %*% E_a - Z_2 %*% W
@@ -284,31 +285,29 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 		}
 	 
 	 # -----Sample delta, update tauh------ #
-		delta = sample_delta( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2 )
+		delta = sample_delta( delta,tauh,Lambda_px_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda_px2)
 		tauh  = cumprod(delta)
 		
 	 # -----Update Plam-------------------- #
-		Plam = sweep(Lambda_prec,2,tauh,'*')
-		Plam = sweep(Plam,2,px_factor,'/')
-
-	 # -----Calculate F and Lambda-------------------- #
-		# Lambda = sweep(Lambda_px,2,sqrt(px_factor),'*')
-		F = sweep(F_px,2,sqrt(px_factor),'/')
+		Plam = sweep(Lambda_px_prec,2,tauh,'*')
 
 	 # -- adapt number of factors to samples ---#
-		adapt_result = update_k( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,px_factor,F_px,
-								Z_1,Lambda_df,delta_2_shape,delta_2_rate,px_shape,px_rate,b0,b1,i,epsilon,prop )
-		F           = adapt_result$F
-		Lambda      = adapt_result$Lambda
-		F_a         = adapt_result$F_a
-		F_h2        = adapt_result$F_h2
-		Lambda_prec = adapt_result$Lambda_prec
-		Plam        = adapt_result$Plam
-		delta       = adapt_result$delta
-		tauh        = adapt_result$tauh
-		px_factor   = adapt_result$px_factor
-		F_px 	    = adapt_result$F_px
-		k = ncol(F)
+		# only if still in burn-in
+		# if(i < burn) {
+			adapt_result = update_k( F,Lambda,F_a,F_h2,Lambda_px_prec,Plam,delta,tauh,px_factor,F_px,
+									Z_1,Lambda_df,delta_2_shape,delta_2_rate,px_shape,px_rate,b0,b1,i,epsilon,prop )
+			F           = adapt_result$F
+			Lambda      = adapt_result$Lambda
+			F_a         = adapt_result$F_a
+			F_h2        = adapt_result$F_h2
+			Lambda_px_prec = adapt_result$Lambda_prec
+			Plam        = adapt_result$Plam
+			delta       = adapt_result$delta
+			tauh        = adapt_result$tauh
+			px_factor   = adapt_result$px_factor
+			F_px 	    = adapt_result$F_px
+			k = ncol(F)
+		# }
 
 	 # -- save sampled values (after thinning) -- #
 		if( (i-burn) %% thin == 0 && i > burn) {

@@ -320,18 +320,22 @@ update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,px_factor,F_p
 
 
 	if(uu < prob && i>200){
-		if(i > 20 && num == 0 && all(lind < 0.995) && k < 2*p) { #add a column
+		if(i > 20 && num == 0 && all(lind < 0.995) && k < 2*p && k < 15) { #add a column
+		print(lind)
+		# print(c(num,length(vec)))
+
+# recover()
 			k=k+1
 			Lambda_prec = cbind(Lambda_prec,rgamma(p,shape = Lambda_df/2, rate = Lambda_df/2))
 			delta[k] = rgamma(1,shape = delta_2_shape,rate = delta_2_rate)
 			tauh = cumprod(delta)
-			Plam = sweep(Lambda_prec,2,tauh,'*')
-			Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
 			F_h2[k] = runif(1)
 			F_a = cbind(F_a,rnorm(r,0,sqrt(F_h2[k])))
 			F = cbind(F,rnorm(n,Z_W %*% F_a[,k],sqrt(1-F_h2[k])))
 			px_factor[k] = rgamma(1,shape = px_shape,rate = px_rate);
 			F_px = cbind(F_px,F[,k] * sqrt(px_factor[k]))
+			Plam = sweep(Lambda_prec,2,tauh*px_factor,'*')
+			Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
 		} else if(num > 0) { # drop redundant columns
 			nonred = which(vec == 0) # non-redundant loadings columns
 			Lambda = Lambda[,nonred]
@@ -345,11 +349,12 @@ update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,px_factor,F_p
 			}
 			delta = delta[nonred]
 			tauh = cumprod(delta)
-			Plam = sweep(Lambda_prec,2,tauh,'*')
+			# Plam = sweep(Lambda_prec,2,tauh,'*')
 			F_h2 = F_h2[nonred]
 			F_a = F_a[,nonred]
 			px_factor = px_factor[nonred]
 			F_px = F_px[,nonred]
+			Plam = sweep(Lambda_prec,2,tauh*px_factor,'*')
 		}
 	}
 

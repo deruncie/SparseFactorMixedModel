@@ -12,7 +12,7 @@ sourceCpp(paste(model_path,'BSFG_functions_c.cpp',sep='/'))
 
 # set the directory to the location of the setup.RData or setup.mat file
 #setwd('Example_simulation')
-setwd('Sim_1')
+# setwd('Sim_1')
 
 # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that 
 # you can repeat the MCMC exactly
