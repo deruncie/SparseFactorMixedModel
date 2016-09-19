@@ -205,7 +205,10 @@ fast_BSFG_sampler_current = function(BSFG_state,n_samples) {
     Y_tilde = as.matrix(Y_tilde)
     # location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
     location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
-    B   = location_sample[1:b,]
+      B   = location_sample[1:b,]
+      if(length(B)==p){
+        B = matrix(0,nr=0,nc=p)
+      }
     E_a = location_sample[b+(1:r),]
     
     # -----Sample W ---------------------- #
@@ -217,7 +220,7 @@ fast_BSFG_sampler_current = function(BSFG_state,n_samples) {
       location_sample = sample_means_c( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
       W = location_sample
     }
-    
+   
     # -----Sample F_h2-------------------- #
     #conditioning on F, marginalizing over F_a
     # F_h2 = sample_h2s_discrete(F,h2_divisions,h2_priors_factors,invert_aI_bZAZ)
@@ -242,7 +245,7 @@ fast_BSFG_sampler_current = function(BSFG_state,n_samples) {
     # -----Sample resid_Y_prec------------ #
     Y_tilde = Y - X %*% B - F %*% t(Lambda) - Z_1 %*% E_a - Z_2 %*% W
     resid_Y_prec = rgamma(p,shape = resid_Y_prec_shape + n/2, rate = resid_Y_prec_rate+1/2*colSums(Y_tilde^2)) #model residual precision
-    
+   
     
     # -----Sample E_a_prec---------------- #
     #     #random effect 1 (D) residual precision
@@ -259,7 +262,7 @@ fast_BSFG_sampler_current = function(BSFG_state,n_samples) {
     
     # -----Update Plam-------------------- #
     Plam = sweep(Lambda_prec,2,tauh,'*')
-    
+ 
     # -- adapt number of factors to samples ---#
     adapt_result = update_k( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_1,Lambda_df,delta_2_shape,delta_2_rate,b0,b1,i,epsilon,prop )
     F           = adapt_result$F
@@ -278,10 +281,16 @@ fast_BSFG_sampler_current = function(BSFG_state,n_samples) {
       sp_num = (i-burn)/thin
       
       Posterior = save_posterior_samples( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec)
+    
+    # reorder elements in Lambda
+      Lambda_pos = Posterior$Lambda
+      Lam_rowmean = rowMeans(Lambda_pos)
+      Lambda_hat = matrix(Lam_rowmean,nr=p)
       
+ 
       if(sp_num %% save_freq == 0) save(Posterior,file='Posterior.RData')
     }
-    
+     
     
     # -- provide run diagnostics and plots -- #
    # if(i %% draw_iter  == 0) {
