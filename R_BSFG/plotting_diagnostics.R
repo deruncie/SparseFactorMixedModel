@@ -234,7 +234,7 @@ draw_results_diagnostics = function(sp_num,params,run_variables,Lambda, F_h2, Po
             E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag(1/Posterior$resid_Y_prec[,j])
             E_est = E_est + E_Lj/sp_num;
             Lambda_est = Lambda_est + matrix(Posterior$Lambda[,j],p,k)/sp_num;
-            traces_E[,j] = lowerTriangle(E_est,diag = TRUE)
+            traces_E[,j] = lowerTriangle(E_Lj,diag = TRUE)
         }
         G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
         #dev.off()
