@@ -31,8 +31,8 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
 # ----------------------- #
 # ------read data-------- #
 # ----------------------- #
-    if(file.exists('../setup_LineCode1.RData')) {
-        load('../setup_LineCode1.RData')
+    if(file.exists('../setup.RData')) {
+        load('../setup.RData')
     }
  # else{
         #require(R.matlab)
@@ -83,8 +83,9 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     
     #determine if a design matrix (X) exists (is loaded from setup.mat). If
     #not, make a dummy X-matrix with no columns.
-    if(! 'X' %in% ls()) {
+    if(is.null(X)) {
         X=matrix(0,nr = n,nc = 0)
+        B=matrix(0,nr = 0,nc = p)
     }
     if(nrow(X) == 1) X = t(X)       # because I used to give X transposed
     stopifnot(nrow(X) == n)
