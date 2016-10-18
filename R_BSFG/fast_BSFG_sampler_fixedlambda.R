@@ -1,4 +1,4 @@
-fast_BSFG_sampler_fixedlambda = function(BSFG_state) {
+fast_BSFG_sampler_fixedlambda = function(BSFG_state,YNew,YOld) {
   # -- Daniel Runcie -- #
   #
   # Gibbs sampler for genetic covariance estimation based on mixed effects
@@ -61,8 +61,7 @@ fast_BSFG_sampler_fixedlambda = function(BSFG_state) {
     run_parameters = BSFG_state$run_parameters
     run_variables  = BSFG_state$run_variables
     traitnames     = BSFG_state$traitnames
-    B              = BSFG_state$B
-    X              = BSFG_state$data_matrices$X
+   
     
     # ----------------------------------------------- #
     # ----------------Load data matrices------------- #
@@ -71,6 +70,7 @@ fast_BSFG_sampler_fixedlambda = function(BSFG_state) {
     Y  			    = data_matrices$Y
     Z_1     	  = data_matrices$Z_1
     Z_2     	  = data_matrices$Z_2
+    X       	  = data_matrices$X
     Y_missing 	= data_matrices$Y_missing
     
     
@@ -104,6 +104,7 @@ fast_BSFG_sampler_fixedlambda = function(BSFG_state) {
     W_prec       =   current_state$W_prec
     F_h2         =   current_state$F_h2
     F_a          =   current_state$F_a
+    B            =   current_state$B
     start_i      =   current_state$nrun
     
     
@@ -178,10 +179,14 @@ fast_BSFG_sampler_fixedlambda = function(BSFG_state) {
     #conditioning on W, F, Lambda
     Y_tilde = Y - F %*% t(Lambda) - Z_2 %*% W - X %*% B
     Y_tilde = as.matrix(Y_tilde)
-    # location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
+   # location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
     location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
-    #B   = location_sample[1:b,]
-    E_a = location_sample
+    B   = location_sample[1:b,]
+    if(length(B)==p){
+      B = matrix(0,nr=0,nc=p)
+    }
+    E_a = location_sample[b+(1:r),]
+    
     
     # -----Sample W ---------------------- #
     #conditioning on B, E_a, F, Lambda
@@ -257,7 +262,7 @@ fast_BSFG_sampler_fixedlambda = function(BSFG_state) {
       RNGkind = RNGkind()
     )
     
-    save(BSFG_state,file ='BSFG_fixedlambda.RData')
+    save(BSFG_state,file =paste0('BSFG_fixedlambda',substr(YNew,6,6),substr(YOld,6,6),".RData"))
   }  
   return(BSFG_state)
 }

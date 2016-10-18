@@ -46,6 +46,7 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
   A       = setup$A	
   n       = setup$n	
   r       = setup$r	
+  B       = setup$B_act
   traitnames = setup$traitnames
   
   #Determine if 'setup.mat' contains output of a simulation, based on if
@@ -120,8 +121,8 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
   # Factors:
   #  initial number of factors
   # Lambda is fixed which means k is also fixed
-  if (file.exists("./BSFG_state.RData")){
-    load("./BSFG_state.Rdata")
+  if (file.exists("BSFG_state.RData")){
+    load("BSFG_state.RData")
   }else{
     print("file BSFG_state.RData does not exist")
   }
@@ -131,7 +132,8 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
   
   
    Lambda = BSFG_state$Posterior$Lambda
-   B      = BSFG_state$Posterior$B
+   #B should also be random(not fixed)
+   #B      = BSFG_state$Posterior$B
    
   
   # g-vector of specific precisions of genetic effects. 
@@ -184,7 +186,7 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
   #  Prior: Normal distribution for each element
   #       mean = 0
   #       sd = sqrt(1/fixed_effects_prec)
-  #B = matrix(rnorm(b*p),nr = b, nc = p)
+  B = matrix(rnorm(b*p),nr = b, nc = p)
   
   
   # ----------------------- #
@@ -199,6 +201,7 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
     E_a_prec      = matrix(0,nr = p,nc = 0),
     W_prec        = matrix(0,nr = p,nc = 0),
     W             = matrix(0,nr = r2,nc = p),
+    B             = matrix(0,nr = b,nc = p),
     E_a           = matrix(0,nr = r,nc = p)
   )
   # ----------------------- #
@@ -211,6 +214,7 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
     W_prec        = W_prec,
     F_a           = F_a,
     F             = F,
+    B             = B,
     E_a           = E_a,
     W             = W,
     nrun 		  = 0
@@ -296,6 +300,7 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
     n       = n,
     r       = r,
     r2      = r2,
+    b       = b,
     Mean_Y  = Mean_Y,
     VY      = VY,
     Ainv    = Ainv,
@@ -321,7 +326,6 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
     simulation     = simulation,
     RNG            = RNG,
     traitnames     = traitnames,
-    Lambda         = Lambda,
-    B              = B
+    Lambda         = Lambda
   ))
 }
