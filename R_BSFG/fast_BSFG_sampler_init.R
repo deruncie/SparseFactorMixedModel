@@ -31,23 +31,24 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
 # ----------------------- #
 # ------read data-------- #
 # ----------------------- #
-    if(file.exists('../setup.RData')) {
-        load('../setup.RData')
-    } else{
-        require(R.matlab)
-        setup = readMat('../setup.mat')
-        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
+    if(file.exists('../setup_LineCode1.RData')) {
+        load('../setup_LineCode1.RData')
     }
+ # else{
+        #require(R.matlab)
+        #setup = readMat('../setup.mat')
+        #for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
+    #}
 	Y       = setup$Y
-	Y       = as.matrix(Y)
 	U_act   = setup$U_act
 	E_act   = setup$E_act
-	B_act   = setup$B_act
+	B       = setup$B_act   #Is B = B_act? There is no use of B_act in this code.
 	Z_1     = setup$Z_1
 	A       = setup$A	
 	X       = setup$X	
 	n       = setup$n	
 	r       = setup$r	
+	traitnames = setup$traitnames
 
     #Determine if 'setup.mat' contains output of a simulation, based on if
     #known factor loadings are included. Affects plotting functions
@@ -355,6 +356,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
 			current_state  = current_state,
 			Posterior      = Posterior,
 			simulation     = simulation,
-			RNG            = RNG
+			RNG            = RNG,
+			traitnames     = traitnames
  		))
 }
