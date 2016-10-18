@@ -1,13 +1,23 @@
-library(R.matlab)
+#library(R.matlab)
 
 require(pracma)
 
-#change
-cholcov = function(X){
+
+#cholcov = function(X){
 	# calculates a matrix U such that t(U) %*% U == X for X that is not PD
-	E = svd(X)
-	U = E$u %*% diag(sqrt(E$d))
-	return(t(U))
+#	E = svd(X)
+#	cols = E$d > 1e-14
+#	U = E$u[,cols] %*% diag(sqrt(E$d[cols]))
+#	return(t(U))
+#}
+
+
+cholcov = function(X){
+  # calculates a matrix U such that t(U) %*% U == X for X that is not PD
+  E = svd(X)
+ # cols = E$d > 1e-14
+  U = E$u %*% diag(sqrt(E$d))
+  return(t(U))
 }
 
 sample_Lambda = function( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ ) {
@@ -368,8 +378,8 @@ save_posterior_samples = function( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F
 	# should be correctly calculated over several re-starts of the sampler.
 
 	sp = ncol(Posterior$Lambda)
-	size(Posterior$Lambda,2)
-
+	#size(Posterior$Lambda,2)
+  ncol(Posterior$Lambda)
 	#save factor samples
 	if(length(Lambda) > nrow(Posterior$Lambda)){
 		# expand factor sample matrix if necessary
@@ -395,6 +405,37 @@ save_posterior_samples = function( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F
 	Posterior$W   = (Posterior$W*(sp_num-1) + W)/sp_num
 
 	return(Posterior)
+}
+                                               
+save_posterior_samples_fixedlambda = function( j,Posterior,F,F_a,B,W,E_a,F_h2,resid_Y_prec,E_a_prec,W_prec) {
+  # save posteriors. Full traces are kept of the more interesting parameters.
+  # Only the posterior means are kept of less interesting parameters. These
+  # should be correctly calculated over several re-starts of the sampler.
+  
+  sp = ncol(Posterior$F)
+  #size(Posterior$Lambda,2)
+  ncol(Posterior$F)
+  #save factor samples
+  if(length(F) > nrow(Posterior$F)){
+    # expand factor sample matrix if necessary
+    Posterior$F      = rbind(Posterior$F, 	   	matrix(0,nr = length(F)     -nrow(Posterior$F),		nc = sp))
+    Posterior$F_a    = rbind(Posterior$F_a, 	matrix(0,nr = length(F_a) 	-nrow(Posterior$F_a),	nc = sp))
+    Posterior$F_h2   = rbind(Posterior$F_h2, 	matrix(0,nr = length(F_h2) 	-nrow(Posterior$F_h2),	nc = sp))
+  }
+  Posterior$F[1:length(F),j]     = c(F)
+  Posterior$F_a[1:length(F_a),j] = c(F_a)
+  Posterior$F_h2[1:length(F_h2),j] = F_h2
+  
+  Posterior$resid_Y_prec[,j] = resid_Y_prec
+  Posterior$E_a_prec[,j]     = E_a_prec
+  Posterior$W_prec[,j]       = W_prec
+  
+  # save B,U,W
+
+  Posterior$E_a = (Posterior$E_a*(j-1) + E_a)/j
+  Posterior$W   = (Posterior$W*(j-1) + W)/j
+  
+  return(Posterior)
 }
 
 
@@ -431,4 +472,98 @@ clear_Posterior = function(BSFG_state) {
     BSFG_state$run_parameters = run_parameters
     return(BSFG_state)
 
+}
+
+G_Matrix_Comp = function(BSFG_state){
+  Posterior      = BSFG_state$Posterior
+  traitnames     = BSFG_state$traitnames
+  run_variables  = BSFG_state$run_variables
+  sp_num = ncol(Posterior$Lambda) 
+  n = run_variables$n
+  p = run_variables$p
+  k1 = nrow(Posterior$F_a)/n;
+  k2 = nrow(Posterior$Lambda)/p;
+  if (k2 >= k1){
+    k = k1
+  }else{
+    k=k2
+  }
+  h2s = Posterior$F_h2[,1:sp_num]
+  #G_Lambdas = array(0,dim = dim(Posterior$Lambda))
+  #Lambda_est = matrix(0,p,k)
+  G_est = E_est = matrix(0,p,p)
+  #traces_G = matrix(,p*(p+1)/2,sp_num)
+  #traces_G_cor = matrix(,p*(p+1)/2,sp_num)
+  #traces_E = matrix(,p*(p+1)/2,sp_num)
+  GMatrix = NULL
+  for(j in 1:sp_num) {
+    Lj = matrix(Posterior$Lambda[,j],p,k)
+    h2j = Posterior$F_h2[,j]
+    G_Lj = Lj %*%  diag(sqrt(h2j))
+    #G_Lambdas[,j] = c(G_Lj)
+    Gj = G_Lj %*%  t(G_Lj) + diag(1/Posterior$E_a_prec[,j])
+    rownames(Gj) = traitnames
+    #posterior mean
+    GMatrix[[j]] = Gj
+    G_est = G_est + Gj/sp_num
+    #library(gdata)
+    #traces_G[,j] = lowerTriangle(Gj,diag = TRUE)
+    #traces_G_cor[,j] = lowerTriangle(CovToCor(Gj),diag = TRUE)
+    
+    #E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag(1/Posterior$resid_Y_prec[,j])
+    #E_est = E_est + E_Lj/sp_num;
+    #posterior mean for lambda
+    #Lambda_est = Lambda_est + matrix(Posterior$Lambda[,j],p,k)/sp_num;
+    #traces_E[,j] = lowerTriangle(E_Lj,diag = TRUE)
+  }
+  #G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
+  return(GMatrix)
+}
+
+G_Traces_Comp = function(BSFG_state){
+  Posterior      = BSFG_state$Posterior
+  traitnames     = BSFG_state$traitnames
+  run_variables  = BSFG_state$run_variables
+  n = run_variables$n
+  sp_num = ncol(Posterior$F_a) 
+  p = run_variables$p
+  # the number of latent traits may be different for different model. If we fixed lambda
+  # need to cut the redudant latent traits or add some latent traits
+  k1 = nrow(Posterior$F_a)/n;
+  k2 = nrow(Posterior$Lambda)/p;
+  if (k2 >= k1){
+    k = k1
+  }else{
+    k=k2
+  }
+  h2s = Posterior$F_h2[,1:sp_num]
+  #G_Lambdas = array(0,dim = dim(Posterior$Lambda))
+  Lambda_est = matrix(0,p,k)
+  G_est = E_est = matrix(0,p,p)
+  traces_G = matrix(,p*(p+1)/2,sp_num)
+  #traces_G_cor = matrix(,p*(p+1)/2,sp_num)
+  #traces_E = matrix(,p*(p+1)/2,sp_num)
+  GMatrix = NULL
+  for(j in 1:sp_num) {
+    Lj = matrix(Posterior$Lambda[p*k,j],p,k)
+    h2j = Posterior$F_h2[,j]
+    G_Lj = Lj %*%  diag(sqrt(h2j))
+    #G_Lambdas[,j] = c(G_Lj)
+    Gj = G_Lj %*%  t(G_Lj) + diag(1/Posterior$E_a_prec[,j])
+    rownames(Gj) = traitnames
+    #posterior mean
+    GMatrix[[j]] = Gj
+    #G_est = G_est + Gj/sp_num
+    library(gdata)
+    traces_G[,j] = lowerTriangle(Gj,diag = TRUE)
+    #traces_G_cor[,j] = lowerTriangle(CovToCor(Gj),diag = TRUE)
+    
+    #E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag(1/Posterior$resid_Y_prec[,j])
+    #E_est = E_est + E_Lj/sp_num;
+    #posterior mean for lambda
+    #Lambda_est = Lambda_est + matrix(Posterior$Lambda[,j],p,k)/sp_num;
+    #traces_E[,j] = lowerTriangle(E_Lj,diag = TRUE)
+  }
+  #G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
+  return(traces_G)
 }
