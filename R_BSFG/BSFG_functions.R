@@ -430,7 +430,7 @@ save_posterior_samples_fixedlambda = function( j,Posterior,F,F_a,B,W,E_a,F_h2,re
   Posterior$E_a_prec[,j]     = E_a_prec
   Posterior$W_prec[,j]       = W_prec
   
-  # save B,U,W
+  # save U,W
 
   Posterior$E_a = (Posterior$E_a*(j-1) + E_a)/j
   Posterior$W   = (Posterior$W*(j-1) + W)/j
