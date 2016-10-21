@@ -71,7 +71,7 @@ fast_BSFG_sampler_init_fixedlambda = function(priors,run_parameters,YNew,YOld){
     load(paste0("../",YOld))
     Y_old = setup$Y
 
-    Mean_Y  = colMeans(Y_old,na.rm=T)
+    Mean_Y  = colMeans(Y,na.rm=T) # subtract the mean of newY if we only care about the variance of F_a
     VY      = apply(Y_old,2,var,na.rm=T)
  
   
