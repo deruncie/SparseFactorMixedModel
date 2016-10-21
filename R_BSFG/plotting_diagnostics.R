@@ -238,7 +238,7 @@ draw_results_diagnostics = function(sp_num,params,run_variables,Lambda, F_h2, Po
         }
         G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
         #dev.off()
-
+        save(G_est,file = "G_est.RData")
         # Figure of posterior mean estimates
         #dev.set(devices[4])
         #pdf('Figure of posterior mean estimates.pdf')
@@ -379,4 +379,5 @@ ComparingGMatrix_plot = function(target){
     dev.off()
   }
 }
+
 
