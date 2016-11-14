@@ -264,7 +264,7 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 		std_sumsq_F_px_resid = colSums(F_px_resid^2)/(1-F_h2)
 		std_sumsq_F_a_px = colSums(F_a_px^2)/F_h2
 		std_sumsq_F_a_px[F_h2 == 0] = 0
-		px_factor = 1/rgamma(k,shape = px_shape + (n+r)/2, rate = px_rate + 1/2*(std_sumsq_F_px_resid + std_sumsq_F_a_px))
+		px_factor = 1/rgamma(k,shape = px_shape + (n+r*(F_h2 != 0))/2, rate = px_rate + 1/2*(std_sumsq_F_px_resid + std_sumsq_F_a_px))
 		
 	 # -----Sample Lambda_prec------------- #
 		Lambda_px2 = Lambda_px^2
