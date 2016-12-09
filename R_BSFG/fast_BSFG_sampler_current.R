@@ -185,7 +185,7 @@ fast_BSFG_sampler_current = function(BSFG_state,n_samples) {
     # recover()
     
     # -----Sample Lambda------------------ #
-    #conditioning on W, B, F, marginalizing over E_a
+    #conditioning on W, B, F, marginalizing over E _a
     Y_tilde = Y - X %*% B - Z_2 %*% W
     Y_tilde = as.matrix(Y_tilde)
     # Lambda = sample_Lambda( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
@@ -201,15 +201,17 @@ fast_BSFG_sampler_current = function(BSFG_state,n_samples) {
     
     # -----Sample B and E_a--------------- #
     #conditioning on W, F, Lambda
-    Y_tilde = Y - F %*% t(Lambda) - Z_2 %*% W
-    Y_tilde = as.matrix(Y_tilde)
-    # location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
-    location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
-      B   = location_sample[1:b,]
-      if(length(B)==p){
-        B = matrix(0,nr=0,nc=p)
-      }
-    E_a = location_sample[b+(1:r),]
+    for£¨pop in pops){
+      Y_tilde = Y - F %*% t(Lambda) - Z_2 %*% W
+      Y_tilde = as.matrix(Y_tilde)
+      # location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
+      location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
+        B   = location_sample[1:b,]
+        if(length(B)==p){
+          B = matrix(0,nr=0,nc=p)
+        }
+      E_a = location_sample[b+(1:r),]
+    }
     
     # -----Sample W ---------------------- #
     #conditioning on B, E_a, F, Lambda

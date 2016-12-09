@@ -43,9 +43,14 @@ sample_Lambda = function( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
 	Lambda = matrix(0,nr = p,nc = k)
 
 	for(j in 1:p) {
-		FUDi = E_a_prec[j] * sweep(FtU,2,(s + E_a_prec[j]/resid_Y_prec[j]),'/')
-		means = FUDi %*% UtY[,j]
-		Qlam = FUDi %*% t(FtU) + diag(Plam[j,])
+	  means = c()
+	  Qlam = c()
+	  for(pop in pops){
+		  FUDi = E_a_prec[[pop]][j] * sweep(FtU[[pop]],2,(s[[pop]] + E_a_prec[[pop]][j]/resid_Y_prec[j]),'/')
+		  means = means + FUDi %*% UtY[[pop]][,j]
+		  Qlam = Qlam + FUDi %*% t(FtU[[pop]]) 
+		}
+	  Qlam = Qlam + diag(Plam[j,])
 
 		# recover()
 		Llam = t(chol(Qlam))
@@ -336,10 +341,12 @@ update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_W,Lambda_df
 			tauh = cumprod(delta)
 			Plam = sweep(Lambda_prec,2,tauh,'*')
 			Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
+			
 			F_h2[k] = runif(1)
 			F_a = cbind(F_a,rnorm(r,0,sqrt(F_h2[k])))
 			F = cbind(F,rnorm(n,Z_W %*% F_a[,k],sqrt(1-F_h2[k])))
-		} else if(num > 0) { # drop redundant columns
+		
+			} else if(num > 0) { # drop redundant columns
 			nonred = which(vec == 0) # non-redundant loadings columns
 			Lambda = Lambda[,nonred]
 			Lambda_prec = Lambda_prec[,nonred]
