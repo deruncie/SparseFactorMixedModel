@@ -308,102 +308,110 @@ sample_delta = function( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta
 }
 
 
-update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_W,Lambda_df,delta_2_shape,delta_2_rate,b0,b1,i,epsilon,prop ) {
+update_k = function( current_state, priors,run_parameters,data_matrices) {
 # adapt the number of factors by dropping factors with only small loadings
 # if they exist, or adding new factors sampled from the prior if all factors
 # appear important. The rate of adaptation decreases through the chain,
 # controlled by b0 and b1. Should work correctly over continuations of
 # previously stopped chains.
 
-	n = nrow(F)
-	k = ncol(F)
-	r = nrow(F_a)
-	p = nrow(Lambda)
-	gene_rows = 1:p
+	current_state_members = names(current_state)
+	current_state = with(c(priors,run_parameters,data_matrices),within(current_state, {
+		i = nrun
+		n = nrow(F)
+		k = ncol(F)
+		r = nrow(F_a)
+		p = nrow(Lambda)
+		gene_rows = 1:p
 
-	prob = 1/exp(b0 + b1*i)                # probability of adapting
-	uu = runif(1)
-	lind = colMeans(abs(Lambda) < epsilon)    # proportion of elements in each column less than eps in magnitude
-	vec = lind >= prop
-	num = sum(vec)       # number of redundant columns
+		prob = 1/exp(b0 + b1*i)                # probability of adapting
+		uu = runif(1)
+		lind = colMeans(abs(Lambda) < epsilon)    # proportion of elements in each column less than eps in magnitude
+		vec = lind >= prop
+		num = sum(vec)       # number of redundant columns
 
-
-	if(uu < prob && i>200){
-		if(i > 20 && num == 0 && all(lind < 0.995) && k < 2*p) { #add a column
-			k=k+1
-			Lambda_prec = cbind(Lambda_prec,rgamma(p,shape = Lambda_df/2, rate = Lambda_df/2))
-			delta[k] = rgamma(1,shape = delta_2_shape,rate = delta_2_rate)
-			tauh = cumprod(delta)
-			Plam = sweep(Lambda_prec,2,tauh,'*')
-			Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
-			F_h2[k] = runif(1)
-			F_a = cbind(F_a,rnorm(r,0,sqrt(F_h2[k])))
-			F = cbind(F,rnorm(n,Z_W %*% F_a[,k],sqrt(1-F_h2[k])))
-		} else if(num > 0) { # drop redundant columns
-			nonred = which(vec == 0) # non-redundant loadings columns
-			Lambda = Lambda[,nonred]
-			Lambda_prec = Lambda_prec[,nonred]
-			F = F[,nonred]
-			for(red in which(vec == 1)){
-				if(red == k) next
-				# combine deltas so that the shrinkage of kept columns doesnt
-				# decrease after dropping redundant columns
-				delta[red+1] = delta[red+1]*delta[red]
+		if(uu < prob && i>200){
+			if(i > 20 && num == 0 && all(lind < 0.995) && k < 2*p) { #add a column
+				k=k+1
+				Lambda_prec = cbind(Lambda_prec,rgamma(p,shape = Lambda_df/2, rate = Lambda_df/2))
+				delta[k] = rgamma(1,shape = delta_2_shape,rate = delta_2_rate)
+				tauh = cumprod(delta)
+				Plam = sweep(Lambda_prec,2,tauh,'*')
+				Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
+				if(exists('F_a_prec')){
+					F_a_prec[i] = rgamma(1, shape = F_a_prec_shape, rate = F_a_prec_rate)
+					F_e_prec[i] = rgamma(1, shape = F_e_prec_shape, rate = F_e_prec_rate)
+					F_h2 = F_e_prec / (F_e_prec + F_a_prec)
+				} else{
+					F_h2[k] = runif(1)
+				}
+				F_a = cbind(F_a,rnorm(r,0,sqrt(F_h2[k])))
+				F = cbind(F,rnorm(n,Z_1 %*% F_a[,k],sqrt(1-F_h2[k])))
+			} else if(num > 0) { # drop redundant columns
+				nonred = which(vec == 0) # non-redundant loadings columns
+				k = length(nonred)
+				Lambda = Lambda[,nonred]
+				Lambda_prec = Lambda_prec[,nonred]
+				F = F[,nonred]
+				for(red in which(vec == 1)){
+					if(red == k) next
+					# combine deltas so that the shrinkage of kept columns doesnt
+					# decrease after dropping redundant columns
+					delta[red+1] = delta[red+1]*delta[red]
+				}
+				delta = delta[nonred]
+				tauh = cumprod(delta)
+				Plam = sweep(Lambda_prec,2,tauh,'*')
+				if(exists('F_a_prec')){
+					F_a_prec = F_a_prec[nonred]
+					F_e_prec = F_e_prec[nonred]
+					F_h2 = F_e_prec / (F_e_prec + F_a_prec)
+				} else {
+					F_h2 = F_h2[nonred]
+				}
+				F_a = F_a[,nonred]
 			}
-			delta = delta[nonred]
-			tauh = cumprod(delta)
-			Plam = sweep(Lambda_prec,2,tauh,'*')
-			F_h2 = F_h2[nonred]
-			F_a = F_a[,nonred]
 		}
-	}
+	}))
+	current_state = current_state[current_state_members]
 
-
-	return(list(
-		F           = F,
-		Lambda      = Lambda,
-		F_a         = F_a,
-		F_h2        = F_h2,
-		Lambda_prec = Lambda_prec,
-		Plam        = Plam,
-		delta       = delta,
-		tauh         = tauh
-		))
+	return(current_state)
 }
 
 
-save_posterior_samples = function( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec) {
+save_posterior_samples = function( sp_num, current_state, Posterior) {
+	# Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec) {
 	# save posteriors. Full traces are kept of the more interesting parameters.
 	# Only the posterior means are kept of less interesting parameters. These
 	# should be correctly calculated over several re-starts of the sampler.
 
-	sp = ncol(Posterior$Lambda)
-	#size(Posterior$Lambda,2)
-  ncol(Posterior$Lambda)
-	#save factor samples
-	if(length(Lambda) > nrow(Posterior$Lambda)){
-		# expand factor sample matrix if necessary
-		Posterior$Lambda = rbind(Posterior$Lambda, 	matrix(0,nr = length(Lambda)-nrow(Posterior$Lambda),nc = sp))
-		Posterior$F      = rbind(Posterior$F, 	   	matrix(0,nr = length(F)     -nrow(Posterior$F),		nc = sp))
-		Posterior$F_a    = rbind(Posterior$F_a, 	matrix(0,nr = length(F_a) 	-nrow(Posterior$F_a),	nc = sp))
-		Posterior$delta  = rbind(Posterior$delta, 	matrix(0,nr = length(delta) -nrow(Posterior$delta),	nc = sp))
-		Posterior$F_h2   = rbind(Posterior$F_h2, 	matrix(0,nr = length(F_h2) 	-nrow(Posterior$F_h2),	nc = sp))
-	}
-	Posterior$Lambda[1:length(Lambda),sp_num] = c(Lambda)
-	Posterior$F[1:length(F),sp_num]     = c(F)
-	Posterior$F_a[1:length(F_a),sp_num] = c(F_a)
-	Posterior$delta[1:length(delta),sp_num] = delta
-	Posterior$F_h2[1:length(F_h2),sp_num] = F_h2
+	Posterior = with(current_state, {
+		sp = ncol(Posterior$Lambda)
+		#save factor samples
+		if(length(Lambda) > nrow(Posterior$Lambda)){
+			# expand factor sample matrix if necessary
+			Posterior$Lambda = rbind(Posterior$Lambda, 	matrix(0,nr = length(Lambda)-nrow(Posterior$Lambda),nc = sp))
+			Posterior$F      = rbind(Posterior$F, 	   	matrix(0,nr = length(F)     -nrow(Posterior$F),		nc = sp))
+			Posterior$F_a    = rbind(Posterior$F_a, 	matrix(0,nr = length(F_a) 	-nrow(Posterior$F_a),	nc = sp))
+			Posterior$delta  = rbind(Posterior$delta, 	matrix(0,nr = length(delta) -nrow(Posterior$delta),	nc = sp))
+			Posterior$F_h2   = rbind(Posterior$F_h2, 	matrix(0,nr = length(F_h2) 	-nrow(Posterior$F_h2),	nc = sp))
+		}
+		Posterior$Lambda[1:length(Lambda),sp_num] = c(Lambda)
+		Posterior$F[1:length(F),sp_num]     = c(F)
+		Posterior$F_a[1:length(F_a),sp_num] = c(F_a)
+		Posterior$delta[1:length(delta),sp_num] = delta
+		Posterior$F_h2[1:length(F_h2),sp_num] = F_h2
 
-	Posterior$resid_Y_prec[,sp_num] = resid_Y_prec
-	Posterior$E_a_prec[,sp_num]     = E_a_prec
-	Posterior$W_prec[,sp_num]       = W_prec
+		Posterior$resid_Y_prec[,sp_num] = resid_Y_prec
+		Posterior$E_a_prec[,sp_num]     = E_a_prec
+		Posterior$W_prec[,sp_num]       = W_prec
 
-	# save B,U,W
-	Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
-	Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
-	Posterior$W   = (Posterior$W*(sp_num-1) + W)/sp_num
-
+		# save B,U,W
+		Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
+		Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
+		Posterior$W   = (Posterior$W*(sp_num-1) + W)/sp_num
+		Posterior
+	})
 	return(Posterior)
 }
                                                
