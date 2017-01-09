@@ -312,11 +312,11 @@ mat sample_F_a_c (mat F,
 	vec tau_u = 1/F_h2;
 	mat b = U.t() * Z_1.t() * sweep_times(F,2,tau_e);
 
-	// mat z = randn(r,k);
-	Environment stats("package:stats");
-	Function rnorm = stats["rnorm"];
-	vec z_v = as<vec>(rnorm(r*k));
-	mat z = reshape(z_v,r,k);
+	mat z = randn(r,k);
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
+	// vec z_v = as<vec>(rnorm(r*k));
+	// mat z = reshape(z_v,r,k);
 
 	mat F_a = zeros(r,k);
 

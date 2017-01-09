@@ -1,5 +1,5 @@
 
-fast_BSFG_sampler_init = function(priors,run_parameters){
+fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
 	# require(PEIP)
 	require(Matrix)
 
@@ -179,6 +179,10 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     E_a = matrix(rnorm(p*r,0,sqrt(1/E_a_prec)),nr = r,nc = p, byrow = T)
         
     # Latent factor variances
+    F_a_prec_shape = priors$F_a_prec_shape
+    F_a_prec_rate  = priors$F_a_prec_rate
+    F_e_prec_shape = priors$F_e_prec_shape
+    F_e_prec_rate  = priors$F_e_prec_rate
     F_a_prec = rgamma(k,shape = F_a_prec_shape,rate = F_a_prec_rate)
     F_e_prec = rgamma(k,shape = F_e_prec_shape,rate = F_e_prec_rate)
     F_h2 = F_e_prec / (F_e_prec + F_a_prec)
@@ -245,6 +249,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     		Lambda        = Lambda,
             F_a_prec      = F_a_prec,
             F_e_prec      = F_e_prec,
+            F_h2          = F_h2,
     		E_a_prec      = E_a_prec,
     		W_prec        = W_prec,
     		F_a           = F_a,

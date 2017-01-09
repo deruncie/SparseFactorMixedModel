@@ -140,7 +140,7 @@ mat sample_factors_scores_ipx_c(mat Y_tilde,
 							mat Lambda,
 							vec resid_Y_prec,
 							mat F_a,
-							vec F_e_prec,
+							vec F_e_prec
 							 ) {
 //Sample factor scores given factor loadings (F_a), factor residual variances (F_e_prec) and
 //phenotype residuals
@@ -193,9 +193,10 @@ mat sample_px_factors_scores_c(mat Y_tilde,
 }
 
 // [[Rcpp::export()]]
-vec sample_h2s_discrete_c (mat F,
+vec sample_h2s_discrete_ipx_c (mat F,
 						int h2_divisions,
 						vec h2_priors,
+						vec F_e_prec,
 						List invert_aI_bZAZ){
 	// sample factor heritibilties from a discrete set on [0,1)
 	// prior places 50% of the weight at h2=0
@@ -210,15 +211,15 @@ vec sample_h2s_discrete_c (mat F,
 	vec F_h2 = zeros(k);
 
 	mat log_ps = zeros(k,h2_divisions);
-	mat std_scores_b = F.t() * U;
+	mat std_scores_b = sweep_times(F.t() * U,1,sqrt(F_e_prec));
 
 	mat det_mat,std_scores;
 	mat det;
 	for(double i =0; i < h2_divisions; i+=1){
 		double h2 = (i)/(h2_divisions);
 		if(h2 > 0) {
-			std_scores = 1/sqrt(h2) * sweep_times(std_scores_b,2,1/sqrt(s+(1-h2)/h2));
-			det = sum(sum(log((s+(1-h2)/h2)*h2)/2)) * ones(1,k);
+			std_scores = sweep_times(std_scores_b,2,1/sqrt(h2/(1-h2)*s+1));
+			det = sum(sum(log((h2/(1-h2)*s+1))/2)) * ones(1,k);
 		} else {
 			std_scores = F.t();
 			det = zeros(1,k);
@@ -311,18 +312,22 @@ mat sample_F_a_ipx_c (mat F,
 	int r = Z_1.n_cols;
 	mat b = U.t() * Z_1.t() * sweep_times(F,2,F_e_prec);
 
-	// mat z = randn(r,k);
-	Environment stats("package:stats");
-	Function rnorm = stats["rnorm"];
-	vec z_v = as<vec>(rnorm(r*k));
-	mat z = reshape(z_v,r,k);
+	mat z = randn(r,k);
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
+	// vec z_v = as<vec>(rnorm(r*k));
+	// mat z = reshape(z_v,r,k);
 
 	mat F_a = zeros(r,k);
 
 	for(int j =0; j<k; j++) {
-		vec d = s2*F_a_prec(j) + s1*F_e_prec(j);
-		vec mlam = b.col(j) / d;
-		F_a.col(j) = U * (mlam + z.col(j)/sqrt(d));
+		if(F_a_prec(j) > 10000) {
+			F_a.col(j) = zeros(r);
+		} else {
+			vec d = s2*F_a_prec(j) + s1*F_e_prec(j);
+			vec mlam = b.col(j) / d;
+			F_a.col(j) = U * (mlam + z.col(j)/sqrt(d));
+		}
 	}
 
 	return(F_a);
