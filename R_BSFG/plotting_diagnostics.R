@@ -5,21 +5,25 @@ CovToCor = function(X){
 }
 
 trace_plot = function(data,main = NULL,ylim = NULL){
-<<<<<<< HEAD
     if(is.null(ylim)) {
         range_y = range(data)
         max_range = max(abs(range_y))
         ylim = c(-max_range,max_range)
     }
-	plot(NA,NA,xlim = c(0,ncol(data)),ylim = ylim,main= main)
-=======
-  if(is.null(ylim)) ylim = range(data)
   plot(NA,NA,xlim = c(0,ncol(data)),ylim = ylim,main= main,xlab = "iteration")
->>>>>>> 93dd71c365f1badb61ef919b4675340ec36ff04f
 	for(i in 1:nrow(data)) lines(data[i,],col=i)
 }
 
-draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Posterior,Lambda,F_h2,E_a_prec,resid_Y_prec){
+# draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Posterior,Lambda,F_h2,E_a_prec,resid_Y_prec){
+draw_simulation_diagnostics = function(BSFG_state){
+    sp_num = dim(BSFG_state$Posterior$Lambda)[2]
+    run_parameters = BSFG_state$run_parameters
+    run_variables = BSFG_state$run_variables
+    Posterior = BSFG_state$Posterior
+    Lambda = BSFG_state$current_state$Lambda
+    F_h2 = BSFG_state$current_state$F_h2
+    E_a_prec = BSFG_state$current_state$E_a_prec
+    resid_Y_prec = BSFG_state$current_state$resid_Y_prec
 
     devices = dev.list()
     while(length(devices) < 4){
@@ -82,7 +86,7 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
         for(k in 0:(min(2*f2_row,nrow(Posterior$Lambda)/p)-1)) {
             o = order(-abs(rowMeans(Posterior$Lambda[(1:p)+k*p,max(1,sp_num-100):sp_num])))
             traces = Posterior$Lambda[o[1:5]+k*p,1:sp_num]
-            trace_plot(traces)
+            trace_plot(traces,main = sprintf('l_%d,.',k),ylim = c(-1,1)*max(abs(traces)))
             
         }
 
@@ -148,16 +152,26 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
     }
 }
 
-draw_results_diagnostics = function(sp_num,params,run_variables,Lambda, F_h2, Posterior,E_a_prec,resid_Y_prec,traitnames){
-    # devices = dev.list()
-    # while(length(devices) < 7){
-    #     if(.Platform$OS.type != "windows") {
-    #        quartz()
-    #     } else {
-    #         windows()
-    #     }
-    #     devices = dev.list()
-    # }
+# draw_results_diagnostics = function(sp_num,params,run_variables,Lambda, F_h2, Posterior,E_a_prec,resid_Y_prec,traitnames){
+draw_results_diagnostics = function(BSFG_state){
+    sp_num = dim(BSFG_state$Posterior$Lambda)[2]
+    run_variables = BSFG_state$run_variables
+    Posterior = BSFG_state$Posterior
+    Lambda = BSFG_state$current_state$Lambda
+    F_h2 = BSFG_state$current_state$F_h2
+    E_a_prec = BSFG_state$current_state$E_a_prec
+    resid_Y_prec = BSFG_state$current_state$resid_Y_prec
+    traitnames = BSFG_state$traitnames
+    
+    devices = dev.list()
+    while(length(devices) < 7){
+        if(.Platform$OS.type != "windows") {
+           quartz()
+        } else {
+            windows()
+        }
+        devices = dev.list()
+    }
 
     p = run_variables$p
     E_h2 = 1-F_h2;
