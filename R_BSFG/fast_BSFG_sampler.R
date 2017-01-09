@@ -148,8 +148,6 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	save_freq    = run_parameters$save_freq
 	burn         = run_parameters$burn
 	thin         = run_parameters$thin
-	draw_iter    = run_parameters$draw_iter
-	simulation   = run_parameters$simulation
 
 
 	# ----------------------------------------------- #
@@ -277,36 +275,6 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 			
 			if(sp_num %% save_freq == 0) save(Posterior,file='Posterior.RData')
 		}
-
-
-	 # -- provide run diagnostics and plots -- #
-	   if(i %% draw_iter  == 0) {
-			# directory=strread(pwd,'#s','delimiter','/')
-			# disp(directory(end))
-			# disp(i)
-			# elapsed=toc
-			# #output some running statistics on the current factors and their genetic variances
-			# # each row represents a factor:
-			# #    delta[i], [i], F_h2[i], V_P(F_i), V_A(F_i)
-			# [delta,[1:size(F,2)]',F_h2,sum(F.^2)'./(size(F,1)-1),sum(F_a.^2)'./(size(F_a,1)-1)]
-			# disp(strcat('Time remaining:',num2str((nrun-i) * (elapsed/i) * 1/60)))
-
-			#make some plots of some running statistics
-			if(simulation) {
-			   gen_factor_Lambda    = run_parameters$gen_factor_Lambda
-			   error_factor_Lambda  = run_parameters$Lambda
-			   G_act                = run_parameters$G
-			   E_act                = run_parameters$R
-			   h2                   = run_parameters$h2
-			   draw_simulation_diagnostics(sp_num,run_parameters,run_variables,Posterior,Lambda,F_h2,E_a_prec,resid_Y_prec)
-			   # optional to also draw diagnostics for fixed effects. 10: fixed
-			   # effects on factors 11: fixed effects on genes.
-	#            figure(10)plot(X_f*current_state$F_b*current_state$Lambda',X_f*run_parameters$B_f*run_parameters$Lambda','.')line(xlim,xli
-	#            figure(11)plot(X*current_state$B,X*run_parameters$B,'.')line(xlim,xli
-			} else {
-			   draw_results_diagnostics(sp_num,run_parameters,run_variables,Lambda, F_h2, Posterior)
-			}
-	   }
 	}
 	end_time = Sys.time()
 	print(end_time - start_time)

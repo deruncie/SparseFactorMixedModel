@@ -567,3 +567,53 @@ G_Traces_Comp = function(BSFG_state){
   #G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
   return(traces_G)
 }
+
+reorder_factors = function(BSFG_state){
+	# re-orders factors in decreasing size of Lambda %*% F
+	# based on current state
+	# also re-orders Posterior
+
+	current_state = BSFG_state$current_state
+
+	Lambda = current_state$Lambda
+	F = current_state$F
+
+	# size is sum lambda_ij^2 * var(F_i)
+	sizes = colSums(Lambda^2) * colMeans(F^2)
+	factor_order = order(sizes,decreasing=T)
+
+	reorder_params = c('Lambda','Lambda_prec','Plam',
+						'delta','tauh',
+						'F','F_a','F_h2'
+						)
+
+	# reorder currrent state
+	for(param in reorder_params){
+		if(is.null(dim(current_state[[param]]))){
+			current_state[[param]] = current_state[[param]][factor_order]
+		} else if(dim(current_state[[param]])[2] == 1) {
+			current_state[[param]] = current_state[[param]][factor_order,]			
+		} else {
+			current_state[[param]] = current_state[[param]][,factor_order]			
+		}
+	}
+	current_state$delta = c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)])
+	BSFG_state$current_state = current_state
+
+	# reorder Posterior
+	Posterior = BSFG_state$Posterior
+
+	p = BSFG_state$run_parameters$setup$p
+	k = dim(Posterior$Lambda)[1]/p
+	if(length(factor_order) < k) factor_order = c(factor_order,seq(length(factor_order)+1,k))
+	
+	for(param in reorder_params){
+		if(!param %in% names(Posterior)) next
+		n = dim(Posterior[[param]])[1]/k
+		index = matrix(1:(n*k),nrow = n)
+		Posterior[[param]] = Posterior[[param]][c(index[,factor_order]),]
+	}
+	BSFG_state$Posterior = Posterior
+
+	return(BSFG_state)
+}

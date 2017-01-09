@@ -26,7 +26,8 @@
 % a=clock;s=1e6*mod(a(6),1)   %reset random seeds
 % rand('seed',s)
 % randn('seed',s)
-s = RandStream('mt19937ar','Seed','shuffle');
+% s = RandStream('mt19937ar','Seed','shuffle');
+s = RandStream('mt19937ar','Seed',1);  % for repeatability
 RandStream.setGlobalStream(s);
 
 %% Make a new folder to hold the analyses.
@@ -44,7 +45,7 @@ cd(folder);
 params.b0=1;params.b1=0.0005;
 params.epsilon=1e-2;
 params.prop = 1.00;
-params.h2_divisions = 50;
+params.h2_divisions = 100;
 params.save_freq = 100;
 
 priors.k_init              =   20;
@@ -55,7 +56,7 @@ priors.E_a_prec_rate       =   1/10;
 priors.W_prec_shape        =   2;
 priors.W_prec_rate         =   1/10;
 priors.Lambda_df           =   3;
-priors.delta_1_shape       =   2.1;
+priors.delta_1_shape       =   2;
 priors.delta_1_rate        =   1/20;
 priors.delta_2_shape       =   3;
 priors.delta_2_rate        =   1;

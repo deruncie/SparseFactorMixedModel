@@ -34,11 +34,11 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     if(file.exists('../setup.RData')) {
         load('../setup.RData')
     }
- # else{
-        #require(R.matlab)
-        #setup = readMat('../setup.mat')
-        #for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
-    #}
+    else{
+        require(R.matlab)
+        setup = readMat('../setup.mat')
+        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
+    }
 	Y       = setup$Y
 	U_act   = setup$U_act
 	E_act   = setup$E_act
@@ -57,6 +57,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     	simulation = T
     	print('simulated data')
     	run_parameters$setup = setup
+        run_parameters$name = setup$name
     }
 	    run_parameters$simulation = simulation
 

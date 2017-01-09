@@ -321,7 +321,7 @@ update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,px_factor,F_p
 
 	if(uu < prob && i>200){
 		if(i > 20 && num == 0 && all(lind < 0.995) && k < 2*p && k < 15) { #add a column
-		print(lind)
+		# print(lind)
 		# print(c(num,length(vec)))
 
 # recover()

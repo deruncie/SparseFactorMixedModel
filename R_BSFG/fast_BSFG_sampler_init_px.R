@@ -1,5 +1,5 @@
 
-fast_BSFG_sampler_init = function(priors,run_parameters){
+fast_BSFG_sampler_init = function(priors,run_parameters,normalize_Y = TRUE){
 	# require(PEIP)
 	require(Matrix)
 
@@ -75,7 +75,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     # simulation because this makes comparing to the simulated values more
     # difficult. 
     # Do we want to do this for real data, or let the user do it?
-    if(simulation) {
+    if(!normalize_Y) {
         VY = rep(1,p)
     } else{
     	Y = sweep(Y,2,Mean_Y,'-')
