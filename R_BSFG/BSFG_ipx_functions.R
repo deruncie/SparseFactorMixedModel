@@ -7,7 +7,7 @@ save_posterior_samples_ipx = function( sp_num, current_state, Posterior) {
 	Posterior = with(current_state, {
 		# transform variables so that the variance of each column of F is 1.
 		F_var = 1/F_a_prec + 1/F_e_prec
-		F_h2 = F_e_prec / (F_e_prec + F_a_prec)
+		# F_h2 = F_e_prec / (F_e_prec + F_a_prec)
 		F_a = sweep(F_a,2,sqrt(F_var),'/')
 		F = sweep(F,2,sqrt(F_var),'/')
 		Lambda = sweep(Lambda,2,sqrt(F_var),'*')

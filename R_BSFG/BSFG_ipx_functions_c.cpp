@@ -1,11 +1,13 @@
-# include <RcppArmadillo.h>
-// [[Rcpp::depends("RcppArmadillo")]]
-
-// Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
-
+// [[Rcpp::depends(RcppParallel)]]
+// [[Rcpp::depends(RcppArmadillo)]]
+#include <RcppArmadillo.h>
+#include <RcppParallel.h>
+#include <iostream>
 using namespace Rcpp;
+using namespace RcppParallel;
 using namespace arma;
 
+// Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
 
 mat sweep_times(mat x, int MARGIN, vec STATS){
 	int m = x.n_rows;
@@ -81,6 +83,70 @@ mat sample_means_c(mat Y_tilde,
 	return(location_sample);
 }
 
+// [[Rcpp::export()]]
+mat sample_means_parallel_c(mat Y_tilde,
+				   vec resid_Y_prec,
+				   vec E_a_prec,
+				   List invert_aPXA_bDesignDesignT,
+				   int grainSize ) {
+	// when used to sample [B;E_a]:
+	//  W - F*Lambda' = X*B + Z_1*E_a + E, vec(E)~N(0,kron(Psi_E,In)). 
+	//  Note: conditioning on F, Lambda and W.
+	// The vector [b_j;E_{a_j}] is sampled simultaneously. Each trait is sampled separately because their
+	// conditional posteriors factor into independent MVNs.
+	// note:invert_aPXA_bDesignDesignT has parameters to diagonalize mixed model equations for fast inversion: 
+	// inv(a*blkdiag(fixed_effects_prec*eye(b),Ainv) + b*[X Z_1]'[X Z_1]) = U*diag(1./(a.*s1+b.*s2))*U'
+	// Design_U = [X Z_1]*U, which doesn't change each iteration. 
+	
+	struct sampleColumn : public Worker {
+		vec E_a_prec, resid_Y_prec, s1, s2;
+		mat means, Zlams, U;
+
+		mat &location_sample;
+
+		sampleColumn(vec E_a_prec, vec resid_Y_prec, vec s1, vec s2, mat means, mat Zlams, mat U, mat &location_sample)
+			: E_a_prec(E_a_prec), resid_Y_prec(resid_Y_prec), s1(s1), s2(s2), means(means), Zlams(Zlams),U(U), location_sample(location_sample) {}
+
+      	void operator()(std::size_t begin, std::size_t end) {
+			vec d, mlam;
+			for(std::size_t j = begin; j < end; j++){
+				d = s1*E_a_prec(j) + s2*resid_Y_prec(j);
+				mlam = means.col(j) /d;
+				location_sample.col(j) = U * (mlam + Zlams.col(j)/sqrt(d));
+			}
+		}
+	};
+
+	mat U = as<mat>(invert_aPXA_bDesignDesignT["U"]);
+	vec s1 = as<vec>(invert_aPXA_bDesignDesignT["s1"]);
+	vec s2 = as<vec>(invert_aPXA_bDesignDesignT["s2"]);
+	mat Design_U = as<mat>(invert_aPXA_bDesignDesignT["Design_U"]);
+
+	// int n = Y_tilde.n_rows;
+	int p = Y_tilde.n_cols;
+	int br = Design_U.n_cols;
+
+	mat means = sweep_times(Design_U.t() * Y_tilde,2,resid_Y_prec);
+	mat location_sample = zeros(br,p);
+
+	mat Zlams = randn(br,p);	
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
+	// vec z = as<vec>(rnorm(br*p));
+	// mat Zlams = reshape(z,br,p);
+
+	// vec d, mlam;
+	// for(int j =0; j<p; j++) {
+	// 	d = s1*E_a_prec(j) + s2*resid_Y_prec(j);
+	// 	mlam = means.col(j) /d;
+	// 	location_sample.col(j) = U * (mlam + Zlams.col(j)/sqrt(d));
+	// }
+	sampleColumn sampler(E_a_prec,resid_Y_prec,s1,s2,means,Zlams,U,location_sample);
+	parallelFor(0,p,sampler,grainSize);
+
+	return(location_sample);
+}
+
 
 // [[Rcpp::export()]]
 mat sample_Lambda_c(mat Y_tilde,
@@ -130,6 +196,90 @@ mat sample_Lambda_c(mat Y_tilde,
 		Lambda.row(j) = ylam.t() + mlam.t();
 
 	}
+
+	return(Lambda);
+}
+
+// [[Rcpp::export()]]
+mat sample_Lambda_parallel_c(mat Y_tilde,
+					mat F,
+					vec resid_Y_prec,
+					vec E_a_prec,
+					mat Plam,
+					List invert_aI_bZAZ,
+					int grainSize ){
+	
+	// Sample factor loadings Lambda while marginalizing over residual
+	// genetic effects: Y - Z_2W = F*Lambda' + E, vec(E)~N(0,kron(Psi_E,In) + kron(Psi_U, ZAZ^T))
+	// note: conditioning on F, but marginalizing over E_a.
+	// sampling is done separately by trait because each column of Lambda is
+	// independent in the conditional posterior
+	// note: invert_aI_bZAZ has parameters that diagonalize aI + bZAZ for fast
+	// inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
+	
+	struct sampleColumn : public Worker {
+
+		vec E_a_prec, s, resid_Y_prec;
+		mat FtU, UtY, Plam, Zlams;
+		mat &Lambda;
+
+		sampleColumn(vec E_a_prec, 
+					 vec s,
+					 vec resid_Y_prec,
+					 mat FtU,
+					 mat UtY,
+					 mat Plam,
+					 mat Zlams,
+					 mat &Lambda)
+			: E_a_prec(E_a_prec), s(s), resid_Y_prec(resid_Y_prec),FtU(FtU),UtY(UtY),Plam(Plam),
+				Zlams(Zlams),
+				Lambda(Lambda) {
+				Lambda.zeros();
+			}
+
+      	void operator()(std::size_t begin, std::size_t end) {
+			mat FUDi, Qlam, Llam_t,Plam_row;
+			vec means,vlam,mlam,ylam,Zcol;
+			for(std::size_t j = begin; j < end; j++){
+				FUDi = E_a_prec(j) * sweep_times(FtU, 2,1/(s + E_a_prec(j)/resid_Y_prec(j)));
+				means = FUDi * UtY.col(j);
+				Qlam = FUDi * FtU.t() + diagmat(Plam.row(j));
+
+				Llam_t = chol(Qlam);
+				vlam = solve(Llam_t.t(),means);
+				mlam = solve(Llam_t,vlam);
+				// Zcol = randn(Llam_t.n_cols);
+				Zcol = Zlams.col(j);
+				ylam = solve(Llam_t,Zcol);
+
+				Lambda.row(j) = ylam.t() + mlam.t();
+			}
+		}
+	};	
+
+	int p = resid_Y_prec.n_elem;
+	int k = F.n_cols;
+
+	mat U = as<mat>(invert_aI_bZAZ["U"]);
+	vec s = as<vec>(invert_aI_bZAZ["s"]);
+
+	mat FtU = F.t() * U;
+	mat UtY = U.t() * Y_tilde;
+
+	mat Zlams = randn(k,p);	
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
+	// vec z = as<vec>(rnorm(k*p));
+	// mat Zlams = reshape(z,k,p);
+	mat Lambda = zeros(p,k);
+
+	mat FUDi, Qlam, Llam_t,Plam_row;
+	vec means,vlam,mlam,ylam,Zcol;
+
+	sampleColumn sampler(E_a_prec,s,resid_Y_prec,FtU,UtY,Plam,
+		Zlams,
+		Lambda);
+	parallelFor(0,p,sampler,grainSize);
 
 	return(Lambda);
 }
@@ -220,6 +370,91 @@ vec sample_h2s_discrete_ipx_c (mat F,
 		if(h2 > 0) {
 			std_scores = sweep_times(std_scores_b,2,1/sqrt(h2/(1-h2)*s+1));
 			det = sum(sum(log((h2/(1-h2)*s+1))/2)) * ones(1,k);
+		} else {
+			std_scores = F.t();
+			det = zeros(1,k);
+		}
+		log_ps.col(i) = sum(dnorm_std_log(std_scores),1) - det.t() + log(h2_priors(i));
+	}
+	for(int j =0; j < k; j++){
+		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
+		mat ps_j = exp(log_ps.row(j) - norm_factor);
+		log_ps.row(j) = ps_j;
+		vec r = randu(1);
+		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
+		F_h2(j) = double(selected.n_elem)/(h2_divisions);
+	}
+
+	return(F_h2);
+}
+// [[Rcpp::export()]]
+vec sample_h2s_discrete_given_p_c (mat Y,
+						int h2_divisions,
+						vec h2_priors,
+						vec Tot_prec,
+						List invert_aI_bZAZ){
+
+	mat U = as<mat>(invert_aI_bZAZ["U"]);
+	vec s = as<vec>(invert_aI_bZAZ["s"]);
+
+	int p = Y.n_cols;
+	vec h2 = zeros(p);
+
+	mat log_ps = zeros(p,h2_divisions);
+	mat std_scores_b = sweep_times(Y.t() * U,1,sqrt(Tot_prec));
+
+	mat det_mat,std_scores;
+	mat det;
+	for(double i =0; i < h2_divisions; i+=1){
+		double h2 = (i)/(h2_divisions);
+		if(h2 > 0) {
+			std_scores = sweep_times(std_scores_b,2,1/sqrt(h2*s + (1-h2)));
+			det = sum(sum(log((h2*s + (1-h2)))/2)) * ones(1,p);
+		} else {
+			std_scores = Y.t();
+			det = zeros(1,p);
+		}
+		log_ps.col(i) = sum(dnorm_std_log(std_scores),1) - det.t() + log(h2_priors(i));
+	}
+	for(int j =0; j < p; j++){
+		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
+		mat ps_j = exp(log_ps.row(j) - norm_factor);
+		log_ps.row(j) = ps_j;
+		vec r = randu(1);
+		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
+		h2(j) = double(selected.n_elem)/(h2_divisions);
+	}
+
+	return(h2);
+}
+
+// [[Rcpp::export()]]
+vec sample_h2s_discrete_c (mat F,
+						int h2_divisions,
+						vec h2_priors,
+						List invert_aI_bZAZ){
+	// sample factor heritibilties from a discrete set on [0,1)
+	// prior places 50% of the weight at h2=0
+	// samples conditional on F, marginalizes over F_a.
+	// uses invert_aI_bZAZ.U and invert_aI_bZAZ.s to not have to invert aI + bZAZ
+	// each iteration.
+
+	mat U = as<mat>(invert_aI_bZAZ["U"]);
+	vec s = as<vec>(invert_aI_bZAZ["s"]);
+
+	int k = F.n_cols;
+	vec F_h2 = zeros(k);
+
+	mat log_ps = zeros(k,h2_divisions);
+	mat std_scores_b = F.t() * U;
+
+	mat det_mat,std_scores;
+	mat det;
+	for(double i =0; i < h2_divisions; i+=1){
+		double h2 = (i)/(h2_divisions);
+		if(h2 > 0) {
+			std_scores = 1/sqrt(h2) * sweep_times(std_scores_b,2,1/sqrt(s+(1-h2)/h2));
+			det = sum(sum(log((s+(1-h2)/h2)*h2)/2)) * ones(1,k);
 		} else {
 			std_scores = F.t();
 			det = zeros(1,k);

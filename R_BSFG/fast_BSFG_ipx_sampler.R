@@ -91,6 +91,10 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 	F_a_prec_rate      =   priors$F_a_prec_rate
 	F_e_prec_shape     =   priors$F_e_prec_shape
 	F_e_prec_rate      =   priors$F_e_prec_rate
+	tot_Y_prec_shape     =   priors$tot_Y_prec_shape
+	tot_Y_prec_rate      =   priors$tot_Y_prec_rate
+	tot_F_prec_shape     =   priors$tot_F_prec_shape
+	tot_F_prec_rate      =   priors$tot_F_prec_rate
 	W_prec_shape       =   priors$W_prec_shape
 	W_prec_rate        =   priors$W_prec_rate
 	Lambda_df          =   priors$Lambda_df
@@ -99,6 +103,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 	delta_2_shape      =   priors$delta_2_shape
 	delta_2_rate       =   priors$delta_2_rate
 	h2_priors_factors  =   priors$h2_priors_factors
+	h2_priors_resids   =   priors$h2_priors_resids
 
 
 	# ----------------------------------------------- #
@@ -134,6 +139,8 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 	# ----------------------------------------------- #
 	Ainv                             = run_variables$Ainv
 	A_2_inv                          = run_variables$A_2_inv
+	chol_Ainv                        = run_variables$chol_Ainv
+	chol_A_2_inv                     = run_variables$A_2_inv
 	invert_aI_bZAZ                   = run_variables$invert_aI_bZAZ  
 	invert_aPXA_bDesignDesignT       = run_variables$invert_aPXA_bDesignDesignT 
 	invert_aZZt_Ainv                 = run_variables$invert_aZZt_Ainv
@@ -182,7 +189,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 		current_state_names = names(current_state)
 		current_state = within(current_state, {
 			k = ncol(Lambda)
-	   
+
 		 # -----fill in missing phenotypes----- #
 			#conditioning on everything else
 			if(sum(Y_missing)>0) {
@@ -196,13 +203,45 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			#conditioning on W, B, F, marginalizing over E_a
 			Y_tilde = Y - X %*% B - Z_2 %*% W
 			# Lambda = sample_Lambda( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
-			Lambda = sample_Lambda_c( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
+			# Lambda = sample_Lambda_c( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
+			Lambda = sample_Lambda_parallel_c( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ,1)
+
+	 	# # -----Sample Lambda_prec------------- #
+			Lambda2 = Lambda^2
+			Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
+
+		 # # -----Sample delta, update tauh------ #
+			delta = sample_delta( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2 )
+			tauh  = cumprod(delta)
+			
+		 # # -----Update Plam-------------------- #
+			Plam = sweep(Lambda_prec,2,tauh,'*')
+
+		 # -----Sample E_a_prec, tot_Y_prec ---------------- #
+			#conditioning on W, B, F, marginalizing over E_a 
+			Y_tilde = Y - X %*% B - F %*% t(Lambda)  - Z_2 %*% W
+
+			resid_h2 = resid_Y_prec/(resid_Y_prec + E_a_prec)
+			U = invert_aI_bZAZ$U
+			s = invert_aI_bZAZ$s
+			UtY_tilde = t(U) %*% Y_tilde
+			n = nrow(Y)
+			tot_Y_prec = sapply(1:p,function(j) {
+				Sigma_sqrt = sqrt(resid_h2[j]*s + (1-resid_h2[j]))
+				SiUtY_tilde_j = UtY_tilde[,j] / Sigma_sqrt
+				rgamma(1,shape = tot_Y_prec_shape + n/2, rate = tot_Y_prec_rate+1/2*sum(SiUtY_tilde_j^2))
+			})
+
+			resid_h2 = sample_h2s_discrete_given_p_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
+			E_a_prec = tot_Y_prec / resid_h2
+			resid_Y_prec = tot_Y_prec / (1-resid_h2)
 
 		 # -----Sample B and E_a--------------- #
 			#conditioning on W, F, Lambda
 			Y_tilde = Y - F %*% t(Lambda) - Z_2 %*% W
 			# location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
-			location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
+			# location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT)
+			location_sample = sample_means_parallel_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT ,1)
 			B   = location_sample[1:b,]
 			E_a = location_sample[b+(1:r),]
 
@@ -211,68 +250,51 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			if(ncol(Z_2) > 0) {
 				Y_tilde = Y - X %*% B - Z_1 %*% E_a - F %*% t(Lambda)
 				# location_sample = sample_means( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
-				location_sample = sample_means_c( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
+				# location_sample = sample_means_c( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
+				location_sample = sample_means_parallel_c( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2,1)
 				W = location_sample
 			}
 		 # -----Sample F----------------------- #
 			#conditioning on B,F_a,E_a,W,Lambda, F_h2
 			
-		 # # -----Sample F_a_prec and F_e_prec -------------------- #
-			# #conditioning on F, F_a
-			# F_e = F - Z_1 %*% F_a
-			# F_e_prec = rgamma(k,shape = F_e_prec_shape + n/2, rate = F_e_prec_rate+1/2*colSums(F_e^2))
-			# F_a_prec = rgamma(k,shape = F_a_prec_shape + r/2, rate = F_a_prec_rate + 1/2 * diag(t(F_a) %*% Ainv %*% F_a))
-			# F_h2 = F_e_prec / (F_a_prec + F_e_prec)
+		 # -----Sample F_a_prec and F_e_prec -------------------- #
+			#conditioning on F, F_a
+			U = invert_aI_bZAZ$U
+			s = invert_aI_bZAZ$s
+			UtF = t(U) %*% F
+			n = nrow(F)
+			tot_F_prec = sapply(1:k,function(j) {
+				Sigma_sqrt = sqrt(s*F_h2[j] + (1-F_h2[j]))
+				SiUtF_j = UtF[,j] / Sigma_sqrt
+				rgamma(1,shape = tot_F_prec_shape + n/2, rate = tot_F_prec_rate+1/2*sum(SiUtF_j^2))
+			})
 
-			F_h2 = sample_h2s_discrete_ipx_c(F,h2_divisions,h2_priors_factors,F_e_prec,invert_aI_bZAZ)
-			F_a_prec = F_e_prec * (1-F_h2) / F_h2
+			F_h2 = sample_h2s_discrete_given_p_c(F,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
+			F_a_prec = tot_F_prec / F_h2
+			F_e_prec = tot_F_prec / (1-F_h2)
 			
 		 # -----Sample F_a--------------------- #
 			#conditioning on F, F_h2
-			# F_a = sample_F_a_c(F,Z_1,F_h2,invert_aZZt_Ainv)
 	    	F_a = sample_F_a_ipx_c(F,Z_1,F_a_prec,F_e_prec,invert_aZZt_Ainv);
-				   
- 		 # -----Sample F_a_prec and F_e_prec -------------------- #
-			#conditioning on F, F_a
-			F_e = F - Z_1 %*% F_a
-			F_e_prec = rgamma(k,shape = F_e_prec_shape + n/2, rate = F_e_prec_rate+1/2*colSums(F_e^2))
 
 		 # -----Sample F----------------------- #
 			#conditioning on B,F_a,E_a,W,Lambda, F_h2
 			Y_tilde = Y - X %*% B - Z_1 %*% E_a - Z_2 %*% W
 			# F1 = sample_factors_scores( Y_tilde, Z_1,Lambda,resid_Y_prec,F_a,F_h2 )
 			F = sample_factors_scores_ipx_c( Y_tilde, Z_1,Lambda,resid_Y_prec,F_a,F_e_prec )
-
-		 # -----Sample Lambda_prec------------- #
-			Lambda2 = Lambda^2
-			Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
-			
-		 # -----Sample resid_Y_prec------------ #
-			Y_tilde = Y - X %*% B - F %*% t(Lambda) - Z_1 %*% E_a - Z_2 %*% W
-			resid_Y_prec = rgamma(p,shape = resid_Y_prec_shape + n/2, rate = resid_Y_prec_rate+1/2*colSums(Y_tilde^2)) #model residual precision
-
-			
-		 # -----Sample E_a_prec---------------- #
-			#     #random effect 1 (D) residual precision
-			E_a_prec = rgamma(p,shape = E_a_prec_shape + r/2, rate = E_a_prec_rate + 1/2*diag(t(E_a) %*% Ainv %*% E_a))
-			
+					
 		 # -----Sample W_prec------------------ #
 			if(ncol(Z_2) > 0) {
-				W_prec =  rgamma(p, W_prec_shape + r2/2,rate = W_prec_rate + 1/2*diag(t(W) %*% A_2_inv %*% W))
+				W_prec =  rgamma(p, W_prec_shape + r2/2,rate = W_prec_rate + 1/2*colSums((chol_A_2_inv %*% W)^2))
 			}
 		 
-		 # -----Sample delta, update tauh------ #
-			delta = sample_delta( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2 )
-			tauh  = cumprod(delta)
-			
-		 # -----Update Plam-------------------- #
-			Plam = sweep(Lambda_prec,2,tauh,'*')
+	
 	})
 	current_state = current_state[current_state_names]
 
 	 # -- adapt number of factors to samples ---#
 		current_state = update_k( current_state, priors, run_parameters, data_matrices)
-
+		
 	 # -- save sampled values (after thinning) -- #
 		if( (i-burn) %% thin == 0 && i > burn) {
 				

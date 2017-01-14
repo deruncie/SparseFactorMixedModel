@@ -100,7 +100,7 @@ draw_simulation_diagnostics = function(BSFG_state){
             if(sum(h2s[!is.na(h2s)])==0) {
                 next
             }
-            plot(h2s,type='l',main = "plot of h2s")
+            plot(h2s,type='l',main = "plot of h2s",ylim = c(0,1))
             hist(h2s,breaks=100,xlim=c(-0.1,1),main = "histogram of h2s")
         }
 

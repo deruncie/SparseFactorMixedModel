@@ -268,7 +268,9 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
     # recover()
     #invert the random effect covariance matrices
     Ainv = solve(A)
+    chol_Ainv = chol(Ainv)
     A_2_inv = diag(1,r2) #Z_2 random effects are assumed to have covariance proportional to the identity. Can be modified.
+    chol_A_2_inv = A_2_inv # need to change with real A_2_inv
 
     #pre-calculate transformation parameters to diagonalize aI + bZAZ for fast
     #inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
@@ -343,8 +345,10 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
 			b       = b,
 			Mean_Y  = Mean_Y,
 			VY      = VY,
-			Ainv    = Ainv,
-			A_2_inv = A_2_inv,
+            Ainv    = Ainv,
+            A_2_inv = A_2_inv,
+            chol_Ainv    = chol_Ainv,
+            chol_A_2_inv = chol_A_2_inv,
 			invert_aI_bZAZ                   = invert_aI_bZAZ,
 			invert_aPXA_bDesignDesignT       = invert_aPXA_bDesignDesignT,
 			invert_aZZt_Ainv                 = invert_aZZt_Ainv,

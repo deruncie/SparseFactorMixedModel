@@ -349,6 +349,10 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				F = cbind(F,rnorm(n,Z_1 %*% F_a[,k],sqrt(1-F_h2[k])))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
+				while(length(nonred) < 2) {
+					nonred = c(nonred,which(vec != 0)[1])
+					vec[nonred[length(nonred)]] = 0
+				} 
 				k = length(nonred)
 				Lambda = Lambda[,nonred]
 				Lambda_prec = Lambda_prec[,nonred]
@@ -611,6 +615,7 @@ reorder_factors = function(BSFG_state){
 
 	# reorder Posterior
 	Posterior = BSFG_state$Posterior
+	if(ncol(Posterior$Lambda) == 0) return(BSFG_state)
 
 	p = BSFG_state$run_parameters$setup$p
 	k = dim(Posterior$Lambda)[1]/p

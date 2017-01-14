@@ -120,8 +120,8 @@ fast_BSFG_EM_sampler = function(BSFG_state,n_samples) {
 	# ----------------------------------------------- #
 	# -----------Reset Global Random Number Stream--- #
 	# ----------------------------------------------- #
-	do.call("RNGkind",as.list(BSFG_state$RNG$RNGkind))  ## must be first!
-	assign(".Random.seed", BSFG_state$RNG$Random.seed, .GlobalEnv)
+	do.call(RNGkind,as.list(BSFG_state$RNG$RNGkind))  ## must be first!
+	assign(.Random.seed, BSFG_state$RNG$Random.seed, .GlobalEnv)
 
 	# ----------------------------------------------- #
 	# -----------Load pre-calcualted matrices-------- #

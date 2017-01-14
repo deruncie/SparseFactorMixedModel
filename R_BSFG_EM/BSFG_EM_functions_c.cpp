@@ -1,5 +1,5 @@
 # include <RcppArmadillo.h>
-// [[Rcpp::depends("RcppArmadillo")]]
+// [[Rcpp::depends(RcppArmadillo)]]
 
 // Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
 
@@ -36,7 +36,7 @@ List GSVD_2_c(mat A, mat B){
 	mat S = diagmat(1/norm_factor);
 	mat X = sweep_times(B.t() * V,2,norm_factor);
 
-	return(List::create(_["U"]=U,_["V"]=V,_["X"]=X,_["C"]=C,_["S"]=S));
+	return(List::create(_[U]=U,_[V]=V,_[X]=X,_[C]=C,_[S]=S));
 }
 
 // [[Rcpp::export()]]
@@ -53,10 +53,10 @@ mat maximize_means_c(mat Y_tilde,
 	// inv(a*blkdiag(fixed_effects_prec*eye(b),Ainv) + b*[X Z_1]'[X Z_1]) = U*diag(1./(a.*s1+b.*s2))*U'
 	// Design_U = [X Z_1]*U, which doesn't change each iteration. 
 	
-	mat U = as<mat>(invert_aPXA_bDesignDesignT["U"]);
-	vec s1 = as<vec>(invert_aPXA_bDesignDesignT["s1"]);
-	vec s2 = as<vec>(invert_aPXA_bDesignDesignT["s2"]);
-	mat Design_U = as<mat>(invert_aPXA_bDesignDesignT["Design_U"]);
+	mat U = as<mat>(invert_aPXA_bDesignDesignT[U]);
+	vec s1 = as<vec>(invert_aPXA_bDesignDesignT[s1]);
+	vec s2 = as<vec>(invert_aPXA_bDesignDesignT[s2]);
+	mat Design_U = as<mat>(invert_aPXA_bDesignDesignT[Design_U]);
 
 	// int n = Y_tilde.n_rows;
 	int p = Y_tilde.n_cols;
@@ -96,15 +96,15 @@ mat maximize_Lambda_c(mat Y_tilde,
 	int p = resid_Y_prec.n_elem;
 	int k = F.n_cols;
 
-	mat U = as<mat>(invert_aI_bZAZ["U"]);
-	vec s = as<vec>(invert_aI_bZAZ["s"]);
+	mat U = as<mat>(invert_aI_bZAZ[U]);
+	vec s = as<vec>(invert_aI_bZAZ[s]);
 
 	mat FtU = F.t() * U;
 	mat UtY = U.t() * Y_tilde;
 
 	// mat Zlams = randn(k,p);	
-	// Environment stats("package:stats");
-	// Function rnorm = stats["rnorm"];
+	// Environment stats(package:stats);
+	// Function rnorm = stats[rnorm];
 	// vec z = as<vec>(rnorm(k*p));
 	// mat Zlams = reshape(z,k,p);
 	mat Lambda = zeros(p,k);
@@ -147,8 +147,8 @@ mat maximize_factors_scores_c(mat Y_tilde,
 	mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(Z_1 * F_a,2,tau_e))));
 
 	// mat Zlams = randn(Meta.n_rows,Meta.n_cols);	
-	// Environment stats("package:stats");
-	// Function rnorm = stats["rnorm"];
+	// Environment stats(package:stats);
+	// Function rnorm = stats[rnorm];
 	// vec z = as<vec>(rnorm(Meta.n_rows*Meta.n_cols));
 	// mat Zlams = reshape(z,Meta.n_rows,Meta.n_cols);
 
@@ -177,8 +177,8 @@ mat maximize_px_factors_scores_c(mat Y_tilde,
 	mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(Z_1 * F_a_px,2,tau_e))));
 
 	// mat Zlams = randn(Meta.n_rows,Meta.n_cols);	
-	// Environment stats("package:stats");
-	// Function rnorm = stats["rnorm"];
+	// Environment stats(package:stats);
+	// Function rnorm = stats[rnorm];
 	// vec z = as<vec>(rnorm(Meta.n_rows*Meta.n_cols));
 	// mat Zlams = reshape(z,Meta.n_rows,Meta.n_cols);
 
@@ -198,8 +198,8 @@ vec maximize_h2s_discrete_c (mat F,
 	// uses invert_aI_bZAZ.U and invert_aI_bZAZ.s to not have to invert aI + bZAZ
 	// each iteration.
 
-	mat U = as<mat>(invert_aI_bZAZ["U"]);
-	vec s = as<vec>(invert_aI_bZAZ["s"]);
+	mat U = as<mat>(invert_aI_bZAZ[U]);
+	vec s = as<vec>(invert_aI_bZAZ[s]);
 
 	int k = F.n_cols;
 	vec F_h2 = zeros(k);
@@ -225,7 +225,7 @@ vec maximize_h2s_discrete_c (mat F,
 		mat ps_j = exp(log_ps.row(j) - norm_factor);
 		log_ps.row(j) = ps_j;
 		// vec r = randu(1);
-		uvec selected = sort_index(ps_j,"descend");
+		uvec selected = sort_index(ps_j,descend);
 		F_h2(j) = double(selected(0))/(h2_divisions);
 	}
 
@@ -247,8 +247,8 @@ vec maximize_prec_discrete_conditional_c(mat Y,
 	//each iteration.
 	//ident_prec is a in the above equation.
 
-	mat U = as<mat>(invert_aI_bZAZ["U"]);
-	vec s = as<vec>(invert_aI_bZAZ["s"]);
+	mat U = as<mat>(invert_aI_bZAZ[U]);
+	vec s = as<vec>(invert_aI_bZAZ[s]);
 
 	int p = Y.n_cols;
 	int n = Y.n_rows;
@@ -275,7 +275,7 @@ vec maximize_prec_discrete_conditional_c(mat Y,
 		mat ps_j = exp(log_ps.row(j) - norm_factor);
 		log_ps.row(j) = ps_j;
 		// vec r = randu(1);
-		uvec selected = sort_index(ps_j,"descend");
+		uvec selected = sort_index(ps_j,descend);
 		Trait_h2(j) = double(selected(0))/(h2_divisions);
 	}
 	vec Prec = (res_prec % (1-Trait_h2))/Trait_h2;
@@ -297,9 +297,9 @@ mat maximize_F_a_c (mat F,
 	// invert_aZZt_Ainv has parameters to diagonalize a*Z_1*Z_1' + b*I for fast
 	// inversion:
 
-	mat U = as<mat>(invert_aZZt_Ainv["U"]);
-	vec s1 = as<vec>(invert_aZZt_Ainv["s1"]);
-	vec s2 = as<vec>(invert_aZZt_Ainv["s2"]);
+	mat U = as<mat>(invert_aZZt_Ainv[U]);
+	vec s1 = as<vec>(invert_aZZt_Ainv[s1]);
+	vec s2 = as<vec>(invert_aZZt_Ainv[s2]);
 
 	int k = F.n_cols;
 	int r = Z_1.n_cols;
@@ -308,8 +308,8 @@ mat maximize_F_a_c (mat F,
 	mat b = U.t() * Z_1.t() * sweep_times(F,2,tau_e);
 
 	// mat z = randn(r,k);
-	// Environment stats("package:stats");
-	// Function rnorm = stats["rnorm"];
+	// Environment stats(package:stats);
+	// Function rnorm = stats[rnorm];
 	// vec z_v = as<vec>(rnorm(r*k));
 	// mat z = reshape(z_v,r,k);
 
