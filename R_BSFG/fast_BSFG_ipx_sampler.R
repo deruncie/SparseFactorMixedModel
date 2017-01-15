@@ -204,7 +204,11 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			Y_tilde = Y - X %*% B - Z_2 %*% W
 			# Lambda = sample_Lambda( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
 			# Lambda = sample_Lambda_c( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
-			Lambda = sample_Lambda_parallel_c( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ,1)
+			# Lambda = sample_Lambda_parallel_c( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ,1)
+
+			resid_h2 = resid_Y_prec/(resid_Y_prec + E_a_prec)
+			tot_Y_prec = 1/(1/E_a_prec + 1/resid_Y_prec)
+			Lambda_2 = t(sample_coefs_parallel_c( Y_tilde,F,resid_h2, tot_Y_prec,matrix(0,k,p),t(Plam),invert_aI_bZAZ,1))
 
 	 	# # -----Sample Lambda_prec------------- #
 			Lambda2 = Lambda^2
@@ -221,16 +225,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			#conditioning on W, B, F, marginalizing over E_a 
 			Y_tilde = Y - X %*% B - F %*% t(Lambda)  - Z_2 %*% W
 
-			resid_h2 = resid_Y_prec/(resid_Y_prec + E_a_prec)
-			U = invert_aI_bZAZ$U
-			s = invert_aI_bZAZ$s
-			UtY_tilde = t(U) %*% Y_tilde
-			n = nrow(Y)
-			tot_Y_prec = sapply(1:p,function(j) {
-				Sigma_sqrt = sqrt(resid_h2[j]*s + (1-resid_h2[j]))
-				SiUtY_tilde_j = UtY_tilde[,j] / Sigma_sqrt
-				rgamma(1,shape = tot_Y_prec_shape + n/2, rate = tot_Y_prec_rate+1/2*sum(SiUtY_tilde_j^2))
-			})
+			tot_Y_prec = sample_tot_prec_c(Y_tilde,resid_h2,tot_Y_prec_shape,tot_Y_prec_rate,invert_aI_bZAZ)
 
 			resid_h2 = sample_h2s_discrete_given_p_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
 			E_a_prec = tot_Y_prec / resid_h2
@@ -259,15 +254,16 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			
 		 # -----Sample F_a_prec and F_e_prec -------------------- #
 			#conditioning on F, F_a
-			U = invert_aI_bZAZ$U
-			s = invert_aI_bZAZ$s
-			UtF = t(U) %*% F
-			n = nrow(F)
-			tot_F_prec = sapply(1:k,function(j) {
-				Sigma_sqrt = sqrt(s*F_h2[j] + (1-F_h2[j]))
-				SiUtF_j = UtF[,j] / Sigma_sqrt
-				rgamma(1,shape = tot_F_prec_shape + n/2, rate = tot_F_prec_rate+1/2*sum(SiUtF_j^2))
-			})
+			# U = invert_aI_bZAZ$U
+			# s = invert_aI_bZAZ$s
+			# UtF = t(U) %*% F
+			# n = nrow(F)
+			# tot_F_prec = sapply(1:k,function(j) {
+			# 	Sigma_sqrt = sqrt(s*F_h2[j] + (1-F_h2[j]))
+			# 	SiUtF_j = UtF[,j] / Sigma_sqrt
+			# 	rgamma(1,shape = tot_F_prec_shape + n/2, rate = tot_F_prec_rate+1/2*sum(SiUtF_j^2))
+			# })
+			tot_F_prec = sample_tot_prec_c(F,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
 
 			F_h2 = sample_h2s_discrete_given_p_c(F,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
 			F_a_prec = tot_F_prec / F_h2
@@ -294,7 +290,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 
 	 # -- adapt number of factors to samples ---#
 		current_state = update_k( current_state, priors, run_parameters, data_matrices)
-		
+
 	 # -- save sampled values (after thinning) -- #
 		if( (i-burn) %% thin == 0 && i > burn) {
 				

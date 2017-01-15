@@ -147,6 +147,114 @@ mat sample_means_parallel_c(mat Y_tilde,
 	return(location_sample);
 }
 
+// [[Rcpp::export()]]
+mat sample_coefs_c(
+					mat Y,
+					mat W,
+					vec h2,
+					vec tot_Y_prec,
+					mat prior_mean,
+					mat prior_prec,
+					List invert_aI_bZAZ) {
+	
+	// Sample regression coefficients
+	// columns of matrices are independent
+	// each column conditional posterior is a MVN due to conjugacy
+	int p = tot_Y_prec.n_elem;
+	int b = W.n_cols;
+
+	mat U = as<mat>(invert_aI_bZAZ["U"]);
+	vec s = as<vec>(invert_aI_bZAZ["s"]);
+
+	mat WtU = W.t() * U;
+	mat UtY = U.t() * Y;
+
+	mat Z = randn(b,p);
+	mat coefs = zeros(b,p);
+
+	mat WtUDi, Q, cholQ;
+	vec means,v,m,y,z;
+	for(int j =0; j<p; j++){
+		WtUDi = tot_Y_prec(j) * sweep_times(WtU,2,1.0/(h2(j) * s + (1-h2(j))));
+		means = WtUDi * UtY.col(j);
+		Q = WtUDi * WtU.t();
+		for(int i = 0; i < b; i++) {
+			Q(i,i) += prior_prec(i,j);
+		}
+
+		cholQ = chol(Q);
+		v = solve(cholQ.t(),means);
+		m = solve(cholQ,v);
+		z = Z.col(j);
+		y = solve(cholQ,z);
+
+		coefs.col(j) = y + m;
+	}
+	return(coefs);
+}
+// [[Rcpp::export()]]
+mat sample_coefs_parallel_c(
+					mat Y,
+					mat W,
+					vec h2,
+					vec tot_Y_prec,
+					mat prior_mean,
+					mat prior_prec,
+					List invert_aI_bZAZ,
+					int grainSize) {
+	
+	// Sample regression coefficients
+	// columns of matrices are independent
+	// each column conditional posterior is a MVN due to conjugacy
+
+
+	struct sampleColumn : public Worker {
+		mat WtU, UtY, prior_prec, Z;
+		vec h2, tot_Y_prec, s;
+		int b;
+		mat &coefs;
+
+		sampleColumn(mat WtU, mat UtY, mat prior_prec, mat Z, vec h2, vec tot_Y_prec, vec s, int b, mat &coefs) :
+			WtU(WtU), UtY(UtY), prior_prec(prior_prec), Z(Z), h2(h2), tot_Y_prec(tot_Y_prec), s(s), b(b), coefs(coefs) {}
+
+      	void operator()(std::size_t begin, std::size_t end) {
+			mat WtUDi, Q, cholQ;
+			vec means,v,m,y,z;
+			for(std::size_t j = begin; j < end; j++){
+				WtUDi = tot_Y_prec(j) * sweep_times(WtU,2,1.0/(h2(j) * s + (1-h2(j))));
+				means = WtUDi * UtY.col(j);
+				Q = WtUDi * WtU.t();
+				for(int i = 0; i < b; i++) {
+					Q(i,i) += prior_prec(i,j);
+				}
+
+				cholQ = chol(Q);
+				v = solve(cholQ.t(),means);
+				m = solve(cholQ,v);
+				z = Z.col(j);
+				y = solve(cholQ,z);
+
+				coefs.col(j) = y + m;
+			}
+		}
+	};
+
+	int p = tot_Y_prec.n_elem;
+	int b = W.n_cols;
+
+	mat U = as<mat>(invert_aI_bZAZ["U"]);
+	vec s = as<vec>(invert_aI_bZAZ["s"]);
+
+	mat WtU = W.t() * U;
+	mat UtY = U.t() * Y;
+
+	mat Z = randn(b,p);
+	mat coefs = zeros(b,p);
+
+	sampleColumn sampler(WtU, UtY, prior_prec, Z, h2, tot_Y_prec, s, b, coefs);
+	parallelFor(0,p,sampler,grainSize);
+	return(coefs);
+}
 
 // [[Rcpp::export()]]
 mat sample_Lambda_c(mat Y_tilde,
@@ -342,51 +450,34 @@ mat sample_px_factors_scores_c(mat Y_tilde,
 	return(F_px);
 }
 
+
 // [[Rcpp::export()]]
-vec sample_h2s_discrete_ipx_c (mat F,
-						int h2_divisions,
-						vec h2_priors,
-						vec F_e_prec,
-						List invert_aI_bZAZ){
-	// sample factor heritibilties from a discrete set on [0,1)
-	// prior places 50% of the weight at h2=0
-	// samples conditional on F, marginalizes over F_a.
-	// uses invert_aI_bZAZ.U and invert_aI_bZAZ.s to not have to invert aI + bZAZ
-	// each iteration.
+vec sample_tot_prec_c (mat Y,
+					   vec h2,
+					   double tot_Y_prec_shape,
+					   double tot_Y_prec_rate,
+					   List invert_aI_bZAZ
+					  ) {
 
 	mat U = as<mat>(invert_aI_bZAZ["U"]);
 	vec s = as<vec>(invert_aI_bZAZ["s"]);
 
-	int k = F.n_cols;
-	vec F_h2 = zeros(k);
+	mat UtY = U.t() * Y;
 
-	mat log_ps = zeros(k,h2_divisions);
-	mat std_scores_b = sweep_times(F.t() * U,1,sqrt(F_e_prec));
+	int n = Y.n_rows;
+	int p = Y.n_cols;
 
-	mat det_mat,std_scores;
-	mat det;
-	for(double i =0; i < h2_divisions; i+=1){
-		double h2 = (i)/(h2_divisions);
-		if(h2 > 0) {
-			std_scores = sweep_times(std_scores_b,2,1/sqrt(h2/(1-h2)*s+1));
-			det = sum(sum(log((h2/(1-h2)*s+1))/2)) * ones(1,k);
-		} else {
-			std_scores = F.t();
-			det = zeros(1,k);
-		}
-		log_ps.col(i) = sum(dnorm_std_log(std_scores),1) - det.t() + log(h2_priors(i));
+	vec tot_Y_prec = zeros(p);
+
+	for(int i = 0; i < p; i++){
+		vec Sigma_sqrt = sqrt(h2(i) * s + (1.0 - h2(i)));
+		vec SiUtY_i = UtY.col(i) / Sigma_sqrt;
+		vec prec = randg(1,distr_param(tot_Y_prec_shape + n/2, 1.0/(tot_Y_prec_rate + 0.5 * dot(SiUtY_i,SiUtY_i))));
+		tot_Y_prec(i) = prec(0);
 	}
-	for(int j =0; j < k; j++){
-		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
-		mat ps_j = exp(log_ps.row(j) - norm_factor);
-		log_ps.row(j) = ps_j;
-		vec r = randu(1);
-		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
-		F_h2(j) = double(selected.n_elem)/(h2_divisions);
-	}
-
-	return(F_h2);
+	return(tot_Y_prec);
 }
+
 // [[Rcpp::export()]]
 vec sample_h2s_discrete_given_p_c (mat Y,
 						int h2_divisions,
@@ -427,103 +518,6 @@ vec sample_h2s_discrete_given_p_c (mat Y,
 
 	return(h2);
 }
-
-// [[Rcpp::export()]]
-vec sample_h2s_discrete_c (mat F,
-						int h2_divisions,
-						vec h2_priors,
-						List invert_aI_bZAZ){
-	// sample factor heritibilties from a discrete set on [0,1)
-	// prior places 50% of the weight at h2=0
-	// samples conditional on F, marginalizes over F_a.
-	// uses invert_aI_bZAZ.U and invert_aI_bZAZ.s to not have to invert aI + bZAZ
-	// each iteration.
-
-	mat U = as<mat>(invert_aI_bZAZ["U"]);
-	vec s = as<vec>(invert_aI_bZAZ["s"]);
-
-	int k = F.n_cols;
-	vec F_h2 = zeros(k);
-
-	mat log_ps = zeros(k,h2_divisions);
-	mat std_scores_b = F.t() * U;
-
-	mat det_mat,std_scores;
-	mat det;
-	for(double i =0; i < h2_divisions; i+=1){
-		double h2 = (i)/(h2_divisions);
-		if(h2 > 0) {
-			std_scores = 1/sqrt(h2) * sweep_times(std_scores_b,2,1/sqrt(s+(1-h2)/h2));
-			det = sum(sum(log((s+(1-h2)/h2)*h2)/2)) * ones(1,k);
-		} else {
-			std_scores = F.t();
-			det = zeros(1,k);
-		}
-		log_ps.col(i) = sum(dnorm_std_log(std_scores),1) - det.t() + log(h2_priors(i));
-	}
-	for(int j =0; j < k; j++){
-		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
-		mat ps_j = exp(log_ps.row(j) - norm_factor);
-		log_ps.row(j) = ps_j;
-		vec r = randu(1);
-		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
-		F_h2(j) = double(selected.n_elem)/(h2_divisions);
-	}
-
-	return(F_h2);
-}
-
-// [[Rcpp::export()]]
-vec sample_prec_discrete_conditional_c(mat Y,
-									   int h2_divisions,
-									   vec h2_priors,
-									   List invert_aI_bZAZ,
-									   vec res_prec) {
-	//sample factor heritibilties conditional on a given residual precision
-	//(res_precision)
-	//prior given as relative weights on each of h2_divisions points. Doesn't
-	//have to be normalized
-	//samples conditional on F, marginalizes over F_a.
-	//uses invert_aI_bZAZ.U and invert_aI_bZAZ.s to not have to invert aI + bZAZ
-	//each iteration.
-	//ident_prec is a in the above equation.
-
-	mat U = as<mat>(invert_aI_bZAZ["U"]);
-	vec s = as<vec>(invert_aI_bZAZ["s"]);
-
-	int p = Y.n_cols;
-	int n = Y.n_rows;
-	vec Trait_h2 = zeros(p,1);
-
-	mat log_ps = zeros(p,h2_divisions);
-	mat std_scores_b = Y.t() * U;
-	mat det_mat,std_scores;
-	mat det;
-	for(double i =0; i < h2_divisions; i+=1){
-		double h2 = (i)/(h2_divisions);
-		if(h2 > 0) {
-			std_scores = sweep_times(sweep_times(std_scores_b,2,1/sqrt(s+(1-h2)/h2)),1,1/sqrt(h2/(res_prec*(1-h2))));
-			det_mat = log((s+(1-h2)/h2) * reshape(h2/(res_prec*(1-h2)),1,p))/2;
-			det = sum(det_mat,0).t();
-		} else {
-			std_scores = sweep_times(Y.t(),1,sqrt(res_prec));
-			det = n/2*log(1/res_prec);
-		}
-		log_ps.col(i) = sum(dnorm_std_log(std_scores),1) - det + log(h2_priors(i));
-	}
-	for(int j =0; j < p; j++){
-		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
-		mat ps_j = exp(log_ps.row(j) - norm_factor);
-		log_ps.row(j) = ps_j;
-		vec r = randu(1);
-		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
-		Trait_h2(j) = double(selected.n_elem)/(h2_divisions);
-	}
-	vec Prec = (res_prec % (1-Trait_h2))/Trait_h2;
-
-	return(Prec);
-}
-
 
 // [[Rcpp::export()]]
 mat sample_F_a_ipx_c (mat F,
