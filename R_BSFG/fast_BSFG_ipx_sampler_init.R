@@ -102,12 +102,18 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
     r2 = ncol(Z_2)
 
 
+    Z_1_sparse = Matrix(Z_1,sparse=T)
+    Z_2_sparse = Matrix(Z_2,sparse=T)
+
+
     data_matrices = list(
-		    Y         = Y,
-		    Z_1       = Z_1,
-		    Z_2       = Z_2,
-		    X         = X,
-            Y_missing = Y_missing
+		    Y           = Y,
+            Z_1         = Z_1,
+            Z_2         = Z_2,
+            Z_1_sparse  = Z_1_sparse,
+            Z_2_sparse  = Z_2_sparse,
+		    X           = X,
+            Y_missing   = Y_missing
     		)
     
     #fixed effect priors
@@ -289,19 +295,29 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
         U = result$u,
         s = result$d
     )
+    invert_aI_bZAZ$U_sparse = Matrix(invert_aI_bZAZ$U,sparse=T)
    
     #fixed effects + random effects 1
     #diagonalize mixed model equations for fast inversion: 
     #inv(a*bdiag(priors$b_X_prec,Ainv) + b*t(cbind(X,Z_1)) %*% cbind(X,Z_1)) = U %*% diag(1/(a*s1+b*s2)) %*% t(U)
-    Design= cbind(X,Z_1)
+ #    Design= cbind(X,Z_1)
+ #    Design2 = t(Design) %*% Design
+ #    result = GSVD_2_c(cholcov(bdiag(priors$b_X_prec,Ainv)),cholcov(Design2))
+	# invert_aPXA_bDesignDesignT = list(
+	# 	U = t(solve(result$X)),
+	# 	s1 = diag(result$C)^2,
+	# 	s2 = diag(result$S)^2
+	# 	)
+	# invert_aPXA_bDesignDesignT$Design_U = Design %*% invert_aPXA_bDesignDesignT$U
+    Design= cbind(Z_1)
     Design2 = t(Design) %*% Design
-    result = GSVD_2_c(cholcov(bdiag(priors$b_X_prec,Ainv)),cholcov(Design2))
-	invert_aPXA_bDesignDesignT = list(
-		U = t(solve(result$X)),
-		s1 = diag(result$C)^2,
-		s2 = diag(result$S)^2
-		)
-	invert_aPXA_bDesignDesignT$Design_U = Design %*% invert_aPXA_bDesignDesignT$U
+    result = GSVD_2_c(cholcov(Ainv),cholcov(Design2))
+    invert_aPXA_bDesignDesignT = list(
+        U = t(solve(result$X)),
+        s1 = diag(result$C)^2,
+        s2 = diag(result$S)^2
+        )
+    invert_aPXA_bDesignDesignT$Design_U = Design %*% invert_aPXA_bDesignDesignT$U
 
     #random effects 2
     #diagonalize mixed model equations for fast inversion: 
