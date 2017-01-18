@@ -236,6 +236,8 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
 		    F             = matrix(0,nr=0,nc=0),
 		    delta         = matrix(0,nr=0,nc=0),
             F_h2          = matrix(0,nr=0,nc=0),
+            tot_Y_prec    = matrix(0,nr=0,nc=0),
+            tot_F_prec    = matrix(0,nr=0,nc=0),
 		    resid_Y_prec  = matrix(0,nr = p,nc = 0),
 		    E_a_prec      = matrix(0,nr = p,nc = 0),
 		    W_prec        = matrix(0,nr = p,nc = 0),

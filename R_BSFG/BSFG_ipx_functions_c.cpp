@@ -75,7 +75,7 @@ mat sweep_times(mat x, int MARGIN, vec STATS){
 }
 
 mat dnorm_std_log(mat x){
-	return(log(1/sqrt(2*M_PI))-0.5* (x % x));
+	return(-0.5 * log(2.0*M_PI)-0.5* (x % x));
 }
 
 // [[Rcpp::export()]]
@@ -784,6 +784,7 @@ vec sample_h2s_discrete_given_p_c (mat Y,
 
 	return(h2);
 }
+
 // [[Rcpp::export()]]
 vec sample_h2s_discrete_given_p_sparse_c (mat Y,
 						int h2_divisions,
@@ -797,23 +798,20 @@ vec sample_h2s_discrete_given_p_sparse_c (mat Y,
 	sp_mat U = convertSparse(U_sparse);
 
 	int p = Y.n_cols;
+	int n = Y.n_rows;
 	vec h2 = zeros(p);
 
 	mat log_ps = zeros(p,h2_divisions);
 	mat std_scores_b = sweep_times(Y.t() * U,1,sqrt(Tot_prec));
 
-	mat det_mat,std_scores;
-	mat det;
+	vec s2s;
+	mat scores_2;
 	for(double i =0; i < h2_divisions; i+=1){
 		double h2 = (i)/(h2_divisions);
-		if(h2 > 0) {
-			std_scores = sweep_times(std_scores_b,2,1/sqrt(h2*s + (1-h2)));
-			det = sum(sum(log((h2*s + (1-h2)))/2)) * ones(1,p);
-		} else {
-			std_scores = Y.t();
-			det = zeros(1,p);
-		}
-		log_ps.col(i) = sum(dnorm_std_log(std_scores),1) - det.t() + log(h2_priors(i));
+		s2s = h2*s + (1-h2);
+		scores_2 = -sweep_times(std_scores_b % std_scores_b,2,0.5/s2s);
+		double det = -n/2 * log(2.0*M_PI) - 0.5*sum(log(s2s));
+		log_ps.col(i) = sum(scores_2,1) + det + log(h2_priors(i));
 	}
 	for(int j =0; j < p; j++){
 		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
@@ -858,13 +856,13 @@ mat sample_F_a_ipx_c (mat F,
 	mat F_a = zeros(r,k);
 
 	for(int j =0; j<k; j++) {
-		if(F_a_prec(j) > 10000) {
-			F_a.col(j) = zeros(r);
-		} else {
+		// if(F_a_prec(j) > 10000) {
+		// 	F_a.col(j) = zeros(r);
+		// } else {
 			vec d = s2*F_a_prec(j) + s1*F_e_prec(j);
 			vec mlam = b.col(j) / d;
 			F_a.col(j) = U * (mlam + z.col(j)/sqrt(d));
-		}
+		// }
 	}
 
 	return(F_a);
@@ -904,14 +902,76 @@ mat sample_F_a_ipx_sparse_c (mat F,
 	mat F_a = zeros(r,k);
 
 	for(int j =0; j<k; j++) {
-		if(F_a_prec(j) > 10000) {
-			F_a.col(j) = zeros(r);
-		} else {
+		// if(F_a_prec(j) > 10000) {
+		// 	F_a.col(j) = zeros(r);
+		// } else {
 			vec d = s2*F_a_prec(j) + s1*F_e_prec(j);
 			vec mlam = b.col(j) / d;
 			F_a.col(j) = U * (mlam + z.col(j)/sqrt(d));
-		}
+		// }
 	}
 
 	return(F_a);
 }
+
+
+// [[Rcpp::export()]]
+mat sample_randomEffects_parallel_sparse_c (mat Y,
+				S4 Z_sparse,
+				vec tot_prec,
+				vec h2,
+				List invert_aZZt_Ainv,
+				int grainSize ) {
+	//samples genetic effects on factors (F_a) conditional on the factor scores F:
+	// F_i = F_{a_i} + E_i, E_i~N(0,s2*(1-h2)*I) for each latent trait i
+	// U_i = zeros(r,1) if h2_i = 0
+	// it is assumed that s2 = 1 because this scaling factor is absorbed in
+	// Lambda
+	// invert_aZZt_Ainv has parameters to diagonalize a*Z*Z' + b*I for fast
+	// inversion:
+
+	vec a_prec = tot_prec / h2;
+	vec e_prec = tot_prec / (1-h2);
+
+	sp_mat Z = convertSparse(Z_sparse);
+
+	mat U = as<mat>(invert_aZZt_Ainv["U"]);
+	vec s1 = as<vec>(invert_aZZt_Ainv["s1"]);
+	vec s2 = as<vec>(invert_aZZt_Ainv["s2"]);
+
+	int p = Y.n_cols;
+	int r = Z.n_cols;
+	mat b = U.t() * Z.t() * sweep_times(Y,2,e_prec);
+
+	mat z = randn(r,p);
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
+	// vec z_v = as<vec>(rnorm(r*k));
+	// mat z = reshape(z_v,r,k);
+
+	mat effects = zeros(r,p);
+
+	struct sampleColumn : public Worker {
+		vec s1, s2, a_prec, e_prec;
+		mat U, b, z;
+		mat &effects;
+
+		sampleColumn(vec s1, vec s2, vec a_prec, vec e_prec, mat U, mat b, mat z, mat &effects) 
+			: s1(s1), s2(s2), a_prec(a_prec), e_prec(e_prec), U(U), b(b), z(z), effects(effects) {}
+
+      	void operator()(std::size_t begin, std::size_t end) {
+			vec d, mlam;
+			for(std::size_t j = begin; j < end; j++){
+				vec d = s2*a_prec(j) + s1*e_prec(j);
+				vec mlam = b.col(j) / d;
+				effects.col(j) = U * (mlam + z.col(j)/sqrt(d));
+			}
+		}
+	};
+
+	sampleColumn sampler(s1, s2, a_prec, e_prec, U, b, z, effects);
+	parallelFor(0,p,sampler,grainSize);
+
+	return(effects);
+}
+

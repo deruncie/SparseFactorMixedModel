@@ -596,7 +596,7 @@ reorder_factors = function(BSFG_state){
 
 	reorder_params = c('Lambda','Lambda_prec','Plam',
 						'delta','tauh',
-						'F','F_a','F_h2','F_a_prec','F_e_prec'
+						'F','F_a','F_h2','F_a_prec','F_e_prec','tot_F_prec'
 						)
 
 	# reorder currrent state

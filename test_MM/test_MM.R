@@ -9,8 +9,8 @@ svd_ZtZ = svd(t(Z) %*% Z)
 Q = svd_ZtZ$u
 d = svd_ZtZ$d
 
-s2G = 5
-s2R = .1
+s2G = 0
+s2R = 2
 
 g = rnorm(nG,0,sqrt(s2G))
 
@@ -73,7 +73,7 @@ pes = rgamma(1e5,shape = resid_prec_shape,rate = 1/resid_prec_rate)
 # lines(z,dbeta(seq(0,1,length=h2_divisions+1),2,2)[-(h2_divisions+1)])
 
 
-h2_divisions = 100
+h2_divisions = 10
 h2_priors = dbeta(seq(0,1,length=h2_divisions+1),2,2)[-(h2_divisions+1)]
 # h2_priors = h2_priors/sum(h2_priors)
 result = svd(Z %*% solve(Ainv) %*% t(Z))

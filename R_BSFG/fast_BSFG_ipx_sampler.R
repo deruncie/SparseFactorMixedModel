@@ -130,6 +130,9 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 	start_i      =   current_state$nrun
 	k = ncol(F)
 
+	current_state$tot_Y_prec = 1/resid_Y_prec + 1/E_a_prec
+	current_state$tot_F_prec = rep(1,k)
+
 	# ----------------------------------------------- #
 	# -----------Reset Global Random Number Stream--- #
 	# ----------------------------------------------- #
@@ -176,6 +179,8 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 		Posterior$F_a           = cbind(Posterior$F_a,matrix(0,nr = nrow(Posterior$F_a),nc = sp))
 		Posterior$delta         = cbind(Posterior$delta,matrix(0,nr = nrow(Posterior$delta),nc = sp))
 		Posterior$F_h2          = cbind(Posterior$F_h2,matrix(0,nr = nrow(Posterior$F_h2),nc = sp))
+		Posterior$tot_Y_prec    = cbind(Posterior$tot_Y_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
+		Posterior$tot_F_prec    = cbind(Posterior$tot_F_prec,matrix(0,nr = nrow(Posterior$tot_F_prec),nc = sp))
 		Posterior$resid_Y_prec  = cbind(Posterior$resid_Y_prec,matrix(0,nr = nrow(Posterior$resid_Y_prec),nc = sp))
 		Posterior$E_a_prec      = cbind(Posterior$E_a_prec,matrix(0,nr = nrow(Posterior$E_a_prec),nc = sp))
 		Posterior$W_prec        = cbind(Posterior$W_prec,matrix(0,nr = nrow(Posterior$W_prec),nc = sp))
@@ -230,13 +235,13 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
 		 # # -----Sample delta, update tauh------ #
-			delta = sample_delta( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2 )
+			delta = sample_delta_ipx( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
 			tauh  = cumprod(delta)
 			
 		 # # -----Update Plam-------------------- #
 			Plam = sweep(Lambda_prec,2,tauh,'*')
 
-		 # -----Sample resid_h2, tot_Y_prec ---------------- #
+		 # -----Sample resid_h2, tot_Y_prec, E_a ---------------- #
 			#conditioning on W, B, F, marginalizing over E_a 
 			# Y_tilde = Y - X %*% B - F %*% t(Lambda)  - Z_2 %*% W
 			Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda)  - Z_2_sparse %*% W)
@@ -247,25 +252,28 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			# resid_h2 = sample_h2s_discrete_given_p_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
 			resid_h2 = sample_h2s_discrete_given_p_sparse_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
 
+
+			E_a = sample_randomEffects_parallel_sparse_c( Y_tilde, Z_1_sparse, tot_Y_prec, resid_h2, invert_aZZt_Ainv, 1)
+
 			E_a_prec = tot_Y_prec / resid_h2
 			resid_Y_prec = tot_Y_prec / (1-resid_h2)
 
 		 # -----Sample E_a--------------- #
 			#conditioning on W, F, Lambda
 			# Y_tilde = Y - X %*% B - F %*% t(Lambda) - Z_2 %*% W
-			Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda) - Z_2_sparse %*% W)
+			# Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda) - Z_2_sparse %*% W)
 			# location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
 			# location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT)
 			# location_sample = sample_means_parallel_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT ,1)
 			# B   = location_sample[1:b,]
 			# E_a = location_sample[b+(1:r),]
-			E_a = sample_means_parallel_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT ,1)
+			# E_a = sample_randomEffects_parallel_sparse_c( Y_tilde, Z_1_sparse, tot_Y_prec, resid_h2, invert_aZZt_Ainv, 1)
 
 		 # -----Sample W ---------------------- #
 			#conditioning on B, E_a, F, Lambda
 			if(ncol(Z_2) > 0) {
 				# Y_tilde = Y - X %*% B - Z_1 %*% E_a - F %*% t(Lambda)
-				Y_tilde = as.matrix(Y - X %*% B - Z_1_sparse %*% E_a - F %*% t(Lambda))
+				Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda) - Z_1_sparse %*% E_a )
 				# location_sample = sample_means( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
 				# location_sample = sample_means_c( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
 				location_sample = sample_means_parallel_c( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2,1)
@@ -274,7 +282,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 		 # -----Sample F----------------------- #
 			#conditioning on B,F_a,E_a,W,Lambda, F_h2
 			
-		 # -----Sample F_h2 and tot_F_prec -------------------- #
+		 # -----Sample F_h2 and tot_F_prec, F_a -------------------- #
 			#conditioning on F, F_a
 			# U = invert_aI_bZAZ$U
 			# s = invert_aI_bZAZ$s
@@ -287,16 +295,31 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			# })
 			# tot_F_prec = sample_tot_prec_c(F,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
 			tot_F_prec = sample_tot_prec_sparse_c(F,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
+			# tot_F_prec = 0 * tot_F_prec + 1
 
 			# F_h2 = sample_h2s_discrete_given_p_c(F,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
 			F_h2 = sample_h2s_discrete_given_p_sparse_c(F,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
+
+	    	F_a = sample_randomEffects_parallel_sparse_c(F,Z_1_sparse,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
+
 			F_a_prec = tot_F_prec / F_h2
 			F_e_prec = tot_F_prec / (1-F_h2)
 			
 		 # -----Sample F_a--------------------- #
 			#conditioning on F, F_h2
 	    	# F_a = sample_F_a_ipx_c(F,Z_1,F_a_prec,F_e_prec,invert_aZZt_Ainv)
-	    	F_a = sample_F_a_ipx_sparse_c(F,Z_1_sparse,F_a_prec,F_e_prec,invert_aZZt_Ainv)
+	    	# tot_F_prec = 1/(1/F_a_prec +1/F_e_prec)
+	    	# F_a = sample_randomEffects_parallel_sparse_c(F,Z_1_sparse,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
+	    	# set.seed(1)
+	    	# w = .1;F_a0 = sample_F_a_ipx_sparse_c(F,Z_1_sparse,F_a_prec*w,(F_a_prec*w* tot_F_prec)/(F_a_prec*w - tot_F_prec),invert_aZZt_Ainv)
+	    	# set.seed(1)
+	    	# w = 10;F_a1 = sample_F_a_ipx_sparse_c(F,Z_1_sparse,F_a_prec*w,(F_a_prec*w* tot_F_prec)/(F_a_prec*w - tot_F_prec),invert_aZZt_Ainv)
+	    	# set.seed(1)
+	    	# w = 100;F_a2 = sample_F_a_ipx_sparse_c(F,Z_1_sparse,F_a_prec*w,(F_a_prec*w* tot_F_prec)/(F_a_prec*w - tot_F_prec),invert_aZZt_Ainv)
+	    	# set.seed(1)
+	    	# w = 1000;F_a3 = sample_F_a_ipx_sparse_c(F,Z_1_sparse,F_a_prec*w,(F_a_prec*w* tot_F_prec)/(F_a_prec*w - tot_F_prec),invert_aZZt_Ainv)
+	    	# set.seed(1)
+	    	# w = 10000;F_a4 = sample_F_a_ipx_sparse_c(F,Z_1_sparse,F_a_prec*w,(F_a_prec*w* tot_F_prec)/(F_a_prec*w - tot_F_prec),invert_aZZt_Ainv)
 
 		 # -----Sample F----------------------- #
 			#conditioning on B,F_a,E_a,W,Lambda, F_h2
@@ -317,6 +340,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 
 	 # -- adapt number of factors to samples ---#
 		current_state = update_k( current_state, priors, run_parameters, data_matrices)
+	current_state$tot_F_prec = with(current_state,1/(1/F_a_prec + 1/F_e_prec))
 
 	 # -- save sampled values (after thinning) -- #
 		if( (i-burn) %% thin == 0 && i > burn) {
