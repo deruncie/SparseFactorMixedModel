@@ -33,6 +33,7 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
 # ----------------------- #
     if(file.exists('../setup.RData')) {
         load('../setup.RData')
+        names(setup) = sub('.','_',names(setup),fixed=T)
     }
     else{
         require(R.matlab)
