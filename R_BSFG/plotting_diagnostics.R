@@ -22,8 +22,8 @@ draw_simulation_diagnostics = function(BSFG_state){
     Posterior = BSFG_state$Posterior
     Lambda = BSFG_state$current_state$Lambda
     F_h2 = BSFG_state$current_state$F_h2
-    E_a_prec = BSFG_state$current_state$E_a_prec
-    resid_Y_prec = BSFG_state$current_state$resid_Y_prec
+    E_a_prec = BSFG_state$current_state$tot_Y_prec / BSFG_state$current_state$resid_h2
+    resid_Y_prec = BSFG_state$current_state$tot_Y_prec / (1-BSFG_state$current_state$resid_h2)
 
     devices = dev.list()
     while(length(devices) < 4){
