@@ -63,6 +63,7 @@ sample_delta_ipx = function( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,d
 	k = length(tauh)
 	mat = Lambda_prec * Lambda2
 	n_genes = nrow(mat)
+	colsums_mat = colSums(mat)
 
 	for(i in 1:times) {
 
@@ -70,14 +71,9 @@ sample_delta_ipx = function( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,d
 		rate = delta_1_rate + 0.5*(1/delta[1])*sum(tauh*colSums(mat))
 		delta[1] = rgamma(1,shape = shape,rate = rate)
 		tauh = cumprod(delta)
-
 		for(h in 2:(k-1)) {
 			shape = delta_2_shape + 0.5*n_genes*(k-h+1)
-			if(h<k){
-				rate = delta_2_rate + 0.5*(1/delta[h])*sum(tauh[h:k]*colSums(mat[,h:k]))
-			} else{
-				rate = delta_2_rate + 0.5*(1/delta[h])*sum(tauh[h:k]*sum(mat[,h:k]))    	
-			}
+			rate = delta_2_rate + 0.5*(1/delta[h])*sum(tauh[h:k]*colsums_mat[h:k])
 			delta[h] = rgamma(1,shape = shape, rate = rate)
 			tauh = cumprod(delta)
 		}
