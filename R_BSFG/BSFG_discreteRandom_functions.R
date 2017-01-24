@@ -64,17 +64,17 @@ sample_MME_ZAZts = function(Y, W, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_ma
 	p = ncol(Y)
 	n = nrow(Y)
 	b = ncol(W)
-	pes = tot_Y_prec / (1-rowSums(h2s))
+	pes = tot_Y_prec / (1-colSums(h2s))
 
 	chunkSize = ceiling(p/ncores)
 	res = mclapply(1:ceiling(p/chunkSize),function(chunk) {
 		cols = 1:chunkSize + (chunk-1)*chunkSize
 		cols = cols[cols <= p]
 		thetas = do.call(cbind,lapply(cols,function(j) {
-			h2s_j = pmax(1e-10,h2s[j,])
+			h2s_j = pmax(1e-10,h2s[,j])
 			C = randomEffect_Cs[[h2_index[j]]]
 			C@x = C@x * tot_Y_prec[j]
-			chol_A = do.call(bdiag,lapply(1:ncol(h2s),function(i) {
+			chol_A = do.call(bdiag,lapply(1:nrow(h2s),function(i) {
 				chol_Ai = chol_As[[i]]
 				chol_Ai@x = chol_Ai@x *sqrt(h2s_j[i]/tot_Y_prec[j])
 				chol_Ai
@@ -105,7 +105,7 @@ sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigmas, h2s_ind
 	rgamma(p,shape = tot_Y_prec_shape + n/2, rate = tot_Y_prec_rate + 1/2*scores)
 }
 
-sample_h2s_discrete = function(Y,tot_Y_prec, Sigmas,h2_divisions,discrete_priors,ncores){
+sample_h2s_discrete = function(Y,tot_Y_prec, Sigmas,discrete_priors,ncores){
 # 	Y = Y[,1:98]
 # 	tot_Y_prec = tot_Y_prec[1:98]
 	n = nrow(Y)
@@ -142,7 +142,7 @@ sample_h2s_discrete = function(Y,tot_Y_prec, Sigmas,h2_divisions,discrete_priors
 		max_row = max(log_ps[j,])
 		norm_factor = max_row+log(sum(exp(log_ps[j,]-max_row)))
 		ps_j = exp(log_ps[j,] - norm_factor)
-		sum(runif(1)>cumsum(ps_j))
+		sum(runif(1)>cumsum(ps_j))+1
 	})
 	# }))
 	return(h2s_index)
@@ -160,31 +160,31 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 		F_var = 1/tot_F_prec
 		F_a = sweep(F_a,2,sqrt(F_var),'/')
 		F = sweep(F,2,sqrt(F_var),'/')
-		F_h2 = rowSums(F_h2)
-		resid_h2 = rowSums(resid_h2)
 		Lambda = sweep(Lambda,2,sqrt(F_var),'*')
 		sp = ncol(Posterior$Lambda)
+		# F_h2 = t(as.matrix(F_h2))
+		# resid_h2 = t(as.matrix(resid_h2))
 		#save factor samples
 		if(length(Lambda) > nrow(Posterior$Lambda)){
 			# expand factor sample matrix if necessary
-			Posterior$Lambda = rbind(Posterior$Lambda, 	matrix(0,nr = length(Lambda)-nrow(Posterior$Lambda),nc = sp))
-			Posterior$F      = rbind(Posterior$F, 	   	matrix(0,nr = length(F)     -nrow(Posterior$F),		nc = sp))
-			Posterior$F_a    = rbind(Posterior$F_a, 	matrix(0,nr = length(F_a) 	-nrow(Posterior$F_a),	nc = sp))
-			Posterior$delta  = rbind(Posterior$delta, 	matrix(0,nr = length(delta) -nrow(Posterior$delta),	nc = sp))
-			Posterior$F_h2   = rbind(Posterior$F_h2, 	matrix(0,nr = length(F_h2) 	-nrow(Posterior$F_h2),	nc = sp))
-			Posterior$tot_F_prec   = rbind(Posterior$tot_F_prec, 	matrix(0,nr = length(tot_F_prec) 	-nrow(Posterior$tot_F_prec),	nc = sp))
+			Posterior$Lambda     = rbind(Posterior$Lambda, 	    matrix(0,nr = length(Lambda)     -nrow(Posterior$Lambda),     nc = sp))
+			Posterior$F          = rbind(Posterior$F, 	   	    matrix(0,nr = length(F)          -nrow(Posterior$F),	      nc = sp))
+			Posterior$F_a        = rbind(Posterior$F_a, 	    matrix(0,nr = length(F_a) 	     -nrow(Posterior$F_a),	      nc = sp))
+			Posterior$delta      = rbind(Posterior$delta, 	    matrix(0,nr = length(delta)      -nrow(Posterior$delta),      nc = sp))
+			Posterior$F_h2       = rbind(Posterior$F_h2, 	    matrix(0,nr = length(F_h2) 	     -nrow(Posterior$F_h2),	      nc = sp))
+			Posterior$tot_F_prec = rbind(Posterior$tot_F_prec, 	matrix(0,nr = length(tot_F_prec) -nrow(Posterior$tot_F_prec), nc = sp))
 		}
-		Posterior$Lambda[1:length(Lambda),sp_num] = c(Lambda)
-		Posterior$F[1:length(F),sp_num]     = c(F)
-		Posterior$F_a[1:length(F_a),sp_num] = c(F_a)
-		Posterior$delta[1:length(delta),sp_num] = delta
-		Posterior$F_h2[1:length(F_h2),sp_num] = F_h2
+		Posterior$Lambda[1:length(Lambda),sp_num]         = c(Lambda)
+		Posterior$F[1:length(F),sp_num]                   = c(F)
+		Posterior$F_a[1:length(F_a),sp_num]               = c(F_a)
+		Posterior$delta[1:length(delta),sp_num]           = delta
+		Posterior$F_h2[1:length(F_h2),sp_num]             = c(F_h2)
 		Posterior$tot_F_prec[1:length(tot_F_prec),sp_num] = tot_F_prec
 
-		Posterior$tot_Y_prec[,sp_num] = tot_Y_prec
-		Posterior$resid_h2[,sp_num] = resid_h2
-		Posterior$resid_Y_prec[,sp_num] = tot_Y_prec/(1-resid_h2)
-		Posterior$E_a_prec[,sp_num]     = tot_Y_prec/resid_h2
+		Posterior$tot_Y_prec[,sp_num]   = tot_Y_prec
+		Posterior$resid_h2[,sp_num]     = c(resid_h2)
+		Posterior$resid_Y_prec[,sp_num] = tot_Y_prec/(1-colSums(resid_h2))
+		Posterior$E_a_prec[,sp_num]     = tot_Y_prec/colSums(resid_h2)
 
 		# save B,U,W
 		Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
@@ -194,6 +194,42 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 	return(Posterior)
 }
 
+
+clear_Posterior = function(BSFG_state) {
+	# resets Posterior samples if burnin was not sufficient
+	Posterior = BSFG_state$Posterior
+	run_parameters = BSFG_state$run_parameters
+
+	if(!is.null(ncol(Posterior$Lambda))) {    
+    	run_parameters$burn = run_parameters$burn + run_parameters$thin*ncol(Posterior$Lambda)
+    }
+
+    p = nrow(BSFG_state$current_state$Lambda)
+    b = max(0,ncol(BSFG_state$current_state$B))
+    n = nrow(BSFG_state$current_state$F)
+    r = nrow(BSFG_state$current_state$E_a)
+    n_RE = ncol(BSFG_state$current_state$resid_h2)
+    
+    Posterior = list(
+		    Lambda        = matrix(0,nr=0,nc=0),
+		    F_a           = matrix(0,nr=0,nc=0),
+		    F             = matrix(0,nr=0,nc=0),
+		    delta         = matrix(0,nr=0,nc=0),
+            tot_F_prec    = matrix(0,nr=0,nc=0),
+		    F_h2          = matrix(0,nr=0,nc=0),
+		    tot_Y_prec    = matrix(0,nr = p,nc = 0),
+		    resid_h2      = matrix(0,nr = p*n_RE,nc = 0),
+		    resid_Y_prec  = matrix(0,nr = p,nc = 0),
+		    E_a_prec      = matrix(0,nr = p,nc = 0),
+		    B             = matrix(0,nr = b,nc = p),
+		    E_a           = matrix(0,nr = r,nc = p)
+    	)
+
+    BSFG_state$Posterior = Posterior
+    BSFG_state$run_parameters = run_parameters
+    return(BSFG_state)
+
+}
 
 
 
@@ -227,11 +263,11 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				tauh = cumprod(delta)
 				Plam = sweep(Lambda_prec,2,tauh,'*')
 				Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
-				F_h2[k,] = runif(ncol(F_h2))
+				F_h2[,k] = runif(nrow(F_h2))
 				F_h2_index[k] = 1
 				tot_F_prec[k] = 1
-				F_a = cbind(F_a,rnorm(r,0,sqrt(sum(F_h2[k,]))))
-				F = cbind(F,rnorm(n,as.matrix(Z_all %*% F_a[,k]),sqrt(1-sum(F_h2[k,]))))
+				F_a = cbind(F_a,rnorm(r,0,sqrt(sum(F_h2[,k]))))
+				F = cbind(F,rnorm(n,as.matrix(Z_all %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
 				while(length(nonred) < 2) {
@@ -251,7 +287,7 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				delta = delta[nonred]
 				tauh = cumprod(delta)
 				Plam = sweep(Lambda_prec,2,tauh,'*')
-				F_h2 = F_h2[nonred,,drop=FALSE]
+				F_h2 = F_h2[,nonred,drop=FALSE]
 				F_h2_index = F_h2_index[nonred]
 				tot_F_prec = tot_F_prec[nonred]
 				F_a = F_a[,nonred]
@@ -261,4 +297,56 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 	current_state = current_state[current_state_members]
 
 	return(current_state)
+}
+
+reorder_factors = function(BSFG_state){
+	# re-orders factors in decreasing size of Lambda %*% F
+	# based on current state
+	# also re-orders Posterior
+
+	current_state = BSFG_state$current_state
+
+	Lambda = current_state$Lambda
+	F = current_state$F
+
+	# size is sum lambda_ij^2 * var(F_i)
+	sizes = colSums(Lambda^2) * colMeans(F^2)
+	factor_order = order(sizes,decreasing=T)
+
+	reorder_params = c('Lambda','Lambda_prec','Plam',
+						'delta','tauh',
+						'F','F_a','F_h2','F_a_prec','F_e_prec','tot_F_prec'
+						)
+
+	# reorder currrent state
+	for(param in reorder_params){
+		if(! param %in% names(current_state)) next
+		if(is.null(dim(current_state[[param]]))){
+			current_state[[param]] = current_state[[param]][factor_order]
+		} else if(dim(current_state[[param]])[2] == 1) {
+			current_state[[param]] = current_state[[param]][factor_order,,drop=F]			
+		} else {
+			current_state[[param]] = current_state[[param]][,factor_order]			
+		}
+	}
+	current_state$delta = c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)])
+	BSFG_state$current_state = current_state
+
+	# reorder Posterior
+	Posterior = BSFG_state$Posterior
+	if(ncol(Posterior$Lambda) == 0) return(BSFG_state)
+
+	p = BSFG_state$run_parameters$setup$p
+	k = dim(Posterior$Lambda)[1]/p
+	if(length(factor_order) < k) factor_order = c(factor_order,seq(length(factor_order)+1,k))
+	
+	for(param in reorder_params){
+		if(!param %in% names(Posterior)) next
+		n = dim(Posterior[[param]])[1]/k
+		index = matrix(1:(n*k),nrow = n)
+		Posterior[[param]] = Posterior[[param]][c(index[,factor_order]),]
+	}
+	BSFG_state$Posterior = Posterior
+
+	return(BSFG_state)
 }

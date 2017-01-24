@@ -30,17 +30,20 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 
 	sp = (start_i + n_samples - burn)/thin - ncol(Posterior$Lambda)
 	if(sp > 0){
-		Posterior$Lambda        = cbind(Posterior$Lambda,matrix(0,nr = nrow(Posterior$Lambda),nc = sp))
-		Posterior$F             = cbind(Posterior$F,matrix(0,nr = nrow(Posterior$F),nc = sp))
-		Posterior$F_a           = cbind(Posterior$F_a,matrix(0,nr = nrow(Posterior$F_a),nc = sp))
-		Posterior$delta         = cbind(Posterior$delta,matrix(0,nr = nrow(Posterior$delta),nc = sp))
-		Posterior$tot_Y_prec    = cbind(Posterior$tot_Y_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
-		Posterior$resid_h2      = cbind(Posterior$resid_h2  ,matrix(0,nr = nrow(Posterior$resid_h2  ),nc = sp))
-		Posterior$tot_F_prec    = cbind(Posterior$tot_F_prec,matrix(0,nr = nrow(Posterior$tot_F_prec),nc = sp))
-		Posterior$F_h2          = cbind(Posterior$F_h2,matrix(0,nr = nrow(Posterior$F_h2),nc = sp))
-		Posterior$resid_Y_prec  = cbind(Posterior$resid_Y_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
-		Posterior$E_a_prec      = cbind(Posterior$E_a_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
-		Posterior$W_prec        = cbind(Posterior$W_prec,matrix(0,nr = nrow(Posterior$W_prec),nc = sp))
+		for(param in names(Posterior)){
+			if(param %in% c('B','E_a')) next
+			Posterior[[param]] = cbind(Posterior[[param]],matrix(0,nr = nrow(Posterior[[param]]),nc = sp))
+		}
+		# Posterior$Lambda        = cbind(Posterior$Lambda,matrix(0,nr = nrow(Posterior$Lambda),nc = sp))
+		# Posterior$F             = cbind(Posterior$F,matrix(0,nr = nrow(Posterior$F),nc = sp))
+		# Posterior$F_a           = cbind(Posterior$F_a,matrix(0,nr = nrow(Posterior$F_a),nc = sp))
+		# Posterior$delta         = cbind(Posterior$delta,matrix(0,nr = nrow(Posterior$delta),nc = sp))
+		# Posterior$tot_Y_prec    = cbind(Posterior$tot_Y_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
+		# Posterior$resid_h2      = cbind(Posterior$resid_h2  ,matrix(0,nr = nrow(Posterior$resid_h2  ),nc = sp))
+		# Posterior$tot_F_prec    = cbind(Posterior$tot_F_prec,matrix(0,nr = nrow(Posterior$tot_F_prec),nc = sp))
+		# Posterior$F_h2          = cbind(Posterior$F_h2,matrix(0,nr = nrow(Posterior$F_h2),nc = sp))
+		# Posterior$resid_Y_prec  = cbind(Posterior$resid_Y_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
+		# Posterior$E_a_prec      = cbind(Posterior$E_a_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
 	}
 
 	# ----------------------------------------------- #
@@ -84,7 +87,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
 		 # # -----Sample delta, update tauh------ #
-			delta = sample_delta_ipx( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
+			delta = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
 			tauh  = cumprod(delta)
 			
 		 # # -----Update Plam-------------------- #
@@ -93,11 +96,10 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 		 # -----Sample tot_Y_prec, resid_h2, E_a ---------------- #
 			#conditioning on B, F, Lambda, resid_h2, tot_Y_prec
 			Y_tilde = Y - X %*% B - F %*% t(Lambda)
-
 			tot_Y_prec = sample_tot_prec(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, Sigmas, resid_h2_index,ncores)
-			resid_h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigmas,h2_divisions,Resid_discrete_priors,ncores)
-			resid_h2 = h2_divisions[resid_h2_index,,drop=FALSE]
-			E_a_prec = tot_Y_prec / rowSums(resid_h2)
+			resid_h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigmas,Resid_discrete_priors,ncores)
+			resid_h2 = h2_divisions[,resid_h2_index,drop=FALSE]
+			E_a_prec = tot_Y_prec / colSums(resid_h2)
 
 			# Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda))
 			# tot_Y_prec = sample_tot_prec_sparse_c(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, inverse_Sigmas, resid_h2_index)
@@ -112,8 +114,8 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			#conditioning on B, F, Lambda, F_h2, tot_F_prec
 
 			tot_F_prec = sample_tot_prec(F, tot_F_prec_shape, tot_F_prec_rate, Sigmas, F_h2_index,ncores)
-			F_h2_index = sample_h2s_discrete(F,tot_F_prec, Sigmas,h2_divisions,F_discrete_priors,ncores)
-			F_h2 = h2_divisions[F_h2_index,,drop=FALSE]
+			F_h2_index = sample_h2s_discrete(F,tot_F_prec, Sigmas,F_discrete_priors,ncores)
+			F_h2 = h2_divisions[,F_h2_index,drop=FALSE]
 
 			# tot_F_prec = sample_tot_prec_sparse_c(F, tot_F_prec_shape, tot_F_prec_rate, inverse_Sigmas, F_h2_index)
 
@@ -126,8 +128,8 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,Lambda, F_h2
 			Y_tilde = as.matrix(Y - X %*% B - Z_all %*% E_a)
-			F_e_prec = tot_F_prec / (1-rowSums(F_h2))
-			resid_Y_prec = tot_Y_prec / (1-rowSums(resid_h2))
+			F_e_prec = tot_F_prec / (1-colSums(F_h2))
+			resid_Y_prec = tot_Y_prec / (1-colSums(resid_h2))
 			F = sample_factors_scores_ipx_sparse_c( Y_tilde, Z_all,Lambda,resid_Y_prec,F_a,F_e_prec )
 	
 	})

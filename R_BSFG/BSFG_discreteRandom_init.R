@@ -59,7 +59,7 @@ BSFG_discreteRandom_init = function(Y, fixed, randomEffects, data, priors, run_p
 
 	h2_divisions = expand.grid(lapply(RE_names,function(re) 0:run_parameters$discrete_divisions)) / run_parameters$discrete_divisions
 	colnames(h2_divisions) = RE_names
-	h2_divisions = h2_divisions[rowSums(h2_divisions) < 1,,drop=FALSE]
+	h2_divisions = t(h2_divisions[rowSums(h2_divisions) < 1,,drop=FALSE])
 
 	data_matrices = list(
 		Y             = Y,
@@ -117,15 +117,15 @@ BSFG_discreteRandom_init = function(Y, fixed, randomEffects, data, priors, run_p
 
     # Factor discrete variances
      # k-matrix of n_RE x k with 
-    F_h2_index = sample(1:nrow(h2_divisions),k,replace=T)
-    F_h2 = h2_divisions[F_h2_index,,drop=FALSE]
+    F_h2_index = sample(1:ncol(h2_divisions),k,replace=T)
+    F_h2 = h2_divisions[,F_h2_index,drop=FALSE]
 
     F_a = lapply(RE_names,function(effect){
-    	matrix(rnorm(r_RE[effect] * k, 0, sqrt(F_h2[,effect] / tot_F_prec)),ncol = k, byrow = T)
+    	matrix(rnorm(r_RE[effect] * k, 0, sqrt(F_h2[effect,] / tot_F_prec)),ncol = k, byrow = T)
     })
     names(F_a) = RE_names
 
-    F = matrix(rnorm(n * k, 0, sqrt(rowSums(F_h2 / tot_F_prec))),ncol = k, byrow = T)
+    F = matrix(rnorm(n * k, 0, sqrt(rowSums(t(F_h2) / tot_F_prec))),ncol = k, byrow = T)
     for(effect in RE_names) {
     	F = F + Z_matrices[[effect]] %*% F_a[[effect]]
     }
@@ -140,11 +140,11 @@ BSFG_discreteRandom_init = function(Y, fixed, randomEffects, data, priors, run_p
 
     # Resid discrete variances
      # p-matrix of n_RE x p with 
-    resid_h2_index = sample(1:nrow(h2_divisions),p,replace=T)
-    resid_h2 = h2_divisions[resid_h2_index,,drop=FALSE]
+    resid_h2_index = sample(1:ncol(h2_divisions),p,replace=T)
+    resid_h2 = h2_divisions[,resid_h2_index,drop=FALSE]
 
     E_a = do.call(rbind,lapply(RE_names,function(effect){
-    	matrix(rnorm(r_RE[effect] * k, 0, sqrt(resid_h2[,effect] / tot_Y_prec)),ncol = k, byrow = T)
+    	matrix(rnorm(r_RE[effect] * k, 0, sqrt(resid_h2[effect,] / tot_Y_prec)),ncol = k, byrow = T)
     }))
 
   # Fixed effects
@@ -160,13 +160,13 @@ BSFG_discreteRandom_init = function(Y, fixed, randomEffects, data, priors, run_p
 		Plam             = Plam,
 		Lambda           = Lambda,
 		tot_F_prec       = tot_F_prec,
-		F_h2_index      = F_h2_index,
-		F_h2            = F_h2,
+		F_h2_index       = F_h2_index,
+		F_h2             = F_h2,
 		F_a              = F_a,
 		F                = F,
 		tot_Y_prec       = tot_Y_prec,
-		resid_h2_index  = resid_h2_index,
-		resid_h2        = resid_h2,
+		resid_h2_index   = resid_h2_index,
+		resid_h2         = resid_h2,
 		E_a              = E_a,
 		B                = B,
 		nrun             = 0
@@ -178,23 +178,24 @@ BSFG_discreteRandom_init = function(Y, fixed, randomEffects, data, priors, run_p
 # ----------------------- #
 
     # Posterior = clear_Posterior(current_state, c('Lambda','delta','F_h2','F_a','F','tot_Y_prec','resid_h2','E_a','B'))
-r2 = 0
-    Posterior = list(
-		    Lambda        = matrix(0,nr=0,nc=0),
-		    F_a           = matrix(0,nr=0,nc=0),
-		    F             = matrix(0,nr=0,nc=0),
-		    delta         = matrix(0,nr=0,nc=0),
-            tot_F_prec    = matrix(0,nr=0,nc=0),
-            F_h2          = matrix(0,nr=0,nc=0),
-            tot_Y_prec    = matrix(0,nr = p,nc = 0),
-            resid_h2      = matrix(0,nr = p,nc = 0),
-            resid_Y_prec  = matrix(0,nr = p,nc = 0),
-            E_a_prec      = matrix(0,nr = p,nc = 0),
-		    B             = matrix(0,nr = b,nc = p),
-		    E_a           = matrix(0,nr = sum(r_RE),nc = p),
-            W_prec        = matrix(0,nr = p,nc = 0),
-		    W             = matrix(0,nr = r2,nc = p)
-    	)
+# r2 = 0
+#     Posterior = list(
+# 		    Lambda        = matrix(0,nr=0,nc=0),
+# 		    F_a           = matrix(0,nr=0,nc=0),
+# 		    F             = matrix(0,nr=0,nc=0),
+# 		    delta         = matrix(0,nr=0,nc=0),
+#             tot_F_prec    = matrix(0,nr=0,nc=0),
+#             F_h2          = matrix(0,nr=0,nc=0),
+#             tot_Y_prec    = matrix(0,nr = p,nc = 0),
+#             resid_h2      = matrix(0,nr = p,nc = 0),
+#             resid_Y_prec  = matrix(0,nr = p,nc = 0),
+#             E_a_prec      = matrix(0,nr = p,nc = 0),
+# 		    B             = matrix(0,nr = b,nc = p),
+# 		    E_a           = matrix(0,nr = sum(r_RE),nc = p),
+#             W_prec        = matrix(0,nr = p,nc = 0),
+# 		    W             = matrix(0,nr = r2,nc = p)
+#     	)
+    Posterior = clear_Posterior(list(current_state = current_state))$Posterior
 
 # ------------------------------------ #
 # ----Precalculate ZAZts, chol_As ---- #
@@ -223,8 +224,8 @@ r2 = 0
     Ai_mats = lapply(1:n_RE,function(i) chol2inv(chol_As[[i]]))
 
     ZtZ = crossprod(Z_all)
-    randomEffect_Cs = lapply(1:nrow(h2_divisions),function(i) {    	
-    	h2s = h2_divisions[i,]
+    randomEffect_Cs = lapply(1:ncol(h2_divisions),function(i) {    	
+    	h2s = h2_divisions[,i]
     	h2s = pmax(1e-10,h2s)
 		Ai = do.call(bdiag,lapply(1:length(h2s),function(i) Ai_mats[[i]]/h2s[i]))
 		C = ZtZ/(1-sum(h2s))
@@ -239,9 +240,9 @@ r2 = 0
 		}
 		R + (1-sum(h2s)) * Diagonal(nrow(R))
 	}
-
-	Sigmas = lapply(1:nrow(h2_divisions),function(i) {
-		Sigma = make_Sigma(ZAZts,h2_divisions[i,])
+	
+	Sigmas = lapply(1:ncol(h2_divisions),function(i) {
+		Sigma = make_Sigma(ZAZts,h2_divisions[,i])
 		det = det(Sigma)
 		chol = chol(Sigma)
 		list(Sigma = Sigma, det = det,chol = chol)
