@@ -1,42 +1,42 @@
-source('~/Runcie Lab/SparseFactorMixedModel_v2/R_BSFG/BSFG_functions.R')
-setwd("~/Runcie Lab/SparseFactorMixedModel_v2/MCMC/5/5/Lambda1.5_delta2shape3")
-BSFGOld = "BSFG_state.RData"
+#source('~/Runcie Lab/SparseFactorMixedModel_v2/R_BSFG/BSFG_functions.R')
+#setwd("~/Runcie Lab/SparseFactorMixedModel_v2/MCMC/5/5/Lambda1.5_delta2shape3")
+#BSFGOld = "BSFG_state.RData"
 #BSFGNew = "BSFG_fixedlambda65.RData"
 #BSFGStar = "BSFG_fixedlambda75.RData"
-BSFGNew = "BSFG_state6.RData"
-BSFGStar = "BSFG_state7.RData"
-target = "F_h2"
-load(BSFGOld)
-traitnames = BSFG_state$traitnames
+#BSFGNew = "BSFG_state6.RData"
+#BSFGStar = "BSFG_state7.RData"
+#target = "F_h2"
+#load(BSFGOld)
+#traitnames = BSFG_state$traitnames
 #old.traces.G = G_Traces_Comp(BSFG_state)
-old.G = G_Matrix_Comp(BSFG_state)
-p = BSFG_state$run_variables$p
-spn = dim(BSFG_state$Posterior[[target]])[2]
+#old.G = G_Matrix_Comp(BSFG_state)
+#p = BSFG_state$run_variables$p
+#spn = dim(BSFG_state$Posterior[[target]])[2]
 # posterior mean
 # do this in case the value of k differ for this two models and there in no lambda in BSFG_state_fixed case
 #Lambda = BSFG_state$Posterior$Lambda
-load(BSFGNew)
+#load(BSFGNew)
 #BSFG_state$Posterior$Lambda = Lambda
-new.G = G_Matrix_Comp(BSFG_state)
+#new.G = G_Matrix_Comp(BSFG_state)
 
-load(BSFGStar)
+#load(BSFGStar)
 #BSFG_state$Posterior$Lambda = Lambda
-star.G = G_Matrix_Comp(BSFG_state)
+#star.G = G_Matrix_Comp(BSFG_state)
 #new.traces.G = G_Traces_Comp(BSFG_state)
 
 
 # The distance of two matrix(in predicted phenotype value/level)
 #selection gradient
-beta = 0.3609
-beta.v = c(0,beta,rep(0,16))
-traces.traits = matrix(,p,spn)
+#beta = 0.3609
+#beta.v = c(0,beta,rep(0,16))
+#traces.traits = matrix(,p,spn)
 
 #old.G in list form
-old.traces.traits = sapply(old.G,function(x)x%*%beta.v)
+#old.traces.traits = sapply(old.G,function(x)x%*%beta.v)
 #old.traits.posmean = apply(old.traces.traits,1,mean)
-new.traces.traits = sapply(new.G,function(x)x%*%beta.v)
+#new.traces.traits = sapply(new.G,function(x)x%*%beta.v)
 #new.traits.posmean = apply(new.traces.traits,1,mean)
-star.traces.traits = sapply(star.G,function(x)x%*%beta.v)
+#star.traces.traits = sapply(star.G,function(x)x%*%beta.v)
 #star.traits.posmean = apply(star.traces.traits,1,mean)
 #boxplot(old.traces_traits[2,])
 #boxplot(t(old.traces.traits))
