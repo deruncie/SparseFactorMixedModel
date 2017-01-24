@@ -46,9 +46,9 @@ sample_Lambda = function( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
 	  means = c()
 	  Qlam = c()
 	  for(pop in pops){
-		  FUDi = E_a_prec[[pop]][j] * sweep(FtU[[pop]],2,(s[[pop]] + E_a_prec[[pop]][j]/resid_Y_prec[j]),'/')
-		  means = means + FUDi %*% UtY[[pop]][,j]
-		  Qlam = Qlam + FUDi %*% t(FtU[[pop]]) 
+		  FUDi = E_a_prec[j] * sweep(FtU,2,(s + E_a_prec[j]/resid_Y_prec[j]),'/')
+		  means = means + FUDi %*% UtY[,j]
+		  Qlam = Qlam + FUDi %*% t(FtU) 
 		}
 	  Qlam = Qlam + diag(Plam[j,])
 
@@ -64,6 +64,7 @@ sample_Lambda = function( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
 
 	return(Lambda)
 }
+
 
 sample_prec_discrete_conditional = function(Y,h2_divisions,h2_priors,invert_aI_bZAZ,res_prec) {
 	#sample factor heritibilties conditional on a given residual precision
@@ -206,6 +207,7 @@ sample_means = function( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDes
 	return(location_sample)
 }
 
+
 sample_F_a = function(F,Z_1,F_h2,invert_aZZt_Ainv) {
 	#samples genetic effects on factors (F_a) conditional on the factor scores F:
 	# F_i = F_{a_i} + E_i, E_i~N(0,s2*(1-h2)*I) for each latent trait i
@@ -246,6 +248,8 @@ sample_F_a = function(F,Z_1,F_h2,invert_aZZt_Ainv) {
 	return(F_a)
 }
 
+
+
 sample_factors_scores = function( Y_tilde, Z_1,Lambda,resid_Y_prec,F_a,F_h2 ) {
 #Sample factor scores given factor loadings (F_a), factor heritabilities (F_h2) and
 #phenotype residuals
@@ -272,6 +276,7 @@ sample_factors_scores = function( Y_tilde, Z_1,Lambda,resid_Y_prec,F_a,F_h2 ) {
 	F = t(backsolve(S,t(Meta + matrix(rnorm(prod(dim(Meta))),nr = nrow(Meta)))))
 	return(F)
 }
+
 
 
 sample_delta = function( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2 ) {
@@ -410,10 +415,56 @@ save_posterior_samples = function( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F
 	Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
 	Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
 	Posterior$W   = (Posterior$W*(sp_num-1) + W)/sp_num
-
 	return(Posterior)
 }
-                                               
+  
+save_posterior_samples_comb = function( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec) {
+  # save posteriors. Full traces are kept of the more interesting parameters.
+  # Only the posterior means are kept of less interesting parameters. These
+  # should be correctly calculated over several re-starts of the sampler.
+  
+  # first unlist F, F_a, F_h2, Y, B, E_a
+  nl = length(F_h2)
+  F = unlist(do.call("rbind", F)) # n*k
+  F_a = unlist(do.call("rbind", F_a)) #n*k
+  F_h2 = Reduce("+", F_h2)/nl # k taking average
+  B = Reduce("+",B)/nl # b*p taking average
+  E_a = unlist(do.call("rbind", E_a)) # n*k
+  W = Reduce("+",W)/nl  # k*p taking average
+  resid_Y_prec = Reduce("+",resid_Y_prec)/nl #p taking average
+  E_a_prec = Reduce("+",E_a_prec)/nl #p
+  W_prec = Reduce("+",W_prec)/nl  #p
+  
+  #sp = ncol(Posterior$Lambda)
+  sp = ncol(Posterior$Lambda)
+  #size(Posterior$Lambda,2)
+  #save factor samples
+  # #if(length(Lambda) > nrow(Posterior[["Lambda"]])){  this will not happen since we stop updatek
+  #   # expand factor sample matrix if necessary
+  #   Posterior[["F"]]      = rbind(Posterior[["F"]], 	   	matrix(0,nr = length(F)     -nrow(Posterior[["F"]]),		nc = sp))
+  #   Posterior[["F_a"]]    = rbind(Posterior[["F_a"]], 	matrix(0,nr = length(F_a) 	-nrow(Posterior[["F_a"]]),	nc = sp))
+  #   Posterior[["delta"]]  = rbind(Posterior[["delta"]], 	matrix(0,nr = length(delta) -nrow(Posterior[["delta"]]),	nc = sp))
+  #   Posterior[["F_h2"]]   = rbind(Posterior[["F_h2"]], 	matrix(0,nr = length(F_h2) 	-nrow(Posterior[["F_h2"]]),	nc = sp))
+  # }
+  Posterior$Lambda[1:length(Lambda),sp_num] = c(Lambda)
+  Posterior$F[1:length(F),sp_num]     = c(F)
+  Posterior$F_a[1:length(F_a),sp_num] = c(F_a)
+  Posterior$delta[1:length(delta),sp_num] = delta
+  Posterior$F_h2[1:length(F_h2),sp_num] = F_h2
+  
+  Posterior$resid_Y_prec[,sp_num] = resid_Y_prec
+  Posterior$E_a_prec[,sp_num]     = E_a_prec
+  Posterior$W_prec[,sp_num]       = W_prec
+  
+  # save B,U,W
+  Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
+  Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
+  Posterior$W   = (Posterior$W*(sp_num-1) + W)/sp_num
+  
+  return(Posterior)
+}
+
+
 save_posterior_samples_fixedlambda = function( j,Posterior,F,F_a,B,W,E_a,F_h2,resid_Y_prec,E_a_prec,W_prec) {
   # save posteriors. Full traces are kept of the more interesting parameters.
   # Only the posterior means are kept of less interesting parameters. These
@@ -442,7 +493,7 @@ save_posterior_samples_fixedlambda = function( j,Posterior,F,F_a,B,W,E_a,F_h2,re
   Posterior$E_a = (Posterior$E_a*(j-1) + E_a)/j
   Posterior$W   = (Posterior$W*(j-1) + W)/j
   
-  return(Posterior)
+  return(Posterior) 
 }
 
 
