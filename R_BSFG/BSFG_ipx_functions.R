@@ -68,7 +68,7 @@ sample_delta_ipx = function( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,d
 	for(i in 1:times) {
 
 		shape = delta_1_shape + 0.5*n_genes*k
-		rate = delta_1_rate + 0.5*(1/delta[1])*sum(tauh*colSums(mat))
+		rate = delta_1_rate + 0.5*(1/delta[1])*sum(tauh*colsums_mat)
 		delta[1] = rgamma(1,shape = shape,rate = rate)
 		tauh = cumprod(delta)
 		for(h in 2:(k-1)) {
