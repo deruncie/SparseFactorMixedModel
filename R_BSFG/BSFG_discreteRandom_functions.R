@@ -174,12 +174,21 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 			Posterior$F_h2       = rbind(Posterior$F_h2, 	    matrix(0,nr = length(F_h2) 	     -nrow(Posterior$F_h2),	      nc = sp))
 			Posterior$tot_F_prec = rbind(Posterior$tot_F_prec, 	matrix(0,nr = length(tot_F_prec) -nrow(Posterior$tot_F_prec), nc = sp))
 		}
-		Posterior$Lambda[1:length(Lambda),sp_num]         = c(Lambda)
-		Posterior$F[1:length(F),sp_num]                   = c(F)
-		Posterior$F_a[1:length(F_a),sp_num]               = c(F_a)
-		Posterior$delta[1:length(delta),sp_num]           = delta
-		Posterior$F_h2[1:length(F_h2),sp_num]             = c(F_h2)
-		Posterior$tot_F_prec[1:length(tot_F_prec),sp_num] = tot_F_prec
+		if(nrow(Posterior$Lambda) > length(Lambda)){
+			# reduce factor matrices if necessary
+			Posterior$Lambda = Posterior$Lambda[1:length(Lambda),]
+			Posterior$F = Posterior$F[1:length(F),]
+			Posterior$F_a = Posterior$F_a[1:length(F_a),]
+			Posterior$delta = Posterior$delta[1:length(delta),]
+			Posterior$F_h2 = Posterior$F_h2[1:length(F_h2),]
+			Posterior$tot_F_prec = Posterior$tot_F_prec[1:length(tot_F_prec),]
+		}
+		Posterior$Lambda[,sp_num]     = c(Lambda)
+		Posterior$F[,sp_num]          = c(F)
+		Posterior$F_a[,sp_num]        = c(F_a)
+		Posterior$delta[,sp_num]      = delta
+		Posterior$F_h2[,sp_num]       = c(F_h2)
+		Posterior$tot_F_prec[,sp_num] = tot_F_prec
 
 		Posterior$tot_Y_prec[,sp_num]   = tot_Y_prec
 		Posterior$resid_h2[,sp_num]     = c(resid_h2)
@@ -263,7 +272,7 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				tauh = cumprod(delta)
 				Plam = sweep(Lambda_prec,2,tauh,'*')
 				Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
-				F_h2[,k] = runif(nrow(F_h2))
+				F_h2 = cbind(F_h2,runif(nrow(F_h2)))
 				F_h2_index[k] = 1
 				tot_F_prec[k] = 1
 				F_a = cbind(F_a,rnorm(r,0,sqrt(sum(F_h2[,k]))))
