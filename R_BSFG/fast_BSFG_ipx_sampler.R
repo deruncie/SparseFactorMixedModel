@@ -91,7 +91,6 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 		Posterior$F_h2          = cbind(Posterior$F_h2,matrix(0,nr = nrow(Posterior$F_h2),nc = sp))
 		Posterior$resid_Y_prec  = cbind(Posterior$resid_Y_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
 		Posterior$E_a_prec      = cbind(Posterior$E_a_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
-		Posterior$W_prec        = cbind(Posterior$W_prec,matrix(0,nr = nrow(Posterior$W_prec),nc = sp))
 	}
 
 	# ----------------------------------------------- #
@@ -108,21 +107,20 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 		 # -----fill in missing phenotypes----- #
 			#conditioning on everything else
 			if(sum(Y_missing)>0) {
-				meanTraits = X %*% B + F %*% t(Lambda) + Z_1_sparse %*% E_a + Z_2_sparse %*% W
+				meanTraits = X %*% B + F %*% t(Lambda) + Z_1_sparse %*% E_a
 				resids = matrix(rnorm(p*n,0,sqrt(1/resid_Y_prec)),nr = n,nc = p,byrow=T)
 				Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
 			}
 			# recover()
 			  
 		 # -----Sample Lambda and B ------------------ #
-			#conditioning on W, F, marginalizing over E_a
-			Y_tilde = as.matrix(Y - Z_2_sparse %*% W)
+			#conditioning on F, marginalizing over E_a
 
 			Design = as.matrix(cbind(X,F))
 			rows = b + k
 			prior_mean = matrix(0,rows,p)
 			prior_prec = rbind(0,t(Plam))
-			coefs = sample_coefs_parallel_sparse_c( Y_tilde,Design,resid_h2, tot_Y_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
+			coefs = sample_coefs_parallel_sparse_c( Y,Design,resid_h2, tot_Y_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
 
 			if(b > 0){
 				B = coefs[1:b,]
@@ -134,7 +132,8 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
 		 # # -----Sample delta, update tauh------ #
-			delta = sample_delta_ipx( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
+			# delta = sample_delta_ipx( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
+			delta = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
 			tauh  = cumprod(delta)
 			
 		 # # -----Update Plam-------------------- #
@@ -142,7 +141,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 
 		 # -----Sample resid_h2, tot_Y_prec, E_a ---------------- #
 			#conditioning on W, B, F, Lambda, marginalizing over E_a 
-			Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda)  - Z_2_sparse %*% W)
+			Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda))
 			tot_Y_prec = sample_tot_prec_sparse_c(Y_tilde,resid_h2,tot_Y_prec_shape,tot_Y_prec_rate,invert_aI_bZAZ)
 
 			resid_h2 = sample_h2s_discrete_given_p_sparse_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
@@ -150,14 +149,6 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			E_a = sample_randomEffects_parallel_sparse_c( Y_tilde, Z_1_sparse, tot_Y_prec, resid_h2, invert_aZZt_Ainv, 1)
 
 			resid_Y_prec = tot_Y_prec / (1-resid_h2)
-
-		 # -----Sample W ---------------------- #
-			#conditioning on B, E_a, F, Lambda
-			if(ncol(Z_2) > 0) {
-				Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda) - Z_1_sparse %*% E_a )
-				location_sample = sample_means_parallel_c( Y_tilde, resid_Y_prec, W_prec, invert_aA_bZ2tZ2,1)
-				W = location_sample
-			}
 			
 		 # -----Sample F_h2 and tot_F_prec, F_a -------------------- #
 			#conditioning on F, F_a
@@ -169,16 +160,10 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,W,Lambda, F_h2
-			Y_tilde = as.matrix(Y - X %*% B - Z_1_sparse %*% E_a - Z_2_sparse %*% W)
+			Y_tilde = as.matrix(Y - X %*% B - Z_1_sparse %*% E_a)
 			F_e_prec = tot_F_prec / (1-F_h2)
 			F = sample_factors_scores_ipx_sparse_c( Y_tilde, Z_1_sparse,Lambda,resid_Y_prec,F_a,F_e_prec )
-					
-		 # -----Sample W_prec------------------ #
-			if(ncol(Z_2) > 0) {
-				W_prec =  rgamma(p, W_prec_shape + r2/2,rate = W_prec_rate + 1/2*colSums((chol_A_2_inv %*% W)^2))
-			}
-		 
-	
+						
 	})
 	current_state = current_state[current_state_names]
 

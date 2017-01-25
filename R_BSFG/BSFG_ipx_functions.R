@@ -21,23 +21,31 @@ save_posterior_samples_ipx = function( sp_num, current_state, Posterior) {
 			Posterior$F_h2   = rbind(Posterior$F_h2, 	matrix(0,nr = length(F_h2) 	-nrow(Posterior$F_h2),	nc = sp))
 			Posterior$tot_F_prec   = rbind(Posterior$tot_F_prec, 	matrix(0,nr = length(tot_F_prec) 	-nrow(Posterior$tot_F_prec),	nc = sp))
 		}
-		Posterior$Lambda[1:length(Lambda),sp_num] = c(Lambda)
-		Posterior$F[1:length(F),sp_num]     = c(F)
-		Posterior$F_a[1:length(F_a),sp_num] = c(F_a)
-		Posterior$delta[1:length(delta),sp_num] = delta
-		Posterior$F_h2[1:length(F_h2),sp_num] = F_h2
-		Posterior$tot_F_prec[1:length(tot_F_prec),sp_num] = tot_F_prec
+		if(nrow(Posterior$Lambda) > length(Lambda)){
+			# reduce factor matrices if necessary
+			Posterior$Lambda = Posterior$Lambda[1:length(Lambda),]
+			Posterior$F = Posterior$F[1:length(F),]
+			Posterior$F_a = Posterior$F_a[1:length(F_a),]
+			Posterior$delta = Posterior$delta[1:length(delta),]
+			Posterior$F_h2 = Posterior$F_h2[1:length(F_h2),]
+			Posterior$tot_F_prec = Posterior$tot_F_prec[1:length(tot_F_prec),]
+		}
+
+		Posterior$Lambda[,sp_num] = c(Lambda)
+		Posterior$F[,sp_num]     = c(F)
+		Posterior$F_a[,sp_num] = c(F_a)
+		Posterior$delta[,sp_num] = delta
+		Posterior$F_h2[,sp_num] = F_h2
+		Posterior$tot_F_prec[,sp_num] = tot_F_prec
 
 		Posterior$tot_Y_prec[,sp_num] = tot_Y_prec
 		Posterior$resid_h2[,sp_num] = resid_h2
 		Posterior$resid_Y_prec[,sp_num] = tot_Y_prec/(1-resid_h2)
 		Posterior$E_a_prec[,sp_num]     = tot_Y_prec/resid_h2
-		Posterior$W_prec[,sp_num]       = W_prec
 
 		# save B,U,W
 		Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
 		Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
-		Posterior$W   = (Posterior$W*(sp_num-1) + W)/sp_num
 		Posterior
 	})
 	return(Posterior)
@@ -96,7 +104,6 @@ clear_Posterior = function(BSFG_state) {
     b = nrow(Posterior$B)
     n = nrow(Posterior$W)
     r = nrow(Posterior$E_a)
-    r2 = nrow(Posterior$W)
     
     Posterior = list(
 		    Lambda        = matrix(0,nr=0,nc=0),
@@ -109,9 +116,7 @@ clear_Posterior = function(BSFG_state) {
 		    resid_h2      = matrix(0,nr = p,nc = 0),
 		    resid_Y_prec  = matrix(0,nr = p,nc = 0),
 		    E_a_prec      = matrix(0,nr = p,nc = 0),
-		    W_prec        = matrix(0,nr = p,nc = 0),
 		    B             = matrix(0,nr = b,nc = p),
-		    W             = matrix(0,nr = r2,nc = p),
 		    E_a           = matrix(0,nr = r,nc = p)
     	)
 

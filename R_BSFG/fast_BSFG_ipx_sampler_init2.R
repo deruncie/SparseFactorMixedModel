@@ -60,7 +60,7 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
     	run_parameters$setup = setup
         run_parameters$name = setup$name
     }
-	    run_parameters$simulation = simulation
+    run_parameters$simulation = simulation
 
     #normalize Y to have zero mean and unit variances among observed values,
     #allowing for NaNs.
@@ -93,26 +93,13 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
     stopifnot(nrow(X) == n)
     b = ncol(X)
     
-    
-    #Determine if a second random effects design matrix exists. If not, make a
-    #dummy matrix
-    if(! 'Z_2' %in% ls()) {
-        Z_2=matrix(0,nr = n,nc = 0)
-    }
-    stopifnot(nrow(Z_2) == n)
-    r2 = ncol(Z_2)
-
-
     Z_1_sparse = Matrix(Z_1,sparse=T)
-    Z_2_sparse = Matrix(Z_2,sparse=T)
 
 
     data_matrices = list(
 		    Y           = Y,
             Z_1         = Z_1,
-            Z_2         = Z_2,
             Z_1_sparse  = Z_1_sparse,
-            Z_2_sparse  = Z_2_sparse,
 		    X           = X,
             Y_missing   = Y_missing
     		)
@@ -192,18 +179,6 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
     #       sd = sqrt(1-F_h2') for each row.
     F = as.matrix(Z_1 %*% F_a + matrix(rnorm(k*n,0,sqrt(1-F_h2)),nr = n,nc = k, byrow = T))
     
-    # p-vector of specific precisions of residuals on factors, random effect 2. 
-	#  Prior: Gamma distribution for each element
-    #       shape = W_a_prec_shape
-    #       rate = W_a_prec_rate
-    W_prec       = with(priors,rgamma(p,shape = W_prec_shape,rate = W_prec_rate))
-    
-    # Genetic effects not accounted for by factors.
-    #   Prior: Normal distribution on each element.
-    #       mean = 0
-    #       sd = 1./sqrt(W_a_prec)' on each row
-    W = matrix(rnorm(p*r2,0,sqrt(1/W_prec)),nr = r2, nc = p, byrow = T)
-
     # Fixed effect coefficients.
 	#  Prior: Normal distribution for each element
     #       mean = 0
@@ -223,11 +198,9 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
             F_h2          = matrix(0,nr=0,nc=0),
             tot_Y_prec    = matrix(0,nr = p,nc = 0),
             resid_h2      = matrix(0,nr = p,nc = 0),
-            W_prec        = matrix(0,nr = p,nc = 0),
             resid_Y_prec  = matrix(0,nr = p,nc = 0),
             E_a_prec      = matrix(0,nr = p,nc = 0),
 		    B             = matrix(0,nr = b,nc = p),
-		    W             = matrix(0,nr = r2,nc = p),
 		    E_a           = matrix(0,nr = r,nc = p)
     	)
 # ----------------------- #
@@ -243,12 +216,10 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
             resid_h2      = resid_h2,
             tot_F_prec    = tot_F_prec,
             F_h2          = F_h2,
-    		W_prec        = W_prec,
     		F_a           = F_a,
     		F             = F,
     		E_a           = E_a,
     		B             = B,
-    		W             = W,
     		nrun 		  = 0
     	)
 
@@ -261,8 +232,6 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
     #invert the random effect covariance matrices
     Ainv = solve(A)
     chol_Ainv = chol(Ainv)
-    A_2_inv = Matrix(diag(1,r2),sparse=T) #Z_2 random effects are assumed to have covariance proportional to the identity. Can be modified.
-    chol_A_2_inv = A_2_inv # need to change with real A_2_inv
 
     #pre-calculate transformation parameters to diagonalize aI + bZAZ for fast
     #inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
@@ -278,21 +247,6 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
     )
     invert_aI_bZAZ$U_sparse = Matrix(invert_aI_bZAZ$U,sparse=T)
    
-    #random effects 2
-    #diagonalize mixed model equations for fast inversion: 
-    #inv(a*A_2_inv + b*Z_2'Z_2]) = U*diag(1./(a.*s1+b.*s2))*U'
-    if(r2 > 0) {
-	    result = GSVD_2_c(cholcov(A_2_inv),cholcov(t(Z_2) %*% Z_2))
-		invert_aA_bZ2tZ2 = list(
-			U = t(solve(result$X)),
-			s1 = diag(result$C)^2,
-			s2 = diag(result$S)^2
-			)
-		invert_aA_bZ2tZ2$Z_U = Z_2 %*% invert_aA_bZ2tZ2$U
-	} else{
-		invert_aA_bZ2tZ2 = list()
-	}
-
     #genetic effect variances of factor traits
     # diagonalizing a*Z_1'*Z_1 + b*Ainv for fast inversion
     #diagonalize mixed model equations for fast inversion: 
@@ -314,17 +268,13 @@ fast_BSFG_ipx_sampler_init = function(priors,run_parameters){
 			p                = p,
 			n                = n,
 			r                = r,
-			r2               = r2,
 			b                = b,
 			Mean_Y           = Mean_Y,
 			VY               = VY,
             Ainv             = Ainv,
-            A_2_inv          = A_2_inv,
             chol_Ainv        = chol_Ainv,
-            chol_A_2_inv     = chol_A_2_inv,
 			invert_aI_bZAZ   = invert_aI_bZAZ,
-			invert_aZZt_Ainv = invert_aZZt_Ainv,
-			invert_aA_bZ2tZ2 = invert_aA_bZ2tZ2
+			invert_aZZt_Ainv = invert_aZZt_Ainv
     )
 
     RNG = list(
