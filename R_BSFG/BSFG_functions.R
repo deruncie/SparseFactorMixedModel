@@ -617,7 +617,7 @@ reorder_factors = function(BSFG_state){
 	Posterior = BSFG_state$Posterior
 	if(ncol(Posterior$Lambda) == 0) return(BSFG_state)
 
-	p = BSFG_state$run_parameters$setup$p
+	p = nrow(Lambda)
 	k = dim(Posterior$Lambda)[1]/p
 	if(length(factor_order) < k) factor_order = c(factor_order,seq(length(factor_order)+1,k))
 	

@@ -160,7 +160,7 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				F_h2[k] = runif(1)
 				tot_F_prec[k] = 1
 				F_a = cbind(F_a,rnorm(r,0,sqrt(F_h2[k])))
-				F = cbind(F,rnorm(n,as.matrix(Z_1 %*% F_a[,k]),sqrt(1-F_h2[k])))
+				F = cbind(F,rnorm(n,as.matrix(Z_sparse %*% F_a[,k]),sqrt(1-F_h2[k])))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
 				while(length(nonred) < 2) {

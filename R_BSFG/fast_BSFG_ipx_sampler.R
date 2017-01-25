@@ -32,8 +32,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 	#     data_matrices: struct holding the (should be imutable) data, design and incidence matrices:
 	#          Y:  		Full phenotype data. n x p
 	# 		   X: 		Fixed effect design matrix. n x b
-	#          Z_1:     Random effect 1 incidence matrix. n x r1
-	#          Z_2:     Random effect 2 incidence matrix. n x r2
+	#          Z_1:     Random effect 1 incidence matrix. n x r
 	#          Y_missing: incidence matrix of missing data in Y
 	#     start_i: iteration number of the end of the last run.
 	#     draw_iter: frequency of updating diagnostic plots
@@ -107,7 +106,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 		 # -----fill in missing phenotypes----- #
 			#conditioning on everything else
 			if(sum(Y_missing)>0) {
-				meanTraits = X %*% B + F %*% t(Lambda) + Z_1_sparse %*% E_a
+				meanTraits = X %*% B + F %*% t(Lambda) + Z_sparse %*% E_a
 				resids = matrix(rnorm(p*n,0,sqrt(1/resid_Y_prec)),nr = n,nc = p,byrow=T)
 				Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
 			}
@@ -146,7 +145,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 
 			resid_h2 = sample_h2s_discrete_given_p_sparse_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
 
-			E_a = sample_randomEffects_parallel_sparse_c( Y_tilde, Z_1_sparse, tot_Y_prec, resid_h2, invert_aZZt_Ainv, 1)
+			E_a = sample_randomEffects_parallel_sparse_c( Y_tilde, Z_sparse, tot_Y_prec, resid_h2, invert_aZZt_Ainv, 1)
 
 			resid_Y_prec = tot_Y_prec / (1-resid_h2)
 			
@@ -156,13 +155,13 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 
 			F_h2 = sample_h2s_discrete_given_p_sparse_c(F,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
 
-	    	F_a = sample_randomEffects_parallel_sparse_c(F,Z_1_sparse,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
+	    	F_a = sample_randomEffects_parallel_sparse_c(F,Z_sparse,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
 			
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,W,Lambda, F_h2
-			Y_tilde = as.matrix(Y - X %*% B - Z_1_sparse %*% E_a)
+			Y_tilde = as.matrix(Y - X %*% B - Z_sparse %*% E_a)
 			F_e_prec = tot_F_prec / (1-F_h2)
-			F = sample_factors_scores_ipx_sparse_c( Y_tilde, Z_1_sparse,Lambda,resid_Y_prec,F_a,F_e_prec )
+			F = sample_factors_scores_ipx_sparse_c( Y_tilde, Z_sparse,Lambda,resid_Y_prec,F_a,F_e_prec )
 						
 	})
 	current_state = current_state[current_state_names]
