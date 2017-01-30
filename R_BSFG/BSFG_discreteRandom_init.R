@@ -144,7 +144,7 @@ BSFG_discreteRandom_init = function(Y, fixed, randomEffects, data, priors, run_p
     resid_h2 = h2_divisions[,resid_h2_index,drop=FALSE]
 
     E_a = do.call(rbind,lapply(RE_names,function(effect){
-    	matrix(rnorm(r_RE[effect] * k, 0, sqrt(resid_h2[effect,] / tot_Y_prec)),ncol = k, byrow = T)
+    	matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Y_prec)),ncol = p, byrow = T)
     }))
 
   # Fixed effects
@@ -226,8 +226,13 @@ BSFG_discreteRandom_init = function(Y, fixed, randomEffects, data, priors, run_p
     ZtZ = crossprod(Z_all)
     randomEffect_Cs = lapply(1:ncol(h2_divisions),function(i) {    	
     	h2s = h2_divisions[,i]
-    	h2s = pmax(1e-10,h2s)
-		Ai = do.call(bdiag,lapply(1:length(h2s),function(i) Ai_mats[[i]]/h2s[i]))
+		Ai = do.call(bdiag,lapply(1:length(h2s),function(i) {
+				if(h2s[i] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0
+					Diagonal(nrow(Ai_mats[[i]]),Inf)
+				} else{
+					Ai_mats[[i]]/h2s[i]  
+				}
+			}))
 		C = ZtZ/(1-sum(h2s))
 		C = C + Ai
 		C

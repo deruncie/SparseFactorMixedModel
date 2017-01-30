@@ -1,54 +1,73 @@
-
-sample_MME_single_diagA = function(y,W,C,RinvSqW,prior_mean,prior_prec,chol_R){
+# re-formulating based on Ainv instead of A.
+sample_MME_single_diagA_inv_v2 = function(y, W, C, RinvSqW, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec) {
+	# R is aZAZ + bI
+	#    we have to do Ainv_inv to form R - losing much sparsity
+	# 	 then form chol_R
+	# 	 check whether solve(t(chol_Rinv),theta) or chol_R %*% theta is better.
+	# G is diagonal (fixed effect) - prior prec
+	# C is built from Ainv so is good.
 	# prior_prec must be > 0
 	n = length(y)
 	n_theta = length(prior_prec)
 	theta_star = prior_mean + rnorm(n_theta)/sqrt(prior_prec)
-	e_star = chol_R %*% rnorm(n)
+	e_star = (chol_R) %*% rnorm(n) / sqrt(tot_Y_prec)
 	W_theta_star = W %*% theta_star
-
+# recover()
 	y_resid = y - W_theta_star - e_star@x
-	WtRinvy = crossprod(RinvSqW,solve(t(chol_R),y_resid))
+	if(!is.null(R_Perm)) {
+		y_resid_p = R_Perm %*% y_resid
+	} else{
+		y_resid_p = y_resid
+	}
+	
+	WtRinvy = crossprod(RinvSqW, solve(Cholesky_R,y_resid_p,'L')) * tot_Y_prec# * sqrt(tot_Y_prec))
 
 	theta_tilda = solve(C,WtRinvy)
 
 	theta = theta_tilda@x + theta_star
-	return(theta)
+	theta
 }
-sample_MME_single_diagR = function(y,W,C,pe,prior_mean,chol_A){
+sample_MME_single_diagR_inv = function(y,W,Cholesky_C,pe,prior_mean,chol_A_inv,tot_Y_prec){
+	# replace chol_A %*% theta with solve(t(chol_A_inv),theta)
 	n = length(y)
-	n_theta = nrow(chol_A)
-	theta_star = chol_A %*% rnorm(n_theta)
+	n_theta = nrow(chol_A_inv)
+	theta_star = solve(t(chol_A_inv),rnorm(n_theta))
 	theta_star = theta_star@x + prior_mean
 	e_star = rnorm(n)/sqrt(pe)
 	W_theta_star = W %*% theta_star
-
 	y_resid = y - W_theta_star@x - e_star
 	WtRiy = crossprod(W,y_resid*pe)
 
-	theta_tilda = solve(C,WtRiy)
+	theta_tilda = solve(Cholesky_C,WtRiy) / tot_Y_prec
 
 	theta = theta_tilda@x + theta_star
 	return(theta)
 }
 
-sample_MME_fixedEffects = function(Y,W,Sigmas, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){
+sample_MME_fixedEffects_inv_v2 = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){
 	require(parallel)
 	# using method described in MCMC Course notes
 	p = ncol(Y)
 	n = nrow(Y)
 	b = ncol(W)
+	Wp = W
+	Yp = Y
+	if(!is.null(Sigma_Perm)) {
+		Wp = Sigma_Perm %*% W
+		Yp = Sigma_Perm %*% Y
+		Yp = matrix(Yp,nrow(Y))
+	}
 	chunkSize = ceiling(p/ncores)
 	res = mclapply(1:ceiling(p/chunkSize),function(chunk) {
 		cols = 1:chunkSize + (chunk-1)*chunkSize
 		cols = cols[cols <= p]
 		thetas = do.call(cbind,lapply(cols,function(j) {
-			chol_R = Sigmas[[h2s_index[j]]]$chol #/ sqrt(tot_Y_prec[j])
-			chol_R@x = chol_R@x / sqrt(tot_Y_prec[j])
-			RinvSqW = solve(t(chol_R),W)
-			C = crossprod(RinvSqW)
+			Cholesky_R = Sigma_Choleskys[[h2s_index[j]]]$Cholesky_Sigma
+			chol_R = Sigma_Choleskys[[h2s_index[j]]]$chol_Sigma
+			RinvSqW = solve(Cholesky_R,Wp,'L')
+			C = crossprod(RinvSqW) * tot_Y_prec[j]
 			diag(C) = diag(C) + prior_prec[,j]
-			theta_j = sample_MME_single_diagA(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],chol_R)			
+			theta_j = sample_MME_single_diagA_inv_v2(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j])
 			theta_j
 		}))
 		thetas
@@ -57,47 +76,8 @@ sample_MME_fixedEffects = function(Y,W,Sigmas, h2s_index, tot_Y_prec, prior_mean
 	res
 }
 
-# sample_MME_fixedEffects_c = function(Y,W,Sigmas, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){
-# 	require(parallel)
-# 	# using method described in MCMC Course notes
-# 	p = ncol(Y)
-# 	n = nrow(Y)
-# 	b = ncol(W)
-# recover()
-# 	chunkSize = ceiling(p/ncores)
-# 	res = mclapply(1:ceiling(p/chunkSize),function(chunk) {
-# 		cols = 1:chunkSize + (chunk-1)*chunkSize
-# 		cols = cols[cols <= p]
-# 		thetas = do.call(cbind,lapply(cols,function(j) {
-# 			chol_R = Sigmas[[h2s_index[j]]]$chol #/ sqrt(tot_Y_prec[j])
-# 			chol_R@x = chol_R@x / sqrt(tot_Y_prec[j])
-# 			RinvSqW = solve(t(chol_R),W)
-# 			C = crossprod(RinvSqW)
-# 			diag(C) = diag(C) + prior_prec[,j]
-# 			W = Matrix(W,sparse=T)
-# 			W2 = as.matrix(W)
-# 			W = as.matrix(W)
-# 			C = as.matrix(C)
-# 			W = Matrix(W,sparse=T)
-# 			C = Matrix(C,sparse=T)
-# 			RinvSqW = Matrix(RinvSqW,sparse=T)
-# 			chol_R = Matrix(chol_R,sparse=T)
-# 			set.seed(2)
-# 			theta_j1 = rowMeans(sapply(1:1000,function(x) sample_MME_single_diagA_c(Y[,j], W2, as.matrix(C), matrix(RinvSqW@x,nr = 250), prior_mean[,j],prior_prec[,j],chol_R)))			
-# 			set.seed(2)
-# 			theta_j2 = rowMeans(sapply(1:1000,function(x) sample_MME_single_diagA(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],chol_R)))			
-# 			plot(theta_j1,theta_j2);abline(0,1)
-# 			microbenchmark(sample_MME_single_diagA(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],chol_R),
-# 				sample_MME_single_diagA_c(Y[,j], W2, as.matrix(C), matrix(RinvSqW@x,nr = 250), prior_mean[,j],prior_prec[,j],chol_R))
-# 			theta_j
-# 		}))
-# 		thetas
-# 	},mc.cores = ncores)
-# 	res = do.call(cbind,res)
-# 	res
-# }
-
-sample_MME_ZAZts = function(Y, W, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_mats, h2s, h2_index, chol_As,ncores){
+sample_MME_ZAZts_inv = function(Y, W, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, h2s, h2_index, chol_As,ncores){
+	# todo . . .
 	require(parallel)
 	# using method described in MCMC Course notes
 	p = ncol(Y)
@@ -111,15 +91,15 @@ sample_MME_ZAZts = function(Y, W, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_ma
 		cols = cols[cols <= p]
 		thetas = do.call(cbind,lapply(cols,function(j) {
 			h2s_j = h2s[,j]
-			C = randomEffect_Cs[[h2_index[j]]]
-			C@x = C@x * tot_Y_prec[j]
+			Cholesky_C = randomEffect_C_Choleskys[[h2_index[j]]]
+			# C@x = C@x * tot_Y_prec[j]  # this won't work if C is a Choleksy. See about removing tot_Y_prec directly from Y.
 			chol_A = do.call(bdiag,lapply(1:nrow(h2s),function(i) {
 				if(h2s_j[i] == 0) return(Diagonal(nrow(chol_As[[i]]),0))  # if h2==0, then we want a Diagonal matrix with 0 diagonal.
 				chol_Ai = chol_As[[i]]
 				chol_Ai@x = chol_Ai@x *sqrt(h2s_j[i]/tot_Y_prec[j])
 				chol_Ai
 			}))
-			theta_j = sample_MME_single_diagR(Y[,j], W, C, pes[j], prior_mean[,j],chol_A)			
+			theta_j = sample_MME_single_diagR_inv(Y[,j], W, Cholesky_C, pes[j], prior_mean[,j],chol_A,tot_Y_prec[j])			
 			theta_j
 		}))
 		thetas
@@ -128,51 +108,50 @@ sample_MME_ZAZts = function(Y, W, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_ma
 	res
 }
 
-sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigmas, h2s_index,ncores){
+sample_tot_prec_inv_v2 = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys,Sigma_Perm, h2s_index,ncores){
+	# recover()
 	n = nrow(Y)
 	p = ncol(Y)
 
+	Yp = Y
+	if(!is.null(Sigma_Perm)){
+		Yp = Sigma_Perm %*% Y
+		Yp = matrix(Yp,nrow(Y))
+	}
 	chunkSize = ceiling(p/ncores)
 	scores = mclapply(1:ceiling(p/chunkSize),function(chunk) {
 		cols = 1:chunkSize + (chunk-1)*chunkSize
 		cols = cols[cols <= p]
 		sapply(cols,function(j) {
-			chol_Sigma = Sigmas[[h2s_index[j]]]$chol
-			sum(solve(t(chol_Sigma),Y[,j])^2)
+			Cholesky_Sigma = Sigma_Choleskys[[h2s_index[j]]]$Cholesky_Sigma
+			sum(solve(Cholesky_Sigma,Yp[,j],'L')^2)
 		})
 	},mc.cores = ncores)
 	scores = do.call(c,scores)
 	rgamma(p,shape = tot_Y_prec_shape + n/2, rate = tot_Y_prec_rate + 1/2*scores)
 }
 
-sample_h2s_discrete = function(Y,tot_Y_prec, Sigmas,discrete_priors,ncores){
-	recover()
+sample_h2s_discrete_inv_v2 = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discrete_priors,ncores){
 	n = nrow(Y)
 	p = ncol(Y)
 	discrete_bins = length(discrete_priors)
+
+	Yp = Y
+	if(!is.null(Sigma_Perm)){
+		Yp = Sigma_Perm %*% Y
+		Yp = matrix(Yp,nrow(Y))
+	}
 
 	chunkSize = ceiling(discrete_bins/ncores)
 	log_ps = mclapply(1:ceiling(discrete_bins/chunkSize),function(chunk) {
 		rows = 1:chunkSize + (chunk-1)*chunkSize
 		rows = rows[rows <= discrete_bins]
 		sapply(rows,function(i) {
-			chol_R = Sigmas[[i]]$chol
-			det_R = Sigmas[[i]]$det
-			# scores_2 = tot_Y_prec*diag(crossprod(Y,solve(R,Y)))
-			scores_2 = tot_Y_prec*colSums(solve(t(chol_R),Y)^2)
+			Cholesky_Sigma = Sigma_Choleskys[[i]]$Cholesky_Sigma
+			log_det_Sigma = Sigma_Choleskys[[i]]$log_det
+			scores_2 = tot_Y_prec*colSums(solve(Cholesky_Sigma,Yp,'L')^2)
 
-			# Ri = solve(R)
-			# scores_2b = tot_Y_prec*diag(crossprod(Y,Ri %*% Y))
-
-			# chol_Ri = chol(ri)
-			# scores_2c = tot_Y_prec*diag(crossprod(chol_Ri %*% Y))
-			# scores_2d = tot_Y_prec*colSums((chol_Ri %*% Y)^2)
-			# chol_R = chol(R)
-			# scores_2e = tot_Y_prec*colSums(solve(chol_R, Y)^2)
-
-			# microbenchmark(diag(crossprod(Y,solve(R,Y))),diag(crossprod(Y,Ri %*% Y)),diag(crossprod(chol_Ri %*% Y)),tot_Y_prec*colSums((chol_Ri %*% Y)^2),tot_Y_prec*colSums(solve(chol(R), Y)^2))
-
-			log_ps = -n/2 * log(2*pi) - 1/2*(log(det_R) - n*log(tot_Y_prec)) - 1/2 * scores_2 + log(discrete_priors[i])
+			log_ps = -n/2 * log(2*pi) - 1/2*(log_det_Sigma - n*log(tot_Y_prec)) - 1/2 * scores_2 + log(discrete_priors[i])
 			log_ps
 		})
 	},mc.cores = ncores)

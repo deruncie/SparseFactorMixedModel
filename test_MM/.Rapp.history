@@ -1,550 +1,914 @@
-cAs
-chol(As)
-expand(Cholesky(As))
-cAs = chol(As)
-expand(update(Cholesky(As),2*As))
-a=expand(Cholesky(As))
-a
-a$P
-solve(a$P)
-solve(a$P) - t(a$P)
-sl = solve(a$L)
-sl
-a$Li = solve(a$L)
-with(a,t(P %*% L %*% t(L) %*% P))
-As
-with(a,t(P) %*% L %*% t(L) %*% P)
-with(a,t(P) %*% Li %*% t(Li) %*% P)
-solve(As)
-with(a,(P) %*% Li %*% t(Li) %*% t(P))
-with(a,solve(P) %*% Li %*% t(Li) %*% solve(t(P)))
-cAs
-det(cAs)
-sum(diag(cAs))
-prod(diag(cAs))
-det(solve(cAs))
-1/prod(diag(cAs))
-formula
-lm
-get_all_vars
-?get_all_vars
-formula = ~A+B
-get_all_vars(formula)
-formula[[1]]
-formula[1]
-formula[2]
-formula[3]
-get_all_vars(formula[2])
-?model.matrix(formula)
-names(formula[2])
-?formula
-terms(formula[2])
-formula[2]
-formula[[2]]
-terms(formula[[2]])
-is(formula[[2]])
-formula[[2]][1]
-formula[[2]][2]
-formula[[2]][2]
-formula[[2]][[2]]
-formula[[2]][[3]]
-length(formula[[2]])
-?expand.grid
-expand.grid(1:2,1:3,1:4)
-RE_names = c('A','B','C')
-run_parameters$discrete_divisions = 5
-discreteVariances = expand.grid(sapply(RE_names,function(re) 0:run_parameters$discrete_divisons))
-run_parameters$discrete_divisons
-run_parameters$discrete_divisions
-discreteVariances = expand.grid(sapply(RE_names,function(re) 0:run_parameters$discrete_divisions))
-discreteVariances
-discreteVariances = expand.grid(lapply(RE_names,function(re) 0:run_parameters$discrete_divisions))
-discreteVariances
-head(discreteVariances)
-colnames(discreteVariances) = RE_names
-discreteVariances = discreteVariances[rowSums(discreteVariances) < 1,]
-discreteVariances
-discreteVariances = expand.grid(lapply(RE_names,function(re) 0:run_parameters$discrete_divisions)) / run_parameters$discrete_divisions
-colnames(discreteVariances) = RE_names
-discreteVariances = discreteVariances[rowSums(discreteVariances) < 1,]
-discreteVariances
-discreteVariances[order(discreteVariances[,1], discreteVariances[,2], discreteVariances[,3]),]
-k=10
-tot_F_prec = with(priors,rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate))
-F_discrete_variances = discreteVariances[sample(1:nrow(discreteVariances),k,replace=T),]
-F_discrete_variances
-A = matrix(rnorm(5*5),5);A =A %*% t(A); A = Matrix(A,sparse=T)
-A
-cA = chol(A)
-cA_inv = solve(cA)
-t(cA_inv) %*% cA_inv %*% A
-(cA_inv) %*% t(cA_inv) %*% A
-det(cA_inv)
-det(A)
-prod(diag(cA))
-prod(diag(cA))^2
-det(A)^(-1/2)
-det(cA_inv)
-h2_divisions
-h2_divisions = expand.grid(lapply(RE_names,function(re) 0:run_parameters$discrete_divisions)) / run_parameters$discrete_divisions#
-    colnames(h2_divisions) = RE_names#
-    h2_divisions = h2_divisions[rowSums(h2_divisions) < 1,]
-h2_divisions
-data = data.frame(A=gl(5,3))
-data
-Z= model.matrix(~0+Z,data)
-Z
-Z= model.matrix(~0+A,data)
-Z
-A = matrix(rnorm(5*5),5);A = A %*% t(A)
-S = matrix(rnorm(15*15),15);S = S %*% t(S)
-Stot = S + A
-Stot = S + Z %*% A %*% t(Z)
-Stot_inv = solve(Stot)
-Sinv = solve(S)
-S %*% (Sinv - Stot_inv) %*% S
-S %*% (Sinv - Stot_inv) %*% S - Z %*% A %*% t(Z)
-target = t(Z) %*% Sinv %*% Z + solve(A)
-S %*% (Sinv - Stot_inv) %*% S - Z %*% target %*% t(Z)
-Stot_inv - Sinv - Sinv %*% Z %*% target %*% t(Z) %*% Sinv
-target = solve(t(Z) %*% Sinv %*% Z + solve(A))
-Stot_inv - Sinv - Sinv %*% Z %*% target %*% t(Z) %*% Sinv
-Sinv - Sinv %*% Z %*% target %*% t(Z) %*% Sinv
-Stot_inv - (Sinv - Sinv %*% Z %*% target %*% t(Z) %*% Sinv)
-S %*% (Sinv - Stot_inv) %*% S - Z %*% target %*% t(Z)
-library(corpcor)
-Zinv = pinv(Z)
-Zinv %*% S %*% (Sinv - Stot_inv) %*% S %*% t(Zinv) - target
-library(Matrix)#
-n = 200#
-A1 = sapply(1:5,function(x) sample(c(0,1),length=n,prob = c(.1,.9),replace=T))
-A1 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.1,.9),replace=T))
-colSums(A1)
-library(Matrix)#
-n = 200#
-A1 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A1 = A1 %*% t(A1)#
-A2 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A2 = A2 %*% t(A2)
-all(A1 == t(A1))
-mean(A1==0)
-?backsolve
-library(SparseM)
-?backsolve
-library(Matrix)#
-library(SparseM)#
-n = 200#
-A1 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A1 = A1 %*% t(A1)#
-A2 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A2 = A2 %*% t(A2)#
-#
-x = rnorm(n)#
-#
-solve1 = function(A,x){#
-    solve(A) %*% x#
-}#
-solve2 = function(A,x) {#
-    solve(A,x)#
-}#
-solve3 = function(cA,x) {#
-    x_star = backsolve(cA,x)#
-    forwardsolve(cA,x_star)#
-}#
-solve4 = function(cA,x) {#
-    x_star = solve(cA,x)#
-    solve(t(cX),x)#
-}
-A = A1+A2
-library(microbenchmark)
-library(Matrix)#
-library(SparseM)#
-library(microbenchmark)#
-n = 200#
-A1 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A1 = A1 %*% t(A1)#
-A2 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A2 = A2 %*% t(A2)#
-A = A1+A2#
-#
-x = rnorm(n)#
-#
-solve1 = function(A,x){#
-    solve(A) %*% x#
-}#
-solve2 = function(A,x) {#
-    solve(A,x)#
-}#
-solve3 = function(cA,x) {#
-    x_star = backsolve(cA,x)#
-    forwardsolve(cA,x_star)#
-}#
-solve4 = function(cA,x) {#
-    x_star = solve(cA,x)#
-    solve(t(cX),x)#
-}#
-solve1(A,x) - solve2(A,x)
-library(Matrix)#
-library(SparseM)#
-library(microbenchmark)#
-n = 200#
-A1 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A1 = A1 %*% t(A1) + diag(1,n)#
-A2 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A2 = A2 %*% t(A2) + diag(1,n#
-A = A1+A2
-library(Matrix)#
-library(SparseM)#
-library(microbenchmark)#
-n = 200#
-A1 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A1 = A1 %*% t(A1) + diag(1,n)#
-A2 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A2 = A2 %*% t(A2) + diag(1,n)#
-A = A1+A2#
-#
-x = rnorm(n)#
-#
-solve1 = function(A,x){#
-    solve(A) %*% x#
-}#
-solve2 = function(A,x) {#
-    solve(A,x)#
-}#
-solve3 = function(cA,x) {#
-    x_star = backsolve(cA,x)#
-    forwardsolve(cA,x_star)#
-}#
-solve4 = function(cA,x) {#
-    x_star = solve(cA,x)#
-    solve(t(cX),x)#
-}#
-solve1(A,x) - solve2(A,x)
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(A,x)))#
-max(abs(solve1(A,x) - solve4(A,x)))
-cA = chol(Matrix(A))
-max(abs(solve1(A,x) - solve3(A,x)))
-max(abs(solve1(A,x) - solve4(A,x)))
-x_star = solve(cA,x)
-dim(cA)
+image(chol(a1))
+plot(chol(a1)@x[i])
+animal = solve(model1.2$ginverse$animal)#
+index = match(data$animal,rownames(model1.2$ginverse$animal))#
+animal = forceSymmetric(animal[index,index])
+a1 = Matrix(forceSymmetric(animal),sparse=T)
+a2 = Matrix(forceSymmetric(solve(model1.2$ginverse$animal[index,index])),sparse=T)
+ca1 = chol(a1)
+ca1[ca1<0]=0
+image(ca1)
+image(ca2)
+a1 = Matrix(forceSymmetric(animal),sparse=T)
+ca1 = Cholesky(a1,LDL=F)
+image(ca1)
+ca2 = Cholesky(a2,LDL=F)
+image(ca2)
+i=1:10000
+plot(chol(a1)@x[i])
+plot(chol(a2)@x[i])
+length(chol(a1)@x)
+length(chol(a2)@x)
+image(model1.2$ginverse$animal)
+image(solve(model1.2$ginverse$animal))
+str(model1.2$ginverse$animal)
+str(solve(model1.2$ginverse$animal))
+sum(solve(model1.2$ginverse$animal)>1e-10)
+Ainv = model1.2$ginverse$animal
+image(Ainv)
+length(Ainv@x)
+length(solve(Ainv)@x)
+length(solve(solve(Ainv))@x)
 dim(A)
-dim(x)
-length(x)
-length(x_star)
-solve(t(cX),x_star)
-dim(x_star)
-solve(t(cX),c(x_star))
-c(x_star)
-is(x_star)
-solve(t(cX),as.matrix(x_star))
-as.matrix(x_star)
-solve3 = function(cA,x) {#
-    x_star = forwardsolve(cA,x)#
-    backsolve(cA,x_star)#
-}#
-solve4 = function(cA,x) {#
-    x_star = solve(cA,x)#
-    solve(t(cX),as.matrix(x_star))#
-}#
-cA = chol(Matrix(A))#
+det(A)
+A
+A = A %*% t(A) + diag(1,4)
+det(A)
+log(det(A)^(-1/2))
+-1/2*log(det(A))
+log(det(solve(A))^(1/2))
+1/2*log(det(solve(A)))
+-1/2*log(det(A/3))
+-1/2*log(det(A)) - 4*log(3)
+-1/2*log(det(A)) - 4/2*log(3)
+-1/2*(log(det(A)) - 4*log(3))
+-1/2*(log(det(solve(A))) + 4*log(3))
+1/2*(log(det(solve(A))) + 4*log(3))
+log(det(A/3)^(-1/2))
+log(det(solve(A/3))^(-1/2))
+1/2*(log(det(solve(A))) + 4*log(3))
+1/2*(log(det(solve(A))) - 4*log(3))
+log(det(solve(A/3))^(1/2))
+1/2*(log(det(solve(A))) + 4*log(3))
+# re-formulating based on Ainv instead of A.#
+sample_MME_single_diagA_inv = function(y,W,C,RinvSqW,prior_mean,prior_prec,chol_R_inv){#
+    # R is aZAZ + bI#
+    #    we have to do Ainv_inv to form R - losing much sparsity#
+    #    then form chol_R#
+    #    check whether solve(t(chol_Rinv),theta) or chol_R %*% theta is better.#
+    # G is diagonal (fixed effect) - prior prec#
+    # C is built from Ainv so is good.#
+    # prior_prec must be > 0#
+    n = length(y)#
+    n_theta = length(prior_prec)#
+    theta_star = prior_mean + rnorm(n_theta)/sqrt(prior_prec)#
+    e_star = solve(t(chol_R_inv),rnorm(n))#
+    W_theta_star = W %*% theta_star#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(A,x)))#
-max(abs(solve1(A,x) - solve4(A,x)))
-is(cA)
-solve3 = function(cA,x) {#
-    x_star = forwardsolve(cA,x)#
-    backsolve(cA,forwardsolve(cA,x))#
-}#
-solve4 = function(cA,x) {#
-    x_star = solve(cA,x)#
-    solve(t(cX),as.matrix(x_star))#
-}#
-cA = chol(Matrix(A))#
+    y_resid = y - W_theta_star - e_star@x#
+    WtRinvy = crossprod(RinvSqW,crossprod(chol_R_inv,y_resid)#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(A,x)))
-cA = SparseM:chol(Matrix(A))
-cA = SparseM::chol(Matrix(A))
-cA = SparseM::chol(Matrix(A))
-max(abs(solve1(A,x) - solve3(A,x)))
-is(cA)
-cA = SparseM::chol(as.matrix.csr(A))
-is(cA)
-max(abs(solve1(A,x) - solve3(A,x)))
-cA = SparseM::chol(A)
-max(abs(solve1(A,x) - solve3(A,x)))
-solve3 = function(cA,x) {#
-    x_star = forwardsolve(cA,x)#
-    backsolve(cA,forwardsolve(cA,x),twice=F)#
-}#
-solve4 = function(cA,x) {#
-    x_star = solve(cA,x)#
-    solve(t(cX),as.matrix(x_star))#
-}#
-cA = SparseM::chol(A)#
+    theta_tilda = solve(C,WtRinvy)#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(A,x)))#
-max(abs(solve1(A,x) - solve4(A,x)))
-cA1 = SparseM::chol(A)
-max(abs(solve1(A,x) - solve3(cA1,x)))
-max(abs(solve1(A,x) - solve4(cA,x)))
-library(Matrix)#
-library(SparseM)#
-library(microbenchmark)#
-n = 200#
-A1 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A1 = A1 %*% t(A1) + diag(1,n)#
-A2 = sapply(1:5,function(x) sample(c(0,1),size=n,prob = c(.9,.1),replace=T)); A2 = A2 %*% t(A2) + diag(1,n)#
-A = A1+A2#
+    theta = theta_tilda@x + theta_star#
+    return(theta)#
+}
+# re-formulating based on Ainv instead of A.#
+sample_MME_single_diagA_inv = function(y,W,C,RinvSqW,prior_mean,prior_prec,chol_R_inv){#
+    # R is aZAZ + bI#
+    #    we have to do Ainv_inv to form R - losing much sparsity#
+    #    then form chol_R#
+    #    check whether solve(t(chol_Rinv),theta) or chol_R %*% theta is better.#
+    # G is diagonal (fixed effect) - prior prec#
+    # C is built from Ainv so is good.#
+    # prior_prec must be > 0#
+    n = length(y)#
+    n_theta = length(prior_prec)#
+    theta_star = prior_mean + rnorm(n_theta)/sqrt(prior_prec)#
+    e_star = solve(t(chol_R_inv),rnorm(n))#
+    W_theta_star = W %*% theta_star#
 #
-x = rnorm(n)#
+    y_resid = y - W_theta_star - e_star@x#
+    WtRinvy = crossprod(RinvSqW,crossprod(chol_R_inv,y_resid))#
 #
-solve1 = function(A,x){#
-    solve(A) %*% x#
-}#
-solve2 = function(A,x) {#
-    solve(A,x)#
-}#
-solve3 = function(cA,x) {#
-    x_star = forwardsolve(cA,x)#
-    backsolve(cA,forwardsolve(cA,x),twice=F)#
-}#
-solve4 = function(cA,x) {#
-    x_star = solve(cA,x)#
-    solve(t(cX),as.matrix(x_star))#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+    theta_tilda = solve(C,WtRinvy)#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))
-solve5 = function(cA,x) {#
-    cAi = solve(cA)#
-    Ai - cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+    theta = theta_tilda@x + theta_star#
+    return(theta)#
+}
+sample_MME_single_diagR_inv = function(y,W,C,pe,prior_mean,chol_A_inv){#
+    # replace chol_A %*% theta with solve(t(chol_A_inv),theta)#
+    n = length(y)#
+    n_theta = nrow(chol_A)#
+    theta_star = solve(t(chol_A_inv),rnorm(n_theta))#
+    theta_star = theta_star@x + prior_mean#
+    e_star = rnorm(n)/sqrt(pe)#
+    W_theta_star = W %*% theta_star#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2,x)))
-solve5 = function(cA,x) {#
-    cAi = solve(cA)#
-    Ai = cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+    y_resid = y - W_theta_star@x - e_star#
+    WtRiy = crossprod(W,y_resid*pe)#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2,x)))
-solve4 = function(cA,x) {#
-    x_star = c(as.matrix(solve(cA,x)))#
-    solve(t(cX),x_star)#
-}#
-solve5 = function(cA,x) {#
-    cAi = solve(cA)#
-    Ai = cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+    theta_tilda = solve(C,WtRiy)#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2,x)))
-x_star = c(as.matrix(solve(cA,x)))
-length(x_star)
-x_star
-solve4 = function(cA,x) {#
-    x_star = c(as.matrix(solve(cA,x)))#
-    solve(t(cA),x_star)#
-}#
-solve5 = function(cA,x) {#
-    cAi = solve(cA)#
-    Ai = cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+    theta = theta_tilda@x + theta_star#
+    return(theta)#
+}
+sample_MME_fixedEffects_inv = function(Y,W,Sigma_invs, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){#
+    require(parallel)#
+    # using method described in MCMC Course notes#
+    p = ncol(Y)#
+    n = nrow(Y)#
+    b = ncol(W)#
+    chunkSize = ceiling(p/ncores)#
+    res = mclapply(1:ceiling(p/chunkSize),function(chunk) {#
+        cols = 1:chunkSize + (chunk-1)*chunkSize#
+        cols = cols[cols <= p]#
+        thetas = do.call(cbind,lapply(cols,function(j) {#
+            chol_R_inv = Sigma_invs[[h2s_index[j]]]$chol #/ sqrt(tot_Y_prec[j])#
+            chol_R_inv@x = chol_R_inv@x * sqrt(tot_Y_prec[j])#
+            RinvSqW = crossprod(chol_R_inv,W)#
+            C = crossprod(RinvSqW)#
+            diag(C) = diag(C) + prior_prec[,j]#
+            theta_j = sample_MME_single_diagA_inv(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],chol_R_inv)           #
+            theta_j#
+        }))#
+        thetas#
+    },mc.cores = ncores)#
+    res = do.call(cbind,res)#
+    res#
+}
+sample_MME_ZAZts_inv = function(Y, W, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_mats, h2s, h2_index, chol_As,ncores){#
+    # todo . . .#
+    require(parallel)#
+    # using method described in MCMC Course notes#
+    p = ncol(Y)#
+    n = nrow(Y)#
+    b = ncol(W)#
+    pes = tot_Y_prec / (1-colSums(h2s))#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2,x)))
-solve4 = function(cA,x) {#
-    x_star = c(as.matrix(solve(t(cA),x)))#
-    solve((cA),x_star)#
-}#
-solve5 = function(cA,x) {#
-    cAi = solve(cA)#
-    Ai = cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+    chunkSize = ceiling(p/ncores)#
+    res = mclapply(1:ceiling(p/chunkSize),function(chunk) {#
+        cols = 1:chunkSize + (chunk-1)*chunkSize#
+        cols = cols[cols <= p]#
+        thetas = do.call(cbind,lapply(cols,function(j) {#
+            h2s_j = h2s[,j]#
+            C = randomEffect_Cs[[h2_index[j]]]#
+            C@x = C@x * tot_Y_prec[j]#
+            chol_A = do.call(bdiag,lapply(1:nrow(h2s),function(i) {#
+                if(h2s_j[i] == 0) return(Diagonal(nrow(chol_As[[i]]),0))  # if h2==0, then we want a Diagonal matrix with 0 diagonal.#
+                chol_Ai = chol_As[[i]]#
+                chol_Ai@x = chol_Ai@x *sqrt(h2s_j[i]/tot_Y_prec[j])#
+                chol_Ai#
+            }))#
+            theta_j = sample_MME_single_diagR(Y[,j], W, C, pes[j], prior_mean[,j],chol_A)           #
+            theta_j#
+        }))#
+        thetas#
+    },mc.cores = ncores)#
+    res = do.call(cbind,res)#
+    res#
+}
+sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_invs, h2s_index,ncores){#
+    n = nrow(Y)#
+    p = ncol(Y)#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2,x)))
-solve3 = function(cA,x) {#
-    x_star = forwardsolve(cA,x)#
-    forwardsolve(cA,backsolve(cA,x),twice=F)#
-}#
-solve4 = function(cA,x) {#
-    x_star = c(as.matrix(solve(t(cA),x)))#
-    solve((cA),x_star)#
-}#
-solve5 = function(cA,x) {#
-    cAi = solve(cA)#
-    Ai = cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+    chunkSize = ceiling(p/ncores)#
+    scores = mclapply(1:ceiling(p/chunkSize),function(chunk) {#
+        cols = 1:chunkSize + (chunk-1)*chunkSize#
+        cols = cols[cols <= p]#
+        sapply(cols,function(j) {#
+            chol_Sigma_inv = Sigma_invs[[h2s_index[j]]]$chol#
+            sum(crossprod(chol_Sigma_inv,Y[,j])^2)#
+        })#
+    },mc.cores = ncores)#
+    scores = do.call(c,scores)#
+    rgamma(p,shape = tot_Y_prec_shape + n/2, rate = tot_Y_prec_rate + 1/2*scores)#
+}
+sample_h2s_discrete_inv = function(Y,tot_Y_prec, Sigma_invs,discrete_priors,ncores){#
+    n = nrow(Y)#
+    p = ncol(Y)#
+    discrete_bins = length(discrete_priors)#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2,x)))
-solve3 = function(cA,x) {#
-    x_star = forwardsolve(cA,x)#
-    forwardsolve(cA,backsolve(cA,x,twice=F))#
-}#
-solve4 = function(cA,x) {#
-    x_star = c(as.matrix(solve(t(cA),x)))#
-    solve((cA),x_star)#
-}#
-solve5 = function(cA,x) {#
-    cAi = solve(cA)#
-    Ai = cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+    chunkSize = ceiling(discrete_bins/ncores)#
+    log_ps = mclapply(1:ceiling(discrete_bins/chunkSize),function(chunk) {#
+        rows = 1:chunkSize + (chunk-1)*chunkSize#
+        rows = rows[rows <= discrete_bins]#
+        sapply(rows,function(i) {#
+            chol_Sigma_inv = Sigma_invs[[i]]$chol#
+            det_Sigma_inv = Sigma_invs[[i]]$det#
+            # scores_2 = tot_Y_prec*diag(crossprod(Y,solve(R,Y)))#
+            scores_2 = tot_Y_prec*colSums(crossprod(chol_Sigma_inv,Y)^2)#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2,x)))
-solve3 = function(cA,x) {#
-    x_star = forwardsolve(cA,x)#
-    forwardsolve(cA,backsolve(cA,x))#
-}#
-solve4 = function(cA,x) {#
-    x_star = c(as.matrix(solve(t(cA),x)))#
-    solve((cA),x_star)#
-}#
-solve5 = function(cA,x) {#
-    cAi = solve(cA)#
-    Ai = cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
+            log_ps = -n/2 * log(2*pi) + 1/2*(log(det_R) + n*log(tot_Y_prec)) - 1/2 * scores_2 + log(discrete_priors[i])#
+            log_ps#
+        })#
+    },mc.cores = ncores)#
+    if(length(log_ps) == 1) {#
+        log_ps = matrix(log_ps[[1]],nrow = p)#
+    } else{#
+        log_ps = do.call(cbind,log_ps)#
+    }#
+    h2s_index = sapply(1:p,function(j) {#
+        max_row = max(log_ps[j,])#
+        norm_factor = max_row+log(sum(exp(log_ps[j,]-max_row)))#
+        ps_j = exp(log_ps[j,] - norm_factor)#
+        sum(runif(1)>cumsum(ps_j))+1#
+    })#
+    # }))#
+    return(h2s_index)#
+}
+data = droplevels(subset(Data,!is.na(BWT)))#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2,x)))
-microbenchmark(solve1(A,x),solve2(A,x),solve4(cA2,x),solve5(cA2,x))
-solve5 = function(cAi,x) {#
-    Ai = cAi %*% t(cAi)#
-    Ai %*% x#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
-cA2i = solve(cA2)#
+index = match(data$animal,rownames(model1.2$ginverse$animal))#
+randomEffects = model1.2$ginverse#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2i,x)))
-microbenchmark(solve1(A,x),solve2(A,x),solve4(cA2,x),solve5(cA2,x))
-solve
-?solve
-cA3 = Cholesky(Matrix(A))
-solve6 = function(cA,x) {#
-    solve(cA,x)#
-}#
-cA1 = SparseM::chol(A)#
-cA2 = chol(Matrix(A))#
-cA2i = solve(cA2)#
-cA3 = Cholesky(Matrix(A))#
+# build Z matrices from random model#
+RE_names = names(randomEffects)#
+n_RE = length(randomEffects)#
+r_RE = sapply(RE_names,function(x) dim(randomEffects[[x]])[1])#
+Z_matrices = lapply(RE_names,function(re) {#
+    Diagonal(r_RE[re],1)#
+    # Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)#
+})#
+names(Z_matrices) = RE_names
+# build Z matrices from random model#
+RE_names = names(randomEffects)#
+n_RE = length(randomEffects)#
+r_RE = sapply(RE_names,function(x) dim(randomEffects[[x]])[1])#
+Z_matrices = lapply(RE_names,function(re) {#
+    Diagonal(r_RE[re],1)#
+    # Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)#
+})#
+names(Z_matrices) = RE_names#
 #
-max(abs(solve1(A,x) - solve2(A,x)))#
-max(abs(solve1(A,x) - solve3(cA1,x)))#
-max(abs(solve1(A,x) - solve4(cA2,x)))#
-max(abs(solve1(A,x) - solve5(cA2i,x)))#
-max(abs(solve1(A,x) - solve6(cA3,x)))
-microbenchmark(solve1(A,x),solve2(A,x),solve4(cA2,x),solve5(cA2,x),solve6(cA3,x))
-As = Matrix(A,sparse=T)
-microbenchmark(chol(10*As),update(cA3,10*As))
-setwd("/Users/der7/Box Sync/DER_projects/BSFG/test_MM")
-library(Matrix)#
-library(SparseM)#
-library(microbenchmark)#
-library(Rcpp)#
-library(RcppArmadillo)#
-sourceCpp('MME_solve.cpp'
+chol_Ainvs = lapply(1:n_RE,function(i) chol(randomEffects[[i]]))
+randomEffects = lapply(names(randomEffects),function(x) forceSymmetric(randomEffects[[x]]))
+names(randomEffects)
+randomEffects = model1.2$ginverse
+randomEffects = lapply(randomEffects,forceSymmetric
 )
-sourceCpp('MME_solve.cpp')
-sourceCpp('MME_solve.cpp')
-sourceCpp('MME_solve.cpp')
-sourceCpp('MME_solve.cpp')
-max(abs(solve1(A,x) - solve_sp_c(cA2,x)))
-sourceCpp('MME_solve.cpp')
-max(abs(solve1(A,x) - solve_sp_c(cA2,x)))
-sourceCpp('MME_solve.cpp')
-max(abs(solve1(A,x) - solve_c(cA2,x)))
-cA = chol(A)
-max(abs(solve1(A,x) - solve_c(cA,x)))
-max(abs(solve1(A,x) - solve_c(t(cA),x)))
-sourceCpp('MME_solve.cpp')
-max(abs(solve1(A,x) - solve_c(cA,x)))
-max(abs(solve1(A,x) - solve_c(t(cA),x)))
-max(abs(solve1(A,x) - solve_c(cA,x)))
-microbenchmark(solve1(A,x),solve2(A,x),solve4(cA2,x),solve5(cA2,x),solve6(cA3,x),solve_c(cA,x))
-sourceCpp('MME_solve.cpp')
-microbenchmark(solve1(A,x),solve2(A,x),solve4(cA2,x),solve5(cA2,x),solve6(cA3,x),solve_c(cA,x))
-sourceCpp('MME_solve.cpp')
-max(abs(solve1(A,x) - solve_c(cA,x)))
-microbenchmark(solve1(A,x),solve2(A,x),solve4(cA2,x),solve5(cA2,x),solve6(cA3,x),solve_c(cA,x))
-A1s = Matrix(A1,sparse=T)
-max(abs(solve4(chol(10*As1),x) - solve6(update(cA3,10*A1s),x)))
-max(abs(solve4(chol(10*A1s),x) - solve6(update(cA3,10*A1s),x)))
-microbenchmark(solve4(chol(10*A1s),x),solve6(update(cA3,10*A1s),x)))
-microbenchmark(solve4(chol(10*A1s),x),solve6(update(cA3,10*A1s),x))
-det(A1s)
-det(update(cA3,10*A1s))
-det(update(cA3,A1s))
-det(update(cA3,A1s))^2
-microbenchmark(det(A1s),det(update(cA3,10*A1s),x))^2)
-microbenchmark(det(A1s),det(update(cA3,10*A1s),x)^2)
-microbenchmark(det(A1s),det(update(cA3,A1s),x)^2)
-microbenchmark(det(As),det(update(cA3,As),x)^2)
-As
-?Matrix
-As + diagonalMatrix(10,n)
-Diagonal(10,3)
-Diagonal(3,10)
-microbenchmark(A+diag(10,n))
-microbenchmark(A+diag(10,n),As + Diagonal(n,10))
-all(A + diag(10,n) == As + Diagonal(n,10))
-diag(A)
-Diagonal(As)
-diag(As)
-diag(As) = diag(As) + 10
-diag(As) = diag(As) - 10
-A2 = A + diag(10,n)
-A2s = As
-diag(A2s) = diag(As)+10
-microbenchmark(A+diag(10,n),diag(A2s) = diag(As)+10)
-microbenchmark(A+diag(10,n),{diag(A2s) = diag(As)+10})
-microbenchmark(A+diag(10,n),{diag(A2s) = diag(As)+10})
-microbenchmark(A+diag(10,n),{diag(A2s) = diag(As)+10})
-microbenchmark({A2=A+diag(10,n)},{diag(A2s) = diag(As)+10})
-n
-diag(10,n)
-all(A + diag(10,n) == As + diag(10,n))
-microbenchmark(A + diag(10,n),As + diag(10,n))
-? crossprod
+names(randomEffects)
+# build Z matrices from random model#
+RE_names = names(randomEffects)#
+n_RE = length(randomEffects)#
+r_RE = sapply(RE_names,function(x) dim(randomEffects[[x]])[1])#
+Z_matrices = lapply(RE_names,function(re) {#
+    Diagonal(r_RE[re],1)#
+    # Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)#
+})#
+names(Z_matrices) = RE_names#
+#
+chol_Ainvs = lapply(1:n_RE,function(i) chol(randomEffects[[i]]))
+index = match(data$animal,rownames(model1.2$ginverse$animal))#
+Ai_mats = model1.2$ginverse#
+Ai_mats = lapply(Ai_mats,forceSymmetric)#
+#
+# build Z matrices from random model#
+RE_names = names(Ai_mats)#
+n_RE = length(Ai_mats)#
+r_RE = sapply(RE_names,function(x) dim(Ai_mats[[x]])[1])#
+Z_matrices = lapply(RE_names,function(re) {#
+    Diagonal(r_RE[re],1)#
+    # Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)#
+})#
+names(Z_matrices) = RE_names#
+#
+chol_Ainvs = lapply(1:n_RE,function(i) chol(Ai_mats[[i]]))#
+# Ai_mats = lapply(1:n_RE,function(i) chol2inv(chol_As[[i]]))#
+#
+ZtZ = crossprod(Z_all)#
+randomEffect_Cs = lapply(1:ncol(h2_divisions),function(i) {     #
+    h2s = h2_divisions[,i]#
+    Ai = do.call(bdiag,lapply(1:length(h2s),function(i) {#
+            if(h2s[i] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[i]]),Inf)#
+            } else{#
+                Ai_mats[[i]]/h2s[i]  #
+            }#
+        }))#
+    C = ZtZ/(1-sum(h2s))#
+    C = C + Ai#
+    C#
+})
+ZtZ = crossprod(Z_all)
+randomEffect_Cs = lapply(1:ncol(h2_divisions),function(i) {     #
+    h2s = h2_divisions[,i]#
+    Ai = do.call(bdiag,lapply(1:length(h2s),function(i) {#
+            if(h2s[i] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[i]]),Inf)#
+            } else{#
+                Ai_mats[[i]]/h2s[i]  #
+            }#
+        }))#
+    C = ZtZ/(1-sum(h2s))#
+    C = C + Ai#
+    C#
+})
+h2_divisions
+i=2
+h2s = h2_divisions[,i]
+h2_divisions = expand.grid(lapply(RE_names,function(re) 0:discrete_divisions)) / discrete_divisions#
+colnames(h2_divisions) = RE_names#
+h2_divisions = t(h2_divisions[rowSums(h2_divisions) < 1,,drop=FALSE])#
+#
+priors$discrete_priors = sapply(1:ncol(h2_divisions),function(x) {#
+    h2s = h2_divisions[,x]#
+    pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)#
+})
+ZtZ = crossprod(Z_all)
+randomEffect_Cs = lapply(1:ncol(h2_divisions),function(i) {     #
+    h2s = h2_divisions[,i]#
+    Ai = do.call(bdiag,lapply(1:length(h2s),function(i) {#
+            if(h2s[i] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[i]]),Inf)#
+            } else{#
+                Ai_mats[[i]]/h2s[i]  #
+            }#
+        }))#
+    C = ZtZ/(1-sum(h2s))#
+    C = C + Ai#
+    C#
+})
+h2s = h2_divisions[,i]
+randomEffect_Cs = lapply(1:ncol(h2_divisions),function(j) {     #
+    h2s = h2_divisions[,j]#
+    Ai = do.call(bdiag,lapply(1:length(h2s),function(i) {#
+            if(h2s[i] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[i]]),Inf)#
+            } else{#
+                Ai_mats[[i]]/h2s[i]  #
+            }#
+        }))#
+    C = ZtZ/(1-sum(h2s))#
+    C = C + Ai#
+    C#
+})
+j=1
+i=1
+Diagonal(nrow(Ai_mats[[i]]),Inf)
+Ai_mats[[i]]
+nrow(Ai_mats[[i]])
+Diagonal(nrow(Ai_mats[[i]]),Inf)
+Diagonal(nrow(Ai_mats[[i]]),1)*Inf
+Diagonal(nrow(Ai_mats[[i]]),1e6)
+nrow(Ai_mats[[i]])
+Diagonal(3,Inf)
+Diagonal(300,Inf)
+Diagonal(nrow(Ai_mats[[i]]),Inf)
+i=2
+h2s
+h2_divisions
+h2s = h2_divisions[,i]
+Ai = do.call(bdiag,lapply(1:length(h2s),function(j) {#
+            if(h2s[j] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[j]]),Inf)#
+            } else{#
+                Ai_mats[[j]]/h2s[j]  #
+            }#
+        }))
+C = ZtZ/(1-sum(h2s))
+C = C + Ai
+dim(ZtZ/(1-sum(h2s)))
+dim(Ai)
+index = match(data$animal,rownames(model1.2$ginverse$animal))#
+Ai_mats = model1.2$ginverse[index,index]#
+Ai_mats = lapply(Ai_mats,forceSymmetric)#
+#
+# build Z matrices from random model#
+RE_names = names(Ai_mats)#
+n_RE = length(Ai_mats)#
+r_RE = sapply(RE_names,function(x) dim(Ai_mats[[x]])[1])#
+Z_matrices = lapply(RE_names,function(re) {#
+    Diagonal(r_RE[re],1)#
+    # Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)#
+})#
+names(Z_matrices) = RE_names#
+h2_divisions = expand.grid(lapply(RE_names,function(re) 0:discrete_divisions)) / discrete_divisions#
+colnames(h2_divisions) = RE_names#
+h2_divisions = t(h2_divisions[rowSums(h2_divisions) < 1,,drop=FALSE])#
+#
+priors$discrete_priors = sapply(1:ncol(h2_divisions),function(x) {#
+    h2s = h2_divisions[,x]#
+    pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)#
+})#
+#
+chol_Ainvs = lapply(1:n_RE,function(i) chol(Ai_mats[[i]]))#
+# Ai_mats = lapply(1:n_RE,function(i) chol2inv(chol_As[[i]]))#
+#
+ZtZ = crossprod(Z_all)#
+randomEffect_Cs = lapply(1:ncol(h2_divisions),function(j) {     #
+    h2s = h2_divisions[,i]#
+    Ai = do.call(bdiag,lapply(1:length(h2s),function(j) {#
+            if(h2s[j] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[j]]),Inf)#
+            } else{#
+                Ai_mats[[j]]/h2s[j]  #
+            }#
+        }))#
+    C = ZtZ/(1-sum(h2s))#
+    C = C + Ai#
+    C#
+})
+j=1
+ZtZ = crossprod(Z_all)#
+randomEffect_Cs = lapply(1:ncol(h2_divisions),function(i) {     #
+    h2s = h2_divisions[,i]#
+    Ai = do.call(bdiag,lapply(1:length(h2s),function(j) {#
+            if(h2s[j] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[j]]),Inf)#
+            } else{#
+                Ai_mats[[j]]/h2s[j]  #
+            }#
+        }))#
+    C = ZtZ/(1-sum(h2s))#
+    C = C + Ai#
+    C#
+})
+h2s = h2_divisions[,i]
+h2s
+i
+h2s = h2_divisions[,i]
+Ai = do.call(bdiag,lapply(1:length(h2s),function(j) {#
+            if(h2s[j] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[j]]),Inf)#
+            } else{#
+                Ai_mats[[j]]/h2s[j]  #
+            }#
+        }))
+dim(Ai)
+index = match(data$animal,rownames(model1.2$ginverse$animal))#
+Ai_mats = model1.2$ginverse[index,index]#
+Ai_mats = lapply(Ai_mats,forceSymmetric)
+sapply(Ai_mats,dim)
+index = match(data$animal,rownames(model1.2$ginverse$animal))#
+Ai_mats = list(animal = model1.2$ginverse$animal[index,index])#
+Ai_mats = lapply(Ai_mats,forceSymmetric)
+# build Z matrices from random model#
+RE_names = names(Ai_mats)#
+n_RE = length(Ai_mats)#
+r_RE = sapply(RE_names,function(x) dim(Ai_mats[[x]])[1])#
+Z_matrices = lapply(RE_names,function(re) {#
+    Diagonal(r_RE[re],1)#
+    # Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)#
+})#
+names(Z_matrices) = RE_names#
+h2_divisions = expand.grid(lapply(RE_names,function(re) 0:discrete_divisions)) / discrete_divisions#
+colnames(h2_divisions) = RE_names#
+h2_divisions = t(h2_divisions[rowSums(h2_divisions) < 1,,drop=FALSE])#
+#
+priors$discrete_priors = sapply(1:ncol(h2_divisions),function(x) {#
+    h2s = h2_divisions[,x]#
+    pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)#
+})#
+#
+chol_Ainvs = lapply(1:n_RE,function(i) chol(Ai_mats[[i]]))#
+# Ai_mats = lapply(1:n_RE,function(i) chol2inv(chol_As[[i]]))#
+#
+ZtZ = crossprod(Z_all)#
+randomEffect_Cs = lapply(1:ncol(h2_divisions),function(i) {     #
+    h2s = h2_divisions[,i]#
+    Ai = do.call(bdiag,lapply(1:length(h2s),function(j) {#
+            if(h2s[j] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[j]]),Inf)#
+            } else{#
+                Ai_mats[[j]]/h2s[j]  #
+            }#
+        }))#
+    C = ZtZ/(1-sum(h2s))#
+    C = C + Ai#
+    C#
+})
+randomEffects = lapply(Ai_mats,function(x) solve(x))
+i=1
+z1 = tcrossprod(Z_matrices[[i]] %*% randomEffects[[i]],Z_matrices[[i]])
+z2 = crossprod(solve(chol_Ainvs[[i]]),t(Z_matrices[[i]]))
+all(z1==z2)
+max(abs(z1-z2))
+max(abs(crossprod(chol_Ainvs[[i]]) - randomEffects[[i]]))
+A
+Ainv = solve(A)
+qAi = chol(Ainv)
+crossprod(aAi)
+crossprod(aAi)
+crossprod(qAi)
+Ainv
+tcrossprod(solve(qAi))
+tcrossprod(solve(qAi)) - A
+A
+tcrossprod(solve(qAi))
+z = matrix(1:4,1)
+z = t(z)
+z
+z = t(z)
+z
+z %*% A %*% t(Z)
+z %*% A %*% t(z)
+crossprod(solve(qAi,z))
+crossprod(solve(qAi,t(z)))
+crossprod(solve(t(qAi),t(z)))
+q = chol(Ainv)
+solve(t(q)) %*% solve(q)
+t(solve(q)) %*% solve(q)
+A
+tcrossprod(solve(q))
+solve(q) %*% t(solve(q))
+solve(q) %*% solve(t(q))
+q %*% t(q)
+Ainv
+z1 = tcrossprod(Z_matrices[[i]] %*% randomEffects[[i]],Z_matrices[[i]])
+z2 = crossprod(solve(t(chol_Ainvs[[i]])),t(Z_matrices[[i]]))
+max(abs(z1-z2))
+l = solve(chol_Ainvs[[i]])
+max(abs(tcrossprod(l) - randomEffects[[i]]))
+z1 = tcrossprod(Z_matrices[[i]] %*% randomEffects[[i]],Z_matrices[[i]])
+z2 = crossprod(solve(t(chol_Ainvs[[i]])),t(Z_matrices[[i]]))
+max(abs(z1-z2))
+z1 = tcrossprod(Z_matrices[[i]] %*% randomEffects[[i]],Z_matrices[[i]])
+z2 = crossprod(solve(t(chol_Ainvs[[i]]),t(Z_matrices[[i]])))
+max(abs(z1-z2))
+length(z1@z)
+is(z1)
+is(z2)
+slotNames(z1)
+str(z1)
+str(z2)
+length(z1@x)
+length(z2@x)
+i
+i=2
+Sigma = make_Sigma(ZAZts,h2_divisions[,i])
+image(Sigma)
+length(Sigma@z)
+length(Sigma@x)
+prod(dim(Sigma))
+sum(Sigma@x < 1e-10)
+chol_Sigma_inv = t(chol(Sigma))
+length(chol_Sigma_inv@x)
+sum(chol_Sigma_inv@x < 1e-10)
+max(abs(crossprod(chol_Sigma_inv)) - solve(Sigma))
+chol_Sigma_inv = t(solve(chol(Sigma)))
+max(abs(crossprod(chol_Sigma_inv)) - solve(Sigma))
+chol_Sigma_inv = solve(chol(Sigma))
+max(abs(crossprod(chol_Sigma_inv)) - solve(Sigma))
+chol_Sigma_inv = solve(t(chol(Sigma)))
+max(abs(crossprod(chol_Sigma_inv)) - solve(Sigma))
+Sigma = make_Sigma(ZAZts,h2_divisions[,i])
+chol_Sigma_inv = solve(t(chol(Sigma)))
+max(abs(crossprod(chol_Sigma_inv)) - solve(Sigma))
+max(abs(crossprod(chol_Sigma_inv) - solve(Sigma)))
+chol_Sigma_inv = t(solve(chol(Sigma))))
+chol_Sigma_inv = t(solve(chol(Sigma)))
+max(abs(crossprod(chol_Sigma_inv) - solve(Sigma)))
+Sigma2 = Sigma
+length(Sigma2@x)
+sum(Sigma2@x < 1e-10)
+Sigma2[Sigma2 < 1e-10] = 0
+image(Sigma)
+image(Sigma2)
+prod(dim(Sigma))
+length(ZAZts[[1]]@x)
+length(Z_matrices[[i]]@x)
+is(Z_matrices[[i]])
+i
+i=1
+is(Z_matrices[[i]])
+length(Z_matrices[[i]]@x)
+z1 = crossprod(solve(t(chol_Ainvs[[i]]),t(Z_matrices[[i]])))
+length(z1@x)
+ZAZts = list()
+for(i in 1:n_RE){#
+    ZAZts[[i]] = crossprod(solve(t(chol_Ainvs[[i]]),t(Z_matrices[[i]])))#
+}
+length(ZAZts[[i]]@x)
+h2_divisions
+i
+Sigma = make_Sigma(ZAZts,h2_divisions[,i])
+length(Sigma@x)
+i=2
+length(Sigma@x)
+Sigma = make_Sigma(ZAZts,h2_divisions[,i])
+length(Sigma@x)
+chol_Sigma_inv = t(solve(chol(Sigma)))
+Sigma_inv = crossprod(chol_Sigma_inv)
+length(Sigma_inv@x)
+ZtZ = crossprod(Z_all)#
+randomEffect_Cs = lapply(1:ncol(h2_divisions),function(i) {     #
+    h2s = h2_divisions[,i]#
+    Ai = do.call(bdiag,lapply(1:length(h2s),function(j) {#
+            if(h2s[j] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0#
+                Diagonal(nrow(Ai_mats[[j]]),Inf)#
+            } else{#
+                Ai_mats[[j]]/h2s[j]  #
+            }#
+        }))#
+    C = ZtZ/(1-sum(h2s))#
+    C = C + Ai#
+    C#
+})#
+#
+make_Sigma = function(ZAZts,h2s){#
+    R = 0#
+    for(i in 1:length(h2s)){#
+        R = R + h2s[i]*ZAZts[[i]]#
+    }#
+    R + (1-sum(h2s)) * Diagonal(nrow(R))#
+}
+Sigma = make_Sigma(ZAZts,h2_divisions[,i])
+chol_Sigma_inv = t(solve(chol(Sigma)))
+Sigma_inv = crossprod(chol_Sigma_inv)
+max(abs(Sigma_inv - solve(Sigma)))
+length(Sigma_inv@x)
+length(solve(Sigma)@x)
+det(Sigma_inv)
+det(chol_Sigma_inv)^2
+Sigma_invs = lapply(1:ncol(h2_divisions),function(i) {#
+    Sigma = make_Sigma(ZAZts,h2_divisions[,i])#
+    chol_Sigma_inv = t(solve(chol(Sigma)))#
+    Sigma_inv = crossprod(chol_Sigma_inv)#
+    det = det(Sigma_inv)#
+    chol = chol(Sigma)#
+    list(Sigma_inv = Sigma_inv, det = det,chol = chol_Sigma_inv)#
+})
+Z_all = do.call(cbind,Z_matrices)#
+#
+Y = data[,'BWT',drop=F]#
+fixed = formula(~SEX)#
+#
+# build X from fixed model#
+X = model.matrix(fixed,data)#
+b = ncol(X)#
+p=1
+nIter = 1000#
+burn = 50#
+thin = 1#
+#
+posterior = matrix(NA,nrow = (nIter-burn)/thin,ncol = length(B)+length(h2)+1)#
+sp = 0#
+#
+for(i in 1:nIter){#
+    if(i %% 10 == 0) print(i)#
+#
+    Design = X#
+    rows = b#
+    prior_mean = matrix(0,rows,p)#
+    prior_prec = matrix(rep(1e-6,b),nc=1)#
+    # recover()#
+    B = sample_MME_fixedEffects(Y,Design,Sigmas, h2_index, tot_Y_prec, prior_mean, prior_prec,1)#
+#
+    Y_tilde = as.matrix(Y - X %*% B)#
+    tot_Y_prec = sample_tot_prec(Y_tilde, priors$tot_Y_prec_shape, priors$tot_Y_prec_rate, Sigmas, h2_index,1)#
+    h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigmas,priors$discrete_priors,1)#
+    h2 = h2_divisions[,h2_index,drop=FALSE]#
+    # a_prec = tot_Y_prec / colSums(h2)#
+#
+    # prior_mean = matrix(0,sum(r_RE),p)#
+    # a = sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_mats, h2, h2_index,chol_As,1)    #
+#
+    if((i > burn) & (i-burn)%%thin == 0){#
+        sp = sp + 1#
+        posterior[sp,] = c(B, h2/tot_Y_prec, (1-sum(h2))/tot_Y_prec)#
+    }#
+#
+}#
+#
+boxplot(posterior)#
+boxplot(cbind(model1.2$Sol,model1.2$VCV))
+for(i in 1:nIter){#
+    if(i %% 100 == 0) print(i)#
+#
+    Design = X#
+    rows = b#
+    prior_mean = matrix(0,rows,p)#
+    prior_prec = matrix(rep(1e-6,b),nc=1)#
+    # recover()#
+    B = sample_MME_fixedEffects(Y,Design,Sigmas, h2_index, tot_Y_prec, prior_mean, prior_prec,1)#
+#
+    Y_tilde = as.matrix(Y - X %*% B)#
+    tot_Y_prec = sample_tot_prec(Y_tilde, priors$tot_Y_prec_shape, priors$tot_Y_prec_rate, Sigmas, h2_index,1)#
+    h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigmas,priors$discrete_priors,1)#
+    h2 = h2_divisions[,h2_index,drop=FALSE]#
+    # a_prec = tot_Y_prec / colSums(h2)#
+#
+    # prior_mean = matrix(0,sum(r_RE),p)#
+    # a = sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_mats, h2, h2_index,chol_As,1)    #
+#
+    if((i > burn) & (i-burn)%%thin == 0){#
+        sp = sp + 1#
+        posterior[sp,] = c(B, h2/tot_Y_prec, (1-sum(h2))/tot_Y_prec)#
+    }#
+#
+}#
+#
+boxplot(posterior)#
+boxplot(cbind(model1.2$Sol,model1.2$VCV))
+sample_MME_single_diagA_inv = function(y,W,C,RinvSqW,prior_mean,prior_prec,chol_R_inv){#
+    # R is aZAZ + bI#
+    #    we have to do Ainv_inv to form R - losing much sparsity#
+    #    then form chol_R#
+    #    check whether solve(t(chol_Rinv),theta) or chol_R %*% theta is better.#
+    # G is diagonal (fixed effect) - prior prec#
+    # C is built from Ainv so is good.#
+    # prior_prec must be > 0#
+    n = length(y)#
+    n_theta = length(prior_prec)#
+    theta_star = prior_mean + rnorm(n_theta)/sqrt(prior_prec)#
+    e_star = solve(t(chol_R_inv),rnorm(n))#
+    W_theta_star = W %*% theta_star#
+#
+    y_resid = y - W_theta_star - e_star@x#
+    WtRinvy = crossprod(RinvSqW,crossprod(chol_R_inv,y_resid))#
+#
+    theta_tilda = solve(C,WtRinvy)#
+#
+    theta = theta_tilda@x + theta_star#
+    return(theta)#
+}
+sample_MME_single_diagR_inv = function(y,W,C,pe,prior_mean,chol_A_inv){#
+    # replace chol_A %*% theta with solve(t(chol_A_inv),theta)#
+    n = length(y)#
+    n_theta = nrow(chol_A)#
+    theta_star = solve(t(chol_A_inv),rnorm(n_theta))#
+    theta_star = theta_star@x + prior_mean#
+    e_star = rnorm(n)/sqrt(pe)#
+    W_theta_star = W %*% theta_star#
+#
+    y_resid = y - W_theta_star@x - e_star#
+    WtRiy = crossprod(W,y_resid*pe)#
+#
+    theta_tilda = solve(C,WtRiy)#
+#
+    theta = theta_tilda@x + theta_star#
+    return(theta)#
+}
+sample_MME_fixedEffects_inv = function(Y,W,Sigma_invs, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){#
+    require(parallel)#
+    # using method described in MCMC Course notes#
+    p = ncol(Y)#
+    n = nrow(Y)#
+    b = ncol(W)#
+    chunkSize = ceiling(p/ncores)#
+    res = mclapply(1:ceiling(p/chunkSize),function(chunk) {#
+        cols = 1:chunkSize + (chunk-1)*chunkSize#
+        cols = cols[cols <= p]#
+        thetas = do.call(cbind,lapply(cols,function(j) {#
+            chol_R_inv = Sigma_invs[[h2s_index[j]]]$chol #* sqrt(tot_Y_prec[j])#
+            chol_R_inv@x = chol_R_inv@x * sqrt(tot_Y_prec[j])#
+            RinvSqW = crossprod(chol_R_inv,W)#
+            C = crossprod(RinvSqW)#
+            diag(C) = diag(C) + prior_prec[,j]#
+            theta_j = sample_MME_single_diagA_inv(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],chol_R_inv)           #
+            theta_j#
+        }))#
+        thetas#
+    },mc.cores = ncores)#
+    res = do.call(cbind,res)#
+    res#
+}
+sample_MME_ZAZts_inv = function(Y, W, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_mats, h2s, h2_index, chol_As,ncores){#
+    # todo . . .#
+    require(parallel)#
+    # using method described in MCMC Course notes#
+    p = ncol(Y)#
+    n = nrow(Y)#
+    b = ncol(W)#
+    pes = tot_Y_prec / (1-colSums(h2s))#
+#
+    chunkSize = ceiling(p/ncores)#
+    res = mclapply(1:ceiling(p/chunkSize),function(chunk) {#
+        cols = 1:chunkSize + (chunk-1)*chunkSize#
+        cols = cols[cols <= p]#
+        thetas = do.call(cbind,lapply(cols,function(j) {#
+            h2s_j = h2s[,j]#
+            C = randomEffect_Cs[[h2_index[j]]]#
+            C@x = C@x * tot_Y_prec[j]#
+            chol_A = do.call(bdiag,lapply(1:nrow(h2s),function(i) {#
+                if(h2s_j[i] == 0) return(Diagonal(nrow(chol_As[[i]]),0))  # if h2==0, then we want a Diagonal matrix with 0 diagonal.#
+                chol_Ai = chol_As[[i]]#
+                chol_Ai@x = chol_Ai@x *sqrt(h2s_j[i]/tot_Y_prec[j])#
+                chol_Ai#
+            }))#
+            theta_j = sample_MME_single_diagR(Y[,j], W, C, pes[j], prior_mean[,j],chol_A)           #
+            theta_j#
+        }))#
+        thetas#
+    },mc.cores = ncores)#
+    res = do.call(cbind,res)#
+    res#
+}
+sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_invs, h2s_index,ncores){#
+    n = nrow(Y)#
+    p = ncol(Y)#
+#
+    chunkSize = ceiling(p/ncores)#
+    scores = mclapply(1:ceiling(p/chunkSize),function(chunk) {#
+        cols = 1:chunkSize + (chunk-1)*chunkSize#
+        cols = cols[cols <= p]#
+        sapply(cols,function(j) {#
+            chol_Sigma_inv = Sigma_invs[[h2s_index[j]]]$chol#
+            sum(crossprod(chol_Sigma_inv,Y[,j])^2)#
+        })#
+    },mc.cores = ncores)#
+    scores = do.call(c,scores)#
+    rgamma(p,shape = tot_Y_prec_shape + n/2, rate = tot_Y_prec_rate + 1/2*scores)#
+}
+sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_invs, h2s_index,ncores){#
+    n = nrow(Y)#
+    p = ncol(Y)#
+#
+    chunkSize = ceiling(p/ncores)#
+    scores = mclapply(1:ceiling(p/chunkSize),function(chunk) {#
+        cols = 1:chunkSize + (chunk-1)*chunkSize#
+        cols = cols[cols <= p]#
+        sapply(cols,function(j) {#
+            chol_Sigma_inv = Sigma_invs[[h2s_index[j]]]$chol#
+            sum(crossprod(chol_Sigma_inv,Y[,j])^2)#
+        })#
+    },mc.cores = ncores)#
+    scores = do.call(c,scores)#
+    rgamma(p,shape = tot_Y_prec_shape + n/2, rate = tot_Y_prec_rate + 1/2*scores)#
+}
+sample_h2s_discrete_inv = function(Y,tot_Y_prec, Sigma_invs,discrete_priors,ncores){#
+    n = nrow(Y)#
+    p = ncol(Y)#
+    discrete_bins = length(discrete_priors)#
+#
+    chunkSize = ceiling(discrete_bins/ncores)#
+    log_ps = mclapply(1:ceiling(discrete_bins/chunkSize),function(chunk) {#
+        rows = 1:chunkSize + (chunk-1)*chunkSize#
+        rows = rows[rows <= discrete_bins]#
+        sapply(rows,function(i) {#
+            chol_Sigma_inv = Sigma_invs[[i]]$chol#
+            det_Sigma_inv = Sigma_invs[[i]]$det#
+            # scores_2 = tot_Y_prec*diag(crossprod(Y,solve(R,Y)))#
+            scores_2 = tot_Y_prec*colSums(crossprod(chol_Sigma_inv,Y)^2)#
+#
+            log_ps = -n/2 * log(2*pi) + 1/2*(log(det_R) + n*log(tot_Y_prec)) - 1/2 * scores_2 + log(discrete_priors[i])#
+            log_ps#
+        })#
+    },mc.cores = ncores)#
+    if(length(log_ps) == 1) {#
+        log_ps = matrix(log_ps[[1]],nrow = p)#
+    } else{#
+        log_ps = do.call(cbind,log_ps)#
+    }#
+    h2s_index = sapply(1:p,function(j) {#
+        max_row = max(log_ps[j,])#
+        norm_factor = max_row+log(sum(exp(log_ps[j,]-max_row)))#
+        ps_j = exp(log_ps[j,] - norm_factor)#
+        sum(runif(1)>cumsum(ps_j))+1#
+    })#
+    # }))#
+    return(h2s_index)#
+}
+for(i in 1:nIter){#
+    if(i %% 100 == 0) print(i)#
+#
+    Design = X#
+    rows = b#
+    prior_mean = matrix(0,rows,p)#
+    prior_prec = matrix(rep(1e-6,b),nc=1)#
+    # recover()#
+    B = sample_MME_fixedEffects(Y,Design,Sigmas, h2_index, tot_Y_prec, prior_mean, prior_prec,1)#
+#
+    Y_tilde = as.matrix(Y - X %*% B)#
+    tot_Y_prec = sample_tot_prec(Y_tilde, priors$tot_Y_prec_shape, priors$tot_Y_prec_rate, Sigmas, h2_index,1)#
+    h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigmas,priors$discrete_priors,1)#
+    h2 = h2_divisions[,h2_index,drop=FALSE]#
+    # a_prec = tot_Y_prec / colSums(h2)#
+#
+    # prior_mean = matrix(0,sum(r_RE),p)#
+    # a = sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_mats, h2, h2_index,chol_As,1)    #
+#
+    if((i > burn) & (i-burn)%%thin == 0){#
+        sp = sp + 1#
+        posterior[sp,] = c(B, h2/tot_Y_prec, (1-sum(h2))/tot_Y_prec)#
+    }#
+#
+}#
+#
+boxplot(posterior)#
+boxplot(cbind(model1.2$Sol,model1.2$VCV))
+prior1.1 = list(R = list(V = 1, nu = 4), G = list(G1 = list(V = 1,nu=4)))
+model1.2 <- MCMCglmm(BWT ~ SEX, random = ~animal, pedigree = Ped,
+data = Data, prior = prior1.1, nitt = 65000, thin = 50, burnin = 15000,
+verbose = FALSE)
+## 1 - my code doesn't seem to give the same variance component estimates. Maybe the priors are different#
+## 2 - I should try to re-write the functions in terms of Ainv rather than A. It is much more sparse at least in this example.#
+#
+library(MCMCglmm)#
+Data <- as.data.frame(read.table(file = "./gryphon.dat", header = TRUE))#
+names(Data)[1] <- "animal"#
+Data$animal <- as.factor(Data$animal)#
+Data$MOTHER <- as.factor(Data$MOTHER)#
+Data$BYEAR <- as.factor(Data$BYEAR)#
+Data$SEX <- as.factor(Data$SEX)#
+Data$BWT <- as.numeric(Data$BWT)#
+Data$TARSUS <- as.numeric(Data$TARSUS)#
+head(Data)#
+Ped <- as.data.frame(read.table(file = "./gryphon.ped", header = TRUE))#
+for (x in 1:3) Ped[, x] <- as.factor(Ped[, x])#
+head(Ped)
+model1.2 <- MCMCglmm(BWT ~ SEX, random = ~animal, pedigree = Ped,#
+    data = Data, prior = prior1.1, nitt = 65000, thin = 50, burnin = 15000,#
+    verbose = FALSE)
+rm(list='inverseA')

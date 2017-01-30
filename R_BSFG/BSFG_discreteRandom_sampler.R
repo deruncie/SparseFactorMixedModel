@@ -61,19 +61,20 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 
 		 # -----fill in missing phenotypes----- #
 			#conditioning on everything else
-			# if(sum(Y_missing)>0) {
-			# 	meanTraits = X %*% B + F %*% t(Lambda) + Z_1_sparse %*% E_a + Z_2_sparse %*% W
-			# 	resids = matrix(rnorm(p*n,0,sqrt(1/resid_Y_prec)),nr = n,nc = p,byrow=T)
-			# 	Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
-			# }
-			# recover()
+			# this is not checked thoroughly
+			if(sum(Y_missing)>0) {
+				meanTraits = X %*% B + F %*% t(Lambda) + Z_all %*% E_a
+				resids = matrix(rnorm(p*n,0,sqrt((1-colSums(resid_h2))/tot_Y_prec)),nr = n,nc = p,byrow=T)
+				Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
+			}
 			  
 		 # -----Sample Lambda and B ------------------ #
 			#conditioning on W, F, marginalizing over random effects (conditional on resid_h2)
 			Design = cbind(X,F)
 			rows = b + k
 			prior_mean = matrix(0,rows,p)
-			prior_prec = rbind(1e-6,t(Plam))
+			prior_prec = rbind(1e-6,t(Plam)) # note: fixed effect priors must be independent.
+			# recover()
 			coefs = sample_MME_fixedEffects(Y,Design,Sigmas, resid_h2_index, tot_Y_prec, prior_mean, prior_prec,ncores)
 			# coefs = sample_coefs_DR_parallel_sparse_c( T, Design, tot_Y_prec, prior_mean, prior_prec, inverse_Sigmas, resid_h2_index, 1)
 
@@ -101,12 +102,6 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			resid_h2 = h2_divisions[,resid_h2_index,drop=FALSE]
 			E_a_prec = tot_Y_prec / colSums(resid_h2)
 
-			# Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda))
-			# tot_Y_prec = sample_tot_prec_sparse_c(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, inverse_Sigmas, resid_h2_index)
-
-			# resid_h2_index = sample_discrete_h2s_given_p_sparse_c( Y_tilde, tot_Y_prec, Resid_discrete_priors, inverse_Sigmas)
-			# resid_h2 = h2_divisions[resid_h2_index,]
-
 			prior_mean = matrix(0,sum(r_RE),p)
 			E_a = sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_Cs, Ai_mats, resid_h2, resid_h2_index,chol_As,ncores)
 			
@@ -117,11 +112,6 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			F_h2_index = sample_h2s_discrete(F,tot_F_prec, Sigmas,F_discrete_priors,ncores)
 			F_h2 = h2_divisions[,F_h2_index,drop=FALSE]
 
-			# tot_F_prec = sample_tot_prec_sparse_c(F, tot_F_prec_shape, tot_F_prec_rate, inverse_Sigmas, F_h2_index)
-
-			# F_h2_index = sample_discrete_h2s_given_p_sparse_c( F, tot_F_prec, F_discrete_priors, inverse_Sigmas)
-			# F_h2 = h2_divisions[F_h2_index,]
-
 			prior_mean = matrix(0,sum(r_RE),k)
 			F_a = sample_MME_ZAZts(F, Z_all, tot_F_prec, prior_mean, randomEffect_Cs, Ai_mats, F_h2, F_h2_index,chol_As,ncores)
 
@@ -130,7 +120,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			Y_tilde = as.matrix(Y - X %*% B - Z_all %*% E_a)
 			F_e_prec = tot_F_prec / (1-colSums(F_h2))
 			resid_Y_prec = tot_Y_prec / (1-colSums(resid_h2))
-			F = sample_factors_scores_ipx_sparse_c( Y_tilde, Z_all,Lambda,resid_Y_prec,F_a,F_e_prec )
+			F = sample_factors_scores_sparse_c( Y_tilde, Z_all,Lambda,resid_Y_prec,F_a,F_e_prec )
 	
 	})
 	current_state = current_state[current_state_names]
