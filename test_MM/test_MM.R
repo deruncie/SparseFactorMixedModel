@@ -103,7 +103,7 @@ for(i in 1:(Iter+burn)) {
 
 	thetas1 = c()
 	thetas2 = c()
-	C = pe*t(W) %*% W + Ai
+	C = pe*t(W) %*% W + pe*Ai
 	Ci = solve(C)
 	cholC = chol(C)
 	cholCi = chol(Ci)
@@ -112,9 +112,7 @@ for(i in 1:(Iter+burn)) {
 	plot(cov(t(a)),Ci);abline(0,1)
 for(i in 1:1000){
 
-microbenchmark(solve(C,WtRiy), Ci %*% WtRiy)
-
-microbenchmark({
+# microbenchmark({
 	theta_star = Ac %*% rnorm(nG)
 	# theta_star = solve(Aic,rnorm(nG))
 	W_theta_star = W %*% theta_star
@@ -138,16 +136,17 @@ microbenchmark({
 	theta_tilda1 = solve(C,WtRiy)
 	# theta_tilda1 = Ci %*% WtRiy
 	theta = theta_tilda1 + theta_star
-},
-{#Ci = solve(C)
+	thetas1 = cbind(thetas1,theta@x)
+# },
+# {#Ci = solve(C)
 	# theta = pe * Ci %*% t(W) %*% data$y + solve(cholC,rnorm(nG))
-	theta = pe * Ci %*% t(W) %*% data$y + t(cholCi) %*% rnorm(nG)
-})
-	thetas1 = cbind(thetas1,as.matrix(theta_tilda1 + theta_star))
+# 	theta = pe * Ci %*% t(W) %*% data$y + t(cholCi) %*% rnorm(nG)
+# # })
+# 	thetas1 = cbind(thetas1,as.matrix(theta_tilda1 + theta_star))
 
 
-	# thetas2 = cbind(thetas2,as.matrix(pe * Ci %*% t(W) %*% data$y + solve(cholC,rnorm(nG))))
-	thetas2 = cbind(thetas2,as.matrix(pe * Ci %*% t(W) %*% data$y + t(cholCi) %*% rnorm(nG)))
+# 	# thetas2 = cbind(thetas2,as.matrix(pe * Ci %*% t(W) %*% data$y + solve(cholC,rnorm(nG))))
+# 	thetas2 = cbind(thetas2,as.matrix(pe * Ci %*% t(W) %*% data$y + t(cholCi) %*% rnorm(nG)))
 }
 plot(rowMeans(thetas1),rowMeans(thetas2));abline(0,1)
 plot(cov(t(thetas1)),cov(t(thetas2)));abline(0,1)
@@ -204,7 +203,7 @@ qqplot(m1$VCV[,2],r[,2]);abline(0,1)
 
 as = c()
 r = c()
-p = 100
+p = 1000
 for(i in 1:(Iter+burn)) {
 	if(i %% 100 == 0) print(i)
 		Y = matrix(rep(data$y,p),nc=p)
@@ -217,8 +216,8 @@ for(i in 1:(Iter+burn)) {
 		Ais = list()
 		Ais[[1]] = Ai
 		prior_mean = matrix(0,nG,p)
-		as = sample_MME_matrixPrior(Y,W,Sigma_Rs,sigma_indexes,tot_Y_prec,prior_mean,Ais, h2s,Ac,1)
-
+		as = sample_MME_randomEffects(Y,W,tot_Y_prec,prior_mean,Ais, h2s,Ac,8)
+plot(cov(t(as)),cov(t(thetas1)));abline(0,1);plot(rowMeans(as),rowMeans(thetas1));abline(0,1)
 
 pas = rgamma(1e5,shape = a_prec_shape,rate = 1/a_prec_rate)
 pes = rgamma(1e5,shape = resid_prec_shape,rate = 1/resid_prec_rate)

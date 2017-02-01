@@ -12,7 +12,6 @@ sample_MME_single_diagA_inv_v2 = function(y, W, C, RinvSqW, prior_mean,prior_pre
 	theta_star = prior_mean + rnorm(n_theta)/sqrt(prior_prec)
 	e_star = (chol_R) %*% rnorm(n) / sqrt(tot_Y_prec)
 	W_theta_star = W %*% theta_star
-# recover()
 	y_resid = y - W_theta_star - e_star@x
 	if(!is.null(R_Perm)) {
 		y_resid_p = R_Perm %*% y_resid
@@ -28,10 +27,9 @@ sample_MME_single_diagA_inv_v2 = function(y, W, C, RinvSqW, prior_mean,prior_pre
 	theta
 }
 sample_MME_single_diagR_inv = function(y,W,Cholesky_C,pe,prior_mean,chol_A_inv,tot_Y_prec){
-	# replace chol_A %*% theta with solve(t(chol_A_inv),theta)
 	n = length(y)
 	n_theta = nrow(chol_A_inv)
-	theta_star = solve(t(chol_A_inv),rnorm(n_theta))
+	theta_star = solve(chol_A_inv,rnorm(n_theta))
 	theta_star = theta_star@x + prior_mean
 	e_star = rnorm(n)/sqrt(pe)
 	W_theta_star = W %*% theta_star
@@ -76,10 +74,9 @@ sample_MME_fixedEffects_inv_v2 = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_i
 	res
 }
 
-sample_MME_ZAZts_inv = function(Y, W, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, h2s, h2_index, chol_As,ncores){
-	# todo . . .
-	require(parallel)
+sample_MME_ZAZts_inv = function(Y, W, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, h2s, h2_index, chol_Ai_mats,ncores){
 	# using method described in MCMC Course notes
+	require(parallel)
 	p = ncol(Y)
 	n = nrow(Y)
 	b = ncol(W)
@@ -93,13 +90,13 @@ sample_MME_ZAZts_inv = function(Y, W, tot_Y_prec, prior_mean, randomEffect_C_Cho
 			h2s_j = h2s[,j]
 			Cholesky_C = randomEffect_C_Choleskys[[h2_index[j]]]
 			# C@x = C@x * tot_Y_prec[j]  # this won't work if C is a Choleksy. See about removing tot_Y_prec directly from Y.
-			chol_A = do.call(bdiag,lapply(1:nrow(h2s),function(i) {
-				if(h2s_j[i] == 0) return(Diagonal(nrow(chol_As[[i]]),0))  # if h2==0, then we want a Diagonal matrix with 0 diagonal.
-				chol_Ai = chol_As[[i]]
-				chol_Ai@x = chol_Ai@x *sqrt(h2s_j[i]/tot_Y_prec[j])
+			chol_A_inv = do.call(bdiag,lapply(1:nrow(h2s),function(i) {
+				if(h2s_j[i] == 0) return(Diagonal(nrow(chol_Ai_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
+				chol_Ai = chol_Ai_mats[[i]]
+				chol_Ai@x = chol_Ai@x *sqrt(tot_Y_prec[j]/h2s_j[i])
 				chol_Ai
 			}))
-			theta_j = sample_MME_single_diagR_inv(Y[,j], W, Cholesky_C, pes[j], prior_mean[,j],chol_A,tot_Y_prec[j])			
+			theta_j = sample_MME_single_diagR_inv(Y[,j], W, Cholesky_C, pes[j], prior_mean[,j],chol_A_inv,tot_Y_prec[j])			
 			theta_j
 		}))
 		thetas
@@ -109,7 +106,6 @@ sample_MME_ZAZts_inv = function(Y, W, tot_Y_prec, prior_mean, randomEffect_C_Cho
 }
 
 sample_tot_prec_inv_v2 = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys,Sigma_Perm, h2s_index,ncores){
-	# recover()
 	n = nrow(Y)
 	p = ncol(Y)
 
@@ -131,6 +127,69 @@ sample_tot_prec_inv_v2 = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Ch
 	rgamma(p,shape = tot_Y_prec_shape + n/2, rate = tot_Y_prec_rate + 1/2*scores)
 }
 
+log_prob_h2 = function(i, y_p, Sigma_Choleskys, n, tot_Y_prec, discrete_priors){
+	Cholesky_Sigma = Sigma_Choleskys[[i]]$Cholesky_Sigma
+	log_det_Sigma = Sigma_Choleskys[[i]]$log_det
+	scores_2 = tot_Y_prec*colSums(solve(Cholesky_Sigma,y_p,'L')^2)
+
+	log_p = -n/2 * log(2*pi) - 1/2*(log_det_Sigma - n*log(tot_Y_prec)) - 1/2 * scores_2 + log(discrete_priors)
+	log_p
+}
+
+sample_h2s_discrete_MH = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discrete_priors,h2_divisions,h2_index,step_size,ncores){
+	# while this works, it is much slower than doing the full scan over all traits, at least for multiple traits
+	# testing with p=100, solving the whole set takes ~4-5x solving just 1. And this method requires doing each trait separately
+	# both methods are similarly easy to multiplex, so no advantage there either.
+	n = nrow(Y)
+	p = ncol(Y)
+	discrete_bins = length(discrete_priors)
+
+	Yp = Y
+	if(!is.null(Sigma_Perm)){
+		Yp = Sigma_Perm %*% Y
+		Yp = matrix(Yp,nrow(Y))
+	}
+
+	chunkSize = ceiling(p/ncores)
+	h2s_index = mclapply(1:ceiling(p/chunkSize),function(chunk) {
+		cols = 1:chunkSize + (chunk-1)*chunkSize
+		cols = cols[cols <= p]
+		sapply(cols,function(j) {
+			## steps:
+			# 1) calculate log_prob at current state
+			# 2) propose new state
+			# 3) calc log_prob at new state
+			# 4) calc proposal prob from old to new
+			# 5) calc proposal prob from new to old
+			old_state <- h2_index[j]
+			old_log_p <- log_prob_h2(old_state,Yp[,j],Sigma_Choleskys,n,tot_Y_prec[j],discrete_priors[old_state])
+
+			candidate_new_states <- which(colSums((h2_divisions - c(h2_divisions[,old_state]))^2) < step_size)
+			proposed_state <- sample(candidate_new_states,1)
+
+			new_log_p <- log_prob_h2(proposed_state,Yp[,j],Sigma_Choleskys,n,tot_Y_prec[j],discrete_priors[proposed_state])
+			candidate_state_from_new_state <- which(colSums((h2_divisions - c(h2_divisions[,proposed_state]))^2) < step_size)
+
+			forward_prob = 1/length(candidate_new_states)
+			if(old_state %in% candidate_state_from_new_state){
+				back_prob = 1/length(candidate_state_from_new_state)
+			} else{
+				back_prob = 0
+			}
+
+			log_MH_ratio = new_log_p - old_log_p + log(forward_prob) - log(back_prob)
+
+			if(log(runif(1)) < log_MH_ratio) {
+				return(proposed_state)
+			} else {
+				return(old_state)
+			}
+		})
+	},mc.cores = ncores)
+	do.call(c,h2s_index) 
+}
+
+
 sample_h2s_discrete_inv_v2 = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discrete_priors,ncores){
 	n = nrow(Y)
 	p = ncol(Y)
@@ -146,14 +205,14 @@ sample_h2s_discrete_inv_v2 = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,d
 	log_ps = mclapply(1:ceiling(discrete_bins/chunkSize),function(chunk) {
 		rows = 1:chunkSize + (chunk-1)*chunkSize
 		rows = rows[rows <= discrete_bins]
-		sapply(rows,function(i) {
+		matrix(sapply(rows,function(i) {
 			Cholesky_Sigma = Sigma_Choleskys[[i]]$Cholesky_Sigma
 			log_det_Sigma = Sigma_Choleskys[[i]]$log_det
 			scores_2 = tot_Y_prec*colSums(solve(Cholesky_Sigma,Yp,'L')^2)
 
 			log_ps = -n/2 * log(2*pi) - 1/2*(log_det_Sigma - n*log(tot_Y_prec)) - 1/2 * scores_2 + log(discrete_priors[i])
 			log_ps
-		})
+		}),nr=p)
 	},mc.cores = ncores)
 	if(length(log_ps) == 1) {
 		log_ps = matrix(log_ps[[1]],nrow = p)
@@ -169,6 +228,7 @@ sample_h2s_discrete_inv_v2 = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,d
 	# }))
 	return(h2s_index)
 }
+
 
 
 save_posterior_samples = function( sp_num, current_state, Posterior) {
