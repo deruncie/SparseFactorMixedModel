@@ -1,9 +1,10 @@
 ## This seems to be working now, with a decent speed up
 ## It is all implemented using the perm-reducing re-ordering, which gives a good speed up to the fixed_effect sampling, 
 ##    and moderate speed-ups to the other two steps.
+## potentially strange results with limited discritization
 
 library(MCMCglmm)
-source('../R_BSFG/BSFG_discreteRandom_Inv_functions_2.R')
+source('../R_BSFG/BSFG_discreteRandom_functions.R')
 Data <- as.data.frame(read.table(file = "./gryphon.dat", header = TRUE))
 names(Data)[1] <- "animal"
 Data$animal <- as.factor(Data$animal)
@@ -35,10 +36,11 @@ model1.3 <- MCMCglmm(BWT ~ SEX, random = ~animal + BYEAR, pedigree = Ped,
 posterior.mode(model1.3$VCV)
 
 mcmc_model = model1.3
+mcmc_model = model1.2
 
 # now BSFG
 
-discrete_divisions = 40
+discrete_divisions = 15
 priors = list(
     tot_Y_prec_shape      =   2.4,
     tot_Y_prec_rate       =   1/3.5
@@ -110,6 +112,15 @@ make_Ai = function(Ai_mats,h2s) {
 		}
 	}))
 }
+
+make_Chol_Ai = function(chol_Ai_mats,h2s){
+	do.call(bdiag,lapply(1:length(h2s),function(i) {
+		if(h2s[i] == 0) return(Diagonal(nrow(chol_Ai_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
+		chol_Ai = chol_Ai_mats[[i]]
+		chol_Ai@x = chol_Ai@x / sqrt(h2s[i])
+		chol_Ai
+	}))
+}
 # setup of symbolic Cholesky of C
 Ai = forceSymmetric(make_Ai(Ai_mats,rep(1,n_RE)/(n_RE+1)))
 Cholesky_C = Cholesky(ZtZ + Ai)
@@ -120,7 +131,11 @@ randomEffect_C_Choleskys = lapply(1:ncol(h2_divisions),function(i) {
 	Ai = make_Ai(Ai_mats,h2s)
 	C = ZtZ/(1-sum(h2s))
 	C = C + Ai
-	update(Cholesky_C,forceSymmetric(C))
+	Cholesky_C_i = update(Cholesky_C,forceSymmetric(C))
+
+
+	chol_A_inv = make_Chol_Ai(chol_Ai_mats,h2s)
+
 })
 
 # Sigma
@@ -134,7 +149,8 @@ make_Sigma = function(ZAZts,h2s){
 
 # setup of symbolic Cholesky of Sigma
 Sigma = make_Sigma(ZAZts,h2_divisions[,2])
-Cholesky_Sigma_base = Cholesky(Sigma,LDL=F,perm=T)
+Cholesky_Sigma_base = Cholesky(Sigma,perm=T,super=T)
+# Cholesky_Sigma_base = Cholesky(Sigma,LDL=F,perm=T)
 Sigma_Perm = expand(Cholesky_Sigma_base)$P
 if(all(diag(Sigma_Perm))) Sigma_Perm = NULL
 
@@ -176,14 +192,14 @@ a = do.call(rbind,lapply(RE_names,function(effect){
 B = rnorm(b)
 B = c(6,2.4)
 
-nIter = 1000
+nIter = 500
 burn = 50
 thin = 1
 
 posterior = c();#matrix(NA,nrow = (nIter-burn)/thin,ncol = length(B)+length(h2)+1)
 as = c()
 sp = 0
-
+start = Sys.time()
 for(i in 1:nIter){
 	if(i %% 100 == 0) print(i)
 
@@ -191,18 +207,19 @@ for(i in 1:nIter){
 	rows = b
 	prior_meanB = matrix(0,rows,p)
 	prior_precB = matrix(rep(1e-10,b),nc=1)
+	# prior_precB = matrix(rep(0,b),nc=1)
 	# recover()
-	B = sample_MME_fixedEffects_inv_v2(Y,Design,Sigma_Choleskys, Sigma_Perm,  h2_index, tot_Y_prec, prior_meanB, prior_precB,1)
+	B = sample_MME_fixedEffects(Y,Design,Sigma_Choleskys, Sigma_Perm,  h2_index, tot_Y_prec, prior_meanB, prior_precB,1)
 
 	Y_tilde = as.matrix(Y - X %*% B)
-	tot_Y_prec = sample_tot_prec_inv_v2(Y_tilde, priors$tot_Y_prec_shape, priors$tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm,  h2_index,1)
-	# h2_index = sample_h2s_discrete_inv_v2(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, priors$discrete_priors,8)
-	h2_index = sample_h2s_discrete_MH(Y_tilde,tot_Y_prec, Sigma_Choleskys,Sigma_Perm, priors$discrete_priors,h2_divisions,h2_index,step_size = 0.02,ncores=1)
+	tot_Y_prec = sample_tot_prec(Y_tilde, priors$tot_Y_prec_shape, priors$tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm,  h2_index,1)
+	h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, priors$discrete_priors,8)
+	# h2_index = sample_h2s_discrete_MH(Y_tilde,tot_Y_prec, Sigma_Choleskys,Sigma_Perm, priors$discrete_priors,h2_divisions,h2_index,step_size = 0.02,ncores=1)
 	h2 = h2_divisions[,h2_index,drop=FALSE]
 	# a_prec = tot_Y_prec / colSums(h2)
 
-	prior_meanA = matrix(0,ncol(Z_all),p)
-	a = sample_MME_ZAZts_inv(Y_tilde, Z_all, tot_Y_prec, prior_meanA, randomEffect_C_Choleskys, h2, h2_index,chol_Ai_mats,1)
+	# prior_meanA = matrix(0,ncol(Z_all),p)
+	# a = sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_meanA, randomEffect_C_Choleskys, h2, h2_index,chol_Ai_mats,1)
 	# a = sapply(1:1000,function(x) sample_MME_ZAZts_inv(Y_tilde, Z_all, tot_Y_prec, prior_meanA, randomEffect_C_Choleskys, h2, h2_index,chol_Ai_mats,1))	
 	# a = a[1:nrow(A_mats[[1]]),]
 	# i = sample(1:nrow(a)^2,10000)
@@ -215,8 +232,9 @@ for(i in 1:nIter){
 	}
 
 }
+Sys.time()-start
 
-boxplot(posterior)
+boxplot(posterior[,1:5])
 boxplot(cbind(mcmc_model$Sol[,1:2],mcmc_model$VCV))
 effectiveSize(posterior[1:sp,])
 effectiveSize(cbind(mcmc_model$Sol[,1:2],mcmc_model$VCV))
@@ -224,6 +242,8 @@ i=2;qqplot(posterior[,i],mcmc_model$Sol[,i]);abline(0,1)
 i=1;qqplot(posterior[,2+i],mcmc_model$VCV[,i]);abline(0,1)
 i=2;qqplot(posterior[,2+i],mcmc_model$VCV[,i]);abline(0,1)
 i=3;qqplot(posterior[,2+i],mcmc_model$VCV[,i]);abline(0,1)
+
+for(i in 1:ncol(posterior)) plot(posterior[,i],type='l',main = i)
 
 microbenchmark(
 	sample_MME_fixedEffects_inv(Y,Design,Sigma_invs, h2_index, tot_Y_prec, prior_meanB, prior_precB,1),
@@ -245,7 +265,10 @@ microbenchmark(
 	sample_h2s_discrete_inv_v2(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, priors$discrete_priors,1),
 	sample_h2s_discrete_inv_v2(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, priors$discrete_priors,8)
 	,times=10)
+
+Ymat = matrix(Y,nrow = nrow(Y),nc = 100)
+
 microbenchmark(
-	sample_h2s_discrete_inv_v2(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, priors$discrete_priors,8),
-	sample_h2s_discrete_MH(Y_tilde,tot_Y_prec, Sigma_Choleskys,Sigma_Perm, priors$discrete_priors,h2_divisions,h2_index,step_size = 0.02,ncores=1))
-	,times = 10)
+	sample_h2s_discrete_inv_v2(Ymat,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, priors$discrete_priors,8),
+	sample_h2s_discrete_MH(Ymat,rep(tot_Y_prec,ncol(Ymat)), Sigma_Choleskys,Sigma_Perm, priors$discrete_priors,h2_divisions,rep(h2_index,ncol(Ymat)),step_size = 0.02,ncores=1)
+	,times = 2)

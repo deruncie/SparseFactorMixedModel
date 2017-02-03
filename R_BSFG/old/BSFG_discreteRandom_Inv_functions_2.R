@@ -1,5 +1,5 @@
 # re-formulating based on Ainv instead of A.
-sample_MME_single_diagA_inv_v2 = function(y, W, C, RinvSqW, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec) {
+sample_MME_single_diagA_inv = function(y, W, C, RinvSqW, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec) {
 	# R is aZAZ + bI
 	#    we have to do Ainv_inv to form R - losing much sparsity
 	# 	 then form chol_R
@@ -42,7 +42,7 @@ sample_MME_single_diagR_inv = function(y,W,Cholesky_C,pe,prior_mean,chol_A_inv,t
 	return(theta)
 }
 
-sample_MME_fixedEffects_inv_v2 = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){
+sample_MME_fixedEffects_inv = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){
 	require(parallel)
 	# using method described in MCMC Course notes
 	p = ncol(Y)
@@ -65,7 +65,7 @@ sample_MME_fixedEffects_inv_v2 = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_i
 			RinvSqW = solve(Cholesky_R,Wp,'L')
 			C = crossprod(RinvSqW) * tot_Y_prec[j]
 			diag(C) = diag(C) + prior_prec[,j]
-			theta_j = sample_MME_single_diagA_inv_v2(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j])
+			theta_j = sample_MME_single_diagA_inv(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j])
 			theta_j
 		}))
 		thetas
@@ -200,7 +200,6 @@ sample_h2s_discrete_inv_v2 = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,d
 		Yp = Sigma_Perm %*% Y
 		Yp = matrix(Yp,nrow(Y))
 	}
-
 	chunkSize = ceiling(discrete_bins/ncores)
 	log_ps = mclapply(1:ceiling(discrete_bins/chunkSize),function(chunk) {
 		rows = 1:chunkSize + (chunk-1)*chunkSize
@@ -210,7 +209,7 @@ sample_h2s_discrete_inv_v2 = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,d
 			log_det_Sigma = Sigma_Choleskys[[i]]$log_det
 			scores_2 = tot_Y_prec*colSums(solve(Cholesky_Sigma,Yp,'L')^2)
 
-			log_ps = -n/2 * log(2*pi) - 1/2*(log_det_Sigma - n*log(tot_Y_prec)) - 1/2 * scores_2 + log(discrete_priors[i])
+			log_ps = -n/2 * log(2*pi) - 1/2*(log_det_Sigma - n*log(tot_Y_prec)) - 1/2 * scores_2# + log(discrete_priors[i])
 			log_ps
 		}),nr=p)
 	},mc.cores = ncores)

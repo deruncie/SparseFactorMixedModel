@@ -1,5 +1,6 @@
-BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores()) {
-	require(parallel)
+require(parallel)
+BSFG_discreteRandom_sampler_v2 = function(BSFG_state,n_samples,ncores = detectCores()) {
+
 	data_matrices  = BSFG_state$data_matrices
 	params         = BSFG_state$params
 	priors         = BSFG_state$priors
@@ -47,7 +48,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 		current_state_names = names(current_state)
 		current_state = within(c(current_state,priors,run_parameters, run_variables,data_matrices), {
 			k = ncol(Lambda)
-
+			
 		 # -----fill in missing phenotypes----- #
 			#conditioning on everything else
 			# this is not checked thoroughly
@@ -64,13 +65,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			prior_mean = matrix(0,rows,p)
 			prior_prec = rbind(1e-6,t(Plam)) # note: fixed effect priors must be independent.
 			# recover()
-			# note: Sim_1: slower with 8 than 1
-			# note: Sim_11: faster with 8 than 1
-			coefs = sample_MME_fixedEffects(Y,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Y_prec, prior_mean, prior_prec,ncores)
-			# microbenchmark(
-			# 	sample_MME_fixedEffects(Y,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Y_prec, prior_mean, prior_prec,ncores),
-			# 	sample_MME_fixedEffects(Y,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Y_prec, prior_mean, prior_prec,1),
-			# 	times = 10)
+			coefs = sample_MME_fixedEffects_inv_v2(Y,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Y_prec, prior_mean, prior_prec,ncores)
 			if(b > 0){
 				B = coefs[1:b,]
 			}
@@ -90,59 +85,24 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 		 # -----Sample tot_Y_prec, resid_h2, E_a ---------------- #
 			#conditioning on B, F, Lambda, resid_h2, tot_Y_prec
 			Y_tilde = Y - X %*% B - F %*% t(Lambda)
-			Y_tilde2 = as.matrix(Y_tilde)
-			# Sim_1: faster with 1 than 8
-			# microbenchmark(
-			# 	sample_tot_prec(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores),
-			# 	sample_tot_prec(Y_tilde2, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
-			# 	)
-			tot_Y_prec = sample_tot_prec(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
-			# microbenchmark(
-			# 	sample_tot_prec(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores),
-			# 	sample_tot_prec(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,1),
-			# 	times = 100)
-			# microbenchmark(sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores),
-			# 	sample_h2s_discrete(Y_tilde2,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores))
-			resid_h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
-			# microbenchmark(
-			# 	sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores),
-			# 	sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,1),
-			# 	times = 10)
-			# resid_h2_index  = sample_h2s_discrete_MH(Y_tilde,tot_Y_prec, Sigma_Choleskys,Sigma_Perm, Resid_discrete_priors,h2_divisions,resid_h2_index,step_size = 0.02,ncores)
+			tot_Y_prec = sample_tot_prec_inv_v2(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
+			resid_h2_index = sample_h2s_discrete_inv_v2(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
+			# resid_h2_index  = sample_h2s_discrete_MH(Y_tilde,tot_Y_prec, Sigma_Choleskys,Sigma_Perm, Resid_discrete_priors,h2_divisions,resid_h2_index,step_size = 0.02,ncores=1)
 			resid_h2 = h2_divisions[,resid_h2_index,drop=FALSE]
 			E_a_prec = tot_Y_prec / colSums(resid_h2)
 
 			prior_mean = matrix(0,sum(r_RE),p)
-			E_a = sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
-			# microbenchmark(
-			# 	sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores),
-			# 	sample_MME_ZAZts_2(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores))
-			# microbenchmark(
-				# sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores),
-				# sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,1),
-				# times = 10)
+			E_a = sample_MME_ZAZts_inv(Y_tilde, Z_all, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
 			
 		 # -----Sample tot_F_prec, F_h2, F_a ---------------- #
 			#conditioning on B, F, Lambda, F_h2, tot_F_prec
 
-			tot_F_prec = sample_tot_prec(F, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,ncores)
-			# microbenchmark(
-			# 	sample_tot_prec(F, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,ncores),
-			# 	sample_tot_prec(F, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,1),
-			# 	times = 100)			
-			F_h2_index = sample_h2s_discrete(F,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores)
-			# microbenchmark(
-			# 	sample_h2s_discrete(F,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores),
-			# 	sample_h2s_discrete(F,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,1),
-			# 	times = 10)
+			tot_F_prec = sample_tot_prec_inv_v2(F, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,ncores)
+			F_h2_index = sample_h2s_discrete_inv_v2(F,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores)
 			F_h2 = h2_divisions[,F_h2_index,drop=FALSE]
 
 			prior_mean = matrix(0,sum(r_RE),k)
-			F_a = sample_MME_ZAZts(F, Z_all, tot_F_prec, prior_mean, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,ncores)
-			# microbenchmark(
-			# 	sample_MME_ZAZts(F, Z_all, tot_F_prec, prior_mean, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,ncores),
-			# 	sample_MME_ZAZts(F, Z_all, tot_F_prec, prior_mean, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,1),
-			# 	times = 10)
+			F_a = sample_MME_ZAZts_inv(F, Z_all, tot_F_prec, prior_mean, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,ncores)
 
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,Lambda, F_h2
@@ -150,7 +110,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			F_e_prec = tot_F_prec / (1-colSums(F_h2))
 			resid_Y_prec = tot_Y_prec / (1-colSums(resid_h2))
 			F = sample_factors_scores_sparse_c( Y_tilde, Z_all,Lambda,resid_Y_prec,F_a,F_e_prec )
-
+	
 	})
 	current_state = current_state[current_state_names]
 
@@ -164,12 +124,12 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			
 			Posterior = save_posterior_samples( sp_num,current_state, Posterior)
 			
-			# if(sp_num %% save_freq == 0) save(Posterior,file='Posterior.RData')
+			if(sp_num %% save_freq == 0) save(Posterior,file='Posterior.RData')
 		}
 	}
 	end_time = Sys.time()
 	print(end_time - start_time)
-	# save(Posterior,file = 'Posterior.RData')
+	save(Posterior,file = 'Posterior.RData')
 
 
 	# ----------------------------------------------- #
@@ -177,7 +137,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 	# ----------------------------------------------- #
 
 
-	# save(current_state,file='current_state.RData')
+	save(current_state,file='current_state.RData')
 
 
 	BSFG_state$current_state = current_state

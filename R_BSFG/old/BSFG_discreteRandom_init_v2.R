@@ -18,10 +18,8 @@ BSFG_discreteRandom_loadData = function(){
 	return(list(Y = setup$Y, data = data, randomEffects = list(Group = Ainv),setup = setup))
 }
 
-BSFG_discreteRandom_init = function(Y, fixed, random, randomEffects, data, priors, run_parameters, scaleY = TRUE,
-									ncores = detectCores(),simulation = F,setup = NULL,verbose=T){
+BSFG_discreteRandom_init_v2 = function(Y, fixed, random, randomEffects, data, priors, run_parameters, scaleY = TRUE,simulation = F,setup = NULL,verbose=T){
 	require(Matrix)
-	require(parallel)
 	# recover()
 
 	# model dimensions
@@ -136,7 +134,6 @@ BSFG_discreteRandom_init = function(Y, fixed, random, randomEffects, data, prior
     for(effect in RE_names) {
     	F = F + Z_matrices[[effect]] %*% F_a[[effect]]
     }
-    F = as.matrix(F)
     F_a = do.call(rbind,F_a)
 
   # residuals
@@ -202,39 +199,36 @@ BSFG_discreteRandom_init = function(Y, fixed, random, randomEffects, data, prior
 	Ai_mats = lapply(A_mats,function(x) fix_A(solve(x)))
 	chol_Ai_mats = lapply(Ai_mats,chol)
 
-	#C
-	ZtZ = crossprod(Z_all)
-	make_Chol_Ai = function(chol_Ai_mats,h2s){
-		do.call(bdiag,lapply(1:length(h2s),function(i) {
-			if(h2s[i] == 0) return(Diagonal(nrow(chol_Ai_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
-			chol_Ai = chol_Ai_mats[[i]]
-			chol_Ai@x = chol_Ai@x / sqrt(h2s[i])
-			chol_Ai
-		}))
-	}
-	# setup of symbolic Cholesky of C
-	Ai = forceSymmetric(crossprod(make_Chol_Ai(chol_Ai_mats,rep(1,n_RE)/(n_RE+1))))
-	Cholesky_C = Cholesky(ZtZ + Ai)
-
-	randomEffect_C_Choleskys = mclapply(1:ncol(h2_divisions),function(i) {    	
-		if(i %% 100 == 0) print(i)
-		h2s = h2_divisions[,i]
-		chol_A_inv = make_Chol_Ai(chol_Ai_mats,h2s)
-		Ai = crossprod(chol_A_inv)
-		C = ZtZ/(1-sum(h2s))
-		C = C + Ai
-		Cholesky_C_i = update(Cholesky_C,forceSymmetric(C))
-
-		return(list(Cholesky_C = Cholesky_C_i, chol_A_inv = chol_A_inv))
-	},mc.cores = ncores)
-
-	# Sigma
 	ZAZts = list()
 	for(i in 1:n_RE){
 		ZAZts[[i]] = forceSymmetric(Z_matrices[[i]] %*% A_mats[[i]] %*% t(Z_matrices[[i]]))
 	}
 
+	#C
+	ZtZ = crossprod(Z_all)
+	make_Ai = function(Ai_mats,h2s) {
+		do.call(bdiag,lapply(1:length(h2s),function(j) {
+			if(h2s[j] == 0) {  # if h2==0, then we want a Diagonal matrix with Inf diagonal. This will allow Cinv = 0
+				Diagonal(nrow(Ai_mats[[j]]),Inf)
+			} else{
+				Ai_mats[[j]]/h2s[j]  
+			}
+		}))
+	}
+	# setup of symbolic Cholesky of C
+	Ai = forceSymmetric(make_Ai(Ai_mats,rep(1,n_RE)/(n_RE+1)))
+	Cholesky_C = Cholesky(ZtZ + Ai)
 
+	randomEffect_C_Choleskys = lapply(1:ncol(h2_divisions),function(i) {    	
+		if(i %% 100 == 0) print(i)
+		h2s = h2_divisions[,i]
+		Ai = make_Ai(Ai_mats,h2s)
+		C = ZtZ/(1-sum(h2s))
+		C = C + Ai
+		update(Cholesky_C,forceSymmetric(C))
+	})
+
+	# Sigma
 	make_Sigma = function(ZAZts,h2s){
 		R = 0
 		for(i in 1:length(h2s)){
@@ -250,7 +244,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, randomEffects, data, prior
 	Sigma_Perm = expand(Cholesky_Sigma_base)$P
 	if(all(diag(Sigma_Perm))) Sigma_Perm = NULL
 
-	Sigma_Choleskys = mclapply(1:ncol(h2_divisions),function(i) {
+	Sigma_Choleskys = lapply(1:ncol(h2_divisions),function(i) {
 		if(i %% 100 == 0) print(i)
 		Sigma = forceSymmetric(make_Sigma(ZAZts,h2_divisions[,i]))
 		stopifnot(class(Sigma) == 'dsCMatrix')
@@ -262,7 +256,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, randomEffects, data, prior
 			chol_Sigma = t(Sigma_Perm) %*% expand(Cholesky_Sigma)$L
 		}
 		list(log_det = log_det,Cholesky_Sigma = Cholesky_Sigma,chol_Sigma=chol_Sigma,Sigma = Sigma)
-	},mc.cores = ncores)
+	})
 
 # ----------------------------- #
 # ----Save run parameters------ #

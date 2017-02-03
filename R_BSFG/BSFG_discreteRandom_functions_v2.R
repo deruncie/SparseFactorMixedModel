@@ -16,7 +16,7 @@ sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Chole
 		y_resid_p = y_resid
 	}
 	
-	WtRinvy = crossprod(RinvSqW, solve(Cholesky_R,y_resid_p,'L')) * tot_Y_prec
+	WtRinvy = crossprod(RinvSqW, solve(Cholesky_R,y_resid_p,'L')) * tot_Y_prec# * sqrt(tot_Y_prec))
 
 	theta_tilda = solve(C,WtRinvy)
 
@@ -25,41 +25,22 @@ sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Chole
 }
 sample_MME_single_diagA = compiler::cmpfun(sample_MME_single_diagA)
 
-# sample_MME_single_diagR = function(y,W,Cholesky_C,pe,prior_mean,chol_A_inv,tot_Y_prec){
-# 	n = length(y)
-# 	n_theta = nrow(chol_A_inv)
-# 	theta_star = solve(chol_A_inv,rnorm(n_theta))
-# 	theta_star = theta_star@x + prior_mean
-# 	e_star = rnorm(n)/sqrt(pe)
-# 	W_theta_star = W %*% theta_star
-# 	y_resid = y - W_theta_star@x - e_star
-# 	WtRiy = crossprod(W,y_resid*pe)
-
-# 	theta_tilda = solve(Cholesky_C,WtRiy) / tot_Y_prec
-
-# 	theta = theta_tilda@x + theta_star
-# 	return(theta)
-# }
-# sample_MME_single_diagR = compiler::cmpfun(sample_MME_single_diagR)
-
-
-sample_MME_multiple_diagR = function(Y,W,Cholesky_C,pe,prior_mean,chol_A_inv,tot_Y_prec){
-	n = nrow(Y)
-	p = ncol(Y)
+sample_MME_single_diagR = function(y,W,Cholesky_C,pe,prior_mean,chol_A_inv,tot_Y_prec){
+	n = length(y)
 	n_theta = nrow(chol_A_inv)
-	theta_star = solve(chol_A_inv,matrix(rnorm(n_theta*p),ncol = p))
-	theta_star = matrix(theta_star@x,ncol = p) + prior_mean
-	e_star = matrix(rnorm(n*p)/sqrt(pe),ncol = p,byrow=T)
+	theta_star = solve(chol_A_inv,rnorm(n_theta))
+	theta_star = theta_star@x + prior_mean
+	e_star = rnorm(n)/sqrt(pe)
 	W_theta_star = W %*% theta_star
-	Y_resid = Y - W_theta_star@x - e_star
-	WtRiy = crossprod(W,sweep(Y_resid,2,pe,'*'))
+	y_resid = y - W_theta_star@x - e_star
+	WtRiy = crossprod(W,y_resid*pe)
 
-	theta_tilda = solve(Cholesky_C,WtRiy)
+	theta_tilda = solve(Cholesky_C,WtRiy) / tot_Y_prec
 
-	theta = sweep(matrix(theta_tilda@x,nc=p),2,tot_Y_prec,'/') + theta_star
+	theta = theta_tilda@x + theta_star
 	return(theta)
 }
-sample_MME_multiple_diagR = compiler::cmpfun(sample_MME_multiple_diagR)
+sample_MME_single_diagR = compiler::cmpfun(sample_MME_single_diagR)
 
 sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){
 	require(parallel)
@@ -88,53 +69,28 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, t
 }
 sample_MME_fixedEffects = compiler::cmpfun(sample_MME_fixedEffects)
 
-# sample_MME_ZAZts = function(Y, W, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, h2s, h2s_index, chol_Ai_mats,ncores){
-# 	# using method described in MCMC Course notes
-# 	require(parallel)
-# 	p = ncol(Y)
-# 	n = nrow(Y)
-# 	b = ncol(W)
-# 	pes = tot_Y_prec / (1-colSums(h2s))
-
-# 	res = mclapply(1:p,function(j) {
-# 		h2s_j = h2s[,j]
-# 		Cholesky_C = randomEffect_C_Choleskys[[h2s_index[j]]]$Cholesky_C
-# 		chol_A_inv = randomEffect_C_Choleskys[[h2s_index[j]]]$chol_A_inv * sqrt(tot_Y_prec[j])
-# 		# a=do.call(bdiag,lapply(1:nrow(h2s),function(i) {
-# 		# 	if(h2s_j[i] == 0) return(Diagonal(nrow(chol_Ai_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
-# 		# 	chol_Ai = chol_Ai_mats[[i]]
-# 		# 	chol_Ai@x = chol_Ai@x *sqrt(tot_Y_prec[j]/h2s_j[i])
-# 		# 	chol_Ai
-# 		# }))
-# 		# recover()
-# 		theta_j = sample_MME_single_diagR(Y[,j], W, Cholesky_C, pes[j], prior_mean[,j],chol_A_inv,tot_Y_prec[j])
-# 		theta_j
-# 	},mc.cores = ncores)
-# 	res = do.call(cbind,res)
-# 	res
-# }
-# sample_MME_ZAZts = compiler::cmpfun(sample_MME_ZAZts)
-
-sample_MME_ZAZts = function(Y, W, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, h2s, h2s_index, chol_Ai_mats,ncores){
+sample_MME_ZAZts = function(Y, W, tot_Y_prec, prior_mean, randomEffect_C_Choleskys, h2s, h2_index, chol_Ai_mats,ncores){
 	# using method described in MCMC Course notes
 	require(parallel)
-	Y = as.matrix(Y)
 	p = ncol(Y)
 	n = nrow(Y)
 	b = ncol(W)
 	pes = tot_Y_prec / (1-colSums(h2s))
 
-	unique_h2s = unique(h2s_index)
-	unique_h2s_index = sapply(unique_h2s,function(x) which(h2s_index == x))	
-	thetas = mclapply(seq_along(unique_h2s),function(j){
-		Cholesky_C = randomEffect_C_Choleskys[[unique_h2s[j]]]$Cholesky_C
-		chol_A_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_A_inv * sqrt(tot_Y_prec[j])
-		traits_j = unique_h2s_index[[j]]
-		sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], prior_mean[,traits_j,drop=F],chol_A_inv,tot_Y_prec[traits_j])		
+	res = mclapply(1:p,function(j) {
+		h2s_j = h2s[,j]
+		Cholesky_C = randomEffect_C_Choleskys[[h2_index[j]]]
+		chol_A_inv = do.call(bdiag,lapply(1:nrow(h2s),function(i) {
+			if(h2s_j[i] == 0) return(Diagonal(nrow(chol_Ai_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
+			chol_Ai = chol_Ai_mats[[i]]
+			chol_Ai@x = chol_Ai@x *sqrt(tot_Y_prec[j]/h2s_j[i])
+			chol_Ai
+		}))
+		theta_j = sample_MME_single_diagR(Y[,j], W, Cholesky_C, pes[j], prior_mean[,j],chol_A_inv,tot_Y_prec[j])			
+		theta_j
 	},mc.cores = ncores)
-	theta = do.call(cbind,thetas)
-	theta = theta[,order(unlist(unique_h2s_index))]
-	theta
+	res = do.call(cbind,res)
+	res
 }
 sample_MME_ZAZts = compiler::cmpfun(sample_MME_ZAZts)
 
@@ -148,7 +104,8 @@ sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys
 		Yp = matrix(Yp,nrow(Y))
 	}
 	unique_h2s = unique(h2s_index)
-	unique_h2s_index = sapply(unique_h2s,function(x) which(h2s_index == x))	
+	unique_h2s_index = sapply(unique_h2s,function(x) which(h2s_index == x))
+	h2s_index_index = sapply(h2s_index,function(x) which(unique_h2s == x))
 	scores = mclapply(seq_along(unique_h2s),function(j){
 		h2_index = unique_h2s[j]
 		Cholesky_Sigma = Sigma_Choleskys[[unique_h2s[j]]]$Cholesky_Sigma
