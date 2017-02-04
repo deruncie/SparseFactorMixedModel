@@ -168,7 +168,7 @@ mat sample_randomEffects_parallel_sparse_c (mat Y,
 	vec a_prec = tot_prec / h2;
 	vec e_prec = tot_prec / (1-h2);
 
-	mat U = as<mat>(invert_aZZt_Ainv["U"]);
+	sp_mat U = as<sp_mat>(invert_aZZt_Ainv["U"]);
 	vec s1 = as<vec>(invert_aZZt_Ainv["s1"]);
 	vec s2 = as<vec>(invert_aZZt_Ainv["s2"]);
 
@@ -186,10 +186,11 @@ mat sample_randomEffects_parallel_sparse_c (mat Y,
 
 	struct sampleColumn : public Worker {
 		vec s1, s2, a_prec, e_prec;
-		mat U, b, z;
+		sp_mat U;
+		mat b, z;
 		mat &effects;
 
-		sampleColumn(vec s1, vec s2, vec a_prec, vec e_prec, mat U, mat b, mat z, mat &effects) 
+		sampleColumn(vec s1, vec s2, vec a_prec, vec e_prec, sp_mat U, mat b, mat z, mat &effects) 
 			: s1(s1), s2(s2), a_prec(a_prec), e_prec(e_prec), U(U), b(b), z(z), effects(effects) {}
 
       	void operator()(std::size_t begin, std::size_t end) {

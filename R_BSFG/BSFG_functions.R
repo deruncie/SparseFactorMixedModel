@@ -1,12 +1,3 @@
-
-cholcov = function(X){
-  # calculates a matrix U such that t(U) %*% U == X for X that is not PD
-  E = svd(X)
- # cols = E$d > 1e-14
-  U = E$u %*% diag(sqrt(E$d))
-  return(t(U))
-}
-
 reorder_factors = function(BSFG_state){
 	# re-orders factors in decreasing size of Lambda %*% F
 	# based on current state

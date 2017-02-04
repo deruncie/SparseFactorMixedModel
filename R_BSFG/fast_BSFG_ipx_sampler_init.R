@@ -257,33 +257,23 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
     #similar to fixed effects + random effects 1 above, but no fixed effects.
     ZZt = crossprod(Z)
 
-    # Z1 = matrix(rnorm(10*4),10)
-    # A1 = matrix(rnorm(16),4);A1 = crossprod(A1) + diag(1,4)
-    # ZZt1 = crossprod(Z1)
-    # A1inv = solve(A1)
-    # result = GSVD_2_c(cholcov(ZZt1),cholcov(A1inv))
-    # r = svd(t(solve(t(cholcov(A1inv)),t(cholcov(ZZt1)))))
-    # norm_factor = sqrt(1 + r$d^2)
-    # c = r$d / norm_factor
-    # s = 1/norm_factor
-    # X = sweep(t(cholcov(A1inv)) %*% r$v,2,norm_factor,'*')
-
-    # a=3;b=5;
-    # solve(a * ZZt1 + b * A1inv)
-    # t(solve(result$X)) %*% diag(1/(a*c^2 + b*s^2)) %*% solve(result$X)
-
-    # chol_base = Cholesky(forceSymmetric(Matrix(ZZt1 + A1inv,sparse=T)),super=T,perm=F)
-
-    # r = svd(solve(A1inv,ZZt1))
-    # r2 = svd(ZZt1 %*% A1)
-
-    result = GSVD_2_c(cholcov(ZZt),cholcov(Ainv))
+    result = GSVD_2_c(as.matrix(chol(ZZt)),as.matrix(chol(Ainv)))
 
     invert_aZZt_Ainv = list(
-		U = t(solve(result$X)),
+        U = Matrix(t(solve(result$X))),
+        # U = t(solve(result$X)),
 			s1 = diag(result$C)^2,
 			s2 = diag(result$S)^2
 		)
+    
+    # require(geigen)
+    # result = gsvd(as.matrix(chol(ZZt)),as.matrix(chol(Ainv)))
+
+    # invert_aZZt_Ainv = list(
+    #         U = Matrix(solve(result$A %*% t(result$Q))),
+    #         s1 = result$alpha^2,
+    #         s2 = result$beta^2
+    #     )
 
 # ----------------------------- #
 # ----Save run parameters------ #
