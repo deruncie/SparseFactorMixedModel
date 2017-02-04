@@ -110,7 +110,6 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 				resids = matrix(rnorm(p*n,0,sqrt(1/resid_Y_prec)),nr = n,nc = p,byrow=T)
 				Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
 			}
-			# recover()
 			  
 		 # -----Sample Lambda and B ------------------ #
 			#conditioning on F, marginalizing over E_a
@@ -120,7 +119,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			prior_mean = matrix(0,rows,p)
 			prior_prec = rbind(0,t(Plam))
 			coefs = sample_coefs_parallel_sparse_c( Y,Design,resid_h2, tot_Y_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
-
+			
 			if(b > 0){
 				B = coefs[1:b,]
 			}
@@ -142,7 +141,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			#conditioning on W, B, F, Lambda, marginalizing over E_a 
 			Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda))
 			tot_Y_prec = sample_tot_prec_sparse_c(Y_tilde,resid_h2,tot_Y_prec_shape,tot_Y_prec_rate,invert_aI_bZAZ)
-
+			
 			resid_h2 = sample_h2s_discrete_given_p_sparse_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
 
 			E_a = sample_randomEffects_parallel_sparse_c( Y_tilde, Z, tot_Y_prec, resid_h2, invert_aZZt_Ainv, 1)
@@ -174,8 +173,8 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 				
 			sp_num = (i-burn)/thin
 			
-			Posterior = save_posterior_samples_ipx( sp_num,current_state, Posterior)
-					}
+			Posterior = save_posterior_samples( sp_num,current_state, Posterior)
+		}
 	}
 	end_time = Sys.time()
 	print(end_time - start_time)

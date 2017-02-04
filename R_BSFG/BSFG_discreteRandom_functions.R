@@ -209,45 +209,45 @@ sample_h2s_discrete = compiler::cmpfun(sample_h2s_discrete)
 
 
 
-save_posterior_samples = function( sp_num, current_state, Posterior) {
-	# Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec) {
-	# save posteriors. Full traces are kept of the more interesting parameters.
-	# Only the posterior means are kept of less interesting parameters. These
-	# should be correctly calculated over several re-starts of the sampler.
+# save_posterior_samples = function( sp_num, current_state, Posterior) {
+# 	# Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec) {
+# 	# save posteriors. Full traces are kept of the more interesting parameters.
+# 	# Only the posterior means are kept of less interesting parameters. These
+# 	# should be correctly calculated over several re-starts of the sampler.
 
-	current_state = within(current_state,{
-		# transform variables so that the variance of each column of F is 1.
-		F_var = 1/tot_F_prec
-		F_a = sweep(F_a,2,sqrt(F_var),'/')
-		F = sweep(F,2,sqrt(F_var),'/')
-		Lambda = sweep(Lambda,2,sqrt(F_var),'*')		
-	})
+# 	current_state = within(current_state,{
+# 		# transform variables so that the variance of each column of F is 1.
+# 		F_var = 1/tot_F_prec
+# 		F_a = sweep(F_a,2,sqrt(F_var),'/')
+# 		F = sweep(F,2,sqrt(F_var),'/')
+# 		Lambda = sweep(Lambda,2,sqrt(F_var),'*')		
+# 	})
 
-	Posterior = with(current_state, {
-		sp = ncol(Posterior$Lambda)
+# 	Posterior = with(current_state, {
+# 		sp = ncol(Posterior$Lambda)
 
-		for(param in c('Lambda','F','F_a','delta','F_h2','tot_F_prec')){
-			if(length(current_state[[param]]) > nrow(Posterior[[param]])){
-				Posterior[[param]] = rbind(Posterior[[param]],matrix(0,nr = length(current_state[[param]]) - nrow(Posterior[[param]]),nc = sp))
-			}
-			if(length(current_state[[param]]) < nrow(Posterior[[param]])){
-				Posterior[[param]] = Posterior[[param]][1:length(current_state[[param]]),]
-			}
-			Posterior[[param]][,sp_num] = c(current_state[[param]])
-		}
+# 		for(param in c('Lambda','F','F_a','delta','F_h2','tot_F_prec')){
+# 			if(length(current_state[[param]]) > nrow(Posterior[[param]])){
+# 				Posterior[[param]] = rbind(Posterior[[param]],matrix(0,nr = length(current_state[[param]]) - nrow(Posterior[[param]]),nc = sp))
+# 			}
+# 			if(length(current_state[[param]]) < nrow(Posterior[[param]])){
+# 				Posterior[[param]] = Posterior[[param]][1:length(current_state[[param]]),]
+# 			}
+# 			Posterior[[param]][,sp_num] = c(current_state[[param]])
+# 		}
 
-		Posterior$tot_Y_prec[,sp_num]   = tot_Y_prec
-		Posterior$resid_h2[,sp_num]     = c(resid_h2)
-		Posterior$resid_Y_prec[,sp_num] = tot_Y_prec/(1-colSums(resid_h2))
-		Posterior$E_a_prec[,sp_num]     = tot_Y_prec/colSums(resid_h2)
+# 		Posterior$tot_Y_prec[,sp_num]   = tot_Y_prec
+# 		Posterior$resid_h2[,sp_num]     = c(resid_h2)
+# 		Posterior$resid_Y_prec[,sp_num] = tot_Y_prec/(1-colSums(resid_h2))
+# 		Posterior$E_a_prec[,sp_num]     = tot_Y_prec/colSums(resid_h2)
 
-		# save B,U,W
-		Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
-		Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
-		Posterior
-	})
-	return(Posterior)
-}
+# 		# save B,U,W
+# 		Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
+# 		Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
+# 		Posterior
+# 	})
+# 	return(Posterior)
+# }
 
 
 clear_Posterior = function(BSFG_state) {

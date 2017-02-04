@@ -7,55 +7,7 @@ using namespace Rcpp;
 using namespace RcppParallel;
 using namespace arma;
 
-// Enable C++11 via this plugin (Rcpp 0.10.3 or later)
-// [[Rcpp::plugins(cpp11)]]
-
 // Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
-
-// sp_mat convertSparse(S4 mat) {         // slight improvement with two non-nested loops
-// 	// from http://gallery.rcpp.org/articles/armadillo-sparse-matrix/
-
-//     IntegerVector dims = mat.slot("Dim");
-//     arma::urowvec i = Rcpp::as<arma::urowvec>(mat.slot("i"));
-//     arma::urowvec p = Rcpp::as<arma::urowvec>(mat.slot("p"));     
-//     arma::vec x     = Rcpp::as<arma::vec>(mat.slot("x"));
-
-//     int nrow = dims[0], ncol = dims[1];
-//     arma::sp_mat res(nrow, ncol);
-
-//     // create space for values, and copy
-//     arma::access::rw(res.values) = arma::memory::acquire_chunked<double>(x.size() + 1);
-//     arma::arrayops::copy(arma::access::rwp(res.values), x.begin(), x.size() + 1);
-
-//     // create space for row_indices, and copy
-//     arma::access::rw(res.row_indices) = arma::memory::acquire_chunked<arma::uword>(i.size() + 1);
-//     arma::arrayops::copy(arma::access::rwp(res.row_indices), i.begin(), i.size() + 1);
-    
-//     // create space for col_ptrs, and copy 
-//     arma::access::rw(res.col_ptrs) = arma::memory::acquire<arma::uword>(p.size() + 2);
-//     arma::arrayops::copy(arma::access::rwp(res.col_ptrs), p.begin(), p.size() + 1);
-
-//     // important: set the sentinel as well
-//     arma::access::rwp(res.col_ptrs)[p.size()+1] = std::numeric_limits<arma::uword>::max();
-    
-//     // set the number of non-zero elements
-//     arma::access::rw(res.n_nonzero) = x.size();
-
-//     return(res);
-
-//     // Rcout << "SpMat res:\n" << res << std::endl;
-// }
-// // [[Rcpp::export()]]
-// mat test_spTimes(mat Y, S4 U){
-// 	sp_mat mU;
-// 	mat res;
-
-// 	mU = convertSparse(U);
-
-// 	res = mU.t() * Y;
-// 	return(res);
-// }
-
 mat sweep_times(mat x, int MARGIN, vec STATS){
 	int m = x.n_rows;
 	int n = x.n_cols;
@@ -159,7 +111,6 @@ vec sample_tot_prec_sparse_c (mat Y,
 	}
 	return(tot_Y_prec);
 }
-
 
 // [[Rcpp::export()]]
 vec sample_h2s_discrete_given_p_sparse_c (mat Y,
