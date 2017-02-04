@@ -12,49 +12,49 @@ using namespace arma;
 
 // Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
 
-sp_mat convertSparse(S4 mat) {         // slight improvement with two non-nested loops
-	// from http://gallery.rcpp.org/articles/armadillo-sparse-matrix/
+// sp_mat convertSparse(S4 mat) {         // slight improvement with two non-nested loops
+// 	// from http://gallery.rcpp.org/articles/armadillo-sparse-matrix/
 
-    IntegerVector dims = mat.slot("Dim");
-    arma::urowvec i = Rcpp::as<arma::urowvec>(mat.slot("i"));
-    arma::urowvec p = Rcpp::as<arma::urowvec>(mat.slot("p"));     
-    arma::vec x     = Rcpp::as<arma::vec>(mat.slot("x"));
+//     IntegerVector dims = mat.slot("Dim");
+//     arma::urowvec i = Rcpp::as<arma::urowvec>(mat.slot("i"));
+//     arma::urowvec p = Rcpp::as<arma::urowvec>(mat.slot("p"));     
+//     arma::vec x     = Rcpp::as<arma::vec>(mat.slot("x"));
 
-    int nrow = dims[0], ncol = dims[1];
-    arma::sp_mat res(nrow, ncol);
+//     int nrow = dims[0], ncol = dims[1];
+//     arma::sp_mat res(nrow, ncol);
 
-    // create space for values, and copy
-    arma::access::rw(res.values) = arma::memory::acquire_chunked<double>(x.size() + 1);
-    arma::arrayops::copy(arma::access::rwp(res.values), x.begin(), x.size() + 1);
+//     // create space for values, and copy
+//     arma::access::rw(res.values) = arma::memory::acquire_chunked<double>(x.size() + 1);
+//     arma::arrayops::copy(arma::access::rwp(res.values), x.begin(), x.size() + 1);
 
-    // create space for row_indices, and copy
-    arma::access::rw(res.row_indices) = arma::memory::acquire_chunked<arma::uword>(i.size() + 1);
-    arma::arrayops::copy(arma::access::rwp(res.row_indices), i.begin(), i.size() + 1);
+//     // create space for row_indices, and copy
+//     arma::access::rw(res.row_indices) = arma::memory::acquire_chunked<arma::uword>(i.size() + 1);
+//     arma::arrayops::copy(arma::access::rwp(res.row_indices), i.begin(), i.size() + 1);
     
-    // create space for col_ptrs, and copy 
-    arma::access::rw(res.col_ptrs) = arma::memory::acquire<arma::uword>(p.size() + 2);
-    arma::arrayops::copy(arma::access::rwp(res.col_ptrs), p.begin(), p.size() + 1);
+//     // create space for col_ptrs, and copy 
+//     arma::access::rw(res.col_ptrs) = arma::memory::acquire<arma::uword>(p.size() + 2);
+//     arma::arrayops::copy(arma::access::rwp(res.col_ptrs), p.begin(), p.size() + 1);
 
-    // important: set the sentinel as well
-    arma::access::rwp(res.col_ptrs)[p.size()+1] = std::numeric_limits<arma::uword>::max();
+//     // important: set the sentinel as well
+//     arma::access::rwp(res.col_ptrs)[p.size()+1] = std::numeric_limits<arma::uword>::max();
     
-    // set the number of non-zero elements
-    arma::access::rw(res.n_nonzero) = x.size();
+//     // set the number of non-zero elements
+//     arma::access::rw(res.n_nonzero) = x.size();
 
-    return(res);
+//     return(res);
 
-    // Rcout << "SpMat res:\n" << res << std::endl;
-}
-// [[Rcpp::export()]]
-mat test_spTimes(mat Y, S4 U){
-	sp_mat mU;
-	mat res;
+//     // Rcout << "SpMat res:\n" << res << std::endl;
+// }
+// // [[Rcpp::export()]]
+// mat test_spTimes(mat Y, S4 U){
+// 	sp_mat mU;
+// 	mat res;
 
-	mU = convertSparse(U);
+// 	mU = convertSparse(U);
 
-	res = mU.t() * Y;
-	return(res);
-}
+// 	res = mU.t() * Y;
+// 	return(res);
+// }
 
 mat sweep_times(mat x, int MARGIN, vec STATS){
 	int m = x.n_rows;
@@ -119,10 +119,8 @@ mat sample_coefs_parallel_sparse_c(
 	int p = tot_Y_prec.n_elem;
 	int b = W.n_cols;
 
-	S4 U_sparse = as<S4>(invert_aI_bZAZ["U_sparse"]);
+	sp_mat U = as<sp_mat>(invert_aI_bZAZ["U"]);
 	vec s = as<vec>(invert_aI_bZAZ["s"]);
-
-	sp_mat U = convertSparse(U_sparse);
 
 	mat WtU = W.t() * U;
 	mat UtY = U.t() * Y;
@@ -143,10 +141,8 @@ vec sample_tot_prec_sparse_c (mat Y,
 					   List invert_aI_bZAZ
 					  ) {
 
-	S4 U_sparse = as<S4>(invert_aI_bZAZ["U_sparse"]);
+	sp_mat U = as<sp_mat>(invert_aI_bZAZ["U"]);
 	vec s = as<vec>(invert_aI_bZAZ["s"]);
-
-	sp_mat U = convertSparse(U_sparse);
 
 	mat UtY = U.t() * Y;
 
@@ -172,10 +168,8 @@ vec sample_h2s_discrete_given_p_sparse_c (mat Y,
 						vec Tot_prec,
 						List invert_aI_bZAZ){
 
-	S4 U_sparse = as<S4>(invert_aI_bZAZ["U_sparse"]);
+	sp_mat U = as<sp_mat>(invert_aI_bZAZ["U"]);
 	vec s = as<vec>(invert_aI_bZAZ["s"]);
-
-	sp_mat U = convertSparse(U_sparse);
 
 	int p = Y.n_cols;
 	int n = Y.n_rows;
@@ -207,7 +201,7 @@ vec sample_h2s_discrete_given_p_sparse_c (mat Y,
 
 // [[Rcpp::export()]]
 mat sample_randomEffects_parallel_sparse_c (mat Y,
-				S4 Z_sparse,
+				sp_mat Z,
 				vec tot_prec,
 				vec h2,
 				List invert_aZZt_Ainv,
@@ -222,8 +216,6 @@ mat sample_randomEffects_parallel_sparse_c (mat Y,
 
 	vec a_prec = tot_prec / h2;
 	vec e_prec = tot_prec / (1-h2);
-
-	sp_mat Z = convertSparse(Z_sparse);
 
 	mat U = as<mat>(invert_aZZt_Ainv["U"]);
 	vec s1 = as<vec>(invert_aZZt_Ainv["s1"]);
@@ -331,7 +323,7 @@ mat sample_means_parallel_c(mat Y_tilde,
 
 // [[Rcpp::export()]]
 mat sample_factors_scores_ipx_sparse_c(mat Y_tilde,
-							S4 Z_sparse,
+							sp_mat Z,
 							mat Lambda,
 							vec resid_Y_prec,
 							mat F_a,
@@ -339,8 +331,6 @@ mat sample_factors_scores_ipx_sparse_c(mat Y_tilde,
 							 ) {
 //Sample factor scores given factor loadings (F_a), factor residual variances (F_e_prec) and
 //phenotype residuals
-
-	sp_mat Z = convertSparse(Z_sparse);
 
 	mat Lmsg = sweep_times(Lambda,1,resid_Y_prec);
 	mat S = chol(Lambda.t() * Lmsg + diagmat(F_e_prec));

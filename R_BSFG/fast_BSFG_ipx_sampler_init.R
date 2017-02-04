@@ -1,4 +1,4 @@
-fast_BSFG_ipx_sampler_loadData = function(){
+load_simulation_data = function(){
     require(Matrix)
     if(file.exists('../setup.RData')) {
         load('../setup.RData')
@@ -9,17 +9,19 @@ fast_BSFG_ipx_sampler_loadData = function(){
         setup = readMat('../setup.mat')
         for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
     }
-
     r = dim(setup$A)[1]
     n = nrow(setup$Y)
     data = data.frame(Group = gl(r,n/r))
-    return(list(Y = setup$Y, data = data, randomEffects = list(Group = setup$A),setup = setup))
+    rownames(setup$A) = data$Group
+    return(list(Y = setup$Y, data = data, A_mats = list(Group = setup$A),setup = setup))
 }
 
 
 
-fast_BSFG_ipx_sampler_init = function(Y, fixed, randomEffects, data, priors, run_parameters, scaleY = TRUE,simulation = FALSE,setup = 3){
-	# require(PEIP)
+fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parameters, A_mat = NULL, A_inv_mat = NULL, 
+                                    fixed_Factors = NULL, scaleY = TRUE,
+                                    simulation = F,setup = NULL,verbose=T){
+# function(Y, fixed, random, data, priors, run_parameters, scaleY = TRUE,simulation = FALSE,setup = NULL){
 	require(Matrix)
 
 	# data_matrices,run_parameters,priors,current_state,Posterior,simulation = F)
@@ -45,7 +47,6 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, randomEffects, data, priors, run
 #         B
 #         factor_h2s
 #         name
-    require(Matrix)
 
     run_parameters$setup = setup
     run_parameters$name = setup$name
@@ -74,28 +75,43 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, randomEffects, data, priors, run
     X = model.matrix(fixed,data)
     b = ncol(X)
 
-    # build Z from random effect
-    stopifnot(length(randomEffects)==1)
-    Z = model.matrix(formula(sprintf('~0 + %s',names(randomEffects))),data)
-    Z_sparse = Matrix(Z,sparse=T)
+    # build Z for random effect
+    RE_name = rownames(attr(terms(random),'factors'))[1]
+    Z = Matrix(model.matrix(formula(sprintf('~0 + %s',RE_name)),data),sparse = TRUE)
+    Z = Z[,paste0(RE_name,levels(data[[RE_name]]))]    
     r = ncol(Z)
 
-    A = randomEffects[[1]]
-    stopifnot(r == ncol(A))
+    if(is.null(A_mat)) {
+        if(is.null(A_inv_mat)){
+            A = Diagonal(ncol(Z))
+        } else{
+            A = Matrix(forceSymmetric(solve(A_inv_mat)))
+        }
+    } else{
+        A = forceSymmetric(A_mat)
+    }
 
     data_matrices = list(
             Y         = Y,
             Z         = Z,
-            Z_sparse  = Z_sparse,
             X         = X,
             Y_missing = Y_missing,
             A         = A
-    		)
-    
-    #fixed effect priors
-    
+    		)        
+
+# ----------------------------- #
+# ----- re-formulate priors --- #
+# ----------------------------- # 
+    priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
+    priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
+    priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
+    priors$tot_F_prec_rate  = with(priors$tot_F_var,nu - 2)
+    priors$delta_1_shape    = with(priors$delta_1,V * nu)
+    priors$delta_1_rate     = with(priors$delta_1,nu - 2)
+    priors$delta_2_shape    = with(priors$delta_2,V * nu)
+    priors$delta_2_rate     = with(priors$delta_2,nu - 2)
     priors$b_X_prec            =   1e-10*diag(1,b)
-        
+
 # ----------------------------- #
 # -----Initialize variables---- #
 # ----------------------------- # 
@@ -109,7 +125,7 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, randomEffects, data, priors, run
    
     # Factors:
     #  initial number of factors
-    k = priors$k_init
+    k = run_parameters$k_init
 
     # Factor loading precisions (except column penalty tauh).
 	 #  Prior: Gamma distribution for each element. 
@@ -228,21 +244,42 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, randomEffects, data, priors, run
 #     XZ = [X_f Z  ]
 #     [U,S,~]          = svd(XZ*blkdiag(1e6*eye(b_f),A)*XZ')
     
-    result = svd(Z   %*% A %*% t(Z  ))
+    result = svd(Z %*% A %*% t(Z))
     invert_aI_bZAZ = list(
-        U = result$u,
+        U = Matrix(result$u),
         s = result$d
     )
-    invert_aI_bZAZ$U_sparse = Matrix(invert_aI_bZAZ$U,sparse=T)
    
     #genetic effect variances of factor traits
     # diagonalizing a*Z  '*Z   + b*Ainv for fast inversion
     #diagonalize mixed model equations for fast inversion: 
     # inv(a*Z  '*Z   + b*Ainv) = U*diag(1./(a.*s1+b.*s2))*U'
     #similar to fixed effects + random effects 1 above, but no fixed effects.
-    ZZt = t(Z  ) %*% Z  
+    ZZt = crossprod(Z)
+
+    # Z1 = matrix(rnorm(10*4),10)
+    # A1 = matrix(rnorm(16),4);A1 = crossprod(A1) + diag(1,4)
+    # ZZt1 = crossprod(Z1)
+    # A1inv = solve(A1)
+    # result = GSVD_2_c(cholcov(ZZt1),cholcov(A1inv))
+    # r = svd(t(solve(t(cholcov(A1inv)),t(cholcov(ZZt1)))))
+    # norm_factor = sqrt(1 + r$d^2)
+    # c = r$d / norm_factor
+    # s = 1/norm_factor
+    # X = sweep(t(cholcov(A1inv)) %*% r$v,2,norm_factor,'*')
+
+    # a=3;b=5;
+    # solve(a * ZZt1 + b * A1inv)
+    # t(solve(result$X)) %*% diag(1/(a*c^2 + b*s^2)) %*% solve(result$X)
+
+    # chol_base = Cholesky(forceSymmetric(Matrix(ZZt1 + A1inv,sparse=T)),super=T,perm=F)
+
+    # r = svd(solve(A1inv,ZZt1))
+    # r2 = svd(ZZt1 %*% A1)
+
     result = GSVD_2_c(cholcov(ZZt),cholcov(Ainv))
-	invert_aZZt_Ainv = list(
+
+    invert_aZZt_Ainv = list(
 		U = t(solve(result$X)),
 			s1 = diag(result$C)^2,
 			s2 = diag(result$S)^2

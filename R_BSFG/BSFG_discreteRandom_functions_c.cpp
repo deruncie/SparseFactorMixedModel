@@ -4,7 +4,6 @@
 #include <RcppParallel.h>
 // #include <iostream>
 using namespace Rcpp;
-using namespace RcppParallel;
 using namespace arma;
 
 mat sweep_times(mat x, int MARGIN, vec STATS){

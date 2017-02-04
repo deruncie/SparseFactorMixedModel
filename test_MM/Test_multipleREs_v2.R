@@ -42,9 +42,10 @@ mcmc_model = model1.2
 
 discrete_divisions = 15
 priors = list(
-    tot_Y_prec_shape      =   2.4,
-    tot_Y_prec_rate       =   1/3.5
+    tot_Y_var      =   list(V = 2.2/3.1, nu = 3.1)
 )
+priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
+priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
 
 data = droplevels(subset(Data,!is.na(BWT)))
 data$animal = factor(as.character(data$animal),levels = data$animal)
@@ -52,10 +53,11 @@ data$animal = factor(as.character(data$animal),levels = data$animal)
 index = match(data$animal,Ped[,1])
 
 
-randomEffects = list(animal = forceSymmetric(inverseA(Ped)[[1]]))
+A_inv_mats = list(animal = forceSymmetric(inverseA(Ped)[[1]]))
+A_mats = c()
 
 # build Z matrices from random model
-RE_names = c(names(randomEffects),'BYEAR')
+RE_names = c(names(A_inv_mats),'BYEAR')
 n_RE = length(RE_names)
 Z_matrices = lapply(RE_names,function(re) {
 	# Diagonal(r_RE[re],1)
@@ -68,21 +70,40 @@ r_RE = sapply(Z_matrices,function(x) ncol(x))
 
 Z_all = do.call(cbind,Z_matrices)
 
-for(re in RE_names[RE_names %in% names(randomEffects) == F]){
-	randomEffects[[re]] = Diagonal(ncol(Z_matrices[[re]]),1)
-	rownames(randomEffects[[re]]) = levels(data[[re]])
-}
+# for(re in RE_names[RE_names %in% names(randomEffects) == F]){
+# 	randomEffects[[re]] = Diagonal(ncol(Z_matrices[[re]]),1)
+# 	rownames(randomEffects[[re]]) = levels(data[[re]])
+# }
 
 
 fix_A = function(x) forceSymmetric(drop0(x,tol = 1e-10))
 
 A_mats = lapply(RE_names,function(re) {
-	A = solve(randomEffects[[re]])
-	index = match(sub(re,'',colnames(Z_matrices[[re]])),rownames(randomEffects[[re]]))
+	if(re %in% names(A_mats)) {
+		A = A_mats[[re]]
+	} else if(re %in% names(A_inv_mats)){
+			A = solve(A_inv_mats[[re]])
+			rownames(A) = rownames(A_inv_mats[[re]])
+	} else{
+		A = Diagonal(ncol(Z_matrices[[re]]))
+		rownames(A) = sub(re,'',colnames(Z_matrices[[re]]))
+	}
+	index = match(sub(re,'',colnames(Z_matrices[[re]])),rownames(A))  # A must have rownames
 	fix_A(A[index,index])
 })
 names(A_mats) = RE_names
-Ai_mats = lapply(A_mats,function(x) fix_A(solve(x)))
+
+Ai_mats = lapply(RE_names,function(re) {
+	if(re %in% names(A_inv_mats)){
+		Ai = A_inv_mats[[re]]
+		index = match(sub(re,'',colnames(Z_matrices[[re]])),rownames(Ai))  # Ai must have rownames
+		Ai = Ai[index,index]
+	} else {
+		Ai = solve(A_mats[[re]])
+	}
+	Ai = fix_A(Ai)
+	Ai
+})
 chol_Ai_mats = lapply(Ai_mats,chol)
 
 h2_divisions = expand.grid(lapply(RE_names,function(re) 0:discrete_divisions)) / discrete_divisions
