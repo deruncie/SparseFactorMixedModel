@@ -1,3 +1,22 @@
+load_simulation_data = function(){
+    require(Matrix)
+    if(file.exists('../setup.RData')) {
+        load('../setup.RData')
+        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
+    }
+    else{
+        require(R.matlab)
+        setup = readMat('../setup.mat')
+        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
+    }
+    r = dim(setup$A)[1]
+    n = nrow(setup$Y)
+    data = data.frame(Group = gl(r,n/r))
+    rownames(setup$A) = data$Group
+    return(list(Y = setup$Y, data = data, A_mats = list(Group = setup$A),setup = setup))
+}
+
+
 reorder_factors = function(BSFG_state){
 	# re-orders factors in decreasing size of Lambda %*% F
 	# based on current state
@@ -79,8 +98,10 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 
 		Posterior$tot_Y_prec[,sp_num]   = tot_Y_prec
 		Posterior$resid_h2[,sp_num]     = c(resid_h2)
-		Posterior$resid_Y_prec[,sp_num] = tot_Y_prec/(1-colSums(matrix(resid_h2,ncol = nrow(Lambda))))
-		Posterior$E_a_prec[,sp_num]     = tot_Y_prec/colSums(matrix(resid_h2,ncol = nrow(Lambda)))
+		# Posterior$resid_Y_prec[,sp_num] = tot_Y_prec/(1-colSums(matrix(resid_h2,ncol = nrow(Lambda))))
+		# Posterior$E_a_prec[,sp_num]     = tot_Y_prec/colSums(matrix(resid_h2,ncol = nrow(Lambda)))
+		Posterior$resid_Y_prec[,sp_num] = tot_Y_prec/(1-resid_h2)
+		Posterior$E_a_prec[,sp_num]     = tot_Y_prec/resid_h2
 
 		# save B,U,W
 		Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num

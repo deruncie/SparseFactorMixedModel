@@ -72,7 +72,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 	save_freq    = run_parameters$save_freq
 	burn         = run_parameters$burn
 	thin         = run_parameters$thin
-	start_i      =   current_state$nrun
+	start_i      = current_state$nrun
 
 	# ----------------------------------------------- #
 	# ---Extend posterior matrices for new samples--- #
@@ -142,7 +142,8 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda))
 			tot_Y_prec = sample_tot_prec_sparse_c(Y_tilde,resid_h2,tot_Y_prec_shape,tot_Y_prec_rate,invert_aI_bZAZ)
 			
-			resid_h2 = sample_h2s_discrete_given_p_sparse_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
+			resid_h2_index = sample_h2s_discrete_given_p_sparse_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
+			resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
 
 			E_a = sample_randomEffects_parallel_sparse_c( Y_tilde, Z, tot_Y_prec, resid_h2, invert_aZZt_Ainv, 1)
 
@@ -152,7 +153,8 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			#conditioning on F, F_a
 			tot_F_prec = sample_tot_prec_sparse_c(F,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
 
-			F_h2 = sample_h2s_discrete_given_p_sparse_c(F,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
+			F_h2_index = sample_h2s_discrete_given_p_sparse_c(F,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
+			F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
 	    	F_a = sample_randomEffects_parallel_sparse_c(F,Z,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
 			

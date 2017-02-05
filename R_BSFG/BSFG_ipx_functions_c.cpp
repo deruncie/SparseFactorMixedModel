@@ -86,7 +86,7 @@ mat sample_coefs_parallel_sparse_c(
 }
 
 // [[Rcpp::export()]]
-vec sample_tot_prec_sparse_c (mat Y,
+rowvec sample_tot_prec_sparse_c (mat Y,
 					   vec h2,
 					   double tot_Y_prec_shape,
 					   double tot_Y_prec_rate,
@@ -109,7 +109,7 @@ vec sample_tot_prec_sparse_c (mat Y,
 		vec prec = randg(1,distr_param(tot_Y_prec_shape + n/2, 1.0/(tot_Y_prec_rate + 0.5 * dot(SiUtY_i,SiUtY_i))));
 		tot_Y_prec(i) = prec(0);
 	}
-	return(tot_Y_prec);
+	return(tot_Y_prec.t());
 }
 
 // [[Rcpp::export()]]
@@ -124,7 +124,7 @@ vec sample_h2s_discrete_given_p_sparse_c (mat Y,
 
 	int p = Y.n_cols;
 	int n = Y.n_rows;
-	vec h2 = zeros(p);
+	vec h2_index = zeros(p);
 
 	mat log_ps = zeros(p,h2_divisions);
 	mat std_scores_b = sweep_times(Y.t() * U,1,sqrt(Tot_prec));
@@ -144,10 +144,11 @@ vec sample_h2s_discrete_given_p_sparse_c (mat Y,
 		log_ps.row(j) = ps_j;
 		vec r = randu(1);
 		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
-		h2(j) = double(selected.n_elem)/(h2_divisions);
+		// h2(j) = double(selected.n_elem)/(h2_divisions);
+		h2_index(j) = selected.n_elem;
 	}
 
-	return(h2);
+	return(h2_index + 1);
 }
 
 // [[Rcpp::export()]]

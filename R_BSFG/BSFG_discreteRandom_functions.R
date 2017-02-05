@@ -1,7 +1,7 @@
 sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec) {
 	# R is aZAZ + bI
 	# 	 then form chol_R
-	# 	 check whether solve(t(chol_Rinv),theta) or chol_R %*% theta is better.
+	# 	 checkh whether solve(t(chol_Rinv),theta) or chol_R %*% theta is better.
 	# G is diagonal (fixed effect) - prior prec
 	# prior_prec must be > 0
 	n = length(y)
@@ -81,7 +81,7 @@ sample_MME_ZAZts = function(Y, W, tot_Y_prec, randomEffect_C_Choleskys, h2s, h2s
 	pes = tot_Y_prec / (1-colSums(h2s))
 
 	unique_h2s = unique(h2s_index)
-	unique_h2s_index = sapply(unique_h2s,function(x) which(h2s_index == x))	
+	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))	
 	thetas = mclapply(seq_along(unique_h2s),function(j){
 		Cholesky_C = randomEffect_C_Choleskys[[unique_h2s[j]]]$Cholesky_C
 		chol_A_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_A_inv * sqrt(tot_Y_prec[j])
@@ -104,7 +104,7 @@ sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys
 		Yp = matrix(Yp,nrow(Y))
 	}
 	unique_h2s = unique(h2s_index)
-	unique_h2s_index = sapply(unique_h2s,function(x) which(h2s_index == x))	
+	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))	
 	scores = mclapply(seq_along(unique_h2s),function(j){
 		h2_index = unique_h2s[j]
 		Cholesky_Sigma = Sigma_Choleskys[[unique_h2s[j]]]$Cholesky_Sigma
@@ -125,7 +125,7 @@ log_prob_h2 = function(i, y_p, Sigma_Choleskys, n, tot_Y_prec, discrete_priors){
 }
 log_prob_h2 = compiler::cmpfun(log_prob_h2)
 
-sample_h2s_discrete_MH = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discrete_priors,h2_divisions,h2_index,step_size,ncores){
+sample_h2s_discrete_MH = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discrete_priors,h2s_matrix,h2_index,step_size,ncores){
 	# while this works, it is much slower than doing the full scan over all traits, at least for multiple traits
 	# testing with p=100, solving the whole set takes ~4-5x solving just 1. And this method requires doing each trait separately
 	# both methods are similarly easy to multiplex, so no advantage there either.
@@ -149,11 +149,11 @@ sample_h2s_discrete_MH = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discr
 			old_state <- h2_index[j]
 			old_log_p <- log_prob_h2(old_state,Yp[,j],Sigma_Choleskys,n,tot_Y_prec[j],discrete_priors[old_state])
 
-			candidate_new_states <- which(colSums((h2_divisions - c(h2_divisions[,old_state]))^2) < step_size)
+			candidate_new_states <- which(colSums((h2s_matrix - c(h2s_matrix[,old_state]))^2) < step_size)
 			proposed_state <- sample(candidate_new_states,1)
 
 			new_log_p <- log_prob_h2(proposed_state,Yp[,j],Sigma_Choleskys,n,tot_Y_prec[j],discrete_priors[proposed_state])
-			candidate_state_from_new_state <- which(colSums((h2_divisions - c(h2_divisions[,proposed_state]))^2) < step_size)
+			candidate_state_from_new_state <- which(colSums((h2s_matrix - c(h2s_matrix[,proposed_state]))^2) < step_size)
 
 			forward_prob = 1/length(candidate_new_states)
 			if(old_state %in% candidate_state_from_new_state){
@@ -276,11 +276,11 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				tauh = cumprod(delta)
 				Plam = sweep(Lambda_prec,2,tauh,'*')
 				Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
-				F_h2_index = c(F_h2_index,sample(1:ncol(h2_divisions),1))
-				F_h2 = h2_divisions[,F_h2_index,drop=FALSE]
+				F_h2_index = c(F_h2_index,sample(1:ncol(h2s_matrix),1))
+				F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 				tot_F_prec[k] = 1
 				F_a = cbind(F_a,rnorm(r,0,sqrt(sum(F_h2[,k]))))
-				F = cbind(F,rnorm(n,as.matrix(Z_all %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
+				F = cbind(F,rnorm(n,as.matrix(Z %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
 				while(length(nonred) < 2) {

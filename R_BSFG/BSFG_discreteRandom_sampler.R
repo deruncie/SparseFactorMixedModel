@@ -52,7 +52,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			#conditioning on everything else
 			# this is not checked thoroughly
 			if(sum(Y_missing)>0) {
-				meanTraits = X %*% B + F %*% t(Lambda) + Z_all %*% E_a
+				meanTraits = X %*% B + F %*% t(Lambda) + Z %*% E_a
 				resids = matrix(rnorm(p*n,0,sqrt((1-colSums(resid_h2))/tot_Y_prec)),nr = n,nc = p,byrow=T)
 				Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
 			}
@@ -85,26 +85,26 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			Y_tilde = Y - X %*% B - F %*% t(Lambda)
 			tot_Y_prec = sample_tot_prec(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
 			resid_h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
-			resid_h2 = h2_divisions[,resid_h2_index,drop=FALSE]
+			resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
 			E_a_prec = tot_Y_prec / colSums(resid_h2)
 
-			E_a = sample_MME_ZAZts(Y_tilde, Z_all, tot_Y_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
+			E_a = sample_MME_ZAZts(Y_tilde, Z, tot_Y_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
 			
 		 # -----Sample tot_F_prec, F_h2, F_a ---------------- #
 			#conditioning on B, F, Lambda, F_h2, tot_F_prec
 
 			tot_F_prec = sample_tot_prec(F, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,ncores)
 			F_h2_index = sample_h2s_discrete(F,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores)
-			F_h2 = h2_divisions[,F_h2_index,drop=FALSE]
+			F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
-			F_a = sample_MME_ZAZts(F, Z_all, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,ncores)
+			F_a = sample_MME_ZAZts(F, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,ncores)
 
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,Lambda, F_h2
-			Y_tilde = as.matrix(Y - X %*% B - Z_all %*% E_a)
+			Y_tilde = as.matrix(Y - X %*% B - Z %*% E_a)
 			F_e_prec = tot_F_prec / (1-colSums(F_h2))
 			resid_Y_prec = tot_Y_prec / (1-colSums(resid_h2))
-			F = sample_factors_scores_sparse_c( Y_tilde, Z_all,Lambda,resid_Y_prec,F_a,F_e_prec )
+			F = sample_factors_scores_sparse_c( Y_tilde, Z,Lambda,resid_Y_prec,F_a,F_e_prec )
 
 	})
 	current_state = current_state[current_state_names]

@@ -1,27 +1,10 @@
-load_simulation_data = function(){
-    require(Matrix)
-    if(file.exists('../setup.RData')) {
-        load('../setup.RData')
-        names(setup) = sub('.','_',names(setup),fixed=T)
-    }
-    else{
-        require(R.matlab)
-        setup = readMat('../setup.mat')
-        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
-    }
-    r = dim(setup$A)[1]
-    n = nrow(setup$Y)
-    data = data.frame(Group = gl(r,n/r))
-    rownames(setup$A) = data$Group
-    return(list(Y = setup$Y, data = data, A_mats = list(Group = setup$A),setup = setup))
-}
-
 BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL, 
 									fixed_Factors = NULL, scaleY = TRUE,
 									ncores = detectCores(),simulation = F,setup = NULL,verbose=T){
 	require(Matrix)
 	require(parallel)
 
+    run_parameters$verbose = verbose
     run_parameters$setup = setup
     run_parameters$name = setup$name
     run_parameters$simulation = simulation
@@ -59,19 +42,19 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 	names(Z_matrices) = RE_names
 	r_RE = sapply(Z_matrices,function(x) ncol(x))
 
-	Z_all = do.call(cbind,Z_matrices)
+	Z = do.call(cbind,Z_matrices)
 
-	h2_divisions = expand.grid(lapply(RE_names,function(re) 0:run_parameters$discrete_divisions)) / run_parameters$discrete_divisions
-	colnames(h2_divisions) = RE_names
-	h2_divisions = t(h2_divisions[rowSums(h2_divisions) < 1,,drop=FALSE])
+	h2s_matrix = expand.grid(lapply(RE_names,function(re) 0:run_parameters$h2_divisions)) / run_parameters$h2_divisions
+	colnames(h2s_matrix) = RE_names
+	h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
 
 	data_matrices = list(
-		Y             = Y,
-		Y_missing     = Y_missing,
-		X             = X,
-		Z_matrices    = Z_matrices,
-		Z_all         = Z_all,
-		h2_divisions  = h2_divisions
+		Y          = Y,
+		Y_missing  = Y_missing,
+		X          = X,
+		Z_matrices = Z_matrices,
+		Z          = Z,
+		h2s_matrix = h2s_matrix
 		)
 
 
@@ -132,8 +115,8 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 
     # Factor discrete variances
      # k-matrix of n_RE x k with 
-    F_h2_index = sample(1:ncol(h2_divisions),k,replace=T)
-    F_h2 = h2_divisions[,F_h2_index,drop=FALSE]
+    F_h2_index = sample(1:ncol(h2s_matrix),k,replace=T)
+    F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
     F_a = lapply(RE_names,function(effect){
     	matrix(rnorm(r_RE[effect] * k, 0, sqrt(F_h2[effect,] / tot_F_prec)),ncol = k, byrow = T)
@@ -156,8 +139,8 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 
     # Resid discrete variances
      # p-matrix of n_RE x p with 
-    resid_h2_index = sample(1:ncol(h2_divisions),p,replace=T)
-    resid_h2 = h2_divisions[,resid_h2_index,drop=FALSE]
+    resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
+    resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
 
     E_a = do.call(rbind,lapply(RE_names,function(effect){
     	matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Y_prec)),ncol = p, byrow = T)
@@ -231,7 +214,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 	chol_Ai_mats = lapply(Ai_mats,chol)
 
 	#C
-	ZtZ = crossprod(Z_all)
+	ZtZ = crossprod(Z)
 	make_Chol_Ai = function(chol_Ai_mats,h2s){
 		do.call(bdiag,lapply(1:length(h2s),function(i) {
 			if(h2s[i] == 0) return(Diagonal(nrow(chol_Ai_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
@@ -244,9 +227,9 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 	Ai = forceSymmetric(crossprod(make_Chol_Ai(chol_Ai_mats,rep(1,n_RE)/(n_RE+1))))
 	Cholesky_C = Cholesky(ZtZ + Ai)
 
-	randomEffect_C_Choleskys = mclapply(1:ncol(h2_divisions),function(i) {    	
-		if(i %% 100 == 0 && verbose) print(sprintf('randomEffects_C %d of %d',i,ncol(h2_divisions)))
-		h2s = h2_divisions[,i]
+	randomEffect_C_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {    	
+		if(i %% 100 == 0 && verbose) print(sprintf('randomEffects_C %d of %d',i,ncol(h2s_matrix)))
+		h2s = h2s_matrix[,i]
 		chol_A_inv = make_Chol_Ai(chol_Ai_mats,h2s)
 		Ai = crossprod(chol_A_inv)
 		C = ZtZ/(1-sum(h2s))
@@ -272,15 +255,15 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 	}
 
 	# setup of symbolic Cholesky of Sigma
-	Sigma = make_Sigma(ZAZts,h2_divisions[,2])
+	Sigma = make_Sigma(ZAZts,h2s_matrix[,2])
 	Cholesky_Sigma_base = Cholesky(Sigma,perm=T,super=T)
 	stopifnot(!isLDL(Cholesky_Sigma_base))
 	Sigma_Perm = expand(Cholesky_Sigma_base)$P
 	if(all(diag(Sigma_Perm))) Sigma_Perm = NULL
 
-	Sigma_Choleskys = mclapply(1:ncol(h2_divisions),function(i) {
-		if(i %% 100 == 0 && verbose) print(sprintf('Sigma_Choleskys %d of %d',i,ncol(h2_divisions)))
-		Sigma = forceSymmetric(make_Sigma(ZAZts,h2_divisions[,i]))
+	Sigma_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
+		if(i %% 100 == 0 && verbose) print(sprintf('Sigma_Choleskys %d of %d',i,ncol(h2s_matrix)))
+		Sigma = forceSymmetric(make_Sigma(ZAZts,h2s_matrix[,i]))
 		stopifnot(class(Sigma) == 'dsCMatrix')
 		Cholesky_Sigma = update(Cholesky_Sigma_base,Sigma)
 		log_det = 2*determinant(Cholesky_Sigma,logarithm=T)$modulus

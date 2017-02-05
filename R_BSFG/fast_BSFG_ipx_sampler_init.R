@@ -1,27 +1,6 @@
-load_simulation_data = function(){
-    require(Matrix)
-    if(file.exists('../setup.RData')) {
-        load('../setup.RData')
-        names(setup) = sub('.','_',names(setup),fixed=T)
-    }
-    else{
-        require(R.matlab)
-        setup = readMat('../setup.mat')
-        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
-    }
-    r = dim(setup$A)[1]
-    n = nrow(setup$Y)
-    data = data.frame(Group = gl(r,n/r))
-    rownames(setup$A) = data$Group
-    return(list(Y = setup$Y, data = data, A_mats = list(Group = setup$A),setup = setup))
-}
-
-
-
-fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parameters, A_mat = NULL, A_inv_mat = NULL, 
+fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL, 
                                     fixed_Factors = NULL, scaleY = TRUE,
                                     simulation = F,setup = NULL,verbose=T){
-# function(Y, fixed, random, data, priors, run_parameters, scaleY = TRUE,simulation = FALSE,setup = NULL){
 	require(Matrix)
 
 	# data_matrices,run_parameters,priors,current_state,Posterior,simulation = F)
@@ -48,6 +27,7 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
 #         factor_h2s
 #         name
 
+    run_parameters$verbose = verbose
     run_parameters$setup = setup
     run_parameters$name = setup$name
     run_parameters$simulation = simulation
@@ -81,22 +61,25 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
     Z = Z[,paste0(RE_name,levels(data[[RE_name]]))]    
     r = ncol(Z)
 
-    if(is.null(A_mat)) {
-        if(is.null(A_inv_mat)){
+    if(is.null(A_mats)) {
+        if(is.null(A_inv_mats)){
             A = Diagonal(ncol(Z))
         } else{
-            A = Matrix(forceSymmetric(solve(A_inv_mat)))
+            A = Matrix(forceSymmetric(solve(A_inv_mats[[1]])))
         }
     } else{
-        A = forceSymmetric(A_mat)
+        A = forceSymmetric(A_mats[[1]])
     }
+
+    h2s_matrix = matrix(0:run_parameters$h2_divisions / run_parameters$h2_divisions,nrow = 1)
 
     data_matrices = list(
             Y         = Y,
             Z         = Z,
             X         = X,
             Y_missing = Y_missing,
-            A         = A
+            A         = A,
+            h2s_matrix  = h2s_matrix
     		)        
 
 # ----------------------------- #
@@ -157,8 +140,10 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
 
     # p-vector of heritabilities for residuals on factors. 
 	#  Prior: discrete prior on interval [0,1)
-    h2s = with(run_parameters,seq(0,1,length = h2_divisions+1)[1:h2_divisions])
-    resid_h2 = with(priors,sample(h2s,p,prob = h2_priors_resids, replace = T))
+    # h2s = with(run_parameters,seq(0,1,length = h2_divisions+1)[1:h2_divisions])
+    # resid_h2 = with(priors,sample(h2s,p,prob = h2_priors_resids, replace = T))    
+    resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
+    resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
     
     # Genetic effects not accounted for by factors.
     #   Prior: Normal distribution on each element.
@@ -168,7 +153,10 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
         
     # Latent factor variances
     tot_F_prec = with(priors,rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate))
-    F_h2 = with(priors,sample(h2s,k,prob = h2_priors_factors, replace = T))
+
+    F_h2_index = sample(1:ncol(h2s_matrix),k,replace=T)
+    F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
+    # F_h2 = with(priors,sample(h2s,k,prob = h2_priors_factors, replace = T))
         
     # Genetic effects on the factor scores.
 	#  Prior: Normal distribution for each element
@@ -211,20 +199,22 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
 # ---Save initial values- #
 # ----------------------- #
     current_state = list(
-    		Lambda_prec   = Lambda_prec,
-    		delta         = delta,
-    		tauh          = tauh,
-    		Plam          = Plam,
-    		Lambda        = Lambda,
-            tot_Y_prec    = tot_Y_prec,
-            resid_h2      = resid_h2,
-            tot_F_prec    = tot_F_prec,
-            F_h2          = F_h2,
-    		F_a           = F_a,
-    		F             = F,
-    		E_a           = E_a,
-    		B             = B,
-    		nrun 		  = 0
+            Lambda_prec    = Lambda_prec,
+            delta          = delta,
+            tauh           = tauh,
+            Plam           = Plam,
+            Lambda         = Lambda,
+            tot_Y_prec     = tot_Y_prec,
+            resid_h2_index = resid_h2_index,
+            resid_h2       = resid_h2,
+            tot_F_prec     = tot_F_prec,
+            F_h2_index     = F_h2_index,
+            F_h2           = F_h2,
+            F_a            = F_a,
+            F              = F,
+            E_a            = E_a,
+            B              = B,
+            nrun           = 0
     	)
 
 
