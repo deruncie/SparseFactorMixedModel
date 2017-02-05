@@ -178,6 +178,7 @@ sample_h2s_discrete = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discrete
 	n = nrow(Y)
 	p = ncol(Y)
 	discrete_bins = length(discrete_priors)
+	tot_Y_prec = c(tot_Y_prec)
 
 	Yp = Y
 	if(!is.null(Sigma_Perm)){
@@ -193,14 +194,14 @@ sample_h2s_discrete = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discrete
 		log_ps
 	},mc.cores = ncores)
 	if(length(log_ps) == 1) {
-		log_ps = matrix(log_ps[[1]],ncol = p)
+		log_ps = matrix(log_ps[[1]],nrow = p)
 	} else{
-		log_ps = do.call(rbind,log_ps)
+		log_ps = do.call(cbind,log_ps)
 	}
 	h2s_index = sapply(1:p,function(j) {
-		max_col = max(log_ps[,j])
-		norm_factor = max_col+log(sum(exp(log_ps[,j]-max_col)))
-		ps_j = exp(log_ps[,j] - norm_factor)
+		max_row = max(log_ps[j,])
+		norm_factor = max_row+log(sum(exp(log_ps[j,]-max_row)))
+		ps_j = exp(log_ps[j,] - norm_factor)
 		sum(runif(1)>cumsum(ps_j))+1
 	})
 	return(h2s_index)
