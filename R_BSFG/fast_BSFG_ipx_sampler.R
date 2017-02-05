@@ -78,19 +78,8 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 	# ---Extend posterior matrices for new samples--- #
 	# ----------------------------------------------- #
 
-	sp = (start_i + n_samples - burn)/thin - ncol(Posterior$Lambda)
-	if(sp > 0){
-		Posterior$Lambda        = cbind(Posterior$Lambda,matrix(0,nr = nrow(Posterior$Lambda),nc = sp))
-		Posterior$F             = cbind(Posterior$F,matrix(0,nr = nrow(Posterior$F),nc = sp))
-		Posterior$F_a           = cbind(Posterior$F_a,matrix(0,nr = nrow(Posterior$F_a),nc = sp))
-		Posterior$delta         = cbind(Posterior$delta,matrix(0,nr = nrow(Posterior$delta),nc = sp))
-		Posterior$tot_Y_prec    = cbind(Posterior$tot_Y_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
-		Posterior$resid_h2      = cbind(Posterior$resid_h2  ,matrix(0,nr = nrow(Posterior$resid_h2  ),nc = sp))
-		Posterior$tot_F_prec    = cbind(Posterior$tot_F_prec,matrix(0,nr = nrow(Posterior$tot_F_prec),nc = sp))
-		Posterior$F_h2          = cbind(Posterior$F_h2,matrix(0,nr = nrow(Posterior$F_h2),nc = sp))
-		Posterior$resid_Y_prec  = cbind(Posterior$resid_Y_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
-		Posterior$E_a_prec      = cbind(Posterior$E_a_prec,matrix(0,nr = nrow(Posterior$tot_Y_prec),nc = sp))
-	}
+	sp = (start_i + n_samples - burn)/thin - dim(Posterior[[Posterior$sample_params[1]]])[3]
+	Posterior = expand_Posterior(Posterior,max(0,sp))
 
 	# ----------------------------------------------- #
 	# --------------start gibbs sampling------------- #
@@ -121,18 +110,17 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			coefs = sample_coefs_parallel_sparse_c( Y,Design,resid_h2, tot_Y_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
 			
 			if(b > 0){
-				B = coefs[1:b,]
+				B = coefs[1:b,,drop=FALSE]
 			}
-			Lambda = t(coefs[b + 1:k,])
+			Lambda = t(coefs[b + 1:k,,drop=FALSE])
 
 	 	# # -----Sample Lambda_prec------------- #
 			Lambda2 = Lambda^2
 			Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
 		 # # -----Sample delta, update tauh------ #
-			# delta = sample_delta_ipx( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
 			delta = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
-			tauh  = cumprod(delta)
+			tauh  = matrix(cumprod(delta),nrow=1)
 			
 		 # # -----Update Plam-------------------- #
 			Plam = sweep(Lambda_prec,2,tauh,'*')

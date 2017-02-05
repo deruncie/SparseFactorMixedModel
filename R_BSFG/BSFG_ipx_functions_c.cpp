@@ -113,7 +113,7 @@ rowvec sample_tot_prec_sparse_c (mat Y,
 }
 
 // [[Rcpp::export()]]
-vec sample_h2s_discrete_given_p_sparse_c (mat Y,
+rowvec sample_h2s_discrete_given_p_sparse_c (mat Y,
 						int h2_divisions,
 						vec h2_priors,
 						vec Tot_prec,
@@ -148,7 +148,7 @@ vec sample_h2s_discrete_given_p_sparse_c (mat Y,
 		h2_index(j) = selected.n_elem;
 	}
 
-	return(h2_index + 1);
+	return(h2_index.t() + 1);
 }
 
 // [[Rcpp::export()]]
@@ -321,7 +321,7 @@ List GSVD_2_c(mat A, mat B){
 
 
 // [[Rcpp::export()]]
-vec sample_delta_c(
+rowvec sample_delta_c(
 					vec delta,
 					vec tauh,
 					mat Lambda_prec,
@@ -354,6 +354,6 @@ vec sample_delta_c(
 			tauh = cumprod(delta);
 		}
 	}
-	return(delta);
+	return(delta.t());
 }
 

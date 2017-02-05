@@ -26,14 +26,9 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 	# ----------------------------------------------- #
 	# ---Extend posterior matrices for new samples--- #
 	# ----------------------------------------------- #
-
-	sp = (start_i + n_samples - burn)/thin - ncol(Posterior$Lambda)
-	if(sp > 0){
-		for(param in names(Posterior)){
-			if(param %in% c('B','E_a')) next
-			Posterior[[param]] = cbind(Posterior[[param]],matrix(0,nr = nrow(Posterior[[param]]),nc = sp))
-		}
-	}
+	
+	sp = (start_i + n_samples - burn)/thin - dim(Posterior[[Posterior$sample_params[1]]])[3]
+	Posterior = expand_Posterior(Posterior,max(0,sp))
 
 	# ----------------------------------------------- #
 	# --------------start gibbs sampling------------- #
@@ -65,9 +60,9 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			prior_prec = rbind(1e-6,t(Plam)) # note: fixed effect priors must be independent.
 			coefs = sample_MME_fixedEffects(Y,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Y_prec, prior_mean, prior_prec,ncores)
 			if(b > 0){
-				B = coefs[1:b,]
+				B = coefs[1:b,,drop=FALSE]
 			}
-			Lambda = t(coefs[b + 1:k,])
+			Lambda = t(coefs[b + 1:k,,drop=FALSE])
 
 	 	# # -----Sample Lambda_prec------------- #
 			Lambda2 = Lambda^2
@@ -75,7 +70,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 
 		 # # -----Sample delta, update tauh------ #
 			delta = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
-			tauh  = cumprod(delta)
+			tauh  = matrix(cumprod(delta),nrow=1)
 			
 		 # # -----Update Plam-------------------- #
 			Plam = sweep(Lambda_prec,2,tauh,'*')

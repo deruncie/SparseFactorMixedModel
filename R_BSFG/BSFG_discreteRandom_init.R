@@ -94,8 +94,8 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
      #     delta_2 ... delta_m:
      #       shape = delta_2_shape
      #       rate = delta_2_rate
-    delta          = with(priors,c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)))
-    tauh           = cumprod(delta)
+    delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
+    tauh  = matrix(cumprod(delta),nrow=1)
     
     # Total Factor loading precisions Lambda_prec * tauh
     Plam = sweep(Lambda_prec,2,tauh,'*')
@@ -111,7 +111,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 	 #  Prior: Gamma distribution for each element
      #       shape = tot_F_prec_shape
      #       rate = tot_F_prec_rate
-    tot_F_prec = with(priors,rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate))
+    tot_F_prec = with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
 
     # Factor discrete variances
      # k-matrix of n_RE x k with 
@@ -123,7 +123,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
     })
     names(F_a) = RE_names
 
-    F = matrix(rnorm(n * k, 0, sqrt(rowSums(t(F_h2) / tot_F_prec))),ncol = k, byrow = T)
+    F = matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
     for(effect in RE_names) {
     	F = F + Z_matrices[[effect]] %*% F_a[[effect]]
     }
@@ -135,7 +135,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 	 #  Prior: Gamma distribution for each element
      #       shape = tot_Y_prec_shape
      #       rate = tot_Y_prec_rate
-    tot_Y_prec = with(priors,rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate))
+    tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
 
     # Resid discrete variances
      # p-matrix of n_RE x p with 
@@ -153,30 +153,35 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 # ---Save initial values- #
 # ----------------------- #
     current_state = list(
-		Lambda_prec      = Lambda_prec,
-		delta            = delta,
-		tauh             = tauh,
-		Plam             = Plam,
-		Lambda           = Lambda,
-		tot_F_prec       = tot_F_prec,
-		F_h2_index       = F_h2_index,
-		F_h2             = F_h2,
-		F_a              = F_a,
-		F                = F,
-		tot_Y_prec       = tot_Y_prec,
-		resid_h2_index   = resid_h2_index,
-		resid_h2         = resid_h2,
-		E_a              = E_a,
-		B                = B,
-		nrun             = 0
+		Lambda_prec    = Lambda_prec,
+		delta          = delta,
+		tauh           = tauh,
+		Plam           = Plam,
+		Lambda         = Lambda,
+		tot_F_prec     = tot_F_prec,
+		F_h2_index     = F_h2_index,
+		F_h2           = F_h2,
+		F_a            = F_a,
+		F              = F,
+		tot_Y_prec     = tot_Y_prec,
+		resid_h2_index = resid_h2_index,
+		resid_h2       = resid_h2,
+		E_a            = E_a,
+		B              = B,
+		traitnames     = traitnames,
+		nrun           = 0
     	)
 
     
 # ----------------------- #
 # -Initialize Posterior-- #
 # ----------------------- #
-
-    Posterior = clear_Posterior(list(current_state = current_state))$Posterior
+    Posterior = list(
+        sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2'),
+        posteriorMean_params = c('B','E_a'),
+        per_trait_params = c('tot_Y_prec','resid_h2')
+    )
+    Posterior = initialize_Posterior(Posterior,current_state)
 
 # ------------------------------------ #
 # ----Precalculate ZAZts, chol_As ---- #

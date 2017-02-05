@@ -104,7 +104,7 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
 	#  Prior: Gamma distribution for each element
     #       shape = tot_Y_prec_shape
     #       rate = tot_Y_prec_rate
-    tot_Y_prec = with(priors,rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate))
+    tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
    
     # Factors:
     #  initial number of factors
@@ -126,8 +126,8 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
      #     delta_2 ... delta_m:
      #       shape = delta_2_shape
      #       rate = delta_2_rate
-    delta          = with(priors,c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)))
-    tauh           = cumprod(delta)
+    delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
+    tauh  = matrix(cumprod(delta),nrow=1)
     
     # Total Factor loading precisions Lambda_prec * tauh
     Plam = sweep(Lambda_prec,2,tauh,'*')
@@ -152,7 +152,7 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
     E_a = matrix(rnorm(p*r,0,sqrt(resid_h2 * tot_Y_prec)),nr = r,nc = p, byrow = T)
         
     # Latent factor variances
-    tot_F_prec = with(priors,rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate))
+    tot_F_prec = with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
 
     F_h2_index = sample(1:ncol(h2s_matrix),k,replace=T)
     F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
@@ -177,24 +177,7 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
     #       sd = sqrt(1/fixed_effects_prec)
     B = matrix(rnorm(b*p),nr = b, nc = p)
 
-    
-# ----------------------- #
-# -Initialize Posterior-- #
-# ----------------------- #
-    Posterior = list(
-		    Lambda        = matrix(0,nr=0,nc=0),
-		    F_a           = matrix(0,nr=0,nc=0),
-		    F             = matrix(0,nr=0,nc=0),
-		    delta         = matrix(0,nr=0,nc=0),
-            tot_F_prec    = matrix(0,nr=0,nc=0),
-            F_h2          = matrix(0,nr=0,nc=0),
-            tot_Y_prec    = matrix(0,nr = p,nc = 0),
-            resid_h2      = matrix(0,nr = p,nc = 0),
-            resid_Y_prec  = matrix(0,nr = p,nc = 0),
-            E_a_prec      = matrix(0,nr = p,nc = 0),
-		    B             = matrix(0,nr = b,nc = p),
-		    E_a           = matrix(0,nr = r,nc = p)
-    	)
+
 # ----------------------- #
 # ---Save initial values- #
 # ----------------------- #
@@ -214,10 +197,20 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
             F              = F,
             E_a            = E_a,
             B              = B,
+            traitnames     = traitnames,
             nrun           = 0
     	)
 
-
+# ----------------------- #
+# -Initialize Posterior-- #
+# ----------------------- #
+    Posterior = list(
+        sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2'),
+        posteriorMean_params = c('B','E_a'),
+        per_trait_params = c('tot_Y_prec','resid_h2')
+    )
+    Posterior = initialize_Posterior(Posterior,current_state)
+    
 # ------------------------------------ #
 # ----Precalculate some matrices------ #
 # ------------------------------------ #
