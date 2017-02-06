@@ -150,7 +150,7 @@ fast_BSFG_ipx_sampler = function(BSFG_state,n_samples) {
 			#conditioning on B, F_a,E_a,W,Lambda, F_h2
 			Y_tilde = as.matrix(Y - X %*% B - Z %*% E_a)
 			F_e_prec = tot_F_prec / (1-F_h2)
-			F = sample_factors_scores_ipx_sparse_c( Y_tilde, Z,Lambda,resid_Y_prec,F_a,F_e_prec )
+			F = sample_factors_scores_sparse_c( Y_tilde, Z,Lambda,resid_Y_prec,F_a,F_e_prec )
 						
 	})
 	current_state = current_state[current_state_names]

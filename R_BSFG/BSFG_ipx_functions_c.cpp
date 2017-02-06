@@ -275,7 +275,7 @@ mat sample_means_parallel_c(mat Y_tilde,
 }
 
 // [[Rcpp::export()]]
-mat sample_factors_scores_ipx_sparse_c(mat Y_tilde,
+mat sample_factors_scores_sparse_c(mat Y_tilde,
 							sp_mat Z,
 							mat Lambda,
 							vec resid_Y_prec,
@@ -292,10 +292,6 @@ mat sample_factors_scores_ipx_sparse_c(mat Y_tilde,
 	mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(Z * F_a,2,F_e_prec))));
 
 	mat Zlams = randn(Meta.n_rows,Meta.n_cols);	
-	// Environment stats("package:stats");
-	// Function rnorm = stats["rnorm"];
-	// vec z = as<vec>(rnorm(Meta.n_rows*Meta.n_cols));
-	// mat Zlams = reshape(z,Meta.n_rows,Meta.n_cols);
 
 	mat F = trans(solve(S,trans(Meta + Zlams)));
 
@@ -317,8 +313,6 @@ List GSVD_2_c(mat A, mat B){
 
 	return(List::create(_["U"]=U,_["V"]=V,_["X"]=X,_["C"]=C,_["S"]=S));
 }
-
-
 
 // [[Rcpp::export()]]
 rowvec sample_delta_c(
