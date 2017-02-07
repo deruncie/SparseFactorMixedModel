@@ -141,6 +141,8 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 	# All factor parameters are matrices with ncol == k
 	# Posterior arrays are expanded / contracted as the number of factors changes (with update_k)
 
+  Posterior$sp_num = sp_num
+
 	current_state = within(current_state,{
 		# transform variables so that the variance of each column of F is 1.
 		F_var = 1/tot_F_prec
@@ -172,7 +174,7 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 
 
 initialize_Posterior = function(Posterior,current_state){
-	for(param in Posterior$sample_params){
+	  for(param in Posterior$sample_params){
     	Posterior[[param]] = array(0,dim = c(dim(current_state[[param]]),0))
     }
 
@@ -183,6 +185,7 @@ initialize_Posterior = function(Posterior,current_state){
     	dimnames(Posterior[[param]])[[2]] = current_state$traitnames
     }
     dimnames(Posterior$Lambda)[[1]] = current_state$traitnames
+    Posterior$sp_num = 0
     Posterior
 }
 

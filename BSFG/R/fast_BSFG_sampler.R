@@ -168,7 +168,7 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 	}
 	end_time = Sys.time()
 	print(end_time - start_time)
-	save(Posterior,file = 'Posterior.RData')
+	current_state$total_time = current_state$total_time + end_time - start_time
 
 
 	# ----------------------------------------------- #

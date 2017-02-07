@@ -116,6 +116,7 @@ general_BSFG_sampler = function(BSFG_state,n_samples,ncores = detectCores()) {
 	}
 	end_time = Sys.time()
 	print(end_time - start_time)
+	current_state$total_time = current_state$total_time + end_time - start_time
 
 
 	# ----------------------------------------------- #

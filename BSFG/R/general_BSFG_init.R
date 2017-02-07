@@ -166,7 +166,8 @@ general_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_m
 		E_a            = E_a,
 		B              = B,
 		traitnames     = traitnames,
-		nrun           = 0
+		nrun           = 0,
+		total_time     = 0
     	)
 
 
