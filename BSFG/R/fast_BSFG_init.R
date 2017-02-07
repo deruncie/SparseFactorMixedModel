@@ -1,98 +1,22 @@
-fast_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
-                                    fixed_Factors = NULL, scaleY = TRUE,
-                                    simulation = F,setup = NULL,verbose=T){
+initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,verbose=T,...){
 
-	# data_matrices,run_parameters,priors,current_state,Posterior,simulation = F)
-#   Preps everything for an analysis with the function MA_sampler.
-#       Loads data from setup.mat
-#       Decides if the data is from a simulation
-#       Uses prior to find initial values for all parameters
-#       Initializes Posterior struct
-#       Saves run parameters
-#
-#   Input file setup.mat should contain:
-#     Y      gene expression data data: n x p
-#     X      fixed-effect design matrix (optional)
-#     Z      random effects 1 incidence matrix n x r
-#     A      kinship matrix of lines: r x r
-#     optional:
-#         U_act
-#         gen_factor_Lambda
-#         error_factor_Lambda
-#         h2_act
-#         G
-#         R
-#         B
-#         factor_h2s
-#         name
+    Z_matrices = BSFG_state$data_matrices$Z_matrices
+    Z          = BSFG_state$data_matrices$Z
+    h2s_matrix = BSFG_state$data_matrices$h2s_matrix
 
-    run_parameters$verbose = verbose
-    run_parameters$setup = setup
-    run_parameters$name = setup$name
-    run_parameters$simulation = simulation
+    RE_names   = rownames(h2s_matrix)
+    n_RE       = length(RE_names)
+    stopifnot(n_RE == 1)  # must be only 1 random effect
 
-    # model dimensions
-    n = nrow(Y)
-    p = ncol(Y)
-    traitnames = colnames(Y)
+    traitnames = BSFG_state$traitnames
+    priors         = BSFG_state$priors
+    run_parameters = BSFG_state$run_parameters
+    run_variables   = BSFG_state$run_variables
 
-    # missing data
-    Y_missing = is.na(Y)
-
-    # scale Y
-    if(scaleY){
-        Mean_Y = colMeans(Y,na.rm=T)
-        VY = apply(Y,2,var,na.rm=T)
-        Y = sweep(Y,2,Mean_Y,'-')
-        Y = sweep(Y,2,sqrt(VY),'/')
-    } else {
-        Mean_Y = rep(0,p)
-        VY = rep(1,p)
-    }
-
-    # build X from fixed model
-    X = model.matrix(fixed,data)
-    b = ncol(X)
-
-    # build Z for random effect
-    RE_name = rownames(attr(terms(random),'factors'))[1]
-    Z = Matrix(model.matrix(formula(sprintf('~0 + %s',RE_name)),data),sparse = TRUE)
-    Z = Z[,paste0(RE_name,levels(data[[RE_name]]))]
-    r = ncol(Z)
-
-    if(is.null(A_mats)) {
-        if(is.null(A_inv_mats)){
-            A = Diagonal(ncol(Z))
-        } else{
-            A = Matrix(forceSymmetric(solve(A_inv_mats[[1]])))
-        }
-    } else{
-        A = forceSymmetric(A_mats[[1]])
-    }
-
-    h2s_matrix = matrix(0:run_parameters$h2_divisions / run_parameters$h2_divisions,nrow = 1)
-
-    data_matrices = list(
-            Y         = Y,
-            Z         = Z,
-            X         = X,
-            Y_missing = Y_missing,
-            A         = A,
-            h2s_matrix  = h2s_matrix
-    		)
-
-# ----------------------------- #
-# ----- re-formulate priors --- #
-# ----------------------------- #
-    priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
-    priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
-    priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
-    priors$tot_F_prec_rate  = with(priors$tot_F_var,nu - 2)
-    priors$delta_1_shape    = with(priors$delta_1,V * nu)
-    priors$delta_1_rate     = with(priors$delta_1,nu - 2)
-    priors$delta_2_shape    = with(priors$delta_2,V * nu)
-    priors$delta_2_rate     = with(priors$delta_2,nu - 2)
-    priors$b_X_prec            =   1e-10*diag(1,b)
+    p    = BSFG_state$run_variables$p
+    n    = BSFG_state$run_variables$n
+    r    = BSFG_state$run_variables$r_RE
+    b    = BSFG_state$run_variables$b
 
 # ----------------------------- #
 # -----Initialize variables---- #
@@ -217,8 +141,8 @@ fast_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats
 
     # recover()
     #invert the random effect covariance matrices
-    Ainv = solve(A)
-    chol_Ainv = chol(Ainv)
+    A = A_mats[[1]]
+    chol_Ainv = chol_Ai_mats[[1]]
 
     #pre-calculate transformation parameters to diagonalize aI + bZAZ for fast
     #inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
@@ -240,7 +164,7 @@ fast_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats
     #similar to fixed effects + random effects 1 above, but no fixed effects.
     ZZt = crossprod(Z)
 
-    result = GSVD_2_c(as.matrix(chol(ZZt)),as.matrix(chol(Ainv)))
+    result = GSVD_2_c(as.matrix(chol(ZZt)),as.matrix(chol_Ainv))
 
     invert_aZZt_Ainv = list(
         U = Matrix(t(solve(result$X))),
@@ -262,33 +186,21 @@ fast_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats
 # ----Save run parameters------ #
 # ----------------------------- #
 
-	run_variables = list(
-			p                = p,
-			n                = n,
-			r                = r,
-			b                = b,
-			Mean_Y           = Mean_Y,
-			VY               = VY,
-            Ainv             = Ainv,
-            chol_Ainv        = chol_Ainv,
+    run_variables = c(run_variables,list(
+      chol_Ainv        = chol_Ainv,
 			invert_aI_bZAZ   = invert_aI_bZAZ,
 			invert_aZZt_Ainv = invert_aZZt_Ainv
-    )
+    ))
 
     RNG = list(
     	Random.seed = .Random.seed,
     	RNGkind = RNGkind()
     )
 
- return(list(
-			data_matrices  = data_matrices,
-			run_parameters = run_parameters,
-			run_variables  = run_variables,
-			priors         = priors,
-			current_state  = current_state,
-			Posterior      = Posterior,
-			simulation     = simulation,
-			RNG            = RNG,
-			traitnames     = traitnames
- 		))
+    BSFG_state$run_variables = run_variables
+    BSFG_state$RNG = RNG
+    BSFG_state$Posterior = Posterior
+    BSFG_state$current_state = current_state
+
+    return(BSFG_state)
 }

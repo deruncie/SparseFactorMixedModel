@@ -1,4 +1,4 @@
-fast_BSFG_sampler = function(BSFG_state,n_samples) {
+sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 	# -- Daniel Runcie -- #
 	#
 	# Gibbs sampler for genetic covariance estimation based on mixed effects

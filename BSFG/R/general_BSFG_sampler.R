@@ -1,4 +1,4 @@
-general_BSFG_sampler = function(BSFG_state,n_samples,ncores = detectCores()) {
+sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
 	data_matrices  = BSFG_state$data_matrices
 	params         = BSFG_state$params
 	priors         = BSFG_state$priors

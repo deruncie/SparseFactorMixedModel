@@ -1,71 +1,24 @@
-general_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
-									fixed_Factors = NULL, scaleY = TRUE,
-									ncores = detectCores(),simulation = F,setup = NULL,verbose=T){
-  run_parameters$verbose = verbose
-  run_parameters$setup = setup
-  run_parameters$name = setup$name
-  run_parameters$simulation = simulation
+initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,
+									ncores = detectCores(),verbose=T,...){
 
-	# model dimensions
-	n = nrow(Y)
-	p = ncol(Y)
-	traitnames = colnames(Y)
+  Z_matrices = BSFG_state$data_matrices$Z_matrices
+  Z          = BSFG_state$data_matrices$Z
+  h2s_matrix = BSFG_state$data_matrices$h2s_matrix
 
-	# missing data
-	Y_missing = is.na(Y)
+  RE_names   = rownames(h2s_matrix)
+  n_RE       = length(RE_names)
+  stopifnot(n_RE == 1)  # must be only 1 random effect
 
-	# scale Y
-	if(scaleY){
-		Mean_Y = colMeans(Y,na.rm=T)
-		VY = apply(Y,2,var,na.rm=T)
-    	Y = sweep(Y,2,Mean_Y,'-')
-    	Y = sweep(Y,2,sqrt(VY),'/')
-    } else {
-    	Mean_Y = rep(0,p)
-    	VY = rep(1,p)
-    }
+  traitnames     = BSFG_state$traitnames
+  priors         = BSFG_state$priors
+  run_parameters = BSFG_state$run_parameters
+  run_variables  = BSFG_state$run_variables
 
-	# build X from fixed model
-	X = model.matrix(fixed,data)
-	b = ncol(X)
+  p    = BSFG_state$run_variables$p
+  n    = BSFG_state$run_variables$n
+  r_RE = BSFG_state$run_variables$r_RE
+  b    = BSFG_state$run_variables$b
 
-	# build Z matrices from random model
-	RE_names = rownames(attr(terms(random),'factors'))
-	n_RE = length(RE_names)
-	Z_matrices = lapply(RE_names,function(re) {
-		Z = Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)
-		Z[,paste0(re,levels(data[[re]]))]
-	})
-	names(Z_matrices) = RE_names
-	r_RE = sapply(Z_matrices,function(x) ncol(x))
-
-	Z = do.call(cbind,Z_matrices)
-
-	h2s_matrix = expand.grid(lapply(RE_names,function(re) 0:run_parameters$h2_divisions)) / run_parameters$h2_divisions
-	colnames(h2s_matrix) = RE_names
-	h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
-
-	data_matrices = list(
-		Y          = Y,
-		Y_missing  = Y_missing,
-		X          = X,
-		Z_matrices = Z_matrices,
-		Z          = Z,
-		h2s_matrix = h2s_matrix
-		)
-
-
-# ----------------------------- #
-# ----- re-formulate priors --- #
-# ----------------------------- #
-	priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
-	priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
-	priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
-	priors$tot_F_prec_rate  = with(priors$tot_F_var,nu - 2)
-	priors$delta_1_shape    = with(priors$delta_1,V * nu)
-	priors$delta_1_rate     = with(priors$delta_1,nu - 2)
-	priors$delta_2_shape    = with(priors$delta_2,V * nu)
-	priors$delta_2_rate     = with(priors$delta_2,nu - 2)
 
 # ----------------------------- #
 # -----Initialize variables---- #
@@ -150,25 +103,25 @@ general_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_m
 # ---Save initial values- #
 # ----------------------- #
     current_state = list(
-		Lambda_prec    = Lambda_prec,
-		delta          = delta,
-		tauh           = tauh,
-		Plam           = Plam,
-		Lambda         = Lambda,
-		tot_F_prec     = tot_F_prec,
-		F_h2_index     = F_h2_index,
-		F_h2           = F_h2,
-		F_a            = F_a,
-		F              = F,
-		tot_Y_prec     = tot_Y_prec,
-		resid_h2_index = resid_h2_index,
-		resid_h2       = resid_h2,
-		E_a            = E_a,
-		B              = B,
-		traitnames     = traitnames,
-		nrun           = 0,
-		total_time     = 0
-    	)
+    		Lambda_prec    = Lambda_prec,
+    		delta          = delta,
+    		tauh           = tauh,
+    		Plam           = Plam,
+    		Lambda         = Lambda,
+    		tot_F_prec     = tot_F_prec,
+    		F_h2_index     = F_h2_index,
+    		F_h2           = F_h2,
+    		F_a            = F_a,
+    		F              = F,
+    		tot_Y_prec     = tot_Y_prec,
+    		resid_h2_index = resid_h2_index,
+    		resid_h2       = resid_h2,
+    		E_a            = E_a,
+    		B              = B,
+    		traitnames     = traitnames,
+    		nrun           = 0,
+    		total_time     = 0
+    )
 
 
 # ----------------------- #
@@ -184,37 +137,7 @@ general_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_m
 # ------------------------------------ #
 # ----Precalculate ZAZts, chol_As ---- #
 # ------------------------------------ #
-    if(verbose) print('Pre-calculating matrices')
-
-	fix_A = function(x) forceSymmetric(drop0(x,tol = 1e-10))
-
-	A_mats = lapply(RE_names,function(re) {
-		if(re %in% names(A_mats)) {
-			A = A_mats[[re]]
-		} else if(re %in% names(A_inv_mats)){
- 			A = solve(A_inv_mats[[re]])
- 			rownames(A) = rownames(A_inv_mats[[re]])
-		} else{
-			A = Diagonal(ncol(Z_matrices[[re]]))
-			rownames(A) = levels(data[[re]])
-		}
-		index = match(sub(re,'',colnames(Z_matrices[[re]])),rownames(A))  # A must have rownames
-		fix_A(A[index,index])
-	})
-	names(A_mats) = RE_names
-
-	Ai_mats = lapply(RE_names,function(re) {
-		if(re %in% names(A_inv_mats)){
-			Ai = A_inv_mats[[re]]
-			index = match(sub(re,'',colnames(Z_matrices[[re]])),rownames(Ai))  # Ai must have rownames
-			Ai = Ai[index,index]
-		} else {
-			Ai = solve(A_mats[[re]])
-		}
-		Ai = fix_A(Ai)
-		Ai
-	})
-	chol_Ai_mats = lapply(Ai_mats,chol)
+  if(verbose) print('Pre-calculating matrices')
 
 	#C
 	# recover()
@@ -283,33 +206,22 @@ general_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_m
 # ----Save run parameters------ #
 # ----------------------------- #
 
-	run_variables = list(
-			p                        = p,
-			n                        = n,
-			r_RE                     = r_RE,
-			b                        = b,
-			Mean_Y                   = Mean_Y,
-			VY                       = VY,
+	run_variables = c(run_variables,list(
 			Sigma_Choleskys          = Sigma_Choleskys,
 			Sigma_Perm               = Sigma_Perm,
 			randomEffect_C_Choleskys = randomEffect_C_Choleskys,
 			chol_Ai_mats             = chol_Ai_mats
-    )
+    ))
 
     RNG = list(
     	Random.seed = .Random.seed,
     	RNGkind = RNGkind()
     )
 
- return(list(
-			data_matrices  = data_matrices,
-			run_parameters = run_parameters,
-			run_variables  = run_variables,
-			priors         = priors,
-			current_state  = current_state,
-			Posterior      = Posterior,
-			simulation     = simulation,
-			RNG            = RNG,
-			traitnames     = traitnames
- 		))
+    BSFG_state$run_variables = run_variables
+    BSFG_state$RNG = RNG
+    BSFG_state$Posterior = Posterior
+    BSFG_state$current_state = current_state
+
+    return(BSFG_state)
 }

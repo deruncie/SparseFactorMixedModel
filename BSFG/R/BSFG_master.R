@@ -34,38 +34,140 @@
 #'
 BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
                                     fixed_Factors = NULL, scaleY = TRUE, sampler = 'fast_BSFG',
-                                    ncores = 1,simulation = F,setup = NULL,verbose=T)
-{
+                                    ncores = 1,simulation = F,setup = NULL,verbose=T) {
+	# RE_names = rownames(attr(terms(random),'factors'))
+
+	run_parameters$verbose = verbose
+	run_parameters$setup = setup
+	run_parameters$simulation = simulation
+
+	# model dimensions
+	n = nrow(Y)
+	p = ncol(Y)
+	traitnames = colnames(Y)
+
+	# missing data
+	Y_missing = is.na(Y)
+
+	# scale Y
+	if(scaleY){
+	  Mean_Y = colMeans(Y,na.rm=T)
+	  VY = apply(Y,2,var,na.rm=T)
+	  Y = sweep(Y,2,Mean_Y,'-')
+	  Y = sweep(Y,2,sqrt(VY),'/')
+	} else {
+	  Mean_Y = rep(0,p)
+	  VY = rep(1,p)
+	}
+
+	# build X from fixed model
+	X = model.matrix(fixed,data)
+	b = ncol(X)
+
+	# build Z matrices from random model
 	RE_names = rownames(attr(terms(random),'factors'))
+	n_RE = length(RE_names)
+	Z_matrices = lapply(RE_names,function(re) {
+	  Z = Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)
+	  Z[,paste0(re,levels(data[[re]]))]
+	})
+	names(Z_matrices) = RE_names
+	r_RE = sapply(Z_matrices,function(x) ncol(x))
+
+	Z = do.call(cbind,Z_matrices)
+
+
+	fix_A = function(x) forceSymmetric(drop0(x,tol = 1e-10))
+
+	A_mats = lapply(RE_names,function(re) {
+	  if(re %in% names(A_mats)) {
+	    A = A_mats[[re]]
+	  } else if(re %in% names(A_inv_mats)){
+	    A = solve(A_inv_mats[[re]])
+	    rownames(A) = rownames(A_inv_mats[[re]])
+	  } else{
+	    A = Diagonal(ncol(Z_matrices[[re]]))
+	    rownames(A) = levels(data[[re]])
+	  }
+	  index = match(sub(re,'',colnames(Z_matrices[[re]])),rownames(A))  # A must have rownames
+	  fix_A(A[index,index])
+	})
+	names(A_mats) = RE_names
+
+	Ai_mats = lapply(RE_names,function(re) {
+	  if(re %in% names(A_inv_mats)){
+	    Ai = A_inv_mats[[re]]
+	    index = match(sub(re,'',colnames(Z_matrices[[re]])),rownames(Ai))  # Ai must have rownames
+	    Ai = Ai[index,index]
+	  } else {
+	    Ai = solve(A_mats[[re]])
+	  }
+	  Ai = fix_A(Ai)
+	  Ai
+	})
+	chol_Ai_mats = lapply(Ai_mats,chol)
+
+	h2s_matrix = expand.grid(lapply(RE_names,function(re) 0:run_parameters$h2_divisions)) / run_parameters$h2_divisions
+	colnames(h2s_matrix) = RE_names
+	h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
+
+	data_matrices = list(
+	  Y          = Y,
+	  Y_missing  = Y_missing,
+	  X          = X,
+	  Z_matrices = Z_matrices,
+	  Z          = Z,
+	  h2s_matrix = h2s_matrix
+	)
+
+	run_variables = list(
+	  p      = p,
+	  n      = n,
+	  r_RE   = r_RE,
+	  b      = b,
+	  Mean_Y = Mean_Y,
+	  VY     = VY
+	)
+
+
+	# ----------------------------- #
+	# ----- re-formulate priors --- #
+	# ----------------------------- #
+	priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
+	priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
+	priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
+	priors$tot_F_prec_rate  = with(priors$tot_F_var,nu - 2)
+	priors$delta_1_shape    = with(priors$delta_1,V * nu)
+	priors$delta_1_rate     = with(priors$delta_1,nu - 2)
+	priors$delta_2_shape    = with(priors$delta_2,V * nu)
+	priors$delta_2_rate     = with(priors$delta_2,nu - 2)
 
 	if(length(RE_names) > 1){
-		print(sprintf('%d random effects. Using "general_BSFG" sampler',length(RE_names)))
-		sampler = 'general_BSFG'
+	  print(sprintf('%d random effects. Using "general_BSFG" sampler',length(RE_names)))
+	  sampler = 'general_BSFG'
 	}
 
-	if(sampler == 'fast_BSFG'){
-		BSFG_state = fast_BSFG_init(Y, fixed, random, data, priors, run_parameters, A_mats, A_inv_mats,
-												fixed_Factors, scaleY, simulation, setup, verbose)
-	} else{
-		BSFG_state = general_BSFG_init(Y, fixed, random, data, priors, run_parameters, A_mats, A_inv_mats,
-												fixed_Factors, scaleY, ncores, simulation, setup, verbose)
-	}
-	BSFG_state$run_parameters$sampler = sampler
-	class(BSFG_state) = append(class(BSFG_state),'BSFG_state')
+	BSFG_state = list(
+	  data_matrices  = data_matrices,
+	  priors         = priors,
+	  run_parameters = run_parameters,
+	  run_variables  = run_variables,
+	  traitnames     = traitnames
+	)
+	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',sampler))
+
+	BSFG_state = initialize_BSFG(BSFG_state, A_mats, chol_Ai_mats,verbose)
+
 	return(BSFG_state)
 }
 
-BSFG_sampler = function(BSFG_state,n_samples, ncores){
-	sampler = BSFG_state$run_parameters$sampler
-	if(sampler == 'fast_BSFG'){
-		if(BSFG_state$run_parameters$verbose) print('fast_BSFG sampler')
-		BSFG_state = fast_BSFG_sampler(BSFG_state,n_samples)
-	} else{
-		if(BSFG_state$run_parameters$verbose) print('general_BSFG sampler')
-		BSFG_state = general_BSFG_sampler(BSFG_state,n_samples, ncores)
-	}
-	BSFG_state$run_parameters$sampler = sampler
-	return(BSFG_state)
+
+initialize_BSFG = function(BSFG_state,...){
+  UseMethod("initialize_BSFG",BSFG_state)
+}
+
+sample_BSFG = function(BSFG_state,...){
+  UseMethod("sample_BSFG",BSFG_state)
 }
 
 summary.BSFG_state = function(BSFG_state){
@@ -92,7 +194,7 @@ print.BSFG_state = function(BSFG_state){
 }
 
 plot.BSFG_state = function(BSFG_state){
-  if(BSFG_state$simulation){
+  if(BSFG_state$run_parameters$simulation){
     draw_simulation_diagnostics(BSFG_state)
   } else{
     draw_results_diagnostics(BSFG_state)
