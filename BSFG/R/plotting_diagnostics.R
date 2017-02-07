@@ -26,13 +26,11 @@ draw_simulation_diagnostics = function(BSFG_state){
     resid_Y_prec = BSFG_state$current_state$tot_Y_prec / (1-BSFG_state$current_state$resid_h2)
 
     devices = dev.list()
+    devices = devices[names(devices) != 'RStudioGD']
     while(length(devices) < 4){
-        if(.Platform$OS.type != "windows") {
-    	   quartz()
-        } else {
-            windows()
-        }
+      dev.new(noRStudioGD = TRUE)
     	devices = dev.list()
+    	devices = devices[names(devices) != 'RStudioGD']
     }
 
 
@@ -86,7 +84,7 @@ draw_simulation_diagnostics = function(BSFG_state){
         for(k in 1:(min(2*f2_row,dim(Posterior$Lambda)[2]))) {
             o = order(-abs(rowMeans(Posterior$Lambda[,k,max(1,sp_num-100):sp_num])))
             traces = Posterior$Lambda[o[1:5],k,1:sp_num]
-            trace_plot(traces,main = sprintf('l_%d,.',k),ylim = c(-1,1)*max(abs(traces)))            
+            trace_plot(traces,main = sprintf('l_%d,.',k),ylim = c(-1,1)*max(abs(traces)))
         }
 
     	dev.set(devices[3])
@@ -115,7 +113,7 @@ draw_simulation_diagnostics = function(BSFG_state){
             G_Lambda_est = G_Lambda_est + G_Lj/sp_num
             Gj = G_Lj %*%  t(G_Lj) + diag(Posterior$resid_h2[1,,j]/Posterior$tot_Y_prec[1,,j])
             G_est = G_est + Gj/sp_num
-            
+
             E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag((1-Posterior$resid_h2[1,,j])/Posterior$tot_Y_prec[1,,j])
             E_est = E_est + E_Lj/sp_num;
             Lambda_est = Lambda_est + Lj/sp_num;
@@ -160,15 +158,13 @@ draw_results_diagnostics = function(BSFG_state){
     E_a_prec = BSFG_state$current_state$tot_Y_prec / BSFG_state$current_state$resid_h2
     resid_Y_prec = BSFG_state$current_state$tot_Y_prec / (1-BSFG_state$current_state$resid_h2)
     traitnames = BSFG_state$traitnames
-    
+
     devices = dev.list()
+    devices = devices[names(devices) != 'RStudioGD']
     while(length(devices) < 4){
-        if(.Platform$OS.type != "windows") {
-           quartz()
-        } else {
-            windows()
-        }
-        devices = dev.list()
+      dev.new(noRStudioGD = TRUE)
+      devices = dev.list()
+      devices = devices[names(devices) != 'RStudioGD']
     }
 
     p = run_variables$p
@@ -182,7 +178,7 @@ draw_results_diagnostics = function(BSFG_state){
     dev.set(devices[1])
     # pdf('plotting_diagnostics.pdf')
     par(mfrow=c(2,2))
-    # plot 1: estimated number of important factors   
+    # plot 1: estimated number of important factors
     factor_variances = diag(t(Lambda) %*% Lambda)
     factor_variances = sort(factor_variances,decreasing=T)
     plot(cumsum(factor_variances)/sum(factor_variances),type='l',main = "cumsum importance of factor")
@@ -196,7 +192,7 @@ draw_results_diagnostics = function(BSFG_state){
     lines(E_h2,col="red")
     legend("topright",legend = c("F_h2","E_h2"),col = c("blue","red"),text.col = c("blue","red"),bty = "n",pch = 1)
     #dev.off()
-    
+
     if(sp_num>1){
 
         dev.set(devices[2])
@@ -207,7 +203,7 @@ draw_results_diagnostics = function(BSFG_state){
         for(k in 1:(min(2*f2_row,dim(Posterior$Lambda)[2]))) {
             o = order(-abs(rowMeans(Posterior$Lambda[,k,max(1,sp_num-100):sp_num])))
             traces = Posterior$Lambda[o[1:5],k,1:sp_num]
-            trace_plot(traces,main = sprintf('l_%d,.',k),ylim = c(-1,1)*max(abs(traces)))            
+            trace_plot(traces,main = sprintf('l_%d,.',k),ylim = c(-1,1)*max(abs(traces)))
         }
 
         dev.set(devices[3])
@@ -242,7 +238,7 @@ draw_results_diagnostics = function(BSFG_state){
             library(gdata)
             traces_G[,j] = lowerTriangle(Gj,diag = TRUE)
             traces_G_cor[,j] = lowerTriangle(CovToCor(Gj),diag = TRUE)
-            
+
             E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag((1-Posterior$resid_h2[1,,j])/Posterior$tot_Y_prec[1,,j])
             E_est = E_est + E_Lj/sp_num;
             Lambda_est = Lambda_est + Lj/sp_num;
@@ -270,7 +266,7 @@ draw_results_diagnostics = function(BSFG_state){
         lines(E_h2,col="red")
         legend("topright",legend = c("F_h2","E_h2"),col = c("blue","red"),text.col = c("blue","red"),bty = "n",pch = 1)
         #dev.off()
-        
+
         #plot 5: trace plot of G_est
         # dev.set(devices[5])
         # #pdf('trace plot of G_est.pdf')
@@ -278,28 +274,28 @@ draw_results_diagnostics = function(BSFG_state){
         # trace_plot(traces_G,main = "trace plot of Gj")
         # trace_plot(traces_G_cor,main = "trace plot of Gj_cor")
         # #dev.off()
-        
-        # plot 6: distance matrix plot 
+
+        # plot 6: distance matrix plot
         # dev.set(devices[6])
         # #pdf('distance matrix plot.pdf')
         # par(mfrow = c(1,2))
         # Gcov2 = G_est^2
         # rownames(Gcov2) = traitnames
         # plot(hclust(dist(1-Gcov2)), main = "distance matrix plot of Gcov2")
-        
-        # Gcor = CovToCor(G_est) 
+
+        # Gcor = CovToCor(G_est)
         # Gcor2 = Gcor^2
         # rownames(Gcor2) = traitnames
         # plot(hclust(dist(1-Gcor2)),main = "distance matrix plot of Gcor2")
         # #dev.off()
-      
-        # # plot 7: distribution of lambda for each trait 
+
+        # # plot 7: distribution of lambda for each trait
         # #pdf('Lambda_columns_posterior.pdf')
         # lam_col = 2
         # lam_row = 2
         # par(mfrow = c(lam_row,lam_col))
         # Lambda = Posterior$Lambda
-        
+
         # for(i in 1:k) {
         #   par(mar=c(10,3,3,1))
         #   Li_samples = Posterior$Lambda[,i,]
@@ -310,8 +306,8 @@ draw_results_diagnostics = function(BSFG_state){
         #   abline(h=0)
         # }
         #dev.off()
-        
-        #plot 8: distribution of upper triangle Gcor 
+
+        #plot 8: distribution of upper triangle Gcor
         # dev.set(devices[7])
         # #pdf('boxplot of G_cor.pdf')
         # par(mfrow = c(1,2))
@@ -319,7 +315,7 @@ draw_results_diagnostics = function(BSFG_state){
         # L = apply(t(traces_G_cor), 2, function(x)quantile(x,.05))
         # U = apply(t(traces_G_cor), 2, function(x)quantile(x,.95))
         # require(plotrix)
-        
+
         # plotCI(1:(p*(p+1)/2),med,ui=U,li=L,main = "90% C.I of G_cor")
         # boxplot(t(traces_G_cor),main="boxplot of G_cor")
         # dev.off()
@@ -343,12 +339,12 @@ plot_diagnostics = function(BSFG_state){
   draw_iter      = BSFG_state$run_parameters$draw_iter
 #   for(i in start_i+(1:n_samples)){
 #   if( (i-burn) %% thin == 0 && i > burn) {
-#       sp_num = (i-burn)/thin    
+#       sp_num = (i-burn)/thin
 #   }
 #     if(i %% draw_iter  == 0) {
-  sp_num = ncol(BSFG_state$Posterior$Lambda)    
+  sp_num = ncol(BSFG_state$Posterior$Lambda)
     draw_results_diagnostics(sp_num,params,run_variables,Lambda, F_h2, Posterior,E_a_prec,resid_Y_prec,traitnames)
-    
+
   # }
 }
 # load("BSFG_state.RData")
@@ -364,7 +360,7 @@ ComparingGMatrix_plot = function(target){
     pos = matrix(pos,nr=n)
     k   = nrow(BSFG_state$Posterior[[target]])/n
   }
-  
+
   #load data from new population
   load("BSFG_fixedlambda.RData")
   n   = dim(BSFG_state$data_matrices$Y)[1]

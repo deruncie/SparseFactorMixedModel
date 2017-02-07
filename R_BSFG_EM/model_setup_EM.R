@@ -1,8 +1,8 @@
 
-# setwd("~/Runcie Lab/SparseFactorMixedModel/R_BSFG")
+# setwd(~/Runcie Lab/SparseFactorMixedModel/R_BSFG)
 model_path = '~/Box Sync/DER_projects/BSFG/R_BSFG_EM'
-#model_path = "../SparseFactorMixedModel/R_BSFG"
-# model_path = "~/Runcie Lab/SparseFactorMixedModel/R_BSFG_EM"
+#model_path = ../SparseFactorMixedModel/R_BSFG
+# model_path = ~/Runcie Lab/SparseFactorMixedModel/R_BSFG_EM
 source(paste(model_path,'fast_BSFG_sampler_init.R',sep='/'))
 source(paste(model_path,'fast_BSFG_EM_sampler.R',sep='/'))
 source(paste(model_path,'BSFG_EM_functions.R',sep='/'))
@@ -42,7 +42,7 @@ run_parameters = list(
     draw_iter = 200
     )
 
-#load("./priors.RData")
+#load(./priors.RData)
 priors = list(
     k_init              =   20,
     resid_Y_prec_shape  =   2,
@@ -63,7 +63,7 @@ print('Initializing')
 save(priors,file = 'Priors.RData')
 # Initialize Chain, prep runs
 BSFG_state = fast_BSFG_sampler_init(priors,run_parameters)
-save(BSFG_state,file="BSFG_state.RData")
+save(BSFG_state,file=BSFG_state.RData)
 
 #BSFG_state = clear_Posterior(BSFG_state)
 
@@ -92,21 +92,21 @@ for(i  in 1:50) {
 
 
 ## function only for plotting
-load("BSFG_state.RData")
+load(BSFG_state.RData)
 plot_diagnostics(BSFG_state)
 
 #fixed lambda
-#load("BSFG_state.RData")
+#load(BSFG_state.RData)
 #priors = BSFG_state$priors
-BSFG_state = fast_BSFG_sampler_init_fixedlambda(priors,run_parameters,YNew="setup_LineCode1.RData",YOld="setup_LineCode1.RData")
+BSFG_state = fast_BSFG_sampler_init_fixedlambda(priors,run_parameters,YNew=setup_LineCode1.RData,YOld=setup_LineCode1.RData)
 
-load("BSFG_fixedlambda.RData")
+load(BSFG_fixedlambda.RData)
 BSFG_state = fast_BSFG_sampler_fixedlambda(BSFG_state)
 
 
 
 
-ComparingGMatrix_plot("F_h2")
+ComparingGMatrix_plot(F_h2)
 
 
 

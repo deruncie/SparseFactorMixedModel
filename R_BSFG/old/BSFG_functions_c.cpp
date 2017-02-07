@@ -1,5 +1,5 @@
 # include <RcppArmadillo.h>
-// [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::depends("RcppArmadillo")]]
 
 // Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
 
@@ -36,15 +36,15 @@ List GSVD_2_c(mat A, mat B){
 	mat S = diagmat(1/norm_factor);
 	mat X = sweep_times(B.t() * V,2,norm_factor);
 
-	return(List::create(_[U]=U,_[V]=V,_[X]=X,_[C]=C,_[S]=S));
+	return(List::create(_["U"]=U,_["V"]=V,_["X"]=X,_["C"]=C,_["S"]=S));
 }
 
 // [[Rcpp::export()]]
-mat maximize_means_c(mat Y_tilde,
+mat sample_means_c(mat Y_tilde,
 				   vec resid_Y_prec,
 				   vec E_a_prec,
 				   List invert_aPXA_bDesignDesignT ) {
-	// when used to maximize [B;E_a]:
+	// when used to sample [B;E_a]:
 	//  W - F*Lambda' = X*B + Z_1*E_a + E, vec(E)~N(0,kron(Psi_E,In)). 
 	//  Note: conditioning on F, Lambda and W.
 	// The vector [b_j;E_{a_j}] is sampled simultaneously. Each trait is sampled separately because their
@@ -53,39 +53,44 @@ mat maximize_means_c(mat Y_tilde,
 	// inv(a*blkdiag(fixed_effects_prec*eye(b),Ainv) + b*[X Z_1]'[X Z_1]) = U*diag(1./(a.*s1+b.*s2))*U'
 	// Design_U = [X Z_1]*U, which doesn't change each iteration. 
 	
-	mat U = as<mat>(invert_aPXA_bDesignDesignT[U]);
-	vec s1 = as<vec>(invert_aPXA_bDesignDesignT[s1]);
-	vec s2 = as<vec>(invert_aPXA_bDesignDesignT[s2]);
-	mat Design_U = as<mat>(invert_aPXA_bDesignDesignT[Design_U]);
+	mat U = as<mat>(invert_aPXA_bDesignDesignT["U"]);
+	vec s1 = as<vec>(invert_aPXA_bDesignDesignT["s1"]);
+	vec s2 = as<vec>(invert_aPXA_bDesignDesignT["s2"]);
+	mat Design_U = as<mat>(invert_aPXA_bDesignDesignT["Design_U"]);
 
 	// int n = Y_tilde.n_rows;
 	int p = Y_tilde.n_cols;
 	int br = Design_U.n_cols;
 
 	mat means = sweep_times(Design_U.t() * Y_tilde,2,resid_Y_prec);
-	mat location_maximum = zeros(br,p);
+	mat location_sample = zeros(br,p);
 
+	mat Zlams = randn(br,p);	
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
+	// vec z = as<vec>(rnorm(br*p));
+	// mat Zlams = reshape(z,br,p);
 
 	vec d, mlam;
 	for(int j =0; j<p; j++) {
 		d = s1*E_a_prec(j) + s2*resid_Y_prec(j);
 		mlam = means.col(j) /d;
-		location_maximum.col(j) = U * mlam;
+		location_sample.col(j) = U * (mlam + Zlams.col(j)/sqrt(d));
 	}
 
-	return(location_maximum);
+	return(location_sample);
 }
 
 
 // [[Rcpp::export()]]
-mat maximize_Lambda_c(mat Y_tilde,
+mat sample_Lambda_c(mat Y_tilde,
 					mat F,
 					vec resid_Y_prec,
 					vec E_a_prec,
 					mat Plam,
 					List invert_aI_bZAZ ){
 	
-	// Maximize factor loadings Lambda while marginalizing over residual
+	// Sample factor loadings Lambda while marginalizing over residual
 	// genetic effects: Y - Z_2W = F*Lambda' + E, vec(E)~N(0,kron(Psi_E,In) + kron(Psi_U, ZAZ^T))
 	// note: conditioning on F, but marginalizing over E_a.
 	// sampling is done separately by trait because each column of Lambda is
@@ -96,21 +101,21 @@ mat maximize_Lambda_c(mat Y_tilde,
 	int p = resid_Y_prec.n_elem;
 	int k = F.n_cols;
 
-	mat U = as<mat>(invert_aI_bZAZ[U]);
-	vec s = as<vec>(invert_aI_bZAZ[s]);
+	mat U = as<mat>(invert_aI_bZAZ["U"]);
+	vec s = as<vec>(invert_aI_bZAZ["s"]);
 
 	mat FtU = F.t() * U;
 	mat UtY = U.t() * Y_tilde;
 
-	// mat Zlams = randn(k,p);	
-	// Environment stats(package:stats);
-	// Function rnorm = stats[rnorm];
+	mat Zlams = randn(k,p);	
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
 	// vec z = as<vec>(rnorm(k*p));
 	// mat Zlams = reshape(z,k,p);
 	mat Lambda = zeros(p,k);
 
 	mat FUDi, Qlam, Llam_t,Plam_row;
-	vec means,vlam,mlam; //,ylam,Zcol;
+	vec means,vlam,mlam,ylam,Zcol;
 	for(int j =0; j<p; j++){
 		FUDi = E_a_prec(j) * sweep_times(FtU, 2,1/(s + E_a_prec(j)/resid_Y_prec(j)));
 		means = FUDi * UtY.col(j);
@@ -119,10 +124,10 @@ mat maximize_Lambda_c(mat Y_tilde,
 		Llam_t = chol(Qlam);
 		vlam = solve(Llam_t.t(),means);
 		mlam = solve(Llam_t,vlam);
-		// Zcol = Zlams.col(j);
-		// ylam = solve(Llam_t,Zcol);
+		Zcol = Zlams.col(j);
+		ylam = solve(Llam_t,Zcol);
 
-		Lambda.row(j) = mlam.t();
+		Lambda.row(j) = ylam.t() + mlam.t();
 
 	}
 
@@ -130,13 +135,13 @@ mat maximize_Lambda_c(mat Y_tilde,
 }
 
 // [[Rcpp::export()]]
-mat maximize_factors_scores_c(mat Y_tilde,
+mat sample_factors_scores_c(mat Y_tilde,
 							mat Z_1,
 							mat Lambda,
 							vec resid_Y_prec,
 							mat F_a,
 							vec F_h2 ) {
-//Maximize factor scores given factor loadings (F_a), factor heritabilities (F_h2) and
+//Sample factor scores given factor loadings (F_a), factor heritabilities (F_h2) and
 //phenotype residuals
 
 	mat Lmsg = sweep_times(Lambda,1,resid_Y_prec);
@@ -146,19 +151,19 @@ mat maximize_factors_scores_c(mat Y_tilde,
 
 	mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(Z_1 * F_a,2,tau_e))));
 
-	// mat Zlams = randn(Meta.n_rows,Meta.n_cols);	
-	// Environment stats(package:stats);
-	// Function rnorm = stats[rnorm];
+	mat Zlams = randn(Meta.n_rows,Meta.n_cols);	
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
 	// vec z = as<vec>(rnorm(Meta.n_rows*Meta.n_cols));
 	// mat Zlams = reshape(z,Meta.n_rows,Meta.n_cols);
 
-	mat F = trans(solve(S,trans(Meta)));
+	mat F = trans(solve(S,trans(Meta + Zlams)));
 
 	return(F);
 }
 
 // [[Rcpp::export()]]
-mat maximize_px_factors_scores_c(mat Y_tilde,
+mat sample_px_factors_scores_c(mat Y_tilde,
 							mat Z_1,
 							mat Lambda_px,
 							vec resid_Y_prec,
@@ -176,19 +181,19 @@ mat maximize_px_factors_scores_c(mat Y_tilde,
 
 	mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(Z_1 * F_a_px,2,tau_e))));
 
-	// mat Zlams = randn(Meta.n_rows,Meta.n_cols);	
-	// Environment stats(package:stats);
-	// Function rnorm = stats[rnorm];
+	mat Zlams = randn(Meta.n_rows,Meta.n_cols);	
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
 	// vec z = as<vec>(rnorm(Meta.n_rows*Meta.n_cols));
 	// mat Zlams = reshape(z,Meta.n_rows,Meta.n_cols);
 
-	mat F_px = trans(solve(S,trans(Meta)));
+	mat F_px = trans(solve(S,trans(Meta + Zlams)));
 
 	return(F_px);
 }
 
 // [[Rcpp::export()]]
-vec maximize_h2s_discrete_c (mat F,
+vec sample_h2s_discrete_c (mat F,
 						int h2_divisions,
 						vec h2_priors,
 						List invert_aI_bZAZ){
@@ -198,8 +203,8 @@ vec maximize_h2s_discrete_c (mat F,
 	// uses invert_aI_bZAZ.U and invert_aI_bZAZ.s to not have to invert aI + bZAZ
 	// each iteration.
 
-	mat U = as<mat>(invert_aI_bZAZ[U]);
-	vec s = as<vec>(invert_aI_bZAZ[s]);
+	mat U = as<mat>(invert_aI_bZAZ["U"]);
+	vec s = as<vec>(invert_aI_bZAZ["s"]);
 
 	int k = F.n_cols;
 	vec F_h2 = zeros(k);
@@ -224,16 +229,16 @@ vec maximize_h2s_discrete_c (mat F,
 		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
 		mat ps_j = exp(log_ps.row(j) - norm_factor);
 		log_ps.row(j) = ps_j;
-		// vec r = randu(1);
-		uvec selected = sort_index(ps_j,descend);
-		F_h2(j) = double(selected(0))/(h2_divisions);
+		vec r = randu(1);
+		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
+		F_h2(j) = double(selected.n_elem)/(h2_divisions);
 	}
 
 	return(F_h2);
 }
 
 // [[Rcpp::export()]]
-vec maximize_prec_discrete_conditional_c(mat Y,
+vec sample_prec_discrete_conditional_c(mat Y,
 									   int h2_divisions,
 									   vec h2_priors,
 									   List invert_aI_bZAZ,
@@ -247,8 +252,8 @@ vec maximize_prec_discrete_conditional_c(mat Y,
 	//each iteration.
 	//ident_prec is a in the above equation.
 
-	mat U = as<mat>(invert_aI_bZAZ[U]);
-	vec s = as<vec>(invert_aI_bZAZ[s]);
+	mat U = as<mat>(invert_aI_bZAZ["U"]);
+	vec s = as<vec>(invert_aI_bZAZ["s"]);
 
 	int p = Y.n_cols;
 	int n = Y.n_rows;
@@ -274,9 +279,9 @@ vec maximize_prec_discrete_conditional_c(mat Y,
 		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
 		mat ps_j = exp(log_ps.row(j) - norm_factor);
 		log_ps.row(j) = ps_j;
-		// vec r = randu(1);
-		uvec selected = sort_index(ps_j,descend);
-		Trait_h2(j) = double(selected(0))/(h2_divisions);
+		vec r = randu(1);
+		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
+		Trait_h2(j) = double(selected.n_elem)/(h2_divisions);
 	}
 	vec Prec = (res_prec % (1-Trait_h2))/Trait_h2;
 
@@ -285,11 +290,11 @@ vec maximize_prec_discrete_conditional_c(mat Y,
 
 
 // [[Rcpp::export()]]
-mat maximize_F_a_c (mat F,
+mat sample_F_a_c (mat F,
 				mat Z_1,
 				vec F_h2,
 				List invert_aZZt_Ainv) {
-	//maximizes genetic effects on factors (F_a) conditional on the factor scores F:
+	//samples genetic effects on factors (F_a) conditional on the factor scores F:
 	// F_i = F_{a_i} + E_i, E_i~N(0,s2*(1-h2)*I) for each latent trait i
 	// U_i = zeros(r,1) if h2_i = 0
 	// it is assumed that s2 = 1 because this scaling factor is absorbed in
@@ -297,9 +302,9 @@ mat maximize_F_a_c (mat F,
 	// invert_aZZt_Ainv has parameters to diagonalize a*Z_1*Z_1' + b*I for fast
 	// inversion:
 
-	mat U = as<mat>(invert_aZZt_Ainv[U]);
-	vec s1 = as<vec>(invert_aZZt_Ainv[s1]);
-	vec s2 = as<vec>(invert_aZZt_Ainv[s2]);
+	mat U = as<mat>(invert_aZZt_Ainv["U"]);
+	vec s1 = as<vec>(invert_aZZt_Ainv["s1"]);
+	vec s2 = as<vec>(invert_aZZt_Ainv["s2"]);
 
 	int k = F.n_cols;
 	int r = Z_1.n_cols;
@@ -307,9 +312,9 @@ mat maximize_F_a_c (mat F,
 	vec tau_u = 1/F_h2;
 	mat b = U.t() * Z_1.t() * sweep_times(F,2,tau_e);
 
-	// mat z = randn(r,k);
-	// Environment stats(package:stats);
-	// Function rnorm = stats[rnorm];
+	mat z = randn(r,k);
+	// Environment stats("package:stats");
+	// Function rnorm = stats["rnorm"];
 	// vec z_v = as<vec>(rnorm(r*k));
 	// mat z = reshape(z_v,r,k);
 
@@ -323,7 +328,7 @@ mat maximize_F_a_c (mat F,
 		} else {
 			vec d = s2*tau_u(j) + s1*tau_e(j);
 			vec mlam = b.col(j) / d;
-			F_a.col(j) = U * (mlam);
+			F_a.col(j) = U * (mlam + z.col(j)/sqrt(d));
 		}
 		if(tau_e(j) == 1) {
 		   //  disp(F_a.col(j))

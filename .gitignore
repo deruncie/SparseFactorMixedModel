@@ -1,3 +1,7 @@
 rep*
 R_rep*
 sourceCpp*
+.Rproj.user
+*.o
+*.so
+.Rhistory

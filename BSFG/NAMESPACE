@@ -1,0 +1,7 @@
+exportPattern("^[[:alpha:]]+")
+importFrom(Rcpp, evalCpp)
+importFrom(RcppParallel, RcppParallelLibs)
+import(Matrix)
+importFrom(parallel,mclapply)
+importFrom(abind,abind)
+useDynLib(BSFG)

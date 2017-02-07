@@ -339,8 +339,8 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				Plam = sweep(Lambda_prec,2,tauh,'*')
 				Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
 				if(exists('F_a_prec')){
-					F_a_prec[i] = rgamma(1, shape = F_a_prec_shape, rate = F_a_prec_rate)
-					F_e_prec[i] = rgamma(1, shape = F_e_prec_shape, rate = F_e_prec_rate)
+					F_a_prec[k] = rgamma(1, shape = F_a_prec_shape, rate = F_a_prec_rate)
+					F_e_prec[k] = rgamma(1, shape = F_e_prec_shape, rate = F_e_prec_rate)
 					F_h2 = F_e_prec / (F_e_prec + F_a_prec)
 				} else{
 					F_h2[k] = runif(1)
@@ -349,6 +349,10 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				F = cbind(F,rnorm(n,Z_1 %*% F_a[,k],sqrt(1-F_h2[k])))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
+				while(length(nonred) < 2) {
+					nonred = c(nonred,which(vec != 0)[1])
+					vec[nonred[length(nonred)]] = 0
+				} 
 				k = length(nonred)
 				Lambda = Lambda[,nonred]
 				Lambda_prec = Lambda_prec[,nonred]
@@ -592,11 +596,12 @@ reorder_factors = function(BSFG_state){
 
 	reorder_params = c('Lambda','Lambda_prec','Plam',
 						'delta','tauh',
-						'F','F_a','F_h2'
+						'F','F_a','F_h2','F_a_prec','F_e_prec','tot_F_prec'
 						)
 
 	# reorder currrent state
 	for(param in reorder_params){
+		if(! param %in% names(current_state)) next
 		if(is.null(dim(current_state[[param]]))){
 			current_state[[param]] = current_state[[param]][factor_order]
 		} else if(dim(current_state[[param]])[2] == 1) {
@@ -610,8 +615,9 @@ reorder_factors = function(BSFG_state){
 
 	# reorder Posterior
 	Posterior = BSFG_state$Posterior
+	if(ncol(Posterior$Lambda) == 0) return(BSFG_state)
 
-	p = BSFG_state$run_parameters$setup$p
+	p = nrow(Lambda)
 	k = dim(Posterior$Lambda)[1]/p
 	if(length(factor_order) < k) factor_order = c(factor_order,seq(length(factor_order)+1,k))
 	
