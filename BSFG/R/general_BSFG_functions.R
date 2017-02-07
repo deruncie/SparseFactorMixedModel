@@ -1,4 +1,4 @@
-sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec) {
+sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec,randn_theta = NULL, randn_e = NULL) {
 	# R is aZAZ + bI
 	# 	 then form chol_R
 	# 	 checkh whether solve(t(chol_Rinv),theta) or chol_R %*% theta is better.
@@ -6,8 +6,14 @@ sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Chole
 	# prior_prec must be > 0
 	n = length(y)
 	n_theta = length(prior_prec)
-	theta_star = prior_mean + rnorm(n_theta)/sqrt(prior_prec)
-	e_star = (chol_R) %*% rnorm(n) / sqrt(tot_Y_prec)
+	if(is.null(randn_theta)) {
+	  randn_theta = rnorm(n_theta)
+	}
+	if(is.null(randn_e)) {
+	  randn_e = rnorm(n)
+	}
+	theta_star = prior_mean + randn_theta/sqrt(prior_prec)
+	e_star = (chol_R) %*% randn_e / sqrt(tot_Y_prec)
 	W_theta_star = W %*% theta_star
 	y_resid = y - W_theta_star - e_star@x
 	if(!is.null(R_Perm)) {
@@ -25,13 +31,18 @@ sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Chole
 }
 sample_MME_single_diagA = compiler::cmpfun(sample_MME_single_diagA)
 
-sample_MME_multiple_diagR = function(Y,W,Cholesky_C,pe,chol_A_inv,tot_Y_prec){
+sample_MME_multiple_diagR = function(Y,W,Cholesky_C,pe,chol_A_inv,tot_Y_prec, randn_theta = NULL, randn_e = NULL){
 	n = nrow(Y)
 	p = ncol(Y)
 	n_theta = nrow(chol_A_inv)
-	theta_star = solve(chol_A_inv,matrix(rnorm(n_theta*p),ncol = p))
-	# theta_star = matrix(theta_star@x,ncol = p) + prior_mean
-	e_star = matrix(rnorm(n*p)/sqrt(pe),ncol = p,byrow=T)
+	if(is.null(randn_theta)) {
+	  randn_theta = matrix(rnorm(n_theta*p),ncol = p)
+	}
+	if(is.null(randn_e)) {
+	  randn_e = matrix(rnorm(n*p), ncol = p)
+	}
+	theta_star = solve(chol_A_inv,randn_theta)
+	e_star = sweep(randn_e,2,sqrt(pe),'/')
 	W_theta_star = W %*% theta_star
 	Y_resid = Y - W_theta_star@x - e_star
 	WtRiy = crossprod(W,sweep(Y_resid,2,pe,'*'))
@@ -45,7 +56,6 @@ sample_MME_multiple_diagR = function(Y,W,Cholesky_C,pe,chol_A_inv,tot_Y_prec){
 sample_MME_multiple_diagR = compiler::cmpfun(sample_MME_multiple_diagR)
 
 sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, tot_Y_prec, prior_mean, prior_prec,ncores){
-	require(parallel)
 	# using method described in MCMC Course notes
 	p = ncol(Y)
 	n = nrow(Y)
@@ -57,13 +67,18 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, t
 		Yp = Sigma_Perm %*% Y
 		Yp = matrix(Yp,nrow(Y))
 	}
+
+	# pre-sample z-scores because draws from parallel processes not consecutive
+	randn_theta = matrix(rnorm(b*p),ncol = p)
+	randn_e = matrix(rnorm(n*p),ncol = p)
+
 	res = mclapply(1:p,function(j) {
 		Cholesky_R = Sigma_Choleskys[[h2s_index[j]]]$Cholesky_Sigma
 		chol_R = Sigma_Choleskys[[h2s_index[j]]]$chol_Sigma
 		RinvSqW = solve(Cholesky_R,Wp,'L')
 		C = crossprod(RinvSqW) * tot_Y_prec[j]
 		diag(C) = diag(C) + prior_prec[,j]
-		theta_j = sample_MME_single_diagA(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j])
+		theta_j = sample_MME_single_diagA(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j], randn_theta[,j],randn_e[,j])
 		theta_j
 	},mc.cores = ncores)
 	res = do.call(cbind,res)
@@ -73,20 +88,23 @@ sample_MME_fixedEffects = compiler::cmpfun(sample_MME_fixedEffects)
 
 sample_MME_ZAZts = function(Y, W, tot_Y_prec, randomEffect_C_Choleskys, h2s, h2s_index, chol_Ai_mats,ncores){
 	# using method described in MCMC Course notes
-	require(parallel)
 	Y = as.matrix(Y)
 	p = ncol(Y)
 	n = nrow(Y)
 	b = ncol(W)
 	pes = tot_Y_prec / (1-colSums(h2s))
 
+	# pre-sample z-scores because draws from parallel processes not consecutive
+	randn_theta = matrix(rnorm(b*p),ncol = p)
+	randn_e = matrix(rnorm(n*p),ncol = p)
+
 	unique_h2s = unique(h2s_index)
-	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))	
+	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))
 	thetas = mclapply(seq_along(unique_h2s),function(j){
 		Cholesky_C = randomEffect_C_Choleskys[[unique_h2s[j]]]$Cholesky_C
 		chol_A_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_A_inv * sqrt(tot_Y_prec[j])
 		traits_j = unique_h2s_index[[j]]
-		sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_A_inv,tot_Y_prec[traits_j])		
+		sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_A_inv,tot_Y_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
 	},mc.cores = ncores)
 	theta = do.call(cbind,thetas)
 	theta = theta[,order(unlist(unique_h2s_index))]
@@ -104,7 +122,7 @@ sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys
 		Yp = matrix(Yp,nrow(Y))
 	}
 	unique_h2s = unique(h2s_index)
-	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))	
+	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))
 	scores = mclapply(seq_along(unique_h2s),function(j){
 		h2_index = unique_h2s[j]
 		Cholesky_Sigma = Sigma_Choleskys[[unique_h2s[j]]]$Cholesky_Sigma
@@ -139,6 +157,9 @@ sample_h2s_discrete_MH = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discr
 		Yp = matrix(Yp,nrow(Y))
 	}
 
+	# sample runif(p,0,1) before because parallel RNGs aren't consecutive.
+	r_draws = runif(p)
+
 	h2s_index = mclapply(1:p,function(j) {
 			## steps:
 			# 1) calculate log_prob at current state
@@ -164,13 +185,13 @@ sample_h2s_discrete_MH = function(Y,tot_Y_prec, Sigma_Choleskys,Sigma_Perm,discr
 
 			log_MH_ratio = new_log_p - old_log_p + log(forward_prob) - log(back_prob)
 
-			if(log(runif(1)) < log_MH_ratio) {
+			if(log(r_draws[j]) < log_MH_ratio) {
 				return(proposed_state)
 			} else {
 				return(old_state)
 			}
 	},mc.cores = ncores)
-	do.call(c,h2s_index) 
+	do.call(c,h2s_index)
 }
 sample_h2s_discrete_MH = compiler::cmpfun(sample_h2s_discrete_MH)
 

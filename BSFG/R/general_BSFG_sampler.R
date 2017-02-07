@@ -1,5 +1,4 @@
-BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores()) {
-	require(parallel)
+general_BSFG_sampler = function(BSFG_state,n_samples,ncores = detectCores()) {
 	data_matrices  = BSFG_state$data_matrices
 	params         = BSFG_state$params
 	priors         = BSFG_state$priors
@@ -26,7 +25,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 	# ----------------------------------------------- #
 	# ---Extend posterior matrices for new samples--- #
 	# ----------------------------------------------- #
-	
+
 	sp = (start_i + n_samples - burn)/thin - dim(Posterior[[Posterior$sample_params[1]]])[3]
 	Posterior = expand_Posterior(Posterior,max(0,sp))
 
@@ -51,7 +50,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 				resids = matrix(rnorm(p*n,0,sqrt((1-colSums(resid_h2))/tot_Y_prec)),nr = n,nc = p,byrow=T)
 				Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
 			}
-			  
+
 		 # -----Sample Lambda and B ------------------ #
 			#conditioning on W, F, marginalizing over random effects (conditional on resid_h2)
 			Design = cbind(X,F)
@@ -71,7 +70,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 		 # # -----Sample delta, update tauh------ #
 			delta = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
 			tauh  = matrix(cumprod(delta),nrow=1)
-			
+
 		 # # -----Update Plam-------------------- #
 			Plam = sweep(Lambda_prec,2,tauh,'*')
 
@@ -84,7 +83,7 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 			E_a_prec = tot_Y_prec / colSums(resid_h2)
 
 			E_a = sample_MME_ZAZts(Y_tilde, Z, tot_Y_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
-			
+
 		 # -----Sample tot_F_prec, F_h2, F_a ---------------- #
 			#conditioning on B, F, Lambda, F_h2, tot_F_prec
 
@@ -109,10 +108,10 @@ BSFG_discreteRandom_sampler = function(BSFG_state,n_samples,ncores = detectCores
 
 	 # -- save sampled values (after thinning) -- #
 		if( (i-burn) %% thin == 0 && i > burn) {
-				
+
 			sp_num = (i-burn)/thin
-			
-			Posterior = save_posterior_samples( sp_num,current_state, Posterior)			
+
+			Posterior = save_posterior_samples( sp_num,current_state, Posterior)
 		}
 	}
 	end_time = Sys.time()

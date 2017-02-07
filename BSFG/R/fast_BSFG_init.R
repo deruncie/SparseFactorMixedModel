@@ -1,10 +1,9 @@
-fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL, 
+fast_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
                                     fixed_Factors = NULL, scaleY = TRUE,
                                     simulation = F,setup = NULL,verbose=T){
-	require(Matrix)
 
 	# data_matrices,run_parameters,priors,current_state,Posterior,simulation = F)
-#   Preps everything for an analysis with the function MA_sampler. 
+#   Preps everything for an analysis with the function MA_sampler.
 #       Loads data from setup.mat
 #       Decides if the data is from a simulation
 #       Uses prior to find initial values for all parameters
@@ -58,7 +57,7 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
     # build Z for random effect
     RE_name = rownames(attr(terms(random),'factors'))[1]
     Z = Matrix(model.matrix(formula(sprintf('~0 + %s',RE_name)),data),sparse = TRUE)
-    Z = Z[,paste0(RE_name,levels(data[[RE_name]]))]    
+    Z = Z[,paste0(RE_name,levels(data[[RE_name]]))]
     r = ncol(Z)
 
     if(is.null(A_mats)) {
@@ -80,11 +79,11 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
             Y_missing = Y_missing,
             A         = A,
             h2s_matrix  = h2s_matrix
-    		)        
+    		)
 
 # ----------------------------- #
 # ----- re-formulate priors --- #
-# ----------------------------- # 
+# ----------------------------- #
     priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
     priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
     priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
@@ -97,27 +96,27 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
 
 # ----------------------------- #
 # -----Initialize variables---- #
-# ----------------------------- # 
+# ----------------------------- #
 
    # --- transcript-level model
-    # p-vector of gene precisions after taking removing effect of factors. 
+    # p-vector of gene precisions after taking removing effect of factors.
 	#  Prior: Gamma distribution for each element
     #       shape = tot_Y_prec_shape
     #       rate = tot_Y_prec_rate
     tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
-   
+
     # Factors:
     #  initial number of factors
     k = run_parameters$k_init
 
     # Factor loading precisions (except column penalty tauh).
-	 #  Prior: Gamma distribution for each element. 
+	 #  Prior: Gamma distribution for each element.
      #       shape = Lambda_df/2
      #       rate = Lambda_df/2
      #    Marginilizes to t-distribution with Lambda_df degrees of freedom
      #    on each factor loading, conditional on tauh
     Lambda_prec = with(priors,matrix(rgamma(p*k,shape = Lambda_df/2,rate = Lambda_df/2),nr = p,nc = k))
-    
+
     # Factor penalty. tauh(h) = \prod_{i=1}^h \delta_i
 	 #  Prior: Gamma distribution for each element of delta
      #     delta_1:
@@ -128,49 +127,49 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
      #       rate = delta_2_rate
     delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
     tauh  = matrix(cumprod(delta),nrow=1)
-    
+
     # Total Factor loading precisions Lambda_prec * tauh
     Plam = sweep(Lambda_prec,2,tauh,'*')
-    
+
     # Lambda - factor loadings
      #   Prior: Normal distribution for each element.
      #       mu = 0
      #       sd = sqrt(1/Plam)
     Lambda = matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
 
-    # p-vector of heritabilities for residuals on factors. 
+    # p-vector of heritabilities for residuals on factors.
 	#  Prior: discrete prior on interval [0,1)
     # h2s = with(run_parameters,seq(0,1,length = h2_divisions+1)[1:h2_divisions])
-    # resid_h2 = with(priors,sample(h2s,p,prob = h2_priors_resids, replace = T))    
+    # resid_h2 = with(priors,sample(h2s,p,prob = h2_priors_resids, replace = T))
     resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
     resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
-    
+
     # Genetic effects not accounted for by factors.
     #   Prior: Normal distribution on each element.
     #       mean = 0
     #       sd = 1./sqrt(E_a_prec)' on each row
     E_a = matrix(rnorm(p*r,0,sqrt(resid_h2 * tot_Y_prec)),nr = r,nc = p, byrow = T)
-        
+
     # Latent factor variances
     tot_F_prec = with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
 
     F_h2_index = sample(1:ncol(h2s_matrix),k,replace=T)
     F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
     # F_h2 = with(priors,sample(h2s,k,prob = h2_priors_factors, replace = T))
-        
+
     # Genetic effects on the factor scores.
 	#  Prior: Normal distribution for each element
     #       mean = 0
     #       sd = sqrt(F_h2') for each row.
     F_a = matrix(rnorm(k*r,0,sqrt(F_h2)),nr = r,nc = k, byrow = T)
-    
+
     # Full Factor scores. Combination of genetic and residual variation on
     # each factor.
 	#  Prior: Normal distribution for each element
     #       mean = Z   * F_a
     #       sd = sqrt(1-F_h2') for each row.
     F = as.matrix(Z   %*% F_a + matrix(rnorm(k*n,0,sqrt(1-F_h2)),nr = n,nc = k, byrow = T))
-    
+
     # Fixed effect coefficients.
 	#  Prior: Normal distribution for each element
     #       mean = 0
@@ -210,7 +209,7 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
         per_trait_params = c('tot_Y_prec','resid_h2')
     )
     Posterior = initialize_Posterior(Posterior,current_state)
-    
+
 # ------------------------------------ #
 # ----Precalculate some matrices------ #
 # ------------------------------------ #
@@ -226,16 +225,16 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
     #rank
 #     XZ = [X_f Z  ]
 #     [U,S,~]          = svd(XZ*blkdiag(1e6*eye(b_f),A)*XZ')
-    
+
     result = svd(Z %*% A %*% t(Z))
     invert_aI_bZAZ = list(
         U = Matrix(result$u),
         s = result$d
     )
-   
+
     #genetic effect variances of factor traits
     # diagonalizing a*Z  '*Z   + b*Ainv for fast inversion
-    #diagonalize mixed model equations for fast inversion: 
+    #diagonalize mixed model equations for fast inversion:
     # inv(a*Z  '*Z   + b*Ainv) = U*diag(1./(a.*s1+b.*s2))*U'
     #similar to fixed effects + random effects 1 above, but no fixed effects.
     ZZt = crossprod(Z)
@@ -248,7 +247,7 @@ fast_BSFG_ipx_sampler_init = function(Y, fixed, random, data, priors, run_parame
 			s1 = diag(result$C)^2,
 			s2 = diag(result$S)^2
 		)
-    
+
     # require(geigen)
     # result = gsvd(as.matrix(chol(ZZt)),as.matrix(chol(Ainv)))
 

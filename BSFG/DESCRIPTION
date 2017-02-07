@@ -1,0 +1,31 @@
+Package: BSFG
+Type: Package
+Title: Bayesian Sparse Factor Analysis of Mixed Models
+Version: 0.1.0
+Author: Daniel E Runcie
+Maintainer: Daniel E Runcie <druncie@ucdavis.edu>
+Description: Efficient implementation the Bayesian Sparse Factor Mixed effects model, based on the 
+    model described by Runcie and Mukherjee (2013) Genetics.
+    This package implements an improved Gibbs sampling algorithm relative to the one described in 
+    the manuscript, and adds the ability to model multiple random effects efficiently - 
+    both for the factors and the residuals.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Imports: 
+  Rcpp (>= 0.12.9),
+  RcppArmadillo,
+  RcppParallel,
+  Matrix,
+  parallel,
+  abind,
+  compiler
+Suggests:
+  R.matlab,
+  MCMCpack
+LinkingTo: 
+  Rcpp,
+  RcppArmadillo,
+  RcppParallel
+SystemRequirements: GNU make
+RoxygenNote: 6.0.0

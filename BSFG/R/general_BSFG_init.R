@@ -1,13 +1,10 @@
-BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL, 
+general_BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
 									fixed_Factors = NULL, scaleY = TRUE,
 									ncores = detectCores(),simulation = F,setup = NULL,verbose=T){
-	require(Matrix)
-	require(parallel)
-
-    run_parameters$verbose = verbose
-    run_parameters$setup = setup
-    run_parameters$name = setup$name
-    run_parameters$simulation = simulation
+  run_parameters$verbose = verbose
+  run_parameters$setup = setup
+  run_parameters$name = setup$name
+  run_parameters$simulation = simulation
 
 	# model dimensions
 	n = nrow(Y)
@@ -60,7 +57,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 
 # ----------------------------- #
 # ----- re-formulate priors --- #
-# ----------------------------- # 
+# ----------------------------- #
 	priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
 	priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
 	priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
@@ -72,20 +69,20 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 
 # ----------------------------- #
 # -----Initialize variables---- #
-# ----------------------------- # 
+# ----------------------------- #
 
   # Factors loadings:
      #  initial number of factors
     k = run_parameters$k_init
 
     # Factor loading precisions (except column penalty tauh).
-	 #  Prior: Gamma distribution for each element. 
+	 #  Prior: Gamma distribution for each element.
      #       shape = Lambda_df/2
      #       rate = Lambda_df/2
      #    Marginilizes to t-distribution with Lambda_df degrees of freedom
      #    on each factor loading, conditional on tauh
     Lambda_prec = with(priors,matrix(rgamma(p*k,shape = Lambda_df/2,rate = Lambda_df/2),nr = p,nc = k))
-    
+
     # Factor penalty. tauh(h) = \prod_{i=1}^h \delta_i
 	 #  Prior: Gamma distribution for each element of delta
      #     delta_1:
@@ -96,10 +93,10 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
      #       rate = delta_2_rate
     delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
     tauh  = matrix(cumprod(delta),nrow=1)
-    
+
     # Total Factor loading precisions Lambda_prec * tauh
     Plam = sweep(Lambda_prec,2,tauh,'*')
-    
+
     # Lambda - factor loadings
      #   Prior: Normal distribution for each element.
      #       mu = 0
@@ -107,14 +104,14 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
     Lambda = matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
 
   # Factor scores:
-     # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility 
+     # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
 	 #  Prior: Gamma distribution for each element
      #       shape = tot_F_prec_shape
      #       rate = tot_F_prec_rate
     tot_F_prec = with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
 
     # Factor discrete variances
-     # k-matrix of n_RE x k with 
+     # k-matrix of n_RE x k with
     F_h2_index = sample(1:ncol(h2s_matrix),k,replace=T)
     F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
@@ -131,14 +128,14 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
     F_a = do.call(rbind,F_a)
 
   # residuals
-     # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility 
+     # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
 	 #  Prior: Gamma distribution for each element
      #       shape = tot_Y_prec_shape
      #       rate = tot_Y_prec_rate
     tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
 
     # Resid discrete variances
-     # p-matrix of n_RE x p with 
+     # p-matrix of n_RE x p with
     resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
     resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
 
@@ -172,7 +169,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 		nrun           = 0
     	)
 
-    
+
 # ----------------------- #
 # -Initialize Posterior-- #
 # ----------------------- #
@@ -219,6 +216,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 	chol_Ai_mats = lapply(Ai_mats,chol)
 
 	#C
+	# recover()
 	ZtZ = crossprod(Z)
 	make_Chol_Ai = function(chol_Ai_mats,h2s){
 		do.call(bdiag,lapply(1:length(h2s),function(i) {
@@ -232,7 +230,7 @@ BSFG_discreteRandom_init = function(Y, fixed, random, data, priors, run_paramete
 	Ai = forceSymmetric(crossprod(make_Chol_Ai(chol_Ai_mats,rep(1,n_RE)/(n_RE+1))))
 	Cholesky_C = Cholesky(ZtZ + Ai)
 
-	randomEffect_C_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {    	
+	randomEffect_C_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
 		if(i %% 100 == 0 && verbose) print(sprintf('randomEffects_C %d of %d',i,ncol(h2s_matrix)))
 		h2s = h2s_matrix[,i]
 		chol_A_inv = make_Chol_Ai(chol_Ai_mats,h2s)
