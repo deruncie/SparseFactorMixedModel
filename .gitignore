@@ -4,3 +4,4 @@ sourceCpp*
 .Rproj.user
 *.o
 *.so
+.Rhistory
