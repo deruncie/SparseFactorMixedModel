@@ -1,15 +1,18 @@
-load_simulation_data = function(){
-    if(file.exists('../setup.RData')) {
+load_simulation_data = function(file = NULL){
+    if(is.null(file)){
+      if(file.exists('../setup.RData')) {
         load('../setup.RData')
         for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
-    }
-    else{
-      if (!requireNamespace("R.matlab", quietly = TRUE)) {
-        stop("R.matlab needed to load setup.mat. Please install it.",
-             call. = FALSE)
+      } else{
+        if (!requireNamespace("R.matlab", quietly = TRUE)) {
+          stop("R.matlab needed to load setup.mat. Please install it.",
+               call. = FALSE)
+        }
+        setup = readMat('../setup.mat')
+        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
       }
-      setup = readMat('../setup.mat')
-      for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
+    } else{
+      load(file)
     }
     Y = setup$Y
     A = setup$A

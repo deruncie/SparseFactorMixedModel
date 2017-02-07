@@ -33,7 +33,3 @@ sample_delta_c <- function(delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate
     .Call('BSFG_sample_delta_c', PACKAGE = 'BSFG', delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, Lambda2, times)
 }
 
-rcpp_hello <- function() {
-    .Call('BSFG_rcpp_hello', PACKAGE = 'BSFG')
-}
-
