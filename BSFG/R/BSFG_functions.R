@@ -59,7 +59,8 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				F_h2          = h2s_matrix[,F_h2_index,drop=FALSE]
 				tot_F_prec    = cbind(tot_F_prec,1)
 				F_a           = cbind(F_a,rnorm(r,0,sqrt(sum(F_h2[,k]))))
-				F             = cbind(F,rnorm(n,as.matrix(Z %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
+				B_F           = cbind(B_F,rnorm(b_F,0,1))
+				F             = cbind(F,rnorm(n,as.matrix(X_F %*% B_F + Z %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
 				while(length(nonred) < 2) {
@@ -84,6 +85,7 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				F_h2_index = F_h2_index[nonred]
 				tot_F_prec = tot_F_prec[,nonred,drop=FALSE]
 				F_a = F_a[,nonred,drop=FALSE]
+				B_F = B_F[,nonred,drop=FALSE]
 			}
 		}
 	}))
