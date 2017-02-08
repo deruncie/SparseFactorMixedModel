@@ -32,14 +32,13 @@
 #' @return traitnames: vector of trait names (from colnames of Y)
 #' @return run_parameters, run_variables, data_matrices, priors, simulation
 #'
-BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
-                                    fixed_Factors = NULL, scaleY = TRUE, sampler = 'fast_BSFG',
+BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,sampler = 'fast_BSFG',
                                     ncores = 1,simulation = F,setup = NULL,verbose=T) {
-	# RE_names = rownames(attr(terms(random),'factors'))
 
-	run_parameters$verbose = verbose
-	run_parameters$setup = setup
-	run_parameters$simulation = simulation
+
+  # ----------------------------- #
+  # ---- build model matrices --- #
+  # ----------------------------- #
 
 	# model dimensions
 	n = nrow(Y)
@@ -47,10 +46,10 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	traitnames = colnames(Y)
 
 	# missing data
-	Y_missing = is.na(Y)
+	Y_missing = Matrix(is.na(Y))
 
 	# scale Y
-	if(scaleY){
+	if(run_parameters$scale_Y){
 	  Mean_Y = colMeans(Y,na.rm=T)
 	  VY = apply(Y,2,var,na.rm=T)
 	  Y = sweep(Y,2,Mean_Y,'-')
@@ -61,12 +60,30 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	}
 
 	# build X from fixed model
+	  # for residuals
 	X = model.matrix(fixed,data)
 	b = ncol(X)
+
+	  # for factors.
+	  #   If fixed_factors, then fixed effects are modeled for factors
+	  #     in this case, the prior variance should be modeled
+	  #   If fixed_factors == F, then an empty matrix
+	if(run_parameters$fixed_factors){
+	  X_F = X[,-1,drop=FALSE]
+	} else{
+	  X_F = matrix(0,nr = n, ncol = 0)
+	}
+	b_F = ncol(X_F)
 
 	# build Z matrices from random model
 	RE_names = rownames(attr(terms(random),'factors'))
 	n_RE = length(RE_names)
+
+	if(n_RE > 1 && sampler == 'fast_BSFG'){
+	  print(sprintf('%d random effects. Using "general_BSFG" sampler',length(RE_names)))
+	  sampler = 'general_BSFG'
+	}
+
 	Z_matrices = lapply(RE_names,function(re) {
 	  Z = Matrix(model.matrix(formula(sprintf('~0 + %s',re)),data),sparse = TRUE)
 	  Z[,paste0(re,levels(data[[re]]))]
@@ -76,9 +93,18 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 
 	Z = do.call(cbind,Z_matrices)
 
+	# covariance matrices from random effects
+	#   Three options for each random effect:
+	#     1) pass an A matrix
+	#     2) pass an A_inv matrix (say from a call to inverseA)
+	#     3) NULL (or un-named). Will construct as an identity matrix
+	#     options 1 and 2: the provided matrix must have rows/columns for each individual in data,
+	#       but can have extra rows (and should for A_inv) if ancestors are known
 
+	  # function to ensure that covariance matrices are sparse and symmetric
 	fix_A = function(x) forceSymmetric(drop0(x,tol = 1e-10))
 
+	  # construct A matrices for each random effect
 	A_mats = lapply(RE_names,function(re) {
 	  if(re %in% names(A_mats)) {
 	    A = A_mats[[re]]
@@ -94,6 +120,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	})
 	names(A_mats) = RE_names
 
+	  # construct A_inverse matrices for each random effect
 	Ai_mats = lapply(RE_names,function(re) {
 	  if(re %in% names(A_inv_mats)){
 	    Ai = A_inv_mats[[re]]
@@ -105,9 +132,22 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	  Ai = fix_A(Ai)
 	  Ai
 	})
+	  # cholesky decompositions (L'L) of each A_inverse matrix
 	chol_Ai_mats = lapply(Ai_mats,chol)
 
-	h2s_matrix = expand.grid(lapply(RE_names,function(re) 0:run_parameters$h2_divisions)) / run_parameters$h2_divisions
+	  # table of possible h2s for each random effect
+	  #   These are percentages of the total residual variance accounted for by each random effect
+	  #   Each column is a set of percentages, the sum of which must be less than 1 (so that Ve is > 0)
+	  # can specify different levels of granularity for each random effect
+	h2_divisions = run_parameters$h2_divisions
+	if(length(h2_divisions) < n_RE){
+	  if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
+	  h2_divisions = rep(ceiling(h2_divisions^(1/n_RE)),n_RE)  # evenly divide divisions among random effects
+	}
+	if(is.null(names(h2_divisions))) {
+	  names(h2_divisions) = RE_names
+	}
+	h2s_matrix = expand.grid(lapply(RE_names,function(re) seq(0,1,length = h2_divisions[[re]]+1)))
 	colnames(h2s_matrix) = RE_names
 	h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
 
@@ -115,6 +155,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	  Y          = Y,
 	  Y_missing  = Y_missing,
 	  X          = X,
+	  X_F        = X_F,
 	  Z_matrices = Z_matrices,
 	  Z          = Z,
 	  h2s_matrix = h2s_matrix
@@ -125,6 +166,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	  n      = n,
 	  r_RE   = r_RE,
 	  b      = b,
+	  b_F    = b_F,
 	  Mean_Y = Mean_Y,
 	  VY     = VY
 	)
@@ -133,25 +175,31 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	# ----------------------------- #
 	# ----- re-formulate priors --- #
 	# ----------------------------- #
+	  # fixed effects
+	priors$fixed_prec_shape = with(priors$fixed_var,V * nu)
+	priors$fixed_prec_rate  = with(priors$fixed_var,nu - 2)
+	  # total precision
 	priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
 	priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
 	priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
 	priors$tot_F_prec_rate  = with(priors$tot_F_var,nu - 2)
+	  # delta: column shrinkage of Lambda
 	priors$delta_1_shape    = with(priors$delta_1,V * nu)
 	priors$delta_1_rate     = with(priors$delta_1,nu - 2)
 	priors$delta_2_shape    = with(priors$delta_2,V * nu)
 	priors$delta_2_rate     = with(priors$delta_2,nu - 2)
 
-	if(length(RE_names) > 1){
-	  print(sprintf('%d random effects. Using "general_BSFG" sampler',length(RE_names)))
-	  sampler = 'general_BSFG'
-	}
+
+	# ----------------------------- #
+	# -- create BSFG_state object - #
+	# ----------------------------- #
 
 	BSFG_state = list(
 	  data_matrices  = data_matrices,
 	  priors         = priors,
 	  run_parameters = run_parameters,
 	  run_variables  = run_variables,
+	  setup          = setup,
 	  traitnames     = traitnames
 	)
 	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',sampler))

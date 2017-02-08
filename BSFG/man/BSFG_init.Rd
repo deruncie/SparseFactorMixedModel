@@ -5,9 +5,8 @@
 \title{Initialize a BSFG model}
 \usage{
 BSFG_init(Y, fixed, random, data, priors, run_parameters, A_mats = NULL,
-  A_inv_mats = NULL, fixed_Factors = NULL, scaleY = TRUE,
-  sampler = "fast_BSFG", ncores = 1, simulation = F, setup = NULL,
-  verbose = T)
+  A_inv_mats = NULL, sampler = "fast_BSFG", ncores = 1, simulation = F,
+  setup = NULL, verbose = T)
 }
 \arguments{
 \item{Y}{a n x p matrix of data (n individuals x p traits)}
@@ -31,10 +30,6 @@ for A_inv_mats), assumed to be the identity.}
 \item{A_inv_mats}{list of covariance matrices for random effects. If none provided (and none
 provided for A_mats), assumed to be the identity.}
 
-\item{fixed_Factors}{currently no effect. To be used to specify fixed effect model for factors}
-
-\item{scaleY}{should columns of Y be re-scaled to mean = 0, var = 1?}
-
 \item{sampler}{('fast_BSFG','general_BSFG'). Specifies which Gibbs sampler to use. If more than
 one random effect, defaults to general_BSFG, regardless of this parameter}
 
@@ -45,6 +40,10 @@ one random effect, defaults to general_BSFG, regardless of this parameter}
 \item{setup}{a list of known values for Lambda (error_factor_lambda), h2, factor_h2s}
 
 \item{verbose}{(T,F) should progress in initialization be reported?}
+
+\item{fixed_Factors}{currently no effect. To be used to specify fixed effect model for factors}
+
+\item{scaleY}{should columns of Y be re-scaled to mean = 0, var = 1?}
 }
 \value{
 An object of class BSFG_state with components:

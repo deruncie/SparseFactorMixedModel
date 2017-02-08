@@ -86,18 +86,17 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_factors_scores_sparse_c
-arma::mat sample_factors_scores_sparse_c(arma::mat Y_tilde, arma::sp_mat Z, arma::mat Lambda, arma::vec resid_Y_prec, arma::mat F_a, arma::vec F_e_prec);
-RcppExport SEXP BSFG_sample_factors_scores_sparse_c(SEXP Y_tildeSEXP, SEXP ZSEXP, SEXP LambdaSEXP, SEXP resid_Y_precSEXP, SEXP F_aSEXP, SEXP F_e_precSEXP) {
+arma::mat sample_factors_scores_sparse_c(arma::mat Y_tilde, arma::mat prior_mean, arma::mat Lambda, arma::vec resid_Y_prec, arma::vec F_e_prec);
+RcppExport SEXP BSFG_sample_factors_scores_sparse_c(SEXP Y_tildeSEXP, SEXP prior_meanSEXP, SEXP LambdaSEXP, SEXP resid_Y_precSEXP, SEXP F_e_precSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::mat >::type Y_tilde(Y_tildeSEXP);
-    Rcpp::traits::input_parameter< arma::sp_mat >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type prior_mean(prior_meanSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type Lambda(LambdaSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type resid_Y_prec(resid_Y_precSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type F_a(F_aSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type F_e_prec(F_e_precSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_factors_scores_sparse_c(Y_tilde, Z, Lambda, resid_Y_prec, F_a, F_e_prec));
+    rcpp_result_gen = Rcpp::wrap(sample_factors_scores_sparse_c(Y_tilde, prior_mean, Lambda, resid_Y_prec, F_e_prec));
     return rcpp_result_gen;
 END_RCPP
 }

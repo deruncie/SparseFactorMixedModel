@@ -17,6 +17,7 @@ trace_plot = function(data,main = NULL,ylim = NULL){
 # draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Posterior,Lambda,F_h2,E_a_prec,resid_Y_prec){
 draw_simulation_diagnostics = function(BSFG_state){
     sp_num = dim(BSFG_state$Posterior$Lambda)[3]
+    setup = BSFG_state$setup
     run_parameters = BSFG_state$run_parameters
     run_variables = BSFG_state$run_variables
     Posterior = BSFG_state$Posterior
@@ -38,13 +39,13 @@ draw_simulation_diagnostics = function(BSFG_state){
     E_h2 = 1-F_h2;
     G_Lambda = sweep(Lambda,2,sqrt(F_h2),'*')
     E_Lambda = sweep(Lambda,2,sqrt(E_h2),'*')
-    actual_G_Lambda = run_parameters$setup$gen_factor_Lambda
-    actual_E_Lambda = run_parameters$setup$error_factor_Lambda
+    actual_G_Lambda = setup$gen_factor_Lambda
+    actual_E_Lambda = setup$error_factor_Lambda
     G_est = G_Lambda %*% t(G_Lambda) + diag(1/unlist(E_a_prec))
     E_est = E_Lambda %*% t(E_Lambda) + diag(1/unlist(resid_Y_prec))
-    G_act = run_parameters$setup$G
-    E_act = run_parameters$setup$R
-    h2s_act = run_parameters$setup$h2
+    G_act = setup$G
+    E_act = setup$R
+    h2s_act = setup$h2
 
     dev.set(devices[1])
     par(mfrow=c(3,3))

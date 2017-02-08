@@ -56,7 +56,11 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 			Design = cbind(X,F)
 			rows = b + k
 			prior_mean = matrix(0,rows,p)
-			prior_prec = rbind(1e-6,t(Plam)) # note: fixed effect priors must be independent.
+			if(b > 0) {
+			  prior_prec = rbind(matrix(prec_B,b,p),t(Plam))
+			} else{ # b == 0
+			  prior_prec = t(Plam)
+			}
 			coefs = sample_MME_fixedEffects(Y,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Y_prec, prior_mean, prior_prec,ncores)
 			if(b > 0){
 				B = coefs[1:b,,drop=FALSE]
@@ -84,22 +88,48 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 
 			E_a = sample_MME_ZAZts(Y_tilde, Z, tot_Y_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
 
+
+			# -----Sample Lambda and B_F ------------------ #
+			# F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
+			if(b_F > 0){
+  			prior_mean = matrix(0,b_F,p)
+  			prior_prec = matrix(prec_B[-1],b_F,k)
+  			B_F = sample_MME_fixedEffects(F,X,Sigma_Choleskys, Sigma_Perm, F_h2_index, tot_F_prec, prior_mean, prior_prec,ncores)
+  			F_tilde = F - X_F %*% B_F
+			} else{
+			  F_tilde = F
+			}
+
 		 # -----Sample tot_F_prec, F_h2, F_a ---------------- #
 			#conditioning on B, F, Lambda, F_h2, tot_F_prec
 
-			tot_F_prec = sample_tot_prec(F, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,ncores)
-			F_h2_index = sample_h2s_discrete(F,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores)
+			tot_F_prec = sample_tot_prec(F_tilde, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,ncores)
+			F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores)
 			F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
-			F_a = sample_MME_ZAZts(F, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,ncores)
+			F_a = sample_MME_ZAZts(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,ncores)
 
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,Lambda, F_h2
 			Y_tilde = as.matrix(Y - X %*% B - Z %*% E_a)
 			F_e_prec = tot_F_prec / (1-colSums(F_h2))
 			resid_Y_prec = tot_Y_prec / (1-colSums(resid_h2))
-			F = sample_factors_scores_sparse_c( Y_tilde, Z,Lambda,resid_Y_prec,F_a,F_e_prec )
+			if(b_F > 0) {
+			  prior_mean = X_F %*% B_F + Z %*% F_a
+			} else {
+			  prior_mean = Z %*% F_a
+			}
+			F = sample_factors_scores_sparse_c( Y_tilde, as.matrix(prior_mean),Lambda,resid_Y_prec,F_e_prec )
 
+		 # -----Sample prec_B------------- #
+			if(b > 1) {
+			  if(b_F > 0){
+			    B2 = cbind(B[,-1],B_F)^2
+			  } else{
+			    B2 = B[,-1,drop=FALSE]^2
+			  }
+			  prec_B[-1,,drop=FALSE] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
+			}
 	})
 	current_state = current_state[current_state_names]
 

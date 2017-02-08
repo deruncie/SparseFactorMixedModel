@@ -266,26 +266,24 @@ arma::mat sample_means_parallel_c(arma::mat Y_tilde,
 
 // [[Rcpp::export()]]
 arma::mat sample_factors_scores_sparse_c(arma::mat Y_tilde,
-							arma::sp_mat Z,
-							arma::mat Lambda,
-							arma::vec resid_Y_prec,
-							arma::mat F_a,
-							arma::vec F_e_prec
-							 ) {
-//Sample factor scores given factor loadings (F_a), factor residual variances (F_e_prec) and
-//phenotype residuals
+                                         arma::mat prior_mean,
+                                         arma::mat Lambda,
+                                         arma::vec resid_Y_prec,
+                                         arma::vec F_e_prec
+) {
+  //Sample factor scores given factor loadings (F_a), factor residual variances (F_e_prec) and
+  //phenotype residuals
+  arma::mat Lmsg = sweep_times(Lambda,1,resid_Y_prec);
+  arma::mat S = chol(Lambda.t() * Lmsg + diagmat(F_e_prec));
+  arma::mat tS = S.t();
 
-	arma::mat Lmsg = sweep_times(Lambda,1,resid_Y_prec);
-	arma::mat S = chol(Lambda.t() * Lmsg + diagmat(F_e_prec));
-	arma::mat tS = S.t();
+  arma::mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(prior_mean,2,F_e_prec))));
 
-	arma::mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(Z * F_a,2,F_e_prec))));
+  arma::mat Zlams = randn(Meta.n_rows,Meta.n_cols);
 
-	arma::mat Zlams = randn(Meta.n_rows,Meta.n_cols);
+  arma::mat F = trans(solve(S,trans(Meta + Zlams)));
 
-	arma::mat F = trans(solve(S,trans(Meta + Zlams)));
-
-	return(F);
+  return(F);
 }
 
 // [[Rcpp::export()]]

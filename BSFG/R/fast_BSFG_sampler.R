@@ -106,7 +106,11 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 			Design = as.matrix(cbind(X,F))
 			rows = b + k
 			prior_mean = matrix(0,rows,p)
-			prior_prec = rbind(0,t(Plam))
+			if(b > 0) {
+			  prior_prec = rbind(matrix(prec_B,b,p),t(Plam))
+			} else{ # b == 0
+			  prior_prec = t(Plam)
+			}
 			coefs = sample_coefs_parallel_sparse_c( Y,Design,resid_h2, tot_Y_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
 
 			if(b > 0){
@@ -137,21 +141,46 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 
 			resid_Y_prec = tot_Y_prec / (1-resid_h2)
 
+		# -----Sample Lambda and B_F ------------------ #
+			# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
+			if(b_F > 0){
+			  prior_mean = matrix(0,b_F,p)
+			  prior_prec = matrix(prec_B[-1],b_F,k)
+			  B_F = sample_coefs_parallel_sparse_c(F,X_F,F_h2, tot_F_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
+			  F_tilde = F - X_F %*% B_F # not sparse.
+			} else{
+			  F_tilde = F
+			}
+
 		 # -----Sample F_h2 and tot_F_prec, F_a -------------------- #
 			#conditioning on F, F_a
-			tot_F_prec = sample_tot_prec_sparse_c(F,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
+			tot_F_prec = sample_tot_prec_sparse_c(F_tilde,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
 
-			F_h2_index = sample_h2s_discrete_given_p_sparse_c(F,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
+			F_h2_index = sample_h2s_discrete_given_p_sparse_c(F_tilde,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
 			F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
-	    	F_a = sample_randomEffects_parallel_sparse_c(F,Z,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
+	    F_a = sample_randomEffects_parallel_sparse_c(F_tilde,Z,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
 
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,W,Lambda, F_h2
 			Y_tilde = as.matrix(Y - X %*% B - Z %*% E_a)
 			F_e_prec = tot_F_prec / (1-F_h2)
-			F = sample_factors_scores_sparse_c( Y_tilde, Z,Lambda,resid_Y_prec,F_a,F_e_prec )
+			if(b_F > 0) {
+			  prior_mean = as.matrix(X_F %*% B_F + Z %*% F_a)
+			} else {
+			  prior_mean = as.matrix(Z %*% F_a)
+			}
+			F = sample_factors_scores_sparse_c( Y_tilde, prior_mean,Lambda,resid_Y_prec,F_e_prec )
 
+		 # -----Sample prec_B------------- #
+			if(b > 1) {
+			  if(b_F > 0){
+			    B2 = cbind(B[,-1],B_F)^2
+			  } else{
+			    B2 = B[,-1,drop=FALSE]^2
+			  }
+			  prec_B[-1,,drop=FALSE] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
+			}
 	})
 	current_state = current_state[current_state_names]
 

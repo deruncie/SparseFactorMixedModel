@@ -1,5 +1,6 @@
 initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,verbose=T,...){
 
+    X_F        = BSFG_state$data_matrices$X_F
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
     h2s_matrix = BSFG_state$data_matrices$h2s_matrix
@@ -8,15 +9,16 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     n_RE       = length(RE_names)
     stopifnot(n_RE == 1)  # must be only 1 random effect
 
-    traitnames = BSFG_state$traitnames
+    traitnames     = BSFG_state$traitnames
     priors         = BSFG_state$priors
     run_parameters = BSFG_state$run_parameters
-    run_variables   = BSFG_state$run_variables
+    run_variables  = BSFG_state$run_variables
 
     p    = BSFG_state$run_variables$p
     n    = BSFG_state$run_variables$n
     r    = BSFG_state$run_variables$r_RE
     b    = BSFG_state$run_variables$b
+    b_F  = BSFG_state$run_variables$b_F
 
 # ----------------------------- #
 # -----Initialize variables---- #
@@ -87,18 +89,27 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     #       sd = sqrt(F_h2') for each row.
     F_a = matrix(rnorm(k*r,0,sqrt(F_h2)),nr = r,nc = k, byrow = T)
 
+    # Factor fixed effects
+    B_F = matrix(rnorm(b_F * k),b_F,k)
+
     # Full Factor scores. Combination of genetic and residual variation on
     # each factor.
 	#  Prior: Normal distribution for each element
     #       mean = Z   * F_a
     #       sd = sqrt(1-F_h2') for each row.
-    F = as.matrix(Z   %*% F_a + matrix(rnorm(k*n,0,sqrt(1-F_h2)),nr = n,nc = k, byrow = T))
+    F = as.matrix(X_F %*% B_F + Z %*% F_a + matrix(rnorm(k*n,0,sqrt(1-F_h2)),nr = n,nc = k, byrow = T))
 
     # Fixed effect coefficients.
 	#  Prior: Normal distribution for each element
     #       mean = 0
     #       sd = sqrt(1/fixed_effects_prec)
     B = matrix(rnorm(b*p),nr = b, nc = p)
+
+    if(b > 0) {
+      prec_B = matrix(c(0,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),ncol=1)
+    } else{
+      prec_B = matrix(0,ncol=1,nrow=1)
+    }
 
 
 # ----------------------- #
@@ -120,6 +131,8 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
             F              = F,
             E_a            = E_a,
             B              = B,
+            B_F            = B_F,
+            prec_B         = prec_B,
             traitnames     = traitnames,
             nrun           = 0,
             total_time     = 0
@@ -129,9 +142,9 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # -Initialize Posterior-- #
 # ----------------------- #
     Posterior = list(
-        sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2'),
-        posteriorMean_params = c('B','E_a'),
-        per_trait_params = c('tot_Y_prec','resid_h2')
+      sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2', 'B', 'B_F', 'prec_B'),
+      posteriorMean_params = c('E_a'),
+      per_trait_params = c('tot_Y_prec','resid_h2','B')
     )
     Posterior = initialize_Posterior(Posterior,current_state)
 

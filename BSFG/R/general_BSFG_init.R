@@ -1,23 +1,24 @@
 initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,
 									ncores = detectCores(),verbose=T,...){
 
-  Z_matrices = BSFG_state$data_matrices$Z_matrices
-  Z          = BSFG_state$data_matrices$Z
-  h2s_matrix = BSFG_state$data_matrices$h2s_matrix
+    X_F        = BSFG_state$data_matrices$X_F
+    Z_matrices = BSFG_state$data_matrices$Z_matrices
+    Z          = BSFG_state$data_matrices$Z
+    h2s_matrix = BSFG_state$data_matrices$h2s_matrix
 
-  RE_names   = rownames(h2s_matrix)
-  n_RE       = length(RE_names)
-  stopifnot(n_RE == 1)  # must be only 1 random effect
+    RE_names   = rownames(h2s_matrix)
+    n_RE       = length(RE_names)
 
-  traitnames     = BSFG_state$traitnames
-  priors         = BSFG_state$priors
-  run_parameters = BSFG_state$run_parameters
-  run_variables  = BSFG_state$run_variables
+    traitnames     = BSFG_state$traitnames
+    priors         = BSFG_state$priors
+    run_parameters = BSFG_state$run_parameters
+    run_variables  = BSFG_state$run_variables
 
-  p    = BSFG_state$run_variables$p
-  n    = BSFG_state$run_variables$n
-  r_RE = BSFG_state$run_variables$r_RE
-  b    = BSFG_state$run_variables$b
+    p    = BSFG_state$run_variables$p
+    n    = BSFG_state$run_variables$n
+    r_RE = BSFG_state$run_variables$r_RE
+    b    = BSFG_state$run_variables$b
+    b_F  = BSFG_state$run_variables$b_F
 
 
 # ----------------------------- #
@@ -73,7 +74,10 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     })
     names(F_a) = RE_names
 
-    F = matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
+    # Factor fixed effects
+    B_F = matrix(rnorm(b_F * k),b_F,k)
+
+    F = X_F %*% B_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
     for(effect in RE_names) {
     	F = F + Z_matrices[[effect]] %*% F_a[[effect]]
     }
@@ -99,6 +103,11 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
   # Fixed effects
     B = matrix(rnorm(b*p), ncol = p)
 
+    if(b > 0) {
+      prec_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),ncol=1)
+    } else{
+      prec_B = matrix(1e-10,ncol=1,nrow=1)
+    }
 # ----------------------- #
 # ---Save initial values- #
 # ----------------------- #
@@ -118,6 +127,8 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     		resid_h2       = resid_h2,
     		E_a            = E_a,
     		B              = B,
+    		B_F            = B_F,
+    		prec_B         = prec_B,
     		traitnames     = traitnames,
     		nrun           = 0,
     		total_time     = 0
@@ -128,9 +139,9 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 # -Initialize Posterior-- #
 # ----------------------- #
     Posterior = list(
-        sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2'),
-        posteriorMean_params = c('B','E_a'),
-        per_trait_params = c('tot_Y_prec','resid_h2')
+        sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2', 'B', 'B_F', 'prec_B'),
+        posteriorMean_params = c('E_a'),
+        per_trait_params = c('tot_Y_prec','resid_h2','B')
     )
     Posterior = initialize_Posterior(Posterior,current_state)
 

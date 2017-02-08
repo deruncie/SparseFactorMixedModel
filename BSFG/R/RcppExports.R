@@ -21,8 +21,8 @@ sample_means_parallel_c <- function(Y_tilde, resid_Y_prec, E_a_prec, invert_aA_b
     .Call('BSFG_sample_means_parallel_c', PACKAGE = 'BSFG', Y_tilde, resid_Y_prec, E_a_prec, invert_aA_bZtZ, grainSize)
 }
 
-sample_factors_scores_sparse_c <- function(Y_tilde, Z, Lambda, resid_Y_prec, F_a, F_e_prec) {
-    .Call('BSFG_sample_factors_scores_sparse_c', PACKAGE = 'BSFG', Y_tilde, Z, Lambda, resid_Y_prec, F_a, F_e_prec)
+sample_factors_scores_sparse_c <- function(Y_tilde, prior_mean, Lambda, resid_Y_prec, F_e_prec) {
+    .Call('BSFG_sample_factors_scores_sparse_c', PACKAGE = 'BSFG', Y_tilde, prior_mean, Lambda, resid_Y_prec, F_e_prec)
 }
 
 GSVD_2_c <- function(A, B) {
