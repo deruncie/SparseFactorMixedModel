@@ -106,7 +106,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     B = matrix(rnorm(b*p),nr = b, nc = p)
 
     if(b > 0) {
-      prec_B = matrix(c(0,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),ncol=1)
+      prec_B = matrix(c(0,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
     } else{
       prec_B = matrix(0,ncol=1,nrow=1)
     }
@@ -180,7 +180,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     result = GSVD_2_c(as.matrix(chol(ZZt)),as.matrix(chol_Ainv))
 
     invert_aZZt_Ainv = list(
-        U = Matrix(t(solve(result$X))),
+        U = drop0(Matrix(t(solve(result$X))),tol = 1e-14),
         # U = t(solve(result$X)),
 			s1 = diag(result$C)^2,
 			s2 = diag(result$S)^2

@@ -128,7 +128,7 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 			  } else{
 			    B2 = B[,-1,drop=FALSE]^2
 			  }
-			  prec_B[-1,,drop=FALSE] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
+			  prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
 			}
 	})
 	current_state = current_state[current_state_names]

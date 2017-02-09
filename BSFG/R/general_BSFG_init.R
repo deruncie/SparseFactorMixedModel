@@ -104,7 +104,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     B = matrix(rnorm(b*p), ncol = p)
 
     if(b > 0) {
-      prec_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),ncol=1)
+      prec_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
     } else{
       prec_B = matrix(1e-10,ncol=1,nrow=1)
     }

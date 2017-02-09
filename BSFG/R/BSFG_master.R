@@ -132,6 +132,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	  Ai = fix_A(Ai)
 	  Ai
 	})
+	names(Ai_mats) = RE_names
 	  # cholesky decompositions (L'L) of each A_inverse matrix
 	chol_Ai_mats = lapply(Ai_mats,chol)
 
