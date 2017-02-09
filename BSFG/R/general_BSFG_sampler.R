@@ -94,7 +94,7 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 			if(b_F > 0){
   			prior_mean = matrix(0,b_F,p)
   			prior_prec = matrix(prec_B[-1],b_F,k)
-  			B_F = sample_MME_fixedEffects(F,X,Sigma_Choleskys, Sigma_Perm, F_h2_index, tot_F_prec, prior_mean, prior_prec,ncores)
+  			B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, Sigma_Perm, F_h2_index, tot_F_prec, prior_mean, prior_prec,ncores)
   			F_tilde = F - X_F %*% B_F
 			} else{
 			  F_tilde = F
@@ -124,9 +124,9 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 		 # -----Sample prec_B------------- #
 			if(b > 1) {
 			  if(b_F > 0){
-			    B2 = cbind(B[,-1],B_F)^2
+			    B2 = cbind(B[-1,],B_F)^2
 			  } else{
-			    B2 = B[,-1,drop=FALSE]^2
+			    B2 = B[-1,,drop=FALSE]^2
 			  }
 			  prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
 			}
