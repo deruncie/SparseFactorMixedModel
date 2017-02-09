@@ -36,10 +36,11 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 	current_state = with(c(priors,run_parameters,data_matrices),within(current_state, {
 		i = nrun
 		n = nrow(F)
-		k = ncol(F)
+		k = ncol(Lambda)
 		r = nrow(F_a)
 		p = nrow(Lambda)
-		gene_rows = 1:p
+		b_F = ncol(X_F)
+		# gene_rows = 1:p
 
 		prob = 1/exp(b0 + b1*i)                # probability of adapting
 		uu = runif(1)
@@ -60,7 +61,7 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 				tot_F_prec    = cbind(tot_F_prec,1)
 				F_a           = cbind(F_a,rnorm(r,0,sqrt(sum(F_h2[,k]))))
 				B_F           = cbind(B_F,rnorm(b_F,0,1))
-				F             = cbind(F,rnorm(n,as.matrix(X_F %*% B_F + Z %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
+				F             = cbind(F,rnorm(n,X_F %*% B_F[,k] + as.matrix(Z %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
 				while(length(nonred) < 2) {
@@ -110,13 +111,13 @@ reorder_factors = function(BSFG_state){
 
 	reorder_params = c('Lambda','Lambda_prec','Plam',
 						'delta','tauh',
-						'F','F_a','F_h2','F_a_prec','F_e_prec','tot_F_prec'
+						'F','B_F','F_a','F_h2','F_a_prec','F_e_prec','tot_F_prec'
 						)
 
 	# reorder currrent state
 	for(param in reorder_params){
 		if(! param %in% names(current_state)) next
-		current_state[[param]] = current_state[[param]][,factor_order,drop=F]
+		current_state[[param]] = current_state[[param]][,factor_order,drop=FALSE]
 	}
 	current_state$delta = matrix(c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)]),nrow=1)
 	BSFG_state$current_state = current_state
@@ -178,10 +179,12 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 initialize_Posterior = function(Posterior,current_state){
 	  for(param in Posterior$sample_params){
     	Posterior[[param]] = array(0,dim = c(dim(current_state[[param]]),0))
+    	dimnames(Posterior[[param]])[1:2] = dimnames(current_state[[param]])
     }
 
     for(param in Posterior$posteriorMean_params) {
     	Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
+    	dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
     }
     for(param in Posterior$per_trait_params){
     	dimnames(Posterior[[param]])[[2]] = current_state$traitnames

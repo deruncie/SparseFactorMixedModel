@@ -241,10 +241,10 @@ print.BSFG_state = function(BSFG_state){
   })
 }
 
-plot.BSFG_state = function(BSFG_state){
-  if(BSFG_state$run_parameters$simulation){
-    draw_simulation_diagnostics(BSFG_state)
-  } else{
-    draw_results_diagnostics(BSFG_state)
-  }
-}
+# plot.BSFG_state = function(BSFG_state){
+#   if(BSFG_state$run_parameters$simulation){
+#     draw_simulation_diagnostics(BSFG_state)
+#   } else{
+#     draw_results_diagnostics(BSFG_state)
+#   }
+# }

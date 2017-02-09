@@ -2,12 +2,12 @@ set_device = function(device) {
   # create new devices up to device
   devices = dev.list()
   devices = devices[names(devices) != 'RStudioGD']
-  while(length(devices) < 4){
+  while(length(devices) < device){
     dev.new(noRStudioGD = TRUE)
     devices = dev.list()
     devices = devices[names(devices) != 'RStudioGD']
   }
-  dev.set(device)
+  dev.set(devices[device])
 }
 
 trace_plot = function(data,main = NULL,ylim = NULL){
@@ -148,13 +148,13 @@ calc_posterior_mean_cov = function(Posterior,random_effect){
     G = matrix(0,p,p)
     for(i in 1:sp_num){
       if(random_effect == 'Ve'){
-        factor_h2s = 1-colSums(F_h2[,,i,drop=FALSE])
-        resid_h2s = 1-colSums(resid_h2[,,i,drop=FALSE])
+        factor_h2s_i = 1-colSums(F_h2[,,i,drop=FALSE])
+        resid_h2s_i = 1-colSums(resid_h2[,,i,drop=FALSE])
       } else{
-        factor_h2s = F_h2[random_effect,,i]
-        resid_h2s = F_h2[random_effect,,i]
+        factor_h2s_i = F_h2[random_effect,,i]
+        resid_h2s_i = resid_h2[random_effect,,i]
       }
-      G_i = tcrossprod(sweep(Lambda[,,i],2,sqrt(factor_h2s),'*')) + diag(c(resid_h2s/tot_Y_prec[,,i]))
+      G_i = tcrossprod(sweep(Lambda[,,i],2,sqrt(factor_h2s_i),'*')) + diag(c(resid_h2s_i/tot_Y_prec[1,,i]))
       G = G + G_i/sp_num
     }
     G
@@ -162,7 +162,7 @@ calc_posterior_mean_cov = function(Posterior,random_effect){
 }
 
 calc_posterior_mean_Lambda = function(Posterior){
-  return(apply(Lambda,c(1,2),mean))
+  return(with(Posterior,apply(Lambda,c(1,2),mean)))
 }
 
 plot_factor_h2s = function(F_h2) {
@@ -190,7 +190,9 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
   setup = BSFG_state$setup
   Posterior = BSFG_state$Posterior
   plot_element_wise_correlations(setup$R, calc_posterior_mean_cov(Posterior,'Ve'),main = 'E elements')
-  plot_element_wise_correlations(setup$G, calc_posterior_mean_cov(Posterior,'Group'),main = sprintf('G: %s elements',RE_name))
+  for(RE_name in dimnames(Posterior$F_h2)[[1]]) {
+    plot_element_wise_correlations(setup$G, calc_posterior_mean_cov(Posterior,'Group'),main = sprintf('G: %s elements',RE_name))
+  }
 
   plot_factor_correlations(setup$error_factor_Lambda,calc_posterior_mean_Lambda(Posterior))
 
@@ -198,10 +200,26 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
 
 
   # B's
-  B_data = with(Posterior,data.frame(
-    B_resid = apply(B,c(1,2),mean),
-    B_factor = apply(sapply(1:sp_num,function(i) B_F[,,i] %*% t(Lambda[,,i])),c(1,2),mean),
-    B_total = apply(sapply(1:sp_num,function(i) B[,,i] + B_F[,,i] %*% t(Lambda[,,i])),c(1,2),mean)
-  ))
-  plot_fixed_effects(setup$B, B_data)
+  B_resid = with(c(Posterior,BSFG_state$data_matrices),
+                 rowMeans(sapply(1:sp_num,function(x) X[1,] %*% B[,,i] - X[1,1,drop=FALSE] %*% B[1,,i,drop=FALSE]))
+            )
+  B_factor = with(c(Posterior,BSFG_state$data_matrices), {
+                    if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
+                    rowMeans(sapply(1:sp_num,function(x) X_F[1,] %*% B_F[,,i] %*% t(Lambda[,,i])))
+                  })
+  B_total = with(c(Posterior,BSFG_state$data_matrices), {
+                if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
+                rowMeans(sapply(1:sp_num,function(x)
+                  X[1,] %*% B[,,i] - X[1,1,drop=FALSE] %*% B[1,,i,drop=FALSE] + X_F[1,] %*% B_F[,,i] %*% t(Lambda[,,i])
+                ))
+              })
+  B_act = with(setup,t(X)[1,] %*% B - t(X)[1,-1,drop=F] %*% matrix(B,ncol = p)[-1,,drop=F])
+  plot_fixed_effects(B_act, B_resid,B_factor,B_total)
+}
+
+plot.BSFG_state = function(BSFG_state){
+  plot_current_state_simulation(BSFG_state, device = 1)
+  plot_posterior_simulation(BSFG_state, device = 2)
+  trace_plot_h2s(BSFG_state$Posterior,device = 3)
+  trace_plot_Lambda(BSFG_state$Posterior,device = 4)
 }

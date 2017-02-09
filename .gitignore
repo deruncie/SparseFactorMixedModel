@@ -5,3 +5,4 @@ sourceCpp*
 *.o
 *.so
 .Rhistory
+*.Rapp.history
