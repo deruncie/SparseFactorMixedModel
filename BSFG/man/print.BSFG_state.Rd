@@ -10,5 +10,6 @@ print.BSFG_state(BSFG_state)
 Print statistics on current BSFG state
 }
 \seealso{
-\code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}}, \code{\link{summary.BSFG_state}}
+\code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}},
+  \code{\link{summary.BSFG_state}}, \code{\link{plot.BSFG_state}}
 }

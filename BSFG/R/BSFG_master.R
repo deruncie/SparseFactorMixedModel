@@ -70,7 +70,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),fixed_factors = 
 #' @return traitnames: vector of trait names (from colnames of Y)
 #' @return run_parameters, run_variables, data_matrices, priors, simulation: input data and
 #'   parameters
-#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}},
+#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
 #'
 BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
                      sampler = c('fast_BSFG','general_BSFG'), ncores = 1,simulation = c(F,T),setup = NULL,verbose=T) {
@@ -265,7 +265,8 @@ sample_BSFG = function(BSFG_state,...){
 #' Print more detailed statistics on current BSFG state
 #'
 #' Print more detailed statistics on current BSFG state
-#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}}, \code{\link{print.BSFG_state}}
+#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}},
+#'   \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
 summary.BSFG_state = function(BSFG_state){
   with(BSFG_state,{
     cat(
@@ -282,7 +283,8 @@ summary.BSFG_state = function(BSFG_state){
 #' Print statistics on current BSFG state
 #'
 #' Print statistics on current BSFG state
-#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}}, \code{\link{summary.BSFG_state}}
+#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}},
+#'   \code{\link{summary.BSFG_state}}, \code{\link{plot.BSFG_state}}
 print.BSFG_state = function(BSFG_state){
   with(BSFG_state,{
     cat(
@@ -293,6 +295,11 @@ print.BSFG_state = function(BSFG_state){
   })
 }
 
+#' Make plots of current BSFG state
+#'
+#' Make plots of current BSFG state
+#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}},
+#'   \code{\link{print.BSFG_state}}, \code{\link{summary.BSFG_state}}
 plot.BSFG_state = function(BSFG_state){
   if(BSFG_state$run_parameters$simulation){
     plot_diagnostics_simulation(BSFG_state)

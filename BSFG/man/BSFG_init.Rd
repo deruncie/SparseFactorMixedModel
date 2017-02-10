@@ -61,5 +61,5 @@ pre-calculates a set of matrices and transformations to speed up each iteration 
 sampler.
 }
 \seealso{
-\code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}},
+\code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
 }

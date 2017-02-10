@@ -18,13 +18,20 @@ load_simulation_data = function(file = NULL){
     A = setup$A
     r = dim(A)[1]
     n = nrow(Y)
-    data = data.frame(Group = gl(r,n/r))
-    rownames(A) = data$Group
+    if(dim(setup$X)[1] != n) setup$X = t(setup$X)
+    data = data.frame(animal = gl(r,n/r))
+    rownames(A) = data$animal
     if(is.null(colnames(Y))) colnames(Y) = paste('Trait',1:ncol(Y),sep='_')
-    return(list(Y = Y, data = data, A_mats = list(Group = A),setup = setup))
+    return(list(Y = Y, data = data, A_mats = list(animal = A),setup = setup))
 }
 
 
+#' Checks if factors (columns of Lambda) can be safely dropped
+#'
+#' Factors are dropped if \code{prop} faction of the \lambda_{ij} elements are less than
+#' \code{epsilon}. Checking happens stochastically at a decreasing rate during the chain controlled
+#' by b0 and b1. If no factors can be dropped, then a new one is appended.
+#' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 update_k = function( current_state, priors,run_parameters,data_matrices) {
 # adapt the number of factors by dropping factors with only small loadings
 # if they exist, or adding new factors sampled from the prior if all factors
@@ -95,6 +102,10 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 	return(current_state)
 }
 
+#' Re-orders factors in decreasing order of magnitude
+#'
+#' Re-orders factors in decreasing order of magnitude
+#' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 reorder_factors = function(BSFG_state){
 	# re-orders factors in decreasing size of Lambda %*% F
 	# based on current state
@@ -136,6 +147,10 @@ reorder_factors = function(BSFG_state){
 	return(BSFG_state)
 }
 
+#' Saves current state in Posterior
+#'
+#' Saves current state in Posterior
+#' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 save_posterior_samples = function( sp_num, current_state, Posterior) {
 	require(abind)
 
@@ -203,6 +218,11 @@ expand_Posterior = function(Posterior,size){
 	Posterior
 }
 
+#' Resets Posterior samples
+#'
+#' Clears and resets the saved Posterior samples. Updates the burn parameter of
+#'     \code{run_parameters} to reflect all previous samples in the chain now count as burnin
+#' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 clear_Posterior = function(BSFG_state) {
 	# resets Posterior samples if burnin was not sufficient
 	Posterior = BSFG_state$Posterior
