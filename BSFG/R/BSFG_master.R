@@ -1,39 +1,79 @@
+#' Set BSFG run parameters
+#'
+#' Function to create run_parameters list for initializing BSFG model
+#'
+#' @param sampler specify the sampler to use. fast_BSFG is much faster, but only allows one random
+#'   effect. If more are specified in \code{BSFG_init}, this is switched to general_BSFG.
+#' @param fixed_factors should the fixed effect model be applied to factors as well as the factor
+#'   residuals? If so, the first column of the design matrix is dropped.
+#' @param simulaiton Is this a fit to simulated data? If so, a setup list will be expected providing
+#'   the true values
+#' @param scale_Y Should the Y values be centered and scaled? Recommend, except for simulated data.
+#' @param b0 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
+#' @param b1 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
+#' @param epsilon parameter of the \code{update_k} function. Smallest \lambda_{ij} that is
+#'   considered "large", signifying a factor should be kept
+#' @param prop proportion of \lambda{ij} elements in a column of \Lambda that must be smaller than
+#'   \code{epsilon} before factor is dropped
+#' @param kinit initial number of factors
+#' @param h2_divisions A scalar or vector of length equal to number of random effects, specifying
+#'   the number of equally spaced divisions to devide each random effect variance component. All
+#'   variance componets are scaled as percent_of_total. This number of divisions are created for
+#'   each component, and then combined with \code{expand.grid()}. Then combinations of variances that sum to less than 1 are selected as valid.
+#' @burn burnin length of the MCMC chain
+#' @thin thinning rate of the MCMC chain
+#' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}},
+BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),fixed_factors = c(T,F),simulation = c(F,T),scale_Y = c(T,F),
+                        b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
+                        k_init = 20, h2_divisions = 100,
+                        burn = 100,
+                        thin = 2) {
+
+  all_args = formals()
+  passed_args = as.list(match.call())[-1]
+  all_args[names(passed_args)] = passed_args
+  return(passed_args)
+}
+
 #' Initialize a BSFG model
 #'
 #' Sets up the BSFG model, selects starting values, and pre-calculates matrices for the GIBBS
 #' sampler.
 #'
+#' The first step in fitting a BSFG model. This function setups up the model matrices based on the
+#' fixed and random effect formulas provided, initializes all of model parameters, and then
+#' pre-calculates a set of matrices and transformations to speed up each iteration of the Gibbs
+#' sampler.
+#'
+#'
 #' @param Y a n x p matrix of data (n individuals x p traits)
-#' @param fixed  formula for the fixed effects. \strong Note: currently only applies to residuals
-#'   (not factors)
-#' @param random formula for the random effects. \strong Note: currently should be of the form \code{~ x1
-#'   + x2} (no interactions)
+#' @param fixed  formula for the fixed effects
+#' @param random formula for the random effects. Multiple random effects can be specified as
+#'   ~random1+random2+..., but currently there is no support for interactions. Each random effect
+#'   must correspond to a column of data (which should be a factor)
 #' @param data data.frame with n rows containing columns corresponding to the fixed and random
 #'   effects
-#' @param priors list providing hyperparameters for the model priors. See details
-#' @param run_parameters list providing various parameters for the model run
+#' @param priors list providing hyperparameters for the model priors. T
+#' @param run_parameters list providing various parameters for the model run. See \link{BSFG_control}
 #' @param A_mats list of covariance matrices for random effects. If none provided (and none provided
 #'   for A_inv_mats), assumed to be the identity.
 #' @param A_inv_mats list of covariance matrices for random effects. If none provided (and none
 #'   provided for A_mats), assumed to be the identity.
-#' @param fixed_Factors currently no effect. To be used to specify fixed effect model for factors
-#' @param scaleY should columns of Y be re-scaled to mean = 0, var = 1?
-#' @param sampler ('fast_BSFG','general_BSFG'). Specifies which Gibbs sampler to use. If more than
-#'   one random effect, defaults to general_BSFG, regardless of this parameter
-#' @param ncores for \code{general_BSFG}, number of cores to use. \code{fast_BSFG} is parallelize by RcppParallel
-#' @param simulation is this a simulation (and are known values included in setup?)?
-#' @param setup a list of known values for Lambda (error_factor_lambda), h2, factor_h2s
-#' @param verbose (T,F) should progress in initialization be reported?
+#' @param ncores for \code{general_BSFG}, number of cores to use during initialization.
+#' @param setup optional - a list of known values for Lambda (error_factor_lambda), h2, factor_h2s
+#' @param verbose should progress in initialization be reported?
 #'
 #' @return An object of class BSFG_state with components:
 #' @return current_state: a list of parameters in the current iteration of the sampler
 #' @return Posterior: a list of arrays of posterior samples
 #' @return RNG current state of R's Random number generator (for re-starting chaings)
 #' @return traitnames: vector of trait names (from colnames of Y)
-#' @return run_parameters, run_variables, data_matrices, priors, simulation
+#' @return run_parameters, run_variables, data_matrices, priors, simulation: input data and
+#'   parameters
+#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}},
 #'
-BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,sampler = 'fast_BSFG',
-                                    ncores = 1,simulation = F,setup = NULL,verbose=T) {
+BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
+                     sampler = c('fast_BSFG','general_BSFG'), ncores = 1,simulation = c(F,T),setup = NULL,verbose=T) {
 
 
   # ----------------------------- #
@@ -79,9 +119,9 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	RE_names = rownames(attr(terms(random),'factors'))
 	n_RE = length(RE_names)
 
-	if(n_RE > 1 && sampler == 'fast_BSFG'){
+	if(n_RE > 1 && run_parameters$sampler == 'fast_BSFG'){
 	  print(sprintf('%d random effects. Using "general_BSFG" sampler',length(RE_names)))
-	  sampler = 'general_BSFG'
+	  run_parameters$sampler = 'general_BSFG'
 	}
 
 	Z_matrices = lapply(RE_names,function(re) {
@@ -203,7 +243,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	  setup          = setup,
 	  traitnames     = traitnames
 	)
-	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',sampler))
+	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',run_parameters$sampler))
 
 	BSFG_state = initialize_BSFG(BSFG_state, A_mats, chol_Ai_mats,verbose)
 
@@ -215,10 +255,17 @@ initialize_BSFG = function(BSFG_state,...){
   UseMethod("initialize_BSFG",BSFG_state)
 }
 
+#' Run BSFG Gibbs sampler
+#'
+#' Run MCMC chain for a specified number of iterations
 sample_BSFG = function(BSFG_state,...){
   UseMethod("sample_BSFG",BSFG_state)
 }
 
+#' Print more detailed statistics on current BSFG state
+#'
+#' Print more detailed statistics on current BSFG state
+#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}}, \code{\link{print.BSFG_state}}
 summary.BSFG_state = function(BSFG_state){
   with(BSFG_state,{
     cat(
@@ -232,6 +279,10 @@ summary.BSFG_state = function(BSFG_state){
   })
 }
 
+#' Print statistics on current BSFG state
+#'
+#' Print statistics on current BSFG state
+#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}}, \code{\link{summary.BSFG_state}}
 print.BSFG_state = function(BSFG_state){
   with(BSFG_state,{
     cat(
@@ -242,10 +293,10 @@ print.BSFG_state = function(BSFG_state){
   })
 }
 
-# plot.BSFG_state = function(BSFG_state){
-#   if(BSFG_state$run_parameters$simulation){
-#     draw_simulation_diagnostics(BSFG_state)
-#   } else{
-#     draw_results_diagnostics(BSFG_state)
-#   }
-# }
+plot.BSFG_state = function(BSFG_state){
+  if(BSFG_state$run_parameters$simulation){
+    plot_diagnostics_simulation(BSFG_state)
+  } else{
+    plot_diagnostics(BSFG_state)
+  }
+}

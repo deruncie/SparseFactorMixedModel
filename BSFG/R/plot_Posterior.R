@@ -133,17 +133,6 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
     xlim = ylim = range(c(B[-1,],B_factor))
     plot(c(B_factor),c(B[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
   }
-
-  # B_resid = with(c(current_state,BSFG_state$data_matrices),
-  #               X %*% B - X[,1,drop=FALSE] %*% B[1,,drop=F]
-  # )
-  # B_factor = with(c(current_state,BSFG_state$data_matrices),
-  #               X_F %*% B_F %*% t(Lambda)
-  # )
-  # B_total = B_resid + B_factor
-  # # B_act = with(setup,t(X) %*% B - t(X)[,-1,drop=F] %*% matrix(B,ncol = p)[-1,,drop=F])
-  # B_act = with(setup,X %*% B - X[,-1,drop=F] %*% matrix(B,ncol = p)[-1,,drop=F])
-  # plot_fixed_effects(B_act[1,], B_resid[1,],B_factor[1,],B_total[1,])
 }
 
 plot_fixed_effects = function(B_act, B_resid,B_factor,B_total){
@@ -227,31 +216,14 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
     plot(c(B_factor_mean),c(B_mean[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
     B_f_HPD = HPDinterval(mcmc(t(Posterior$B_F[1,,])))
     B_f_mean = rowMeans(Posterior$B_F[1,,])
+
     plot(1:length(B_f_mean),B_f_mean,xlim = c(1,length(B_f_mean)),ylim = range(B_f_HPD),xlab = '',main = 'Posterior B_F')
     arrows(seq_along(B_f_mean),B_f_HPD[,1],seq_along(B_f_mean),B_f_HPD[,2],length=0)
     abline(h=0)
   }
-  # B_resid = with(c(Posterior,BSFG_state$data_matrices),
-  #                apply(B,c(1,2),mean)
-  #                # rowMeans(sapply(1:sp_num,function(x) X[1,] %*% B[,,i] - X[1,1,drop=FALSE] %*% B[1,,i,drop=FALSE]))
-  #           )
-  # B_factor = with(c(Posterior,BSFG_state$data_matrices), {
-  #                   if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
-  #                   matrix(rowMeans(sapply(1:sp_num,function(i) B_F[,,i] %*% t(Lambda[,,i]))),nrow = ncol(X_F))
-  #                 })
-  # abline(0,1)
-  # B_total = with(c(Posterior,BSFG_state$data_matrices), {
-  #               if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
-  #               rowMeans(sapply(1:sp_num,function(i)
-  #                 X[1,] %*% B[,,i] - X[1,1,drop=FALSE] %*% B[1,,i,drop=FALSE] + X_F[1,] %*% B_F[,,i] %*% t(Lambda[,,i])
-  #               ))
-  #             })
-  # # B_act = with(setup,t(X)[1,] %*% B - t(X)[1,-1,drop=F] %*% matrix(B,ncol = p)[-1,,drop=F])
-  # B_act = with(setup,X[1,] %*% B - X[1,-1,drop=F] %*% matrix(B,ncol = p)[-1,,drop=F])
-  # plot_fixed_effects(B_act, B_resid,B_factor,B_total)
 }
 
-plot.BSFG_state = function(BSFG_state){
+plot_diagnostics_simulation = function(BSFG_state){
   plot_current_state_simulation(BSFG_state, device = 2)
   if(BSFG_state$Posterior$sp_num > 0) {
     plot_posterior_simulation(BSFG_state, device = 3)

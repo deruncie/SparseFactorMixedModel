@@ -5,24 +5,24 @@
 \title{Initialize a BSFG model}
 \usage{
 BSFG_init(Y, fixed, random, data, priors, run_parameters, A_mats = NULL,
-  A_inv_mats = NULL, sampler = "fast_BSFG", ncores = 1, simulation = F,
-  setup = NULL, verbose = T)
+  A_inv_mats = NULL, sampler = c("fast_BSFG", "general_BSFG"), ncores = 1,
+  simulation = c(F, T), setup = NULL, verbose = T)
 }
 \arguments{
 \item{Y}{a n x p matrix of data (n individuals x p traits)}
 
-\item{fixed}{formula for the fixed effects. \strong Note: currently only applies to residuals
-(not factors)}
+\item{fixed}{formula for the fixed effects}
 
-\item{random}{formula for the random effects. \strong Note: currently should be of the form \code{~ x1
-+ x2} (no interactions)}
+\item{random}{formula for the random effects. Multiple random effects can be specified as
+~random1+random2+..., but currently there is no support for interactions. Each random effect
+must correspond to a column of data (which should be a factor)}
 
 \item{data}{data.frame with n rows containing columns corresponding to the fixed and random
 effects}
 
-\item{priors}{list providing hyperparameters for the model priors. See details}
+\item{priors}{list providing hyperparameters for the model priors. T}
 
-\item{run_parameters}{list providing various parameters for the model run}
+\item{run_parameters}{list providing various parameters for the model run. See \link{BSFG_control}}
 
 \item{A_mats}{list of covariance matrices for random effects. If none provided (and none provided
 for A_inv_mats), assumed to be the identity.}
@@ -30,20 +30,11 @@ for A_inv_mats), assumed to be the identity.}
 \item{A_inv_mats}{list of covariance matrices for random effects. If none provided (and none
 provided for A_mats), assumed to be the identity.}
 
-\item{sampler}{('fast_BSFG','general_BSFG'). Specifies which Gibbs sampler to use. If more than
-one random effect, defaults to general_BSFG, regardless of this parameter}
+\item{ncores}{for \code{general_BSFG}, number of cores to use during initialization.}
 
-\item{ncores}{for \code{general_BSFG}, number of cores to use. \code{fast_BSFG} is parallelize by RcppParallel}
+\item{setup}{optional - a list of known values for Lambda (error_factor_lambda), h2, factor_h2s}
 
-\item{simulation}{is this a simulation (and are known values included in setup?)?}
-
-\item{setup}{a list of known values for Lambda (error_factor_lambda), h2, factor_h2s}
-
-\item{verbose}{(T,F) should progress in initialization be reported?}
-
-\item{fixed_Factors}{currently no effect. To be used to specify fixed effect model for factors}
-
-\item{scaleY}{should columns of Y be re-scaled to mean = 0, var = 1?}
+\item{verbose}{should progress in initialization be reported?}
 }
 \value{
 An object of class BSFG_state with components:
@@ -56,9 +47,19 @@ RNG current state of R's Random number generator (for re-starting chaings)
 
 traitnames: vector of trait names (from colnames of Y)
 
-run_parameters, run_variables, data_matrices, priors, simulation
+run_parameters, run_variables, data_matrices, priors, simulation: input data and
+  parameters
 }
 \description{
 Sets up the BSFG model, selects starting values, and pre-calculates matrices for the GIBBS
 sampler.
+}
+\details{
+The first step in fitting a BSFG model. This function setups up the model matrices based on the
+fixed and random effect formulas provided, initializes all of model parameters, and then
+pre-calculates a set of matrices and transformations to speed up each iteration of the Gibbs
+sampler.
+}
+\seealso{
+\code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}},
 }
