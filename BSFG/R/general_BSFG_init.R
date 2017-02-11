@@ -56,6 +56,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
      #       mu = 0
      #       sd = sqrt(1/Plam)
     Lambda = matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
+    rownames(Lambda) = traitnames
 
   # Factor scores:
      # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
@@ -90,6 +91,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
      #       shape = tot_Y_prec_shape
      #       rate = tot_Y_prec_rate
     tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
+    colnames(Lambda) = traitnames
 
     # Resid discrete variances
      # p-matrix of n_RE x p with
@@ -99,9 +101,11 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     E_a = do.call(rbind,lapply(RE_names,function(effect){
     	matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Y_prec)),ncol = p, byrow = T)
     }))
+    colnames(E_a) = traitnames
 
   # Fixed effects
     B = matrix(rnorm(b*p), ncol = p)
+    colnames(B) = traitnames
 
     if(b > 0) {
       prec_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)

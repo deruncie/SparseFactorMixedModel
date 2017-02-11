@@ -60,6 +60,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, k, k_G, i_Va = 0.2, i_V
 
   Y = X %*% B + F %*% t(Lambda) + E_a + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
   Y = as.matrix(Y)
+  colnames(Y) = paste0('gene',1:p)
 
 
   setup = list(

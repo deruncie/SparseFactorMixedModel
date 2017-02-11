@@ -139,7 +139,7 @@ reorder_factors = function(BSFG_state){
 	for(param in reorder_params){
 		if(! param %in% names(Posterior)) next
 		if(dim(Posterior[[param]])[3] == 0) next
-		Posterior[[param]] = Posterior[[param]][,factor_order,,drop=FALSE]
+		Posterior[[param]] = Posterior[[param]][,,factor_order,drop=FALSE]
 	}
 
 	BSFG_state$Posterior = Posterior
@@ -169,18 +169,18 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 		Lambda = sweep(Lambda,2,sqrt(F_var),'*')
 	})
 
-	sp = dim(Posterior$Lambda)[3]
+	sp = dim(Posterior$Lambda)[1]
 
 	for(param in Posterior$sample_params){
 		ncol_current = ncol(current_state[[param]])
-		ncol_Posterior = dim(Posterior[[param]])[2]
+		ncol_Posterior = dim(Posterior[[param]])[3]
 		if(ncol_current > ncol_Posterior){
-			Posterior[[param]] = abind(Posterior[[param]],array(0,dim = c(nrow(current_state[[param]]),ncol_current-ncol_Posterior,sp)),along=2)
+			Posterior[[param]] = abind(Posterior[[param]],array(0,dim = c(sp,nrow(current_state[[param]]),ncol_current-ncol_Posterior)),along=3)
 		}
 		if(ncol_current < ncol_Posterior) {
-			Posterior[[param]] = Posterior[[param]][,1:ncol_current,,drop=F]
+			Posterior[[param]] = Posterior[[param]][,,1:ncol_current,drop=F]
 		}
-		Posterior[[param]][,,sp_num] = current_state[[param]]
+		Posterior[[param]][sp_num,,] = current_state[[param]]
 	}
 
 	for(param in Posterior$posteriorMean_params){
@@ -193,18 +193,17 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 
 initialize_Posterior = function(Posterior,current_state){
 	  for(param in Posterior$sample_params){
-    	Posterior[[param]] = array(0,dim = c(dim(current_state[[param]]),0))
-    	dimnames(Posterior[[param]])[1:2] = dimnames(current_state[[param]])
+    	Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
+    	dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
     }
-
     for(param in Posterior$posteriorMean_params) {
     	Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
     	dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
     }
-    for(param in Posterior$per_trait_params){
-    	dimnames(Posterior[[param]])[[2]] = current_state$traitnames
-    }
-    dimnames(Posterior$Lambda)[[1]] = current_state$traitnames
+    # for(param in Posterior$per_trait_params){
+    # 	dimnames(Posterior[[param]])[[length(dim(Posterior[[param]]))]] = current_state$traitnames
+    # }
+    # dimnames(Posterior$Lambda)[[2]] = current_state$traitnames
     Posterior$sp_num = 0
     Posterior
 }
@@ -213,7 +212,7 @@ expand_Posterior = function(Posterior,size){
 	require(abind)
 
 	for(param in Posterior$sample_params){
-		Posterior[[param]] = abind(Posterior[[param]],array(NA,dim = c(dim(Posterior[[param]])[1:2],size)),along = 3)
+		Posterior[[param]] = abind(Posterior[[param]],array(NA,dim = c(size,dim(Posterior[[param]])[2:3])),along = 1)
 	}
 	Posterior
 }

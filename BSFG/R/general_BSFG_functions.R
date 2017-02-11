@@ -1,3 +1,27 @@
+#' Sample from Mixed Model equations given a diagonal A matrix
+#'
+#' Sample from Mixed Model equations given a diagonal A matrix with sparse but non-diagonal R
+#'
+#' This function draws a sample of the vector \eqn{theta} given the model: \deqn{y = W\theta + e}
+#' \deqn{\theta \sim N_b(\mu,A)} \deqn{e \sim N(0,R)} The algorithm follows that shown in the
+#' MCMCglmm course notes. This involves solving: \deqn{\tilde{\theta} = C^{-1}W'R^{-1}(1 -
+#' W\theta_{*} - e_{*})}, where \deqn{C = W'R^{-1}W + A^{-1}}, and \deqn{\theta_{*} \sim N(\mu,A),
+#' e_{*} \sim N(0,R)}
+#'
+#' @param y vector of length n
+#' @param W matrix of size n x b
+#' @param C the C matrix
+#' @param prior_mean the vector \eqn{\mu}
+#' @param prior_prec the diagonal of the matrix A^{-1}
+#' @param Cholesky_R Cholesky decomposition of the sparse matrix R calculated by
+#'   \code(Cholesky(R_hat,perm=T,super=T)). The factorization is  \eqn{P' L L' P}. R_hat here is
+#'   \eqn R*tot_Y_prec, i.e., the covariance up to normalization by the total variance.
+#' @param chol_R the matrix \eqn{P' L} corresponding to the Cholesky_R decomposition above
+#' @param R_Perm either \code{NULL} if \eqn{P} is diagonal, or the \eqn{P} matrix.
+#' @param tot_Y_prec the inverse of the total variance
+#'
+#'
+#'
 sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec,randn_theta = NULL, randn_e = NULL) {
 	# R is aZAZ + bI
 	# 	 then form chol_R

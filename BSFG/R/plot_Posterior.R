@@ -16,8 +16,8 @@ trace_plot = function(data,main = NULL,ylim = NULL){
     max_range = max(abs(range_y))
     ylim = c(-max_range,max_range)
   }
-  plot(NA,NA,xlim = c(0,ncol(data)),ylim = ylim,main= main,xlab = "iteration")
-  for(i in 1:nrow(data)) lines(data[i,],col=i)
+  plot(NA,NA,xlim = c(0,nrow(data)),ylim = ylim,main= main,xlab = "iteration")
+  for(i in 1:ncol(data)) lines(data[,i],col=i)
 }
 
 trace_plot_h2s = function(Posterior, n_factors = 8, device = NULL){
@@ -31,12 +31,12 @@ trace_plot_h2s = function(Posterior, n_factors = 8, device = NULL){
   cols = 2*ceiling(n_factors / rows)
   par(mfrow=c(rows,cols))
 
-  for(k in 1:min(n_factors,dim(F_h2_samples)[2])){
-    trace_plot(t(as.matrix(F_h2_samples[,k,,drop=F])),main = sprintf('Factor %d h2s',k),ylim = c(0,1))
-    hist(F_h2_samples[1,k,],breaks=seq(0,1,length=100),xlim = c(-0.1,1),main = sprintf('Factor %d',k))
-    if(dim(F_h2_samples)[1] > 1) {
-      for(i in 2:dim(F_h2_samples)[1]){
-        hist(F_h2_samples[1,k,],breaks=seq(0,1,length=100),col = i)
+  for(k in 1:min(n_factors,dim(F_h2_samples)[3])){
+    trace_plot(as.matrix(F_h2_samples[,,k,drop=F]),main = sprintf('Factor %d h2s',k),ylim = c(0,1))
+    hist(F_h2_samples[,1,k],breaks=seq(0,1,length=100),xlim = c(-0.1,1),main = sprintf('Factor %d',k))
+    if(dim(F_h2_samples)[2] > 1) {
+      for(i in 2:dim(F_h2_samples)[2]){
+        hist(F_h2_samples[,1,k],breaks=seq(0,1,length=100),col = i)
       }
     }
   }
@@ -49,13 +49,13 @@ trace_plot_Lambda = function(Posterior, n_factors = 16, device = NULL){
 
   Lambda = Posterior$Lambda
 
-  rows = sqrt(n_factors)
+  rows = ceiling(sqrt(n_factors))
   cols = ceiling(n_factors / rows)
   par(mfrow=c(rows,cols))
 
-  for(k in 1:min(n_factors,dim(Lambda)[2])){
-    o = order(-abs(rowMeans(Lambda[,k,])))
-    traces = Lambda[o[1:5],k,]
+  for(k in 1:min(n_factors,dim(Lambda)[3])){
+    o = order(-abs(colMeans(Lambda[,,k])))
+    traces = Lambda[,o[1:5],k]
     trace_plot(traces,main = sprintf('Factor %d lambdas',k))
   }
 }
@@ -145,17 +145,17 @@ plot_fixed_effects = function(B_act, B_resid,B_factor,B_total){
 
 calc_posterior_mean_cov = function(Posterior,random_effect){
   with(Posterior,{
-    p = dim(Lambda)[1]
+    p = dim(Lambda)[2]
     G = matrix(0,p,p)
     for(i in 1:sp_num){
       if(random_effect == 'Ve'){
-        factor_h2s_i = 1-colSums(F_h2[,,i,drop=FALSE])
-        resid_h2s_i = 1-colSums(resid_h2[,,i,drop=FALSE])
+        factor_h2s_i = 1-colSums(F_h2[i,,,drop=FALSE])
+        resid_h2s_i = 1-colSums(resid_h2[i,,,drop=FALSE])
       } else{
-        factor_h2s_i = F_h2[random_effect,,i]
-        resid_h2s_i = resid_h2[random_effect,,i]
+        factor_h2s_i = F_h2[i,random_effect,]
+        resid_h2s_i = resid_h2[i,random_effect,]
       }
-      G_i = tcrossprod(sweep(Lambda[,,i],2,sqrt(factor_h2s_i),'*')) + diag(c(resid_h2s_i/tot_Y_prec[1,,i]))
+      G_i = tcrossprod(sweep(Lambda[i,,],2,sqrt(factor_h2s_i),'*')) + diag(c(resid_h2s_i/tot_Y_prec[i,1,]))
       G = G + G_i/sp_num
     }
     G
@@ -163,7 +163,7 @@ calc_posterior_mean_cov = function(Posterior,random_effect){
 }
 
 calc_posterior_mean_Lambda = function(Posterior){
-  return(with(Posterior,apply(Lambda,c(1,2),mean)))
+  return(with(Posterior,apply(Lambda,c(2,3),mean)))
 }
 
 plot_factor_h2s = function(F_h2) {
@@ -191,22 +191,22 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
   Posterior = BSFG_state$Posterior
   p = dim(Posterior$Lambda)[1]
   plot_element_wise_correlations(setup$R, calc_posterior_mean_cov(Posterior,'Ve'),main = 'E elements')
-  for(RE_name in dimnames(Posterior$F_h2)[[1]]) {
+  for(RE_name in dimnames(Posterior$F_h2)[[2]]) {
     plot_element_wise_correlations(setup$G, calc_posterior_mean_cov(Posterior,RE_name),main = sprintf('G: %s elements',RE_name))
   }
 
   plot_factor_correlations(calc_posterior_mean_Lambda(Posterior),setup$error_factor_Lambda)
 
-  plot_factor_h2s(apply(Posterior$F_h2,c(1,2),mean))
+  plot_factor_h2s(apply(Posterior$F_h2,c(2,3),mean))
 
 
   # B's # These seem to be wrong.
 
   if(dim(setup$B)[1] > 1) {
-    B_mean = apply(Posterior$B,c(1,2),mean)
+    B_mean = apply(Posterior$B,c(2,3),mean)
     B_factor_mean = with(c(Posterior,BSFG_state$data_matrices), {
       if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
-      matrix(rowMeans(sapply(1:sp_num,function(i) B_F[,,i] %*% t(Lambda[,,i]))),nrow = ncol(X_F))
+      matrix(rowMeans(sapply(1:sp_num,function(i) B_F[i,,] %*% t(Lambda[i,,]))),nrow = ncol(X_F))
     })
     plot(c(B_mean),c(setup$B))
     abline(0,1)
@@ -214,8 +214,8 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
     abline(0,1)
     xlim = ylim = range(c(B_mean[-1,],B_factor_mean))
     plot(c(B_factor_mean),c(B_mean[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
-    B_f_HPD = HPDinterval(mcmc(t(Posterior$B_F[1,,])))
-    B_f_mean = rowMeans(Posterior$B_F[1,,])
+    B_f_HPD = HPDinterval(mcmc(Posterior$B_F[,1,]))
+    B_f_mean = colMeans(Posterior$B_F[,1,])
 
     plot(1:length(B_f_mean),B_f_mean,xlim = c(1,length(B_f_mean)),ylim = range(B_f_HPD),xlab = '',main = 'Posterior B_F')
     arrows(seq_along(B_f_mean),B_f_HPD[,1],seq_along(B_f_mean),B_f_HPD[,2],length=0)

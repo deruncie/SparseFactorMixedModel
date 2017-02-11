@@ -30,6 +30,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     #       shape = tot_Y_prec_shape
     #       rate = tot_Y_prec_rate
     tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
+    colnames(tot_Y_prec) = traitnames
 
     # Factors:
     #  initial number of factors
@@ -62,6 +63,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
      #       mu = 0
      #       sd = sqrt(1/Plam)
     Lambda = matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
+    rownames(Lambda) = traitnames
 
     # p-vector of heritabilities for residuals on factors.
 	#  Prior: discrete prior on interval [0,1)
@@ -75,6 +77,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     #       mean = 0
     #       sd = 1./sqrt(E_a_prec)' on each row
     E_a = matrix(rnorm(p*r,0,sqrt(resid_h2 * tot_Y_prec)),nr = r,nc = p, byrow = T)
+    colnames(E_a) = traitnames
 
     # Latent factor variances
     tot_F_prec = with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
@@ -104,6 +107,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     #       mean = 0
     #       sd = sqrt(1/fixed_effects_prec)
     B = matrix(rnorm(b*p),nr = b, nc = p)
+    colnames(B) = traitnames
 
     if(b > 0) {
       prec_B = matrix(c(0,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
@@ -143,8 +147,8 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # ----------------------- #
     Posterior = list(
       sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2', 'B', 'B_F', 'prec_B'),
-      posteriorMean_params = c('E_a'),
-      per_trait_params = c('tot_Y_prec','resid_h2','B')
+      posteriorMean_params = c('E_a')
+      # per_trait_params = c('tot_Y_prec','resid_h2','B','E_a')
     )
     Posterior = initialize_Posterior(Posterior,current_state)
 

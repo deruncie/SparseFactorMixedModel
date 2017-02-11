@@ -191,6 +191,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	h2s_matrix = expand.grid(lapply(RE_names,function(re) seq(0,1,length = h2_divisions[[re]]+1)))
 	colnames(h2s_matrix) = RE_names
 	h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
+	colnames(h2s_matrix) = NULL
 
 	data_matrices = list(
 	  Y          = Y,
