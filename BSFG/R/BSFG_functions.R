@@ -28,17 +28,13 @@ load_simulation_data = function(file = NULL){
 
 #' Checks if factors (columns of Lambda) can be safely dropped
 #'
-#' Factors are dropped if \code{prop} faction of the \lambda_{ij} elements are less than
+#' Factors are dropped if \code{prop} faction of the \eqn{\lambda_{ij}} elements are less than
 #' \code{epsilon}. Checking happens stochastically at a decreasing rate during the chain controlled
-#' by b0 and b1. If no factors can be dropped, then a new one is appended.
+#' by b0 and b1. If no factors can be dropped, then a new one is appended. The rate of adaptation
+#' decreases through the chain, controlled by b0 and b1. Should work correctly over continuations of
+#' previously stopped chains.
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 update_k = function( current_state, priors,run_parameters,data_matrices) {
-# adapt the number of factors by dropping factors with only small loadings
-# if they exist, or adding new factors sampled from the prior if all factors
-# appear important. The rate of adaptation decreases through the chain,
-# controlled by b0 and b1. Should work correctly over continuations of
-# previously stopped chains.
-
 	current_state_members = names(current_state)
 	current_state = with(c(priors,run_parameters,data_matrices),within(current_state, {
 		i = nrun
@@ -227,7 +223,7 @@ clear_Posterior = function(BSFG_state) {
 	Posterior = BSFG_state$Posterior
 	run_parameters = BSFG_state$run_parameters
 
-	current_samples = dim(Posterior[[Posterior$sample_params[1]]])[3]
+	current_samples = dim(Posterior[[Posterior$sample_params[1]]])[1]
 
 	if(current_samples > 0) {
     	run_parameters$burn = run_parameters$burn + run_parameters$thin*current_samples

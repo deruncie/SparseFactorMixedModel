@@ -7,9 +7,11 @@
 update_k(current_state, priors, run_parameters, data_matrices)
 }
 \description{
-Factors are dropped if \code{prop} faction of the \lambda_{ij} elements are less than
+Factors are dropped if \code{prop} faction of the \eqn{\lambda_{ij}} elements are less than
 \code{epsilon}. Checking happens stochastically at a decreasing rate during the chain controlled
-by b0 and b1. If no factors can be dropped, then a new one is appended.
+by b0 and b1. If no factors can be dropped, then a new one is appended. The rate of adaptation
+decreases through the chain, controlled by b0 and b1. Should work correctly over continuations of
+previously stopped chains.
 }
 \seealso{
 \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}

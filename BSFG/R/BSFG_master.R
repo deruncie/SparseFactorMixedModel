@@ -11,18 +11,19 @@
 #' @param scale_Y Should the Y values be centered and scaled? Recommend, except for simulated data.
 #' @param b0 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
 #' @param b1 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
-#' @param epsilon parameter of the \code{update_k} function. Smallest \lambda_{ij} that is
+#' @param epsilon parameter of the \code{update_k} function. Smallest \eqn{\lambda_{ij}} that is
 #'   considered "large", signifying a factor should be kept
-#' @param prop proportion of \lambda{ij} elements in a column of \Lambda that must be smaller than
+#' @param prop proportion of \eqn{\lambda{ij}} elements in a column of \eqn{\Lambda} that must be smaller than
 #'   \code{epsilon} before factor is dropped
 #' @param kinit initial number of factors
 #' @param h2_divisions A scalar or vector of length equal to number of random effects, specifying
 #'   the number of equally spaced divisions to devide each random effect variance component. All
 #'   variance componets are scaled as percent_of_total. This number of divisions are created for
 #'   each component, and then combined with \code{expand.grid()}. Then combinations of variances that sum to less than 1 are selected as valid.
-#' @burn burnin length of the MCMC chain
-#' @thin thinning rate of the MCMC chain
-#' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}},
+#' @param burn burnin length of the MCMC chain
+#' @param thin thinning rate of the MCMC chain
+#' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
+#'
 BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),fixed_factors = c(T,F),simulation = c(F,T),scale_Y = c(T,F),
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100,
@@ -217,6 +218,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 	# ----------------------------- #
 	# ----- re-formulate priors --- #
 	# ----------------------------- #
+	if(any(sapply(priors, function(x) {try({return(x$nu <= 2)},silent=T);return(FALSE)}))) stop('priors nu must be > 2')
 	  # fixed effects
 	priors$fixed_prec_shape = with(priors$fixed_var,V * nu)
 	priors$fixed_prec_rate  = with(priors$fixed_var,nu - 2)

@@ -4,23 +4,23 @@
 \alias{sample_MME_single_diagA}
 \title{Sample from Mixed Model equations given a diagonal A matrix}
 \usage{
-sample_MME_single_diagA(y, W, C, RinvSqW, prior_mean, prior_prec, Cholesky_R,
-  chol_R, R_Perm, tot_Y_prec, randn_theta = NULL, randn_e = NULL)
+sample_MME_single_diagA(y, W, Wp, prior_mean, prior_prec, Cholesky_R, chol_R,
+  R_Perm, tot_Y_prec, randn_theta = NULL, randn_e = NULL)
 }
 \arguments{
 \item{y}{vector of length n}
 
 \item{W}{matrix of size n x b}
 
-\item{C}{the C matrix}
+\item{Wp}{\eqn{R_perm * W} (see below)}
 
 \item{prior_mean}{the vector \eqn{\mu}}
 
-\item{prior_prec}{the diagonal of the matrix A^{-1}}
+\item{prior_prec}{the diagonal of the matrix A^{-1}. All elements must be > 0}
 
 \item{Cholesky_R}{Cholesky decomposition of the sparse matrix R calculated by
-\code(Cholesky(R_hat,perm=T,super=T)). The factorization is  \eqn{P' L L' P}. R_hat here is
-\eqn R*tot_Y_prec, i.e., the covariance up to normalization by the total variance.}
+\code{Cholesky(R_hat,perm=T,super=T)}. The factorization is  \eqn{P' L L' P}. R_hat here is
+\eqn{R*tot_Y_prec}, i.e., the covariance up to normalization by the total variance.}
 
 \item{chol_R}{the matrix \eqn{P' L} corresponding to the Cholesky_R decomposition above}
 
@@ -32,9 +32,14 @@ sample_MME_single_diagA(y, W, C, RinvSqW, prior_mean, prior_prec, Cholesky_R,
 Sample from Mixed Model equations given a diagonal A matrix with sparse but non-diagonal R
 }
 \details{
-This function draws a sample of the vector \eqn{theta} given the model: \deqn{y = W\theta + e}
-\deqn{\theta \sim N_b(\mu,A)} \deqn{e \sim N(0,R)} The algorithm follows that shown in the
-MCMCglmm course notes. This involves solving: \deqn{\tilde{\theta} = C^{-1}W'R^{-1}(1 -
-W\theta_{*} - e_{*})}, where \deqn{C = W'R^{-1}W + A^{-1}}, and \deqn{\theta_{*} \sim N(\mu,A),
-e_{*} \sim N(0,R)}
+This function draws a sample of the vector \eqn{theta} given the model:
+    \deqn{y = W\theta + e}
+    \deqn{\theta \sim N_b(\mu,A)} \deqn{e \sim N(0,R)} The algorithm follows that shown in the
+    MCMCglmm course notes. This involves solving:
+    \deqn{\tilde{\theta} = C^{-1}W'R^{-1}(1 - W\theta_{*} - e_{*})}
+    \deqn{C = W'R^{-1}W + A^{-1}}
+    \deqn{\theta_{*} \sim N(\mu,A), e_{*} \sim N(0,R)}
+
+To speed up the calculations, \eqn{R_hat = R*tot_Y_prec = P' L L' P} is pre-calculated, and used
+in place of \eqn{R^{-1}}.
 }

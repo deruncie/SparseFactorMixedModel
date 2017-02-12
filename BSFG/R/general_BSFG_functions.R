@@ -2,32 +2,30 @@
 #'
 #' Sample from Mixed Model equations given a diagonal A matrix with sparse but non-diagonal R
 #'
-#' This function draws a sample of the vector \eqn{theta} given the model: \deqn{y = W\theta + e}
-#' \deqn{\theta \sim N_b(\mu,A)} \deqn{e \sim N(0,R)} The algorithm follows that shown in the
-#' MCMCglmm course notes. This involves solving: \deqn{\tilde{\theta} = C^{-1}W'R^{-1}(1 -
-#' W\theta_{*} - e_{*})}, where \deqn{C = W'R^{-1}W + A^{-1}}, and \deqn{\theta_{*} \sim N(\mu,A),
-#' e_{*} \sim N(0,R)}
+#' This function draws a sample of the vector \eqn{theta} given the model:
+#'     \deqn{y = W\theta + e}
+#'     \deqn{\theta \sim N_b(\mu,A)} \deqn{e \sim N(0,R)} The algorithm follows that shown in the
+#'     MCMCglmm course notes. This involves solving:
+#'     \deqn{\tilde{\theta} = C^{-1}W'R^{-1}(1 - W\theta_{*} - e_{*})}
+#'     \deqn{C = W'R^{-1}W + A^{-1}}
+#'     \deqn{\theta_{*} \sim N(\mu,A), e_{*} \sim N(0,R)}
+#'
+#' To speed up the calculations, \eqn{R_hat = R*tot_Y_prec = P' L L' P} is pre-calculated, and used
+#' in place of \eqn{R^{-1}}.
 #'
 #' @param y vector of length n
 #' @param W matrix of size n x b
-#' @param C the C matrix
+#' @param Wp \eqn{R_perm * W} (see below)
 #' @param prior_mean the vector \eqn{\mu}
-#' @param prior_prec the diagonal of the matrix A^{-1}
+#' @param prior_prec the diagonal of the matrix A^{-1}. All elements must be > 0
 #' @param Cholesky_R Cholesky decomposition of the sparse matrix R calculated by
-#'   \code(Cholesky(R_hat,perm=T,super=T)). The factorization is  \eqn{P' L L' P}. R_hat here is
-#'   \eqn R*tot_Y_prec, i.e., the covariance up to normalization by the total variance.
+#'   \code{Cholesky(R_hat,perm=T,super=T)}. The factorization is  \eqn{P' L L' P}. R_hat here is
+#'   \eqn{R*tot_Y_prec}, i.e., the covariance up to normalization by the total variance.
 #' @param chol_R the matrix \eqn{P' L} corresponding to the Cholesky_R decomposition above
 #' @param R_Perm either \code{NULL} if \eqn{P} is diagonal, or the \eqn{P} matrix.
 #' @param tot_Y_prec the inverse of the total variance
 #'
-#'
-#'
-sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec,randn_theta = NULL, randn_e = NULL) {
-	# R is aZAZ + bI
-	# 	 then form chol_R
-	# 	 checkh whether solve(t(chol_Rinv),theta) or chol_R %*% theta is better.
-	# G is diagonal (fixed effect) - prior prec
-	# prior_prec must be > 0
+sample_MME_single_diagA = function(y, W, Wp, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec,randn_theta = NULL, randn_e = NULL) {
 	n = length(y)
 	n_theta = length(prior_prec)
 	if(is.null(randn_theta)) {
@@ -46,6 +44,9 @@ sample_MME_single_diagA = function(y, W, C, RinvSqW, prior_mean,prior_prec,Chole
 		y_resid_p = y_resid
 	}
 
+	RinvSqW = solve(Cholesky_R,Wp,'L')
+	C = crossprod(RinvSqW) * tot_Y_prec
+	diag(C) = diag(C) + prior_prec
 	WtRinvy = crossprod(RinvSqW, solve(Cholesky_R,y_resid_p,'L')) * tot_Y_prec
 
 	theta_tilda = solve(C,WtRinvy)
@@ -99,10 +100,7 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, t
 	res = mclapply(1:p,function(j) {
 		Cholesky_R = Sigma_Choleskys[[h2s_index[j]]]$Cholesky_Sigma
 		chol_R = Sigma_Choleskys[[h2s_index[j]]]$chol_Sigma
-		RinvSqW = solve(Cholesky_R,Wp,'L')
-		C = crossprod(RinvSqW) * tot_Y_prec[j]
-		diag(C) = diag(C) + prior_prec[,j]
-		theta_j = sample_MME_single_diagA(Y[,j], W, C, RinvSqW, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j], randn_theta[,j],randn_e[,j])
+		theta_j = sample_MME_single_diagA(Y[,j], W, Wp, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j], randn_theta[,j],randn_e[,j])
 		theta_j
 	},mc.cores = ncores)
 	res = do.call(cbind,res)

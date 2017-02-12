@@ -91,7 +91,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
      #       shape = tot_Y_prec_shape
      #       rate = tot_Y_prec_rate
     tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
-    colnames(Lambda) = traitnames
+    colnames(tot_Y_prec) = traitnames
 
     # Resid discrete variances
      # p-matrix of n_RE x p with

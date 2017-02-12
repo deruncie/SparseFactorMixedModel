@@ -22,16 +22,20 @@ residuals? If so, the first column of the design matrix is dropped.}
 
 \item{b1}{parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011}
 
-\item{epsilon}{parameter of the \code{update_k} function. Smallest \lambda_{ij} that is
+\item{epsilon}{parameter of the \code{update_k} function. Smallest \eqn{\lambda_{ij}} that is
 considered "large", signifying a factor should be kept}
 
-\item{prop}{proportion of \lambda{ij} elements in a column of \Lambda that must be smaller than
+\item{prop}{proportion of \eqn{\lambda{ij}} elements in a column of \eqn{\Lambda} that must be smaller than
 \code{epsilon} before factor is dropped}
 
 \item{h2_divisions}{A scalar or vector of length equal to number of random effects, specifying
 the number of equally spaced divisions to devide each random effect variance component. All
 variance componets are scaled as percent_of_total. This number of divisions are created for
 each component, and then combined with \code{expand.grid()}. Then combinations of variances that sum to less than 1 are selected as valid.}
+
+\item{burn}{burnin length of the MCMC chain}
+
+\item{thin}{thinning rate of the MCMC chain}
 
 \item{simulaiton}{Is this a fit to simulated data? If so, a setup list will be expected providing
 the true values}
@@ -42,5 +46,5 @@ the true values}
 Function to create run_parameters list for initializing BSFG model
 }
 \seealso{
-\code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}},
+\code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 }
