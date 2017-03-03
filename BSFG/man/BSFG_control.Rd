@@ -23,15 +23,17 @@ residuals? If so, the first column of the design matrix is dropped.}
 \item{b1}{parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011}
 
 \item{epsilon}{parameter of the \code{update_k} function. Smallest \eqn{\lambda_{ij}} that is
-considered "large", signifying a factor should be kept}
+considered "large", signifying a factor should be kept. See Bhattacharya and Dunson 2011}
 
 \item{prop}{proportion of \eqn{\lambda{ij}} elements in a column of \eqn{\Lambda} that must be smaller than
-\code{epsilon} before factor is dropped}
+\code{epsilon} before factor is dropped. See Bhattacharya and Dunson 2011}
 
-\item{h2_divisions}{A scalar or vector of length equal to number of random effects, specifying
-the number of equally spaced divisions to devide each random effect variance component. All
-variance componets are scaled as percent_of_total. This number of divisions are created for
-each component, and then combined with \code{expand.grid()}. Then combinations of variances that sum to less than 1 are selected as valid.}
+\item{h2_divisions}{A scalar or vector of length equal to number of random effects. In BSFG, random
+effects are re-scaled as percentages of the total variation. Then a discrete prior spanning [0,1)
+with \code{h2_divisions} equally spaced values is constructred for each variance component. If
+\code{h2_divisions} is a scalar, the prior for each variance component has this number of divisions.
+In the joint prior over all variance components, combinations of variance components with total variance != 1
+are assigned a prior of zero and ignored.}
 
 \item{burn}{burnin length of the MCMC chain}
 

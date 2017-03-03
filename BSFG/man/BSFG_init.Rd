@@ -11,11 +11,11 @@ BSFG_init(Y, fixed, random, data, priors, run_parameters, A_mats = NULL,
 \arguments{
 \item{Y}{a n x p matrix of data (n individuals x p traits)}
 
-\item{fixed}{formula for the fixed effects}
+\item{fixed}{formula for the fixed effects. Terms in the model must be columns of \code{data}}
 
 \item{random}{formula for the random effects. Multiple random effects can be specified as
-~random1+random2+..., but currently there is no support for interactions. Each random effect
-must correspond to a column of data (which should be a factor)}
+~random1+random2+..., but currently there is no support for interactions or within-group models.
+Each random effect must correspond to a column of data (which should be a factor)}
 
 \item{data}{data.frame with n rows containing columns corresponding to the fixed and random
 effects}

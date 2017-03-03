@@ -12,14 +12,16 @@
 #' @param b0 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
 #' @param b1 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
 #' @param epsilon parameter of the \code{update_k} function. Smallest \eqn{\lambda_{ij}} that is
-#'   considered "large", signifying a factor should be kept
+#'   considered "large", signifying a factor should be kept. See Bhattacharya and Dunson 2011
 #' @param prop proportion of \eqn{\lambda{ij}} elements in a column of \eqn{\Lambda} that must be smaller than
-#'   \code{epsilon} before factor is dropped
+#'   \code{epsilon} before factor is dropped. See Bhattacharya and Dunson 2011
 #' @param kinit initial number of factors
-#' @param h2_divisions A scalar or vector of length equal to number of random effects, specifying
-#'   the number of equally spaced divisions to devide each random effect variance component. All
-#'   variance componets are scaled as percent_of_total. This number of divisions are created for
-#'   each component, and then combined with \code{expand.grid()}. Then combinations of variances that sum to less than 1 are selected as valid.
+#' @param h2_divisions A scalar or vector of length equal to number of random effects. In BSFG, random
+#'   effects are re-scaled as percentages of the total variation. Then a discrete prior spanning [0,1)
+#'   with \code{h2_divisions} equally spaced values is constructred for each variance component. If
+#'   \code{h2_divisions} is a scalar, the prior for each variance component has this number of divisions.
+#'   In the joint prior over all variance components, combinations of variance components with total variance != 1
+#'   are assigned a prior of zero and ignored.
 #' @param burn burnin length of the MCMC chain
 #' @param thin thinning rate of the MCMC chain
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
@@ -48,10 +50,10 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),fixed_factors = 
 #'
 #'
 #' @param Y a n x p matrix of data (n individuals x p traits)
-#' @param fixed  formula for the fixed effects
+#' @param fixed formula for the fixed effects. Terms in the model must be columns of \code{data}
 #' @param random formula for the random effects. Multiple random effects can be specified as
-#'   ~random1+random2+..., but currently there is no support for interactions. Each random effect
-#'   must correspond to a column of data (which should be a factor)
+#'   ~random1+random2+..., but currently there is no support for interactions or within-group models.
+#'   Each random effect must correspond to a column of data (which should be a factor)
 #' @param data data.frame with n rows containing columns corresponding to the fixed and random
 #'   effects
 #' @param priors list providing hyperparameters for the model priors. T
@@ -102,6 +104,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 
 	# build X from fixed model
 	  # for residuals
+	if(!all(all.vars(fixed) %in% colnames(data))) stop('missing fixed effect columns in data')
 	X = model.matrix(fixed,data)
 	b = ncol(X)
 
@@ -118,6 +121,7 @@ BSFG_init = function(Y, fixed, random, data, priors, run_parameters, A_mats = NU
 
 	# build Z matrices from random model
 	RE_names = rownames(attr(terms(random),'factors'))
+	if(!all(RE_names %in% colnames(data))) stop('missing random effect columns in data')
 	n_RE = length(RE_names)
 
 	if(n_RE > 1 && run_parameters$sampler == 'fast_BSFG'){
