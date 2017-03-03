@@ -19,7 +19,7 @@ run_parameters = list(
     # sampler = 'general_BSFG',
     fixed_factors = FALSE,
     simulation   = FALSE,
-    scale_Y      = FALSE,
+    scale_Y      = TRUE,
     b0           = 1,
     b1           = 0.0005,
     epsilon      = 1e-1,
@@ -44,9 +44,8 @@ priors = list(
 
 print('Initializing')
 
-BSFG_state = with(setup,BSFG_init(Y, fixed=~1, random=~animal, #
-                                  data,priors,run_parameters,A_mats = list(animal = A),
-                                  setup = setup))
+BSFG_state = BSFG_init(Y, fixed=~1, random=~animal,
+                                  data,priors,run_parameters,A_mats = list(animal = A))
 
 # h2_divisions = run_parameters$h2_divisions
 # BSFG_state$priors$Resid_discrete_priors = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
@@ -82,7 +81,9 @@ for(i  in 1:70) {
     Posterior = BSFG_state$Posterior
     save(Posterior,file = 'Posterior.RData')
     print(BSFG_state)
+    pdf('adsf.pdf')
     plot(BSFG_state)
+    dev.off()
 }
 
 library(shinystan)
