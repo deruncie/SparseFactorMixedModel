@@ -77,7 +77,6 @@ plot_element_wise_correlations = function(actual_G, estimated_G, main = NULL){
 }
 
 plot_current_state_simulation = function(BSFG_state, device = NULL){
-  require(cowplot)
   if(!is.null(device)) {
     set_device(device)
   }
@@ -181,7 +180,6 @@ plot_HPDIntervals_factor_h2 = function(Posterior){
 }
 
 plot_posterior_simulation = function(BSFG_state, device = NULL){
-  require(cowplot)
   if(!is.null(device)) {
     set_device(device)
   }
