@@ -1,7 +1,5 @@
 library(pedantics)
 #library(R.matlab)
-# define E_a_prec; resid_Y_prec; name
-# get A
 
 
 prepare_simulation2 = function(A_chol,A,Lambda,factor_h2s,E_a_prec,resid_Y_prec,name){
@@ -37,8 +35,8 @@ prepare_simulation2 = function(A_chol,A,Lambda,factor_h2s,E_a_prec,resid_Y_prec,
   
   print(name)
   setup = list(Y=Y,F_act=F,E_a_act=E_a_act,F_a_act = F_a,Z_1=Z_1,A=A,X=X,n=n,r=r,p=p,G=G,R=R,
-               gen_factor_Lambda = Lambda,error_factor_Lambda = Lambda,h2=h2,B=B, factor_h2s=factor_h2s,name=name)
-  
+               gen_factor_Lambda = Lambda,error_factor_Lambda = Lambda,h2=h2,B=B, factor_h2s=factor_h2s,name=name,pops)
+  # ????????????????????gen_factor_Lambda ; error_factor_Lambda
   return(setup)
   #do.call(writeMat,c("setup.mat",setup))
   #save(pedigree,file="pedigree.Robj")
@@ -46,9 +44,6 @@ prepare_simulation2 = function(A_chol,A,Lambda,factor_h2s,E_a_prec,resid_Y_prec,
 
  
 #==================================================================
-
-
-
 counter = 0
 
 #sample_size simulations
@@ -72,7 +67,7 @@ setwd("~/Runcie Lab/pedigree")
 data=read.csv('IDDammSirelnUpdate(1).csv',header = TRUE)
 source("~/Runcie Lab/SparseFactorMixedModel_v2/R_BSFG/setup_pedigree.R")
 # find way to change this according to the size(different pops)
-pops = c("LConG1","LConG2","LConG3")
+
 ori.setup = list()
 ori.setup[[pops[1]]] = setup_pedigree(data,GenerationCode=3,LineCode=c(0,1),fixedfactor=NA) # no fixed factor because we seperate the dataset based on generation
 ori.setup[[pops[2]]] = setup_pedigree(data,GenerationCode=2,LineCode=1,fixedfactor=NA)
@@ -82,6 +77,7 @@ setwd("~/Runcie Lab/SparseFactorMixedModel_v2/R_BSFG/Simulation")
  #sample_size = list(Small = c(50,5), Medium = c(100,10), Large = c(500,10))
 # set seed for repeatability
 set.seed(1)
+pops = c("LConG1","LConG2","LConG3")
 for(rep in 1:num_reps){
   # number of individuals that have the same mother:
   # c(50,5) in this case means that for 50 fathers, each of them have 5 children. There are total 250 individuals.
@@ -107,7 +103,7 @@ for(rep in 1:num_reps){
     factor_h2s = factor_h2s[order(factor_h2s,decreasing = TRUE)]
     factor_h2s[seq(1,k,by=2)]=0  # make 5 of them to be zero
     
-    g_cols = factor_h2s>0
+    g_cols = factor_h2s>0  # will this step makes lambda matrix to be different in pops?????
     Lambda =Lambda[do.call("order", unname(split(-abs(Lambda[,cols[factor_h2s>0]]), col(Lambda[,cols[factor_h2s>0]])))),]
     # reordering lambda
     
@@ -121,7 +117,6 @@ for(rep in 1:num_reps){
   setwd(dir)
   save(setup,file = 'setup.RData')
   setwd('..')
-  
 }
 
 
