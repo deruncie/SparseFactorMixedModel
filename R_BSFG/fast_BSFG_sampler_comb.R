@@ -115,7 +115,7 @@ fast_BSFG_sampler_comb = function(BSFG_state,n_samples) {
   F_a          =   current_state$F_a
   B            =   current_state$B
   start_i      =   current_state$nrun
-  k = ncol(F)
+  k = ncol(F[[1]])
   
   # ----------------------------------------------- #
   # -----------Reset Global Random Number Stream--- #
@@ -184,39 +184,6 @@ fast_BSFG_sampler_comb = function(BSFG_state,n_samples) {
     }
     # recover()
     
-    # -----Sample Lambda------------------ #
-    #conditioning on W, B, F, marginalizing over E _a
-    Y_tilde = Y - X %*% B - Z_2 %*% W
-    Y_tilde = as.matrix(Y_tilde)
-    # Lambda = sample_Lambda( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
-    
-    Lambda = sample_Lambda_comb( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
-
-    # -----Sample Lambda_prec------------- #
-    Lambda2 = Lambda^2
-    Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
-    
-    # -----Sample delta, update tauh------ #
-    delta = sample_delta( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2 )
-    tauh  = cumprod(delta)
-    
-    # -----Update Plam-------------------- #
-    Plam = sweep(Lambda_prec,2,tauh,'*')
-    
-    # -----Sample resid_Y_prec ---------------- #
-    # should be able to sample this here marginalizing over E_a in the same way that E_a_prec is done below.
-    
-    # -----Sample E_a_prec---------------- #
-    #conditioning on W, B, F, marginalizing over E_a 
-    # E_a_prec = sample_prec_discrete_conditional(Y - X %*% B-F %*% t(Lambda) - Z_2 %*% W,h2_divisions,h2_priors_resids,invert_aI_bZAZ,resid_Y_prec)
-    # E_a_prec = sample_prec_discrete_conditional_c(Y - X %*% B-F %*% t(Lambda) - Z_2 %*% W,h2_divisions,h2_priors_resids,invert_aI_bZAZ,resid_Y_prec)
-    
-    # pops should be a output from setup datasets and for pop in pops, the row number for 
-    # each pop should also included in the setup dataset
-    # read pops (number of populations)
-    # read row number for each pop
-    # in the loop, replace Y as Y[pops,], etc (instead of using lists because we need to use all Y together to sample lambda)
-   
     # -----Sample B and E_a--------------- #
     #conditioning on W, F, Lambda
     for(pop in pops){
@@ -224,16 +191,12 @@ fast_BSFG_sampler_comb = function(BSFG_state,n_samples) {
       Y_tilde = as.matrix(Y_tilde)
       # location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
       location_sample = sample_means( Y_tilde, resid_Y_prec[[pop]], E_a_prec[[pop]], invert_aPXA_bDesignDesignT[[pop]] )
-      B[[pop]]   = location_sample[1:b,]
-      if(length(B[[pop]])==p){
-        B[[pop]] = matrix(0,nr=0,nc=p)
-      }
-      E_a[[pop]] = location_sample[b+(1:r),]
-      
+      B[[pop]]   = location_sample[1:b[[pop]],,drop=FALSE]
+      E_a[[pop]] = location_sample[b[[pop]]+(1:r[[pop]]),]
       
       # -----Sample W ---------------------- #
       #conditioning on B, E_a, F, Lambda
-      if(ncol(Z_2) > 0) {
+      if(ncol(Z_2[[pop]]) > 0) {
         Y_tilde = Y[[pop]] - X[[pop]] %*% B[[pop]] - Z_1[[pop]] %*% E_a[[pop]] - F[[pop]] %*% t(Lambda)
         Y_tilde = as.matrix(Y_tilde)
         # location_sample = sample_means( Y_tilde, resid_Y_prec, W_prec, invert_aPXA_bDesignDesignT_rand2 )
@@ -261,18 +224,65 @@ fast_BSFG_sampler_comb = function(BSFG_state,n_samples) {
       
       # -----Sample resid_Y_prec------------ #
       Y_tilde = Y[[pop]] - X[[pop]] %*% B[[pop]] - F[[pop]] %*% t(Lambda) - Z_1[[pop]] %*% E_a[[pop]] - Z_2[[pop]] %*% W[[pop]]
-      resid_Y_prec[[pop]] = rgamma(p,shape = resid_Y_prec_shape + n/2, rate = resid_Y_prec_rate+1/2*colSums(Y_tilde^2)) #model residual precision
+      resid_Y_prec[[pop]] = rgamma(p,shape = resid_Y_prec_shape + n[[pop]]/2, rate = resid_Y_prec_rate+1/2*colSums(Y_tilde^2)) #model residual precision
       # n is the sum of all populations
       
       # -----Sample E_a_prec---------------- #
       #     #random effect 1 (D) residual precision
-      E_a_prec[[pop]] = rgamma(p,shape = E_a_prec_shape + r/2, rate = E_a_prec_rate + 1/2*diag(t(E_a[[pop]]) %*% Ainv[[pop]] %*% E_a[[pop]]))
+      E_a_prec[[pop]] = rgamma(p,shape = E_a_prec_shape + r[[pop]]/2, rate = E_a_prec_rate + 1/2*diag(t(E_a[[pop]]) %*% Ainv[[pop]] %*% E_a[[pop]]))
       
       # -----Sample W_prec------------------ #
-      if(ncol(Z_2) > 0) {
+      if(ncol(Z_2[[pop]]) > 0) {
         W_prec[[pop]] =  rgamma(p, W_prec_shape + r2/2,rate = W_prec_rate + 1/2*diag(t(W[[pop]]) %*% A_2_inv[[pop]] %*% W[[pop]]))
       }
     }
+    
+    # -----Sample Lambda------------------ #
+    # create a new set of variables for sampling Lambda
+    #Y_lab = do.call(rbind,Y)
+    # Combine X as block diagonal matrix  
+    #library(Matrix)
+    #X_lab = Reduce(bdiag,X)
+    #B_lab = do.call(rbind,B)
+                          
+    #Z_2_lab = do.call(rbind,Z_2)
+    #W_lab = Reduce("+",W)/length(W)
+    #F_lab = do.call(rbind,F)
+    #resid_Y_prec_lab = Reduce("+",resid_Y_prec)/length(resid_Y_prec)
+    #E_a_prec_lab = Reduce("+",E_a_prec)/length(E_a_prec)
+    
+    #conditioning on W, B, F, marginalizing over E _a
+    #Y_tilde = Y - X %*% B - Z_2 %*% W
+    #Y_tilde = as.matrix(Y_tilde)
+    # Lambda = sample_Lambda( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
+    
+    Lambda = sample_Lambda_comb( Y,X,B,Z_2,W,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
+    
+    # -----Sample Lambda_prec------------- #
+    Lambda2 = Lambda^2
+    Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
+    
+    # -----Sample delta, update tauh------ #
+    delta = sample_delta( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2 )
+    tauh  = cumprod(delta)
+    
+    # -----Update Plam-------------------- #
+    Plam = sweep(Lambda_prec,2,tauh,'*')
+    
+    # -----Sample resid_Y_prec ---------------- #
+    # should be able to sample this here marginalizing over E_a in the same way that E_a_prec is done below.
+    
+    # -----Sample E_a_prec---------------- #
+    #conditioning on W, B, F, marginalizing over E_a 
+    # E_a_prec = sample_prec_discrete_conditional(Y - X %*% B-F %*% t(Lambda) - Z_2 %*% W,h2_divisions,h2_priors_resids,invert_aI_bZAZ,resid_Y_prec)
+    # E_a_prec = sample_prec_discrete_conditional_c(Y - X %*% B-F %*% t(Lambda) - Z_2 %*% W,h2_divisions,h2_priors_resids,invert_aI_bZAZ,resid_Y_prec)
+    
+    # pops should be a output from setup datasets and for pop in pops, the row number for 
+    # each pop should also included in the setup dataset
+    # read pops (number of populations)
+    # read row number for each pop
+    # in the loop, replace Y as Y[pops,], etc (instead of using lists because we need to use all Y together to sample lambda)
+    
       # -- adapt number of factors to samples ---#
       # adapt_result = update_k( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_1,Lambda_df,delta_2_shape,delta_2_rate,b0,b1,i,epsilon,prop )
       # F           = adapt_result$F

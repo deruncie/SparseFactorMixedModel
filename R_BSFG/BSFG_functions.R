@@ -45,11 +45,9 @@ sample_Lambda = function( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
 	for(j in 1:p) {
 	  means = c()
 	  Qlam = c()
-	  for(pop in pops){
-		  FUDi = E_a_prec[j] * sweep(FtU,2,(s + E_a_prec[j]/resid_Y_prec[j]),'/')
-		  means = means + FUDi %*% UtY[,j]
-		  Qlam = Qlam + FUDi %*% t(FtU) 
-		}
+		FUDi = E_a_prec[j] * sweep(FtU,2,(s + E_a_prec[j]/resid_Y_prec[j]),'/')
+		means = means + FUDi %*% UtY[,j]
+		Qlam = Qlam + FUDi %*% t(FtU) 
 	  Qlam = Qlam + diag(Plam[j,])
 
 		# recover()
@@ -65,6 +63,58 @@ sample_Lambda = function( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
 	return(Lambda)
 }
 
+sample_Lambda_comb = function( Y,X,B,Z_2,W,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ ) {
+  
+  #Sample factor loadings Lambda while marginalizing over residual
+  #genetic effects: Y - Z_2W = F*Lambda' + E, vec(E)~N(0,kron(Psi_E,In) + kron(Psi_U, ZAZ^T))
+  #note: conditioning on F, but marginalizing over E_a.
+  #sampling is done separately by trait because each column of Lambda is
+  #independent in the conditional posterior
+  #note: invert_aI_bZAZ has parameters that diagonalize aI + bZAZ for fast
+  #inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
+  
+  p = length(resid_Y_prec[[1]])
+  k = ncol(F[[1]])
+  
+  Zlams = matrix(rnorm(k*p),nr = k, nc = p)
+  Lambda = matrix(0,nr = p,nc = k)
+  
+  
+  for(j in 1:p) {
+    means = matrix(0,nr=p,nc=1)
+    Qlam = matrix(0,p,p)
+    # Is this part correct????????????????????
+    Y_tilde = list();
+    for(pop in pops){
+      #conditioning on W, B, F, marginalizing over E _a
+      Y_tilde[[pop]] = Y[[pop]] - X[[pop]] %*% B[[pop]] - Z_2[[pop]] %*% W[[pop]]
+      Y_tilde[[pop]] = as.matrix(Y_tilde[[pop]])
+      
+      U = invert_aI_bZAZ[[pop]]$U
+      s = invert_aI_bZAZ[[pop]]$s
+      
+      FtU = t(F[[pop]]) %*% U
+      UtY = t(U) %*% Y_tilde[[pop]]
+      
+      FUDi = E_a_prec[[pop]][j] * sweep(FtU,2,(s + E_a_prec[[pop]][j]/resid_Y_prec[[pop]][j]),'/')
+      means = means + FUDi %*% UtY[,j]
+      Qlam = Qlam + FUDi %*% t(FtU) 
+      #recover()
+    }
+    Qlam = Qlam + diag(Plam[j,])
+    
+     #recover()
+    Llam = t(chol(Qlam))
+    vlam = forwardsolve(Llam,means)
+    mlam = backsolve(t(Llam),vlam)
+    ylam = backsolve(t(Llam),Zlams[,j])
+    
+    Lambda[j,] = ylam + mlam
+    
+  } 
+  
+  return(Lambda)
+}
 
 sample_prec_discrete_conditional = function(Y,h2_divisions,h2_priors,invert_aI_bZAZ,res_prec) {
 	#sample factor heritibilties conditional on a given residual precision
@@ -439,13 +489,15 @@ save_posterior_samples_comb = function( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,de
   sp = ncol(Posterior$Lambda)
   #size(Posterior$Lambda,2)
   #save factor samples
-  # #if(length(Lambda) > nrow(Posterior[["Lambda"]])){  this will not happen since we stop updatek
-  #   # expand factor sample matrix if necessary
-  #   Posterior[["F"]]      = rbind(Posterior[["F"]], 	   	matrix(0,nr = length(F)     -nrow(Posterior[["F"]]),		nc = sp))
-  #   Posterior[["F_a"]]    = rbind(Posterior[["F_a"]], 	matrix(0,nr = length(F_a) 	-nrow(Posterior[["F_a"]]),	nc = sp))
-  #   Posterior[["delta"]]  = rbind(Posterior[["delta"]], 	matrix(0,nr = length(delta) -nrow(Posterior[["delta"]]),	nc = sp))
-  #   Posterior[["F_h2"]]   = rbind(Posterior[["F_h2"]], 	matrix(0,nr = length(F_h2) 	-nrow(Posterior[["F_h2"]]),	nc = sp))
-  # }
+  # change the if condition to be if sp_num == 1. So we don't need to run the update k part and we can also assign new value to out posterior variables.
+  if(sp_num==1){  
+     # expand factor sample matrix if necessary
+     Posterior$Lambda = rbind(Posterior$Lambda, 	matrix(0,nr = length(Lambda)-nrow(Posterior$Lambda),nc = sp))
+     Posterior[["F"]]      = rbind(Posterior[["F"]], 	   	matrix(0,nr = length(F)     -nrow(Posterior[["F"]]),		nc = sp))
+     Posterior[["F_a"]]    = rbind(Posterior[["F_a"]], 	matrix(0,nr = length(F_a) 	-nrow(Posterior[["F_a"]]),	nc = sp))
+     Posterior[["delta"]]  = rbind(Posterior[["delta"]], 	matrix(0,nr = length(delta) -nrow(Posterior[["delta"]]),	nc = sp))
+     Posterior[["F_h2"]]   = rbind(Posterior[["F_h2"]], 	matrix(0,nr = length(F_h2) 	-nrow(Posterior[["F_h2"]]),	nc = sp))
+   }
   Posterior$Lambda[1:length(Lambda),sp_num] = c(Lambda)
   Posterior$F[1:length(F),sp_num]     = c(F)
   Posterior$F_a[1:length(F_a),sp_num] = c(F_a)

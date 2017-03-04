@@ -1,5 +1,4 @@
-
-fast_BSFG_sampler_init = function(priors,run_parameters){
+fast_BSFG_sampler_init_comb = function(priors,run_parameters){
   # require(PEIP)
   require(Matrix)
   
@@ -34,24 +33,9 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   if(file.exists('../setup.RData')) {
     load('../setup.RData')
   }
-  # else{
-  #require(R.matlab)
-  #setup = readMat('../setup.mat')
-  #for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
-  #}
-  Y       = setup$Y
-  U_act   = setup$U_act
-  E_act   = setup$E_act
-  B       = setup$B_act   #Is B = B_act? There is no use of B_act in this code.
-  Z_1     = setup$Z_1
-  A       = setup$A	
-  X       = setup$X	
-  n       = setup$n	
-  r       = setup$r	
-  traitnames = setup$traitnames
   
-  #Determine if 'setup.mat' contains output of a simulation, based on if
-  #known factor loadings are included. Affects plotting functions
+  #k = priors$k_init
+  
   simulation = F
   if('gen_factor_Lambda' %in% names(setup)){
     simulation = T
@@ -60,23 +44,47 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   }
   run_parameters$simulation = simulation
   
+  pops = c("LConG1","LConG2","LConG3")
+  # do a loop for each Y in the list
+  Y =list();U_act=list();E_act=list();B=list();Z_1=list();A=list()
+  X=list();n=list();r=list();r2=list();b=list();traitnames=list()
+  Z_2=list();priors$b_X_prec = list();resid_Y_prec=list()
+  E_a_prec=list();E_a=list();F_h2=list();F_a=list();F=list();W_prec=list();W=list()
+  Ainv=list();A_2_inv=list();invert_aI_bZAZ=list();invert_aZZt_Ainv=list();invert_aPXA_bDesignDesignT=list()
+  invert_aPXA_bDesignDesignT_rand2=list()
+  
+  for (pop in pops){
+  Y[[pop]]       = setup[[pop]]$Y
+  U_act[[pop]]   = setup[[pop]]$U_act
+  E_act[[pop]]   = setup[[pop]]$E_act
+  B[[pop]]       = setup[[pop]]$B_act   #Is B = B_act? There is no use of B_act in this code.
+  Z_1[[pop]]     = setup[[pop]]$Z_1
+  A[[pop]]       = setup[[pop]]$A	
+  X[[pop]]       = setup[[pop]]$X	
+  n[[pop]]       = setup[[pop]]$n	
+  r[[pop]]       = setup[[pop]]$r	
+  traitnames[[pop]] = setup[[pop]]$traitnames
+  
+  
+  #Determine if 'setup.mat' contains output of a simulation, based on if
+  #known factor loadings are included. Affects plotting functions
+  
   # Factors:
   #  initial number of factors
-  k = priors$k_init
+  
   resid_Y_prec_shape  = priors$resid_Y_prec_shape
   resid_Y_prec_rate   = priors$resid_Y_prec_rate
   E_a_prec_shape = priors$E_a_prec_shape
   E_a_prec_rate  = priors$E_a_prec_rate
   W_prec_shape = priors$W_prec_shape
   W_prec_rate  = priors$W_prec_rate
-  p = ncol(Y[[1]])
-  
-  # do a loop for each Y in the list
-  for (pop in pops){
+  p = ncol(Y[[1]]) 
+  k = p
+
   #normalize Y to have zero mean and unit variances among observed values,
   #allowing for NaNs.
-  n = nrow(Y[[pop]])
-  r = ncol(Z_1[[pop]])
+  n[[pop]] = nrow(Y[[pop]])
+  r[[pop]] = ncol(Z_1[[pop]])
   
   Y_missing = is.na(Y[[pop]])        # matrix recording missing data in Y
   Mean_Y = colMeans(Y[[pop]],na.rm=T)
@@ -96,27 +104,30 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   #determine if a design matrix (X) exists (is loaded from setup.mat). If
   #not, make a dummy X-matrix with no columns.
   if(is.null(X[[pop]])) {
-    X[[pop]]=matrix(0,nr = n,nc = 0)
+    X[[pop]]=matrix(0,nr = n[[pop]],nc = 0)
     B[[pop]]=matrix(0,nr = 0,nc = p)
   }
   if(nrow(X[[pop]]) == 1) X[[pop]] = t(X[[pop]])       # because I used to give X transposed
-  stopifnot(nrow(X[[pop]]) == n)
-  b = ncol(X[[pop]])
+  stopifnot(nrow(X[[pop]]) == n[[pop]])
+  b[[pop]] = ncol(X[[pop]])
   
   
   #Determine if a second random effects design matrix exists. If not, make a
   #dummy matrix
-  if(! 'Z_2' %in% ls()) {
-    Z_2[[pop]]=matrix(0,nr = n,nc = 0)
-  }
-  stopifnot(nrow(Z_2[[pop]]) == n)
-  r2 = ncol(Z_2[[pop]])
+  # if(! 'Z_2' %in% ls()) {
+  #   Z_2[[pop]]=matrix(0,nr = n,nc = 0)
+  # }
+    if(is.null(Z_2[[pop]])){
+      Z_2[[pop]]=matrix(0,nr = n[[pop]],nc = 0)
+    }
+    stopifnot(nrow(Z_2[[pop]]) == n[[pop]])
+    r2[[pop]] = ncol(Z_2[[pop]])
   
 
   
   #fixed effect priors
   
-  priors$b_X_prec[[pop]]            =   1e-10*diag(1,b)   
+  priors$b_X_prec[[pop]]            =   1e-10*diag(1,b[[pop]])   
   
   # ----------------------------- #
   # -----Initialize variables---- #
@@ -140,25 +151,28 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   #   Prior: Normal distribution on each element.
   #       mean = 0
   #       sd = 1./sqrt(E_a_prec)' on each row
-  E_a[[pop]] = matrix(rnorm(p*r,0,sqrt(1/E_a_prec[[pop]])),nr = r,nc = p, byrow = T)
+  E_a[[pop]] = matrix(rnorm(p*r[[pop]],0,sqrt(1/E_a_prec[[pop]])),nr = r[[pop]],nc = p, byrow = T)
   
   # Latent factor heritabilties. h2 can take h2_divisions values
   #   between 0 and 1.
   #   Prior: 0.5: h2=0, .05: h2 > 0. 
+  
+  # change k back  to p
   F_h2[[pop]] = runif(k)
   
   # Genetic effects on the factor scores.
   #  Prior: Normal distribution for each element
   #       mean = 0
   #       sd = sqrt(F_h2') for each row.
-  F_a[[pop]] = matrix(rnorm(k*r,0,sqrt(F_h2[[pop]])),nr = r,nc = k, byrow = T)
+  #F_a[[pop]] = matrix(rnorm(k*r,0,sqrt(F_h2[[pop]])),nr = r,nc = k, byrow = T)
+  F_a[[pop]] = matrix(rnorm(k*r[[pop]],0,sqrt(F_h2[[pop]])),nr = r[[pop]],nc = k, byrow = T)
   
   # Full Factor scores. Combination of genetic and residual variation on
   # each factor.
   #  Prior: Normal distribution for each element
   #       mean = Z_1 * F_a
   #       sd = sqrt(1-F_h2') for each row.
-  F[[pop]] = Z_1[[pop]] %*% F_a[[pop]] + matrix(rnorm(k*n,0,sqrt(1-F_h2[[pop]])),nr = n,nc = k, byrow = T)    
+  F[[pop]] = Z_1[[pop]] %*% F_a[[pop]] + matrix(rnorm(k*n[[pop]],0,sqrt(1-F_h2[[pop]])),nr = n[[pop]],nc = k, byrow = T)    
   
   # g-vector of specific precisions of genetic effects. 
   #  Prior: Gamma distribution for each element
@@ -170,13 +184,13 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   #   Prior: Normal distribution on each element.
   #       mean = 0
   #       sd = 1./sqrt(E_a_prec)' on each row
-  W[[pop]] = matrix(rnorm(p*r2,0,sqrt(1/W_prec[[pop]])),nr = r2, nc = p, byrow = T)
+  W[[pop]] = matrix(rnorm(p*r2[[pop]],0,sqrt(1/W_prec[[pop]])),nr = r2[[pop]], nc = p, byrow = T)
   
   # Fixed effect coefficients.
   #  Prior: Normal distribution for each element
   #       mean = 0
   #       sd = sqrt(1/fixed_effects_prec)
-  B[[pop]] = matrix(rnorm(b*p),nr = b, nc = p)
+  B[[pop]] = matrix(rnorm(b[[pop]]*p),nr = b[[pop]], nc = p)
   
   # ------------------------------------ #
   # ----Precalculate some matrices------ #
@@ -185,7 +199,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   # recover()
   #invert the random effect covariance matrices
   Ainv[[pop]] = solve(A[[pop]])
-  A_2_inv[[pop]] = diag(1,r2) #Z_2 random effects are assumed to have covariance proportional to the identity. Can be modified.
+  A_2_inv[[pop]] = diag(1,r2[[pop]]) #Z_2 random effects are assumed to have covariance proportional to the identity. Can be modified.
   
   #pre-calculate transformation parameters to diagonalize aI + bZAZ for fast
   #inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
@@ -210,7 +224,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   #inv(a*bdiag(priors$b_X_prec,Ainv) + b*t(cbind(X,Z_1)) %*% cbind(X,Z_1)) = U %*% diag(1/(a*s1+b*s2)) %*% t(U)
   Design= cbind(X[[pop]],Z_1[[pop]])
   Design2 = t(Design) %*% Design
-  result = GSVD_2_c(cholcov(bdiag(priors$b_X_prec,Ainv[[pop]])),cholcov(Design2))
+  result = GSVD_2_c(cholcov(bdiag(priors$b_X_prec[[pop]],Ainv[[pop]])),cholcov(Design2))
   invert_aPXA_bDesignDesignT[[pop]] = list(
     U = t(solve(result$X)),
     s1 = diag(result$C)^2,
@@ -221,7 +235,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   #random effects 2
   #diagonalize mixed model equations for fast inversion: 
   #inv(a*A_2_inv + b*Z_2'Z_2]) = U*diag(1./(a.*s1+b.*s2))*U'
-  if(r2 > 0) {
+  if(r2[[pop]] > 0) {
     Design = Z_2[[pop]]
     Design2 = t(Design) %*% Design
     result = GSVD_2_c(cholcov(A_2_inv[[pop]]),cholcov(Design2))
@@ -242,7 +256,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   #similar to fixed effects + random effects 1 above, but no fixed effects.
   ZZt = t(Z_1[[pop]]) %*% Z_1[[pop]]
   result = GSVD_2_c(cholcov(ZZt),cholcov(Ainv[[pop]]))
-  invert_aZZt_Ainv = list(
+  invert_aZZt_Ainv[[pop]] = list(
     U = t(solve(result$X)),
     s1 = diag(result$C)^2,
     s2 = diag(result$S)^2
@@ -300,6 +314,7 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
   # ----------------------- #
   Posterior = list(
     Lambda        = matrix(0,nr=0,nc=0),
+    E_a           = matrix(0,nr =nrow(do.call(rbind,F_a)) ,nc = p),
     F_a           = matrix(0,nr=0,nc=0),
     F             = matrix(0,nr=0,nc=0),
     delta         = matrix(0,nr=0,nc=0),
@@ -307,9 +322,9 @@ fast_BSFG_sampler_init = function(priors,run_parameters){
     resid_Y_prec  = matrix(0,nr = p,nc = 0),
     E_a_prec      = matrix(0,nr = p,nc = 0),
     W_prec        = matrix(0,nr = p,nc = 0),
-    B             = matrix(0,nr = b,nc = p),
-    W             = matrix(0,nr = r2,nc = p),
-    E_a           = matrix(0,nr = r,nc = p)
+    B             = matrix(0,nr = b[[1]],nc = p),
+    W             = matrix(0,nr = r2[[1]],nc = p)
+    #E_a           = matrix(0,nr = r[[1]],nc = p)
   )
   # ----------------------- #
   # ---Save initial values- #
