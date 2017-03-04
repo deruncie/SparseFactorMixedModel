@@ -72,7 +72,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 
 # Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
 # burn in
-BSFG_state$run_parameters$simulation = F
+BSFG_state$run_parameters$simulation = FALSE
 n_samples = 100;
 for(i  in 1:20) {
     print(sprintf('Run %d',i))
@@ -82,9 +82,9 @@ for(i  in 1:20) {
     }
     BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
-    pdf('diagnostics_plots.pdf')
+    # pdf('diagnostics_plots.pdf')
     plot(BSFG_state)
-    dev.off()
+    # dev.off()
 }
 
 # library(shinystan)

@@ -236,9 +236,9 @@ plot_diagnostics_simulation = function(BSFG_state){
 plot_diagnostics = function(BSFG_state){
   if(BSFG_state$Posterior$total_samples > 0) {
     F_h2_samples = load_posterior_param(BSFG_state,'F_h2')
-    trace_plot_h2s(F_h2,device = 2)
+    trace_plot_h2s(F_h2_samples,device = 2)
     Lambda_samples = load_posterior_param(BSFG_state,'Lambda')
-    trace_plot_Lambda(Lambda,device = 3)
+    trace_plot_Lambda(Lambda_samples,device = 3)
   }
 }
 
