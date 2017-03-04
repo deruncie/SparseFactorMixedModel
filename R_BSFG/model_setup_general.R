@@ -17,6 +17,7 @@ setwd(folder)
 run_parameters = list(
     sampler = 'fast_BSFG',
     # sampler = 'general_BSFG',
+    Posterior_folder = 'Posterior',
     fixed_factors = FALSE,
     simulation   = FALSE,
     scale_Y      = TRUE,
@@ -60,7 +61,6 @@ save(BSFG_state,file="BSFG_state.RData")
 
 BSFG_state = clear_Posterior(BSFG_state)
 
-
 # # optional: To load from end of previous run, run above code, then run these lines:
 # load('Posterior.RData')
 # load('BSFG_state.RData')
@@ -80,21 +80,20 @@ for(i  in 1:20) {
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
     }
-    save_posterior(BSFG_state$Posterior,folder = 'Posterior',ID = i)
-    BSFG_state = clear_Posterior(BSFG_state)
+    BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
     pdf('diagnostics_plots.pdf')
     plot(BSFG_state)
     dev.off()
 }
 
-library(shinystan)
-library(MCMCpack)
-samples = BSFG_state$Posterior$F_h2
-samples = list(A=BSFG_state$Posterior$Lambda[,,1])
-samples[[1]][] = samples[[1]][,order(-abs(colMeans(samples[[1]])))]
-my_sso <- as.shinystan(samples)
-my_sso <- launch_shinystan(my_sso)
+# library(shinystan)
+# library(MCMCpack)
+# samples = BSFG_state$Posterior$F_h2
+# samples = list(A=BSFG_state$Posterior$Lambda[,,1])
+# samples[[1]][] = samples[[1]][,order(-abs(colMeans(samples[[1]])))]
+# my_sso <- as.shinystan(samples)
+# my_sso <- launch_shinystan(my_sso)
 
 F_h2 = get_posteriorMean(BSFG_state,'F_h2')
 Lambda = get_posteriorMean(BSFG_state,'Lambda')

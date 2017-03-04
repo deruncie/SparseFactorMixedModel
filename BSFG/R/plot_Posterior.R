@@ -142,7 +142,7 @@ calc_posterior_mean_cov = function(Posterior,random_effect){
   with(Posterior,{
     p = dim(Lambda)[2]
     G = matrix(0,p,p)
-    for(i in 1:sp_num){
+    for(i in 1:total_samples){
       if(random_effect == 'Ve'){
         factor_h2s_i = 1-colSums(F_h2[i,,,drop=FALSE])
         resid_h2s_i = 1-colSums(resid_h2[i,,,drop=FALSE])
@@ -151,7 +151,7 @@ calc_posterior_mean_cov = function(Posterior,random_effect){
         resid_h2s_i = resid_h2[i,random_effect,]
       }
       G_i = tcrossprod(sweep(Lambda[i,,],2,sqrt(factor_h2s_i),'*')) + diag(c(resid_h2s_i/tot_Y_prec[i,1,]))
-      G = G + G_i/sp_num
+      G = G + G_i/total_samples
     }
     G
   })
@@ -200,7 +200,7 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
     B_mean = apply(Posterior$B,c(2,3),mean)
     B_factor_mean = with(c(Posterior,BSFG_state$data_matrices), {
       if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
-      matrix(rowMeans(sapply(1:sp_num,function(i) B_F[i,,] %*% t(Lambda[i,,]))),nrow = ncol(X_F))
+      matrix(rowMeans(sapply(1:total_samples,function(i) B_F[i,,] %*% t(Lambda[i,,]))),nrow = ncol(X_F))
     })
     plot(c(B_mean),c(setup$B))
     abline(0,1)
@@ -218,8 +218,9 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
 }
 
 plot_diagnostics_simulation = function(BSFG_state){
+  BSFG_state$Posterior = reload_Posterior(BSFG_state)
   plot_current_state_simulation(BSFG_state, device = 2)
-  if(BSFG_state$Posterior$sp_num > 0) {
+  if(BSFG_state$Posterior$total_samples > 0) {
     plot_posterior_simulation(BSFG_state, device = 3)
     trace_plot_h2s(BSFG_state$Posterior$F_h2,device = 4)
     trace_plot_Lambda(BSFG_state$Posterior$Lambda,device = 5)
@@ -233,10 +234,10 @@ plot_diagnostics_simulation = function(BSFG_state){
 #'
 #' @param BSFG_state a BSFG_state object
 plot_diagnostics = function(BSFG_state){
-  if(BSFG_state$Posterior$sp_num > 0) {
-    F_h2 = load_posterior_param('Posterior','F_h2')
+  if(BSFG_state$Posterior$total_samples > 0) {
+    F_h2_samples = load_posterior_param(BSFG_state,'F_h2')
     trace_plot_h2s(F_h2,device = 2)
-    Lambda = load_posterior_param('Posterior','Lambda')
+    Lambda_samples = load_posterior_param(BSFG_state,'Lambda')
     trace_plot_Lambda(Lambda,device = 3)
   }
 }
@@ -275,73 +276,3 @@ HPDinterval.BSFG_state = function(obj,prob,parameter = 'F_h2',samples = NULL){
 }
 
 
-#' Saves a chunk of posterior samples
-#'
-#' Saves a chunk of posterior samples, each paramter in it's own RData file.
-#' The complete chain for a particular parameter can be re-loaded with \code{load_posterior}
-#'
-#' @param Posterior a Posterior list from a BSFG_state object
-#' @param folder the folder to save the RData files
-#' @param ID the ID of this chunck of samples. Should be consecutive with previous chunks
-save_posterior = function(Posterior,folder = 'Posterior',ID = 1){
-  if(!dir.exists(folder)) dir.create(folder)
-  res = sapply(names(Posterior),function(param) {
-    if(param %in% c('sample_params','posteriorMean_params')) return()
-    file_name = sprintf('%s/%s_%d.RData',folder,param,ID)
-    samples = Posterior[[param]]
-    save(samples,file = file_name)
-  })
-}
-
-#' load a set of posterior samples into a single array
-#'
-#' @param folder folder to find Posterior chunk files
-#' @param param Name of parameter to load
-#' @return array with all chuncks of Posterior samples appended together
-load_posterior_param = function(folder = 'Posterior',param){
-  param_files = list.files(path = folder,full.names = T)
-  param_files = param_files[grep(sprintf('/%s_[1-9]*.RData',param),param_files)]
-  # extract ID from each file and re-order file list
-  IDs = sapply(param_files,function(x) as.numeric(sub('_','',strsplit(sub('.RData','',x),param)[[1]][2])))
-  param_files = param_files[order(IDs)]
-
-  # load file 1 and determine dimensions
-  load(param_files[1])
-  samples_dim = dim(samples)
-  if(length(samples_dim) == 2) {
-    all_samples = samples / length(IDs)
-  } else{
-    all_samples = array(0,dim = c(length(param_files),1,1)*samples_dim)
-    all_samples[1:samples_dim[1],,] = samples
-  }
-
-  # load other files
-  if(length(param_files) > 1) {
-    current_row = samples_dim[1]
-    for(i in 2:length(param_files)){
-      load(param_files[i])
-      if(length(samples_dim) == 2) {
-        all_samples = all_samples + samples / length(IDs)
-      } else{
-        all_samples[current_row+1:dim(samples)[1],,] = samples
-        current_row = current_row+dim(samples)[1]
-      }
-    }
-  }
-  return(all_samples)
-}
-
-#' Re-loads a full Posterior list with all parameters
-#'
-#' @param Posterior an empty Posterior list (after call to \link{clear_Posterior})
-#' @param folder folder with all posterior chunk files
-#' @return Posterior list, as part of a BSFG_state object
-reload_Posterior = function(Posterior,folder){
-  params = names(Posterior)
-  for(param in params){
-    if(param %in% c('sample_params','posteriorMean_params','sp_num')) next
-    Posterior[[param]] = load_posterior_param(folder,param)
-  }
-  Posterior$sp_num = dim(Posterior$Lambda)[1]
-  Posterior
-}

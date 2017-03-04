@@ -147,7 +147,7 @@ reorder_factors = function(BSFG_state){
 #'
 #' Saves current state in Posterior
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
-save_posterior_samples = function( sp_num, current_state, Posterior) {
+save_posterior_sample = function(current_state, Posterior) {
 	require(abind)
 
 	# All parameters in current are matrices.
@@ -155,6 +155,8 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 	# All factor parameters are matrices with ncol == k
 	# Posterior arrays are expanded / contracted as the number of factors changes (with update_k)
 
+  Posterior$total_samples = Posterior$total_samples + 1
+  sp_num = Posterior$sp_num + 1
   Posterior$sp_num = sp_num
 
 	current_state = within(current_state,{
@@ -187,21 +189,35 @@ save_posterior_samples = function( sp_num, current_state, Posterior) {
 }
 
 
-initialize_Posterior = function(Posterior,current_state){
-	  for(param in Posterior$sample_params){
-    	Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
-    	dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
-    }
-    for(param in Posterior$posteriorMean_params) {
-    	Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
-    	dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
-    }
-    # for(param in Posterior$per_trait_params){
-    # 	dimnames(Posterior[[param]])[[length(dim(Posterior[[param]]))]] = current_state$traitnames
-    # }
-    # dimnames(Posterior$Lambda)[[2]] = current_state$traitnames
-    Posterior$sp_num = 0
-    Posterior
+# initialize_Posterior = function(Posterior,current_state){
+# 	  for(param in Posterior$sample_params){
+#     	Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
+#     	dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
+#     }
+#     for(param in Posterior$posteriorMean_params) {
+#     	Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
+#     	dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
+#     }
+#     # for(param in Posterior$per_trait_params){
+#     # 	dimnames(Posterior[[param]])[[length(dim(Posterior[[param]]))]] = current_state$traitnames
+#     # }
+#     # dimnames(Posterior$Lambda)[[2]] = current_state$traitnames
+#     Posterior$sp_num = 0
+#     Posterior
+# }
+
+
+reset_Posterior = function(Posterior,current_state){
+  for(param in Posterior$sample_params){
+    Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
+    dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
+  }
+  for(param in Posterior$posteriorMean_params) {
+    Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
+    dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
+  }
+  Posterior$sp_num = 0
+  Posterior
 }
 
 expand_Posterior = function(Posterior,size){
@@ -223,15 +239,119 @@ clear_Posterior = function(BSFG_state) {
 	Posterior = BSFG_state$Posterior
 	run_parameters = BSFG_state$run_parameters
 
-	current_samples = dim(Posterior[[Posterior$sample_params[1]]])[1]
+	# current_samples = dim(Posterior[[Posterior$sample_params[1]]])[1]
+	# current_samples = Posterior$total_samples # I think this is right
 
-	if(current_samples > 0) {
-    	run_parameters$burn = run_parameters$burn + run_parameters$thin*current_samples
-    }
+	# if(current_samples > 0) {
+	run_parameters$burn = run_parameters$burn + run_parameters$thin*Posterior$total_samples
+  # }
 
-    Posterior = initialize_Posterior(Posterior,BSFG_state$current_state)
+  Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
+  Posterior$total_samples = 0
 
-    BSFG_state$Posterior = Posterior
-    BSFG_state$run_parameters = run_parameters
-    return(BSFG_state)
+  if(length(list.files(path = Posterior$folder))>0) system('rm Posterior/*')
+  Posterior$files = c()
+
+  BSFG_state$Posterior = Posterior
+  BSFG_state$run_parameters = run_parameters
+  return(BSFG_state)
 }
+
+# reset_Posterior = function(BSFG_state){
+#   Posterior = BSFG_state$Posterior
+#   Posterior = initialize_Posterior(Posterior,BSFG_state$current_state)
+#   BSFG_state$Posterior = Posterior
+#   return(BSFG_state)
+# }
+
+
+#' Saves a chunk of posterior samples
+#'
+#' Saves a chunk of posterior samples, each paramter in it's own RData file.
+#' The complete chain for a particular parameter can be re-loaded with \code{load_posterior}
+#'
+#' @param Posterior a Posterior list from a BSFG_state object
+#' @param folder the folder to save the RData files
+#' @param ID the ID of this chunck of samples. Should be consecutive with previous chunks
+#' @return Posterior
+save_posterior_chunk = function(BSFG_state,ID = 0){
+  Posterior = BSFG_state$Posterior
+  folder = Posterior$folder
+  if(!dir.exists(folder)) dir.create(folder)
+
+  if(ID == 0) ID = Posterior$total_samples
+  file_suffix = sprintf('%d.RData',ID)
+  res = sapply(c(Posterior$sample_params,Posterior$posteriorMean_params),function(param) {
+    file_name = sprintf('%s/%s_%s',folder,param,file_suffix)
+    samples = Posterior[[param]]
+    if(dim(samples)[1] > 0) save(samples,file = file_name)
+  })
+  Posterior$files = unique(c(Posterior$files,file_suffix))
+  Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
+  BSFG_state$Posterior = Posterior
+  return(BSFG_state)
+}
+
+#' load a set of posterior samples into a single array
+#'
+#' @param folder folder to find Posterior chunk files
+#' @param param Name of parameter to load
+#' @return array with all chuncks of Posterior samples appended together
+load_posterior_param = function(BSFG_state,param){
+  if(length(BSFG_state$Posterior$files) == 0) return(c())
+  folder = BSFG_state$Posterior$folder
+  param_files = paste0(folder,'/',param,'_',BSFG_state$Posterior$files)
+  all_files = list.files(path=folder,full.names = T)
+  param_files = param_files[param_files %in% all_files]
+  if(length(param_files) == 0) return(c())
+
+  load(param_files[1])
+  samples_dim = dim(samples)
+  if(param %in% BSFG_state$Posterior$posteriorMean_params) {
+    all_samples = samples / length(param_files)
+  } else{
+    all_samples = array(0,dim = c(BSFG_state$Posterior$total_samples,samples_dim[2:3]))
+    all_samples[1:samples_dim[1],,] = samples
+    current_row = samples_dim[1]
+  }
+  if(current_row == 0) return(c())
+
+  # load other files
+  if(length(param_files) > 1) {
+    for(i in 2:length(param_files)){
+      load(param_files[i])
+      if(length(samples_dim) == 2) {
+        all_samples = all_samples + samples / length(param_files)
+      } else{
+        samples_dim = dim(samples)
+        if(current_row+samples_dim[1] > dim(all_samples)[1]){
+          all_samples = abind(all_samples,array(0,dim = c(current_row+samples_dim[1] - dim(all_samples)[1],dim(all_samples)[2:3])),along = 1)
+        }
+        if(samples_dim[2] > dim(all_samples)[2]){
+          all_samples = abind(all_samples,array(0,dim = c(samples_dim[1],samples_dim[2]-dim(all_samples)[2],dim(all_samples)[3])),along = 2)
+        }
+        if(samples_dim[3] > dim(all_samples)[3]){
+          all_samples = abind(all_samples,array(0,dim = c(dim(all_samples)[1:2],samples_dim[3]-dim(all_samples)[3])),along = 3)
+        }
+        all_samples[current_row+1:dim(samples)[1],1:samples_dim[2],1:samples_dim[3]] = samples
+        current_row = current_row+dim(samples)[1]
+      }
+    }
+  }
+
+  return(all_samples)
+}
+
+#' Re-loads a full Posterior list with all parameters
+#'
+#' @param Posterior an empty Posterior list (after call to \link{clear_Posterior})
+#' @param folder folder with all posterior chunk files
+#' @return Posterior list, as part of a BSFG_state object
+reload_Posterior = function(BSFG_state){
+  Posterior = BSFG_state$Posterior
+  for(param in c(Posterior$sample_params,Posterior$posteriorMean_params)){
+    Posterior[[param]] = load_posterior_param(BSFG_state,param)
+  }
+  Posterior
+}
+

@@ -26,7 +26,7 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 	# ---Extend posterior matrices for new samples--- #
 	# ----------------------------------------------- #
 
-	sp = (start_i + n_samples - burn)/thin - dim(Posterior[[Posterior$sample_params[1]]])[1]
+	sp = (start_i + n_samples - burn)/thin - Posterior$total_samples
 	Posterior = expand_Posterior(Posterior,max(0,sp))
 
 	# ----------------------------------------------- #
@@ -138,10 +138,7 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 
 	 # -- save sampled values (after thinning) -- #
 		if( (i-burn) %% thin == 0 && i > burn) {
-
-			sp_num = (i-burn)/thin
-
-			Posterior = save_posterior_samples( sp_num,current_state, Posterior)
+			Posterior = save_posterior_sample(current_state, Posterior)
 		}
 	}
 	end_time = Sys.time()

@@ -7,9 +7,9 @@ library(BSFG)
 
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
-# seed = 1
-# new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=10000, b=5, k=10, k_G=5, i_Va = 0.2, i_Ve = 0.2)
-# set.seed(seed)
+seed = 1
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, k=10, k_G=5, i_Va = 0.2, i_Ve = 0.2)
+set.seed(seed)
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
 rep = "2"
@@ -22,6 +22,7 @@ setwd(folder)
 run_parameters = list(
     sampler = 'fast_BSFG',
     # sampler = 'general_BSFG',
+    Posterior_folder = 'Posterior',
     fixed_factors = T,
     simulation   = T,
     scale_Y      = FALSE,
@@ -94,9 +95,10 @@ for(i  in 1:70) {
     #     times = 10
     #     )
     BSFG_state = sample_BSFG(BSFG_state,n_samples,1)
-    BSFG_state = reorder_factors(BSFG_state)
-    Posterior = BSFG_state$Posterior
-    save(Posterior,file = 'Posterior.RData')
+    if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
+      BSFG_state = reorder_factors(BSFG_state)
+    }
+    BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
     plot(BSFG_state)
 }

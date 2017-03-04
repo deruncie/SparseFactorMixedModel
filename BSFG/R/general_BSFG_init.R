@@ -145,9 +145,16 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     Posterior = list(
         sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2', 'B', 'B_F', 'prec_B'),
         posteriorMean_params = c('E_a'),
-        per_trait_params = c('tot_Y_prec','resid_h2','B')
+        per_trait_params = c('tot_Y_prec','resid_h2','B'),
+        total_samples = 0,
+        folder = run_parameters$Posterior_folder,
+        files = c()
+        # per_trait_params = c('tot_Y_prec','resid_h2','B','E_a')
     )
-    Posterior = initialize_Posterior(Posterior,current_state)
+    Posterior = reset_Posterior(Posterior,current_state)
+    # Posterior = initialize_Posterior(Posterior,current_state)
+    # Posterior = reset_Posterior(Posterior,current_state)
+    # Posterior$sp_num = 0
 
 # ------------------------------------ #
 # ----Precalculate ZAZts, chol_As ---- #

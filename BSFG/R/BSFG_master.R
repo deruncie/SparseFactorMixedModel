@@ -4,6 +4,7 @@
 #'
 #' @param sampler specify the sampler to use. fast_BSFG is much faster, but only allows one random
 #'   effect. If more are specified in \code{BSFG_init}, this is switched to general_BSFG.
+#' @param Posterior_folder folder to save posterior sample chunk files
 #' @param fixed_factors should the fixed effect model be applied to factors as well as the factor
 #'   residuals? If so, the first column of the design matrix is dropped.
 #' @param simulaiton Is this a fit to simulated data? If so, a setup list will be expected providing
@@ -26,7 +27,8 @@
 #' @param thin thinning rate of the MCMC chain
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 #'
-BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),fixed_factors = c(T,F),simulation = c(F,T),scale_Y = c(T,F),
+BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder = 'Posterior',
+                        fixed_factors = c(T,F),simulation = c(F,T),scale_Y = c(T,F),
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100,
                         burn = 100,
@@ -280,7 +282,7 @@ summary.BSFG_state = function(BSFG_state){
       c(sprintf('\n BSFG_state object for data of size %d x %d \n',nrow(data_matrices$Y),ncol(data_matrices$Y))),
       c(sprintf('Model dimensions: fixed = %d, random = %d \n',ncol(data_matrices$X),ncol(data_matrices$Z))),
       c(sprintf('Sampler: %s \n',run_parameters$sampler)),
-      c(sprintf('Current iteration: %d, Posterior_samples: %d \n',current_state$nrun,Posterior$sp_num)),
+      c(sprintf('Current iteration: %d, Posterior_samples: %d \n',current_state$nrun,Posterior$total_samples)),
       c(sprintf('Current factor dimension: %d factors \n',ncol(current_state$Lambda))),
       c(sprintf('Total time: %s \n\n',format(current_state$total_time)))
     )
@@ -295,7 +297,7 @@ summary.BSFG_state = function(BSFG_state){
 print.BSFG_state = function(BSFG_state){
   with(BSFG_state,{
     cat(
-      c(sprintf('\n Current iteration: %d, Posterior_samples: %d \n',current_state$nrun,Posterior$sp_num)),
+      c(sprintf('\n Current iteration: %d, Posterior_samples: %d \n',current_state$nrun,Posterior$total_samples)),
       c(sprintf('Current factor dimension: %d factors \n',ncol(current_state$Lambda))),
       c(sprintf('Total time: %s \n\n',format(current_state$total_time)))
     )
