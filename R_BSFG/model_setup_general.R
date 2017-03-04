@@ -25,8 +25,8 @@ run_parameters = list(
     epsilon      = 1e-1,
     prop         = 1.00,
     k_init       = 20,
-    h2_divisions = 100,
-    burn         = 100,
+    h2_divisions = 20,
+    burn         = 1000,
     thin         = 2
     )
 
@@ -72,16 +72,18 @@ BSFG_state = clear_Posterior(BSFG_state)
 
 # Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
 # burn in
-
+BSFG_state$run_parameters$simulation = F
 n_samples = 100;
-for(i  in 1:70) {
+for(i  in 1:20) {
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples,1)
-    BSFG_state = reorder_factors(BSFG_state)
-    Posterior = BSFG_state$Posterior
-    save(Posterior,file = 'Posterior.RData')
+    if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
+      BSFG_state = reorder_factors(BSFG_state)
+    }
+    save_posterior(BSFG_state$Posterior,folder = 'Posterior',ID = i)
+    BSFG_state = clear_Posterior(BSFG_state)
     print(BSFG_state)
-    pdf('adsf.pdf')
+    pdf('diagnostics_plots.pdf')
     plot(BSFG_state)
     dev.off()
 }
