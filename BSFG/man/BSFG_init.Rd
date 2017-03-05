@@ -4,18 +4,23 @@
 \alias{BSFG_init}
 \title{Initialize a BSFG model}
 \usage{
-BSFG_init(Y, fixed, random, data, priors, run_parameters, A_mats = NULL,
-  A_inv_mats = NULL, sampler = c("fast_BSFG", "general_BSFG"), ncores = 1,
-  simulation = c(F, T), setup = NULL, verbose = T)
+BSFG_init(Y, model, data, priors, run_parameters, A_mats = NULL,
+  A_inv_mats = NULL, sampler = c("fast_BSFG", "general_BSFG"),
+  ncores = detectCores(), simulation = c(F, T), setup = NULL,
+  verbose = T)
 }
 \arguments{
 \item{Y}{a n x p matrix of data (n individuals x p traits)}
 
-\item{fixed}{formula for the fixed effects. Terms in the model must be columns of \code{data}}
-
-\item{random}{formula for the random effects. Multiple random effects can be specified as
-~random1+random2+..., but currently there is no support for interactions or within-group models.
-Each random effect must correspond to a column of data (which should be a factor)}
+\item{model}{RHS of a model. The syntax is similar to \link{lmer}.
+Random effects are specified by (1+factor | group), with the left side of the '|' a design
+matrix, and the right side a random effect factor (group). For each random effect factor, a
+covariance matrix (\code{A_mats}) or precision matrix (\code{A_inv_mats}) can be provided.
+Unlike in \code{lmer}, each variable or covariate in the design matrix is given an
+independent random effect (ie no covariance among random effects is modeled), so two bars '||'
+gives an identical model to one bar.
+Note: the speed of the model will decrease dramatically with the number of random effects (multiplied
+by h2_divisions)}
 
 \item{data}{data.frame with n rows containing columns corresponding to the fixed and random
 effects}
@@ -25,10 +30,10 @@ effects}
 \item{run_parameters}{list providing various parameters for the model run. See \link{BSFG_control}}
 
 \item{A_mats}{list of covariance matrices for random effects. If none provided (and none provided
-for A_inv_mats), assumed to be the identity.}
+for A_inv_mats) for any of the random effects, A is assumed to be the identity.}
 
-\item{A_inv_mats}{list of covariance matrices for random effects. If none provided (and none
-provided for A_mats), assumed to be the identity.}
+\item{A_inv_mats}{list of precision matrices for random effects. If none provided (and none
+provided for A_mats) for any of the random effects, A is assumed to be the identity.}
 
 \item{ncores}{for \code{general_BSFG}, number of cores to use during initialization.}
 

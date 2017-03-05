@@ -172,7 +172,10 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 			chol_Ai
 		}))
 	}
+
 	# setup of symbolic Cholesky of C
+	print('creating randomEffects_C')
+
 	Ai = forceSymmetric(crossprod(make_Chol_Ai(chol_Ai_mats,rep(1,n_RE)/(n_RE+1))))
 	Cholesky_C = Cholesky(ZtZ + Ai)
 
@@ -204,6 +207,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 	}
 
 	# setup of symbolic Cholesky of Sigma
+	print('creating Sigma_Choleskys')
 	Sigma = make_Sigma(ZAZts,h2s_matrix[,2])
 	Cholesky_Sigma_base = Cholesky(Sigma,perm=T,super=T)
 	stopifnot(!isLDL(Cholesky_Sigma_base))

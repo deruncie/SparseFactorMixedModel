@@ -194,14 +194,6 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 			s2 = diag(result$S)^2
 		)
 
-    # require(geigen)
-    # result = gsvd(as.matrix(chol(ZZt)),as.matrix(chol(Ainv)))
-
-    # invert_aZZt_Ainv = list(
-    #         U = Matrix(solve(result$A %*% t(result$Q))),
-    #         s1 = result$alpha^2,
-    #         s2 = result$beta^2
-    #     )
 
 # ----------------------------- #
 # ----Save run parameters------ #

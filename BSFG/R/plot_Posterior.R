@@ -162,7 +162,6 @@ calc_posterior_mean_Lambda = function(Posterior){
 }
 
 plot_factor_h2s = function(F_h2) {
-  require(reshape2)
   if(is.null(rownames(F_h2))) rownames(F_h2) = 'Va'
   F_h2 = rbind(F_h2,1-colSums(F_h2))
   rownames(F_h2)[nrow(F_h2)] = 'Ve'

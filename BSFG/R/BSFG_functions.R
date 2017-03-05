@@ -148,8 +148,6 @@ reorder_factors = function(BSFG_state){
 #' Saves current state in Posterior
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 save_posterior_sample = function(current_state, Posterior) {
-	require(abind)
-
 	# All parameters in current are matrices.
 	# Posterior is a list of arrays.
 	# All factor parameters are matrices with ncol == k
@@ -202,8 +200,6 @@ reset_Posterior = function(Posterior,current_state){
 }
 
 expand_Posterior = function(Posterior,size){
-	require(abind)
-
 	for(param in Posterior$sample_params){
 		Posterior[[param]] = abind(Posterior[[param]],array(NA,dim = c(size,dim(Posterior[[param]])[2:3])),along = 1)
 	}
@@ -274,6 +270,7 @@ load_posterior_param = function(BSFG_state,param){
 
   load(param_files[1])
   samples_dim = dim(samples)
+  current_row = 0
   if(param %in% BSFG_state$Posterior$posteriorMean_params) {
     all_samples = samples / length(param_files)
   } else{

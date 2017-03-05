@@ -17,8 +17,10 @@ Imports:
   RcppArmadillo,
   RcppParallel,
   Matrix,
+  lme4,
   parallel,
   abind,
+  reshape2,
   compiler
 Suggests:
   R.matlab,

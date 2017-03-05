@@ -31,7 +31,7 @@ run_parameters = list(
     epsilon      = 1e-1,
     prop         = 1.00,
     k_init       = 20,
-    h2_divisions = 100,
+    h2_divisions = 10,
     burn         = 100,
     thin         = 2
     )
@@ -52,9 +52,14 @@ print('Initializing')
 # setup = load_simulation_data()
 # setup = load_simulation_FE_data()
 load('../setup.RData')
-BSFG_state = with(setup,BSFG_init(Y, fixed=~Fixed1+Fixed2+Fixed3+Fixed4, random=~animal, #
+setup$data$Group = gl(3,1,length = nrow(setup$data))
+# BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1+Fixed2 + Fixed3|Sire)+(Group|animal), #
+#                                   data,priors,run_parameters,A_mats = list(animal = A),
+#                                   setup = setup))
+BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), #
                                   data,priors,run_parameters,A_mats = list(animal = A),
                                   setup = setup))
+BSFG_state$current_state$F_h2
 
 h2_divisions = run_parameters$h2_divisions
 BSFG_state$priors$Resid_discrete_priors = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {

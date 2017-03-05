@@ -45,8 +45,7 @@ priors = list(
 
 print('Initializing')
 
-BSFG_state = BSFG_init(Y, fixed=~1, random=~animal,
-                                  data,priors,run_parameters,A_mats = list(animal = A))
+BSFG_state = BSFG_init(Y, model=~1 + (1|animal),data,priors,run_parameters,A_mats = list(animal = A))
 
 # h2_divisions = run_parameters$h2_divisions
 # BSFG_state$priors$Resid_discrete_priors = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
