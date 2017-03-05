@@ -82,9 +82,7 @@ for(i  in 1:20) {
     }
     BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
-    # pdf('diagnostics_plots.pdf')
-    plot(BSFG_state)
-    # dev.off()
+    plot(BSFG_state,file = 'diagnostics_plots.pdf')
 }
 
 # library(shinystan)

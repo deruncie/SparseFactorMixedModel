@@ -2,7 +2,7 @@
 % Please edit documentation in R/BSFG_functions.R
 \name{load_posterior_param}
 \alias{load_posterior_param}
-\title{load a set of posterior samples into a single array}
+\title{load the posterior samples of a single parameter from all saved chunks}
 \usage{
 load_posterior_param(BSFG_state, param)
 }
@@ -15,5 +15,5 @@ load_posterior_param(BSFG_state, param)
 array with all chuncks of Posterior samples appended together
 }
 \description{
-load a set of posterior samples into a single array
+load the posterior samples of a single parameter from all saved chunks
 }

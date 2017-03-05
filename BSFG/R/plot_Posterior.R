@@ -171,9 +171,6 @@ plot_factor_h2s = function(F_h2) {
   barplot(F_h2,main = 'Factor h2s',legend.text = rownames(F_h2))
 }
 
-plot_HPDIntervals_factor_h2 = function(Posterior){
-  require(MCMCpack)
-}
 
 plot_posterior_simulation = function(BSFG_state, device = NULL){
   if(!is.null(device)) {
@@ -192,9 +189,6 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
   plot_factor_correlations(calc_posterior_mean_Lambda(Posterior),setup$error_factor_Lambda)
 
   plot_factor_h2s(apply(Posterior$F_h2,c(2,3),mean))
-
-
-  # B's # These seem to be wrong.
 
   if(dim(setup$B)[1] > 1) {
     B_mean = apply(Posterior$B,c(2,3),mean)
@@ -219,11 +213,11 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
 
 plot_diagnostics_simulation = function(BSFG_state){
   BSFG_state$Posterior = reload_Posterior(BSFG_state)
-  plot_current_state_simulation(BSFG_state, device = 2)
+  plot_current_state_simulation(BSFG_state)
   if(BSFG_state$Posterior$total_samples > 0) {
-    plot_posterior_simulation(BSFG_state, device = 3)
-    trace_plot_h2s(BSFG_state$Posterior$F_h2,device = 4)
-    trace_plot_Lambda(BSFG_state$Posterior$Lambda,device = 5)
+    plot_posterior_simulation(BSFG_state)
+    trace_plot_h2s(BSFG_state$Posterior$F_h2)
+    trace_plot_Lambda(BSFG_state$Posterior$Lambda)
   }
 }
 
@@ -235,10 +229,8 @@ plot_diagnostics_simulation = function(BSFG_state){
 #' @param BSFG_state a BSFG_state object
 plot_diagnostics = function(BSFG_state){
   if(BSFG_state$Posterior$total_samples > 0) {
-    F_h2_samples = load_posterior_param(BSFG_state,'F_h2')
-    trace_plot_h2s(F_h2_samples,device = 2)
-    Lambda_samples = load_posterior_param(BSFG_state,'Lambda')
-    trace_plot_Lambda(Lambda_samples,device = 3)
+    trace_plot_h2s(load_posterior_param(BSFG_state,'F_h2'))
+    trace_plot_Lambda(load_posterior_param(BSFG_state,'Lambda'))
   }
 }
 
@@ -251,7 +243,7 @@ plot_diagnostics = function(BSFG_state){
 #'    to convergence, or to thin saved samples)
 #' @return matrix of posterior means of same dimension as parameter in current_state
 get_posteriorMean = function(BSFG_state,parameter = c('Lambda','F','F_a','F_h2','B','B_F'),samples = NULL){
-  post_samples = BSFG_state$Posterior[[parameter]]
+  post_samples = load_posterior_param(BSFG_state,parameter)
   if(!is.null(samples)) post_samples = post_samples[samples,,]
   return(apply(post_samples,c(2,3),mean))
 }
@@ -266,7 +258,7 @@ get_posteriorMean = function(BSFG_state,parameter = c('Lambda','F','F_a','F_h2',
 #' @return array of HPDintervals. The dimensions correspond to the dimensions in Posterior
 #'     (the first dimension holds the lower and upper bounds, the other two the matrix of parameters)
 HPDinterval.BSFG_state = function(obj,prob,parameter = 'F_h2',samples = NULL){
-  post_samples = BSFG_state$Posterior[[parameter]]
+  post_samples = load_posterior_param(BSFG_state,parameter)
   if(!is.null(samples)) post_samples = post_samples[samples,,]
   intervals = apply(post_samples,3,function(x) HPDinterval(mcmc(x)))
   dims = dim(post_samples)[-1]

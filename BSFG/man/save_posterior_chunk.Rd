@@ -4,11 +4,9 @@
 \alias{save_posterior_chunk}
 \title{Saves a chunk of posterior samples}
 \usage{
-save_posterior_chunk(BSFG_state, ID = 0)
+save_posterior_chunk(BSFG_state)
 }
 \arguments{
-\item{ID}{the ID of this chunck of samples. Should be consecutive with previous chunks}
-
 \item{Posterior}{a Posterior list from a BSFG_state object}
 
 \item{folder}{the folder to save the RData files}
@@ -17,6 +15,6 @@ save_posterior_chunk(BSFG_state, ID = 0)
 Posterior
 }
 \description{
-Saves a chunk of posterior samples, each paramter in it's own RData file.
-The complete chain for a particular parameter can be re-loaded with \code{load_posterior}
+Saves a chunk of posterior samples, each paramter in its own RData file.
+The complete chain for a particular parameter can be re-loaded with \link{load_posterior_param}
 }

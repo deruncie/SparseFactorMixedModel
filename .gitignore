@@ -6,3 +6,4 @@ sourceCpp*
 *.so
 .Rhistory
 *.Rapp.history
+*.RData

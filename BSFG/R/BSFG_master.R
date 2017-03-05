@@ -309,10 +309,12 @@ print.BSFG_state = function(BSFG_state){
 #' Make plots of current BSFG state
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}},
 #'   \code{\link{print.BSFG_state}}, \code{\link{summary.BSFG_state}}
-plot.BSFG_state = function(BSFG_state){
+plot.BSFG_state = function(BSFG_state,file = 'diagnostics_polts.pdf'){
+  pdf(file)
   if(BSFG_state$run_parameters$simulation){
     plot_diagnostics_simulation(BSFG_state)
   } else{
     plot_diagnostics(BSFG_state)
   }
+  dev.off()
 }

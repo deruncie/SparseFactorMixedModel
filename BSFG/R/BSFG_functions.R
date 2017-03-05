@@ -33,6 +33,7 @@ load_simulation_data = function(file = NULL){
 #' by b0 and b1. If no factors can be dropped, then a new one is appended. The rate of adaptation
 #' decreases through the chain, controlled by b0 and b1. Should work correctly over continuations of
 #' previously stopped chains.
+#'
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 update_k = function( current_state, priors,run_parameters,data_matrices) {
 	current_state_members = names(current_state)
@@ -100,7 +101,6 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 
 #' Re-orders factors in decreasing order of magnitude
 #'
-#' Re-orders factors in decreasing order of magnitude
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 reorder_factors = function(BSFG_state){
 	# re-orders factors in decreasing size of Lambda %*% F
@@ -188,25 +188,6 @@ save_posterior_sample = function(current_state, Posterior) {
 	return(Posterior)
 }
 
-
-# initialize_Posterior = function(Posterior,current_state){
-# 	  for(param in Posterior$sample_params){
-#     	Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
-#     	dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
-#     }
-#     for(param in Posterior$posteriorMean_params) {
-#     	Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
-#     	dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
-#     }
-#     # for(param in Posterior$per_trait_params){
-#     # 	dimnames(Posterior[[param]])[[length(dim(Posterior[[param]]))]] = current_state$traitnames
-#     # }
-#     # dimnames(Posterior$Lambda)[[2]] = current_state$traitnames
-#     Posterior$sp_num = 0
-#     Posterior
-# }
-
-
 reset_Posterior = function(Posterior,current_state){
   for(param in Posterior$sample_params){
     Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
@@ -239,12 +220,7 @@ clear_Posterior = function(BSFG_state) {
 	Posterior = BSFG_state$Posterior
 	run_parameters = BSFG_state$run_parameters
 
-	# current_samples = dim(Posterior[[Posterior$sample_params[1]]])[1]
-	# current_samples = Posterior$total_samples # I think this is right
-
-	# if(current_samples > 0) {
 	run_parameters$burn = run_parameters$burn + run_parameters$thin*Posterior$total_samples
-  # }
 
   Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
   Posterior$total_samples = 0
@@ -257,30 +233,21 @@ clear_Posterior = function(BSFG_state) {
   return(BSFG_state)
 }
 
-# reset_Posterior = function(BSFG_state){
-#   Posterior = BSFG_state$Posterior
-#   Posterior = initialize_Posterior(Posterior,BSFG_state$current_state)
-#   BSFG_state$Posterior = Posterior
-#   return(BSFG_state)
-# }
-
 
 #' Saves a chunk of posterior samples
 #'
-#' Saves a chunk of posterior samples, each paramter in it's own RData file.
-#' The complete chain for a particular parameter can be re-loaded with \code{load_posterior}
+#' Saves a chunk of posterior samples, each paramter in its own RData file.
+#' The complete chain for a particular parameter can be re-loaded with \link{load_posterior_param}
 #'
 #' @param Posterior a Posterior list from a BSFG_state object
 #' @param folder the folder to save the RData files
-#' @param ID the ID of this chunck of samples. Should be consecutive with previous chunks
 #' @return Posterior
-save_posterior_chunk = function(BSFG_state,ID = 0){
+save_posterior_chunk = function(BSFG_state){
   Posterior = BSFG_state$Posterior
   folder = Posterior$folder
   if(!dir.exists(folder)) dir.create(folder)
 
-  if(ID == 0) ID = Posterior$total_samples
-  file_suffix = sprintf('%d.RData',ID)
+  file_suffix = sprintf('%d.RData',Posterior$total_samples)
   res = sapply(c(Posterior$sample_params,Posterior$posteriorMean_params),function(param) {
     file_name = sprintf('%s/%s_%s',folder,param,file_suffix)
     samples = Posterior[[param]]
@@ -292,7 +259,7 @@ save_posterior_chunk = function(BSFG_state,ID = 0){
   return(BSFG_state)
 }
 
-#' load a set of posterior samples into a single array
+#' load the posterior samples of a single parameter from all saved chunks
 #'
 #' @param folder folder to find Posterior chunk files
 #' @param param Name of parameter to load
