@@ -92,13 +92,8 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 		current_state = within(c(current_state,priors,run_parameters, run_variables,data_matrices), {
 			k = ncol(Lambda)
 
-		 # -----fill in missing phenotypes----- #
-			#conditioning on everything else
-			if(sum(Y_missing)>0) {
-				Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
-				resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
-				Eta[Y_missing] = Eta_mean[Y_missing] + resids[Y_missing]
-			}
+			# ----- sample Eta ----- #
+			Eta = data_model(Y,data_model_parameters,current_state)
 
 		 # -----Sample Lambda and B ------------------ #
 			#conditioning on F, marginalizing over E_a

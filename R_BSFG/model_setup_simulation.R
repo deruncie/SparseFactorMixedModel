@@ -23,7 +23,7 @@ run_parameters = list(
     sampler = 'fast_BSFG',
     # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
-    save_Eta     = F,
+    save_Eta     = FALSE,
     fixed_factors = T,
     simulation   = T,
     scale_Y      = FALSE,
@@ -58,7 +58,7 @@ setup$data$Group = gl(3,1,length = nrow(setup$data))
 #                                   data,priors,run_parameters,A_mats = list(animal = A),
 #                                   setup = setup))
 BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), #
-                                  data,priors,run_parameters,A_mats = list(animal = A),
+                                  data,priors=priors,run_parameters=run_parameters,A_mats = list(animal = A),
                                   setup = setup))
 BSFG_state$current_state$F_h2
 

@@ -1,7 +1,8 @@
 initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,verbose=T,...){
 
     Y          = BSFG_state$data_matrices$Y
-    Y_missing  = BSFG_state$data_matrices$Y_missing
+    data_model = BSFG_state$data_matrices$data_model
+    data_model_parameters = BSFG_state$data_matrices$data_model_parameters
     X_F        = BSFG_state$data_matrices$X_F
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
@@ -25,15 +26,6 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # ----------------------------- #
 # -----Initialize variables---- #
 # ----------------------------- #
-
-    # Initialize Eta
-    #    Here, Eta = Y.
-    #    With missing data, Eta is complete data
-    #    Eta could be parameters of a Y-level model (independent across individuals)
-    Eta = Y
-    if(sum(Y_missing)>0) {
-      Eta[Y_missing] = rnorm(sum(Y_missing))
-    }
 
    # --- transcript-level model
     # p-vector of gene precisions after taking removing effect of factors.
@@ -131,7 +123,6 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # ---Save initial values- #
 # ----------------------- #
     current_state = list(
-            Eta            = Eta,
             Lambda_prec    = Lambda_prec,
             delta          = delta,
             tauh           = tauh,
@@ -153,6 +144,13 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
             nrun           = 0,
             total_time     = 0
     	)
+
+    # Initialize Eta
+    #    Here, Eta = Y.
+    #    With missing data, Eta is complete data
+    #    Eta could be parameters of a Y-level model (independent across individuals)
+    Eta = data_model(Y,data_model_parameters,current_state)
+    current_state$Eta = Eta
 
 # ----------------------- #
 # -Initialize Posterior-- #

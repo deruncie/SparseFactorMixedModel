@@ -70,6 +70,15 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'   for A_inv_mats) for any of the random effects, A is assumed to be the identity.
 #' @param A_inv_mats list of precision matrices for random effects. If none provided (and none
 #'   provided for A_mats) for any of the random effects, A is assumed to be the identity.
+#' @param data_model either a character vector identifying a provided data_model
+#'     (ex. 'missing_data' calls \link{missing_data_model}),
+#'     or a function modeled after \code{missing_data_model} (see code by typing this into the console)
+#'     that draws posterior samples of Eta conditional on
+#'     the observations (Y) and the current state of the BSFG model (current_state). The function should have
+#'     the same form as \link{missing_data}, and must return Eta even if current_state is NULL
+#' @param data_model_parameters a list of parameters necessary for computing \code{data_model}.
+#'     Ex. Y_missing for the missing_data model.
+#'     If \code{data_model == 'missing_data'}, Y_missing is computed automatically.
 #' @param ncores for \code{general_BSFG}, number of cores to use during initialization.
 #' @param setup optional - a list of known values for Lambda (error_factor_lambda), h2, factor_h2s
 #' @param verbose should progress in initialization be reported?
@@ -84,6 +93,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
 #'
 BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
+                     data_model = 'missing_data', data_model_parameters = NULL,
                      sampler = c('fast_BSFG','general_BSFG'), ncores = detectCores(),simulation = c(F,T),setup = NULL,verbose=T) {
 
   # ----------------------------- #
@@ -91,11 +101,10 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
   # ----------------------------- #
 
 	# model dimensions
-	n = nrow(Y)
-	p = ncol(Y)
+	n = nrow(data)
+	p_Y = ncol(Y)
 	traitnames = colnames(Y)
 
-	# missing data
 	Y_missing = Matrix(is.na(Y))
 
 	# scale Y
@@ -105,9 +114,18 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	  Y = sweep(Y,2,Mean_Y,'-')
 	  Y = sweep(Y,2,sqrt(VY),'/')
 	} else {
-	  Mean_Y = rep(0,p)
-	  VY = rep(1,p)
+	  Mean_Y = rep(0,p_Y)
+	  VY = rep(1,p_Y)
 	}
+
+	# use data_model to get dimensions, names of Y
+	if(data_model == 'missing_data') {
+	  data_model = missing_data_model
+	  data_model_parameters = list(Y_missing = Matrix(is.na(Y)))
+	}
+	Eta = data_model(Y,data_model_parameters)
+	p = ncol(Eta)
+	traitnames = colnames(Y)
 
 	# check that all terms in model are in data
 	if(!all(all.vars(model) %in% colnames(data))) {
@@ -232,7 +250,8 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 
 	data_matrices = list(
 	  Y          = Y,
-	  Y_missing  = Y_missing,
+	  data_model = data_model,
+	  data_model_parameters  = data_model_parameters,
 	  X          = X,
 	  X_F        = X_F,
 	  Z_matrices = Z_matrices,
@@ -347,4 +366,33 @@ plot.BSFG_state = function(BSFG_state,file = 'diagnostics_polts.pdf'){
     plot_diagnostics(BSFG_state)
   }
   dev.off()
+}
+
+#' Sample missing data
+#'
+#' Function to sample missing data given model parameters. This is also a template
+#'     for data_model functions.
+#'
+#' Note: The model must return an appropriate Eta matrix, even if current_state is NULL
+#'
+#' @param Y data matrix n_Y x p_Y
+#' @param data_model_parameters List of parameters necessary for the data model.
+#'      Here, a Matrix of coordinates of NAs in Y
+#' @param current_state current_state from BSFG_state
+#' @return Eta matrix of latent data: n x p
+missing_data_model = function(Y,data_model_parameters,current_state = NULL){
+  with(c(data_model_parameters,current_state),{
+    if(sum(Y_missing) == 0) return(Y)
+    if(is.null(current_state)) {
+      n = nrow(Y)
+      p = ncol(Y)
+      Eta_mean = matrix(0,n,p)
+      resids = matrix(rnorm(n*p),n,p)
+    } else{
+      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+      resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+    }
+    Eta[Y_missing] = Eta_mean[Y_missing] + resids[Y_missing]
+    Eta
+  })
 }

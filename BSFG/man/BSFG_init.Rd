@@ -5,7 +5,8 @@
 \title{Initialize a BSFG model}
 \usage{
 BSFG_init(Y, model, data, priors, run_parameters, A_mats = NULL,
-  A_inv_mats = NULL, sampler = c("fast_BSFG", "general_BSFG"),
+  A_inv_mats = NULL, data_model = "missing_data",
+  data_model_parameters = NULL, sampler = c("fast_BSFG", "general_BSFG"),
   ncores = detectCores(), simulation = c(F, T), setup = NULL,
   verbose = T)
 }
@@ -34,6 +35,17 @@ for A_inv_mats) for any of the random effects, A is assumed to be the identity.}
 
 \item{A_inv_mats}{list of precision matrices for random effects. If none provided (and none
 provided for A_mats) for any of the random effects, A is assumed to be the identity.}
+
+\item{data_model}{either a character vector identifying a provided data_model
+(ex. 'missing_data' calls \link{missing_data_model}),
+or a function modeled after \code{missing_data_model} (see code by typing this into the console)
+that draws posterior samples of Eta conditional on
+the observations (Y) and the current state of the BSFG model (current_state). The function should have
+the same form as \link{missing_data}, and must return Eta even if current_state is NULL}
+
+\item{data_model_parameters}{a list of parameters necessary for computing \code{data_model}.
+Ex. Y_missing for the missing_data model.
+If \code{data_model == 'missing_data'}, Y_missing is computed automatically.}
 
 \item{ncores}{for \code{general_BSFG}, number of cores to use during initialization.}
 

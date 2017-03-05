@@ -42,14 +42,17 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 		current_state = within(c(current_state,priors,run_parameters, run_variables,data_matrices), {
 			k = ncol(Lambda)
 
-		 # -----fill in missing phenotypes----- #
-			#conditioning on everything else
-			# this is not checked thoroughly
-			if(sum(Y_missing)>0) {
-			  Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
-			  resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
-			  Eta[Y_missing] = Eta_mean[Y_missing] + resids[Y_missing]
-			}
+			# ----- sample Eta ----- #
+			Eta = data_model(Y,data_model_parameters,current_state)
+
+		#  # -----fill in missing phenotypes----- #
+		# 	#conditioning on everything else
+		# 	# this is not checked thoroughly
+		# 	if(sum(Y_missing)>0) {
+		# 	  Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+		# 	  resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+		# 	  Eta[Y_missing] = Eta_mean[Y_missing] + resids[Y_missing]
+		# 	}
 
 		 # -----Sample Lambda and B ------------------ #
 			#conditioning on W, F, marginalizing over random effects (conditional on resid_h2)
