@@ -1,6 +1,8 @@
 initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,
 									ncores = detectCores(),verbose=T,...){
 
+    Y          = BSFG_state$data_matrices$Y
+    Y_missing  = BSFG_state$data_matrices$Y_missing
     X_F        = BSFG_state$data_matrices$X_F
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
@@ -24,6 +26,15 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 # ----------------------------- #
 # -----Initialize variables---- #
 # ----------------------------- #
+
+  # Initialize Eta
+    #    Here, Eta = Y.
+    #    With missing data, Eta is complete data
+    #    Eta could be parameters of a Y-level model (independent across individuals)
+    Eta = Y
+    if(sum(Y_missing)>0) {
+      Eta[Y_missing] = rnorm(sum(Y_missing))
+    }
 
   # Factors loadings:
      #  initial number of factors
@@ -88,10 +99,10 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
   # residuals
      # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
 	 #  Prior: Gamma distribution for each element
-     #       shape = tot_Y_prec_shape
-     #       rate = tot_Y_prec_rate
-    tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
-    colnames(tot_Y_prec) = traitnames
+     #       shape = tot_Eta_prec_shape
+     #       rate = tot_Eta_prec_rate
+    tot_Eta_prec = with(priors,matrix(rgamma(p,shape = tot_Eta_prec_shape,rate = tot_Eta_prec_rate),nrow = 1))
+    colnames(tot_Eta_prec) = traitnames
 
     # Resid discrete variances
      # p-matrix of n_RE x p with
@@ -99,7 +110,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
 
     E_a = do.call(rbind,lapply(RE_names,function(effect){
-    	matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Y_prec)),ncol = p, byrow = T)
+    	matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Eta_prec)),ncol = p, byrow = T)
     }))
     colnames(E_a) = traitnames
 
@@ -116,6 +127,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 # ---Save initial values- #
 # ----------------------- #
     current_state = list(
+        Eta            = Eta,
     		Lambda_prec    = Lambda_prec,
     		delta          = delta,
     		tauh           = tauh,
@@ -126,7 +138,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     		F_h2           = F_h2,
     		F_a            = F_a,
     		F              = F,
-    		tot_Y_prec     = tot_Y_prec,
+    		tot_Eta_prec     = tot_Eta_prec,
     		resid_h2_index = resid_h2_index,
     		resid_h2       = resid_h2,
     		E_a            = E_a,
@@ -143,18 +155,16 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 # -Initialize Posterior-- #
 # ----------------------- #
     Posterior = list(
-        sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2', 'B', 'B_F', 'prec_B'),
+        sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B'),
         posteriorMean_params = c('E_a'),
-        per_trait_params = c('tot_Y_prec','resid_h2','B'),
+        per_trait_params = c('tot_Eta_prec','resid_h2','B'),
         total_samples = 0,
         folder = run_parameters$Posterior_folder,
         files = c()
-        # per_trait_params = c('tot_Y_prec','resid_h2','B','E_a')
+        # per_trait_params = c('tot_Eta_prec','resid_h2','B','E_a')
     )
+    if(run_parameters$save_Eta) Posterior$sample_params = c(Posterior$sample_params,'Eta')
     Posterior = reset_Posterior(Posterior,current_state)
-    # Posterior = initialize_Posterior(Posterior,current_state)
-    # Posterior = reset_Posterior(Posterior,current_state)
-    # Posterior$sp_num = 0
 
 # ------------------------------------ #
 # ----Precalculate ZAZts, chol_As ---- #

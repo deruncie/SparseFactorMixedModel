@@ -30,7 +30,7 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 	#
 	# This function takes the following inputs:
 	#     data_matrices: struct holding the (should be imutable) data, design and incidence matrices:
-	#          Y:  		Full phenotype data. n x p
+	#          Eta:  		Full phenotype data. n x p
 	# 		   X: 		Fixed effect design matrix. n x b
 	#          Z_1:     Random effect 1 incidence matrix. n x r
 	#          Y_missing: incidence matrix of missing data in Y
@@ -95,9 +95,9 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 		 # -----fill in missing phenotypes----- #
 			#conditioning on everything else
 			if(sum(Y_missing)>0) {
-				meanTraits = X %*% B + F %*% t(Lambda) + Z %*% E_a
-				resids = matrix(rnorm(p*n,0,sqrt(1/resid_Y_prec)),nr = n,nc = p,byrow=T)
-				Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
+				Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+				resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+				Eta[Y_missing] = Eta_mean[Y_missing] + resids[Y_missing]
 			}
 
 		 # -----Sample Lambda and B ------------------ #
@@ -111,7 +111,7 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 			} else{ # b == 0
 			  prior_prec = t(Plam)
 			}
-			coefs = sample_coefs_parallel_sparse_c( Y,Design,resid_h2, tot_Y_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
+			coefs = sample_coefs_parallel_sparse_c( Eta,Design,resid_h2, tot_Eta_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
 
 			if(b > 0){
 				B[] = coefs[1:b,,drop=FALSE]
@@ -129,17 +129,17 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 		 # # -----Update Plam-------------------- #
 			Plam = sweep(Lambda_prec,2,tauh,'*')
 
-		 # -----Sample resid_h2, tot_Y_prec, E_a ---------------- #
+		 # -----Sample resid_h2, tot_Eta_prec, E_a ---------------- #
 			#conditioning on W, B, F, Lambda, marginalizing over E_a
-			Y_tilde = as.matrix(Y - X %*% B - F %*% t(Lambda))
-			tot_Y_prec[] = sample_tot_prec_sparse_c(Y_tilde,resid_h2,tot_Y_prec_shape,tot_Y_prec_rate,invert_aI_bZAZ)
+			Eta_tilde = as.matrix(Eta - X %*% B - F %*% t(Lambda))
+			tot_Eta_prec[] = sample_tot_prec_sparse_c(Eta_tilde,resid_h2,tot_Eta_prec_shape,tot_Eta_prec_rate,invert_aI_bZAZ)
 
-			resid_h2_index = sample_h2s_discrete_given_p_sparse_c(Y_tilde,h2_divisions,h2_priors_resids,tot_Y_prec,invert_aI_bZAZ)
+			resid_h2_index = sample_h2s_discrete_given_p_sparse_c(Eta_tilde,h2_divisions,h2_priors_resids,tot_Eta_prec,invert_aI_bZAZ)
 			resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
 
-			E_a[] = sample_randomEffects_parallel_sparse_c( Y_tilde, Z, tot_Y_prec, resid_h2, invert_aZZt_Ainv, 1)
+			E_a[] = sample_randomEffects_parallel_sparse_c( Eta_tilde, Z, tot_Eta_prec, resid_h2, invert_aZZt_Ainv, 1)
 
-			resid_Y_prec = tot_Y_prec / (1-resid_h2)
+			resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
 
 		# -----Sample Lambda and B_F ------------------ #
 			# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
@@ -163,14 +163,14 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,W,Lambda, F_h2
-			Y_tilde = as.matrix(Y - X %*% B - Z %*% E_a)
+			Eta_tilde = as.matrix(Eta - X %*% B - Z %*% E_a)
 			F_e_prec = tot_F_prec / (1-F_h2)
 			if(b_F > 0) {
 			  prior_mean = as.matrix(X_F %*% B_F + Z %*% F_a)
 			} else {
 			  prior_mean = as.matrix(Z %*% F_a)
 			}
-			F[] = sample_factors_scores_sparse_c( Y_tilde, prior_mean,Lambda,resid_Y_prec,F_e_prec )
+			F[] = sample_factors_scores_sparse_c( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec )
 
 		 # -----Sample prec_B------------- #
 			if(b > 1) {

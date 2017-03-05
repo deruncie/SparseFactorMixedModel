@@ -1,5 +1,7 @@
 initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,verbose=T,...){
 
+    Y          = BSFG_state$data_matrices$Y
+    Y_missing  = BSFG_state$data_matrices$Y_missing
     X_F        = BSFG_state$data_matrices$X_F
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
@@ -24,13 +26,22 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # -----Initialize variables---- #
 # ----------------------------- #
 
+    # Initialize Eta
+    #    Here, Eta = Y.
+    #    With missing data, Eta is complete data
+    #    Eta could be parameters of a Y-level model (independent across individuals)
+    Eta = Y
+    if(sum(Y_missing)>0) {
+      Eta[Y_missing] = rnorm(sum(Y_missing))
+    }
+
    # --- transcript-level model
     # p-vector of gene precisions after taking removing effect of factors.
 	#  Prior: Gamma distribution for each element
-    #       shape = tot_Y_prec_shape
-    #       rate = tot_Y_prec_rate
-    tot_Y_prec = with(priors,matrix(rgamma(p,shape = tot_Y_prec_shape,rate = tot_Y_prec_rate),nrow = 1))
-    colnames(tot_Y_prec) = traitnames
+    #       shape = tot_Eta_prec_shape
+    #       rate = tot_Eta_prec_rate
+    tot_Eta_prec = with(priors,matrix(rgamma(p,shape = tot_Eta_prec_shape,rate = tot_Eta_prec_rate),nrow = 1))
+    colnames(tot_Eta_prec) = traitnames
 
     # Factors:
     #  initial number of factors
@@ -76,7 +87,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     #   Prior: Normal distribution on each element.
     #       mean = 0
     #       sd = 1./sqrt(E_a_prec)' on each row
-    E_a = matrix(rnorm(p*r,0,sqrt(resid_h2 * tot_Y_prec)),nr = r,nc = p, byrow = T)
+    E_a = matrix(rnorm(p*r,0,sqrt(resid_h2 * tot_Eta_prec)),nr = r,nc = p, byrow = T)
     colnames(E_a) = traitnames
 
     # Latent factor variances
@@ -120,12 +131,13 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # ---Save initial values- #
 # ----------------------- #
     current_state = list(
+            Eta            = Eta,
             Lambda_prec    = Lambda_prec,
             delta          = delta,
             tauh           = tauh,
             Plam           = Plam,
             Lambda         = Lambda,
-            tot_Y_prec     = tot_Y_prec,
+            tot_Eta_prec   = tot_Eta_prec,
             resid_h2_index = resid_h2_index,
             resid_h2       = resid_h2,
             tot_F_prec     = tot_F_prec,
@@ -146,13 +158,14 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # -Initialize Posterior-- #
 # ----------------------- #
     Posterior = list(
-      sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Y_prec','resid_h2', 'B', 'B_F', 'prec_B'),
+      sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B'),
       posteriorMean_params = c('E_a'),
       total_samples = 0,
       folder = run_parameters$Posterior_folder,
       files = c()
-      # per_trait_params = c('tot_Y_prec','resid_h2','B','E_a')
+      # per_trait_params = c('tot_Eta_prec','resid_h2','B','E_a')
     )
+    if(run_parameters$save_Eta) Posterior$sample_params = c(Posterior$sample_params,'Eta')
     Posterior = reset_Posterior(Posterior,current_state)
 
 

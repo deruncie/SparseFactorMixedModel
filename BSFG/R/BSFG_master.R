@@ -7,8 +7,9 @@
 #' @param Posterior_folder folder to save posterior sample chunk files
 #' @param fixed_factors should the fixed effect model be applied to factors as well as the factor
 #'   residuals? If so, the first column of the design matrix is dropped.
-#' @param simulaiton Is this a fit to simulated data? If so, a setup list will be expected providing
+#' @param simulation Is this a fit to simulated data? If so, a setup list will be expected providing
 #'   the true values
+#' @param save_Eta Should posterior samples of Eta be saved?
 #' @param scale_Y Should the Y values be centered and scaled? Recommend, except for simulated data.
 #' @param b0 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
 #' @param b1 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
@@ -28,7 +29,7 @@
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 #'
 BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder = 'Posterior',
-                        fixed_factors = c(T,F),simulation = c(F,T),scale_Y = c(T,F),
+                        fixed_factors = c(T,F),save_Eta = F, simulation = c(F,T),scale_Y = c(T,F),
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100,
                         burn = 100,
@@ -258,8 +259,8 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	priors$fixed_prec_shape = with(priors$fixed_var,V * nu)
 	priors$fixed_prec_rate  = with(priors$fixed_var,nu - 2)
 	  # total precision
-	priors$tot_Y_prec_shape = with(priors$tot_Y_var,V * nu)
-	priors$tot_Y_prec_rate  = with(priors$tot_Y_var,nu - 2)
+	priors$tot_Eta_prec_shape = with(priors$tot_Y_var,V * nu)
+	priors$tot_Eta_prec_rate  = with(priors$tot_Y_var,nu - 2)
 	priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
 	priors$tot_F_prec_rate  = with(priors$tot_F_var,nu - 2)
 	  # delta: column shrinkage of Lambda

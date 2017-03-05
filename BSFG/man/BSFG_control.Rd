@@ -5,7 +5,7 @@
 \title{Set BSFG run parameters}
 \usage{
 BSFG_control(sampler = c("fast_BSFG", "general_BSFG"),
-  Posterior_folder = "Posterior", fixed_factors = c(T, F),
+  Posterior_folder = "Posterior", fixed_factors = c(T, F), save_Eta = F,
   simulation = c(F, T), scale_Y = c(T, F), b0 = 1, b1 = 5e-04,
   epsilon = 0.1, prop = 1, k_init = 20, h2_divisions = 100,
   burn = 100, thin = 2)
@@ -18,6 +18,11 @@ effect. If more are specified in \code{BSFG_init}, this is switched to general_B
 
 \item{fixed_factors}{should the fixed effect model be applied to factors as well as the factor
 residuals? If so, the first column of the design matrix is dropped.}
+
+\item{save_Eta}{Should posterior samples of Eta be saved?}
+
+\item{simulation}{Is this a fit to simulated data? If so, a setup list will be expected providing
+the true values}
 
 \item{scale_Y}{Should the Y values be centered and scaled? Recommend, except for simulated data.}
 
@@ -41,9 +46,6 @@ are assigned a prior of zero and ignored.}
 \item{burn}{burnin length of the MCMC chain}
 
 \item{thin}{thinning rate of the MCMC chain}
-
-\item{simulaiton}{Is this a fit to simulated data? If so, a setup list will be expected providing
-the true values}
 
 \item{kinit}{initial number of factors}
 }

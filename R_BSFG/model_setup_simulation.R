@@ -23,6 +23,7 @@ run_parameters = list(
     sampler = 'fast_BSFG',
     # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
+    save_Eta     = F,
     fixed_factors = T,
     simulation   = T,
     scale_Y      = FALSE,

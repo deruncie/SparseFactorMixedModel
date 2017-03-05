@@ -33,7 +33,7 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 	# --------------start gibbs sampling------------- #
 	# ----------------------------------------------- #
 
-	current_state$E_a_prec = with(current_state,tot_Y_prec / rowSums(resid_h2))
+	current_state$E_a_prec = with(current_state,tot_Eta_prec / rowSums(resid_h2))
 
 	start_time = Sys.time()
 	for(i in start_i+(1:n_samples)){
@@ -46,9 +46,9 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 			#conditioning on everything else
 			# this is not checked thoroughly
 			if(sum(Y_missing)>0) {
-				meanTraits = X %*% B + F %*% t(Lambda) + Z %*% E_a
-				resids = matrix(rnorm(p*n,0,sqrt((1-colSums(resid_h2))/tot_Y_prec)),nr = n,nc = p,byrow=T)
-				Y[Y_missing] = meanTraits[Y_missing] + resids[Y_missing]
+			  Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+			  resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+			  Eta[Y_missing] = Eta_mean[Y_missing] + resids[Y_missing]
 			}
 
 		 # -----Sample Lambda and B ------------------ #
@@ -61,7 +61,7 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 			} else{ # b == 0
 			  prior_prec = t(Plam)
 			}
-			coefs = sample_MME_fixedEffects(Y,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Y_prec, prior_mean, prior_prec,ncores)
+			coefs = sample_MME_fixedEffects(Eta,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,ncores)
 			if(b > 0){
 				B[] = coefs[1:b,,drop=FALSE]
 			}
@@ -78,15 +78,15 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 		 # # -----Update Plam-------------------- #
 			Plam[] = sweep(Lambda_prec,2,tauh,'*')
 
-		 # -----Sample tot_Y_prec, resid_h2, E_a ---------------- #
-			#conditioning on B, F, Lambda, resid_h2, tot_Y_prec
-			Y_tilde = Y - X %*% B - F %*% t(Lambda)
-			tot_Y_prec[] = sample_tot_prec(Y_tilde, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
-			resid_h2_index = sample_h2s_discrete(Y_tilde,tot_Y_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
+		 # -----Sample tot_Eta_prec, resid_h2, E_a ---------------- #
+			#conditioning on B, F, Lambda, resid_h2, tot_Eta_prec
+			Eta_tilde = Eta - X %*% B - F %*% t(Lambda)
+			tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
+			resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
 			resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
-			E_a_prec = tot_Y_prec / colSums(resid_h2)
+			E_a_prec = tot_Eta_prec / colSums(resid_h2)
 
-			E_a[] = sample_MME_ZAZts(Y_tilde, Z, tot_Y_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
+			E_a[] = sample_MME_ZAZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
 
 
 			# -----Sample Lambda and B_F ------------------ #
@@ -111,15 +111,15 @@ sample_BSFG.general_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),
 
 		 # -----Sample F----------------------- #
 			#conditioning on B, F_a,E_a,Lambda, F_h2
-			Y_tilde = as.matrix(Y - X %*% B - Z %*% E_a)
+			Eta_tilde = as.matrix(Eta - X %*% B - Z %*% E_a)
 			F_e_prec = tot_F_prec / (1-colSums(F_h2))
-			resid_Y_prec = tot_Y_prec / (1-colSums(resid_h2))
+			resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
 			if(b_F > 0) {
 			  prior_mean = X_F %*% B_F + Z %*% F_a
 			} else {
 			  prior_mean = Z %*% F_a
 			}
-			F[] = sample_factors_scores_sparse_c( Y_tilde, as.matrix(prior_mean),Lambda,resid_Y_prec,F_e_prec )
+			F[] = sample_factors_scores_sparse_c( Eta_tilde, as.matrix(prior_mean),Lambda,resid_Eta_prec,F_e_prec )
 
 		 # -----Sample prec_B------------- #
 			if(b > 1) {

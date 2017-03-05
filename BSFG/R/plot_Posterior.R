@@ -93,8 +93,8 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
   Lambda = current_state$Lambda
   F_h2 = current_state$F_h2
   if(is.null(dim(F_h2))) F_h2 = matrix(F_h2,nrow=1)
-  E_a_prec = current_state$tot_Y_prec / current_state$resid_h2
-  resid_Y_prec = current_state$tot_Y_prec / (1-current_state$resid_h2)
+  E_a_prec = current_state$tot_Eta_prec / current_state$resid_h2
+  resid_Eta_prec = current_state$tot_Eta_prec / (1-current_state$resid_h2)
   p = run_variables$p
 
 
@@ -104,13 +104,13 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
 
   # element-wise correlations
   G_plots = lapply(1:nrow(F_h2),function(re) {
-    G_est = tcrossprod(sweep(Lambda,2,sqrt(F_h2[re,]),'*')) + diag(c(current_state$resid_h2[re,]/current_state$tot_Y_prec))
+    G_est = tcrossprod(sweep(Lambda,2,sqrt(F_h2[re,]),'*')) + diag(c(current_state$resid_h2[re,]/current_state$tot_Eta_prec))
     G_act = setup$G
     RE_name = rownames(F_h2)[re]
     if(is.null(RE_name)) RE_name = 'Va'
     plot_element_wise_correlations(G_act, G_est, main = sprintf('G: %s elements',RE_name))
   })
-  E_est = tcrossprod(sweep(Lambda,2,sqrt(1-colSums(F_h2)),'*')) + diag(c((1-colSums(current_state$resid_h2))/current_state$tot_Y_prec))
+  E_est = tcrossprod(sweep(Lambda,2,sqrt(1-colSums(F_h2)),'*')) + diag(c((1-colSums(current_state$resid_h2))/current_state$tot_Eta_prec))
   E_act = setup$R
   plot_element_wise_correlations(E_act, E_est,main = 'E elements')
 
@@ -150,7 +150,7 @@ calc_posterior_mean_cov = function(Posterior,random_effect){
         factor_h2s_i = F_h2[i,random_effect,]
         resid_h2s_i = resid_h2[i,random_effect,]
       }
-      G_i = tcrossprod(sweep(Lambda[i,,],2,sqrt(factor_h2s_i),'*')) + diag(c(resid_h2s_i/tot_Y_prec[i,1,]))
+      G_i = tcrossprod(sweep(Lambda[i,,],2,sqrt(factor_h2s_i),'*')) + diag(c(resid_h2s_i/tot_Eta_prec[i,1,]))
       G = G + G_i/total_samples
     }
     G

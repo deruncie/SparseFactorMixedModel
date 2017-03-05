@@ -18,6 +18,7 @@ run_parameters = list(
     sampler = 'fast_BSFG',
     # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
+    save_Eta     = F,
     fixed_factors = FALSE,
     simulation   = FALSE,
     scale_Y      = TRUE,
@@ -93,6 +94,7 @@ for(i  in 1:20) {
 # my_sso <- launch_shinystan(my_sso)
 
 F_h2 = get_posteriorMean(BSFG_state,'F_h2')
+Eta = get_posteriorMean(BSFG_state,'Eta')
 Lambda = get_posteriorMean(BSFG_state,'Lambda')
 F = get_posteriorMean(BSFG_state,'F')
 F_a = get_posteriorMean(BSFG_state,'F_a')
