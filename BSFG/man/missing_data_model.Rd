@@ -4,7 +4,8 @@
 \alias{missing_data_model}
 \title{Sample missing data}
 \usage{
-missing_data_model(Y, data_model_parameters, current_state = NULL)
+missing_data_model(Y, data_model_parameters, current_state = list(),
+  data_matrices = NULL)
 }
 \arguments{
 \item{Y}{data matrix n_Y x p_Y}
@@ -13,6 +14,8 @@ missing_data_model(Y, data_model_parameters, current_state = NULL)
 Here, a Matrix of coordinates of NAs in Y}
 
 \item{current_state}{current_state from BSFG_state}
+
+\item{data_matrices}{from BSFG_state}
 }
 \value{
 Eta matrix of latent data: n x p

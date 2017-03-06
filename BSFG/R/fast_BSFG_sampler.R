@@ -92,8 +92,6 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 		current_state = within(c(current_state,priors,run_parameters, run_variables,data_matrices), {
 			k = ncol(Lambda)
 
-			# ----- sample Eta ----- #
-			Eta = data_model(Y,data_model_parameters,current_state)
 
 		 # -----Sample Lambda and B ------------------ #
 			#conditioning on F, marginalizing over E_a
@@ -176,8 +174,12 @@ sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
 			  }
 			  prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
 			}
-	})
-	current_state = current_state[current_state_names]
+	  })
+
+	# ----- sample Eta ----- #
+	  current_state = with(run_parameters,data_model(Y,data_model_parameters,current_state,data_matrices))
+
+	  current_state = current_state[current_state_names]
 
 	 # -- adapt number of factors to samples ---#
 		current_state = update_k( current_state, priors, run_parameters, data_matrices)

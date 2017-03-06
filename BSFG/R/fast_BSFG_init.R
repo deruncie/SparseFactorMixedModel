@@ -1,8 +1,9 @@
 initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,verbose=T,...){
 
+    data_model            = BSFG_state$run_parameters$data_model
+    data_model_parameters = BSFG_state$run_parameters$data_model_parameters
+
     Y          = BSFG_state$data_matrices$Y
-    data_model = BSFG_state$data_matrices$data_model
-    data_model_parameters = BSFG_state$data_matrices$data_model_parameters
     X_F        = BSFG_state$data_matrices$X_F
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
@@ -149,8 +150,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     #    Here, Eta = Y.
     #    With missing data, Eta is complete data
     #    Eta could be parameters of a Y-level model (independent across individuals)
-    Eta = data_model(Y,data_model_parameters,current_state)
-    current_state$Eta = Eta
+    current_state = data_model(Y,data_model_parameters,current_state,BSFG_state$data_matrices)
 
 # ----------------------- #
 # -Initialize Posterior-- #

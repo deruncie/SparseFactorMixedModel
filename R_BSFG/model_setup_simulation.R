@@ -57,6 +57,7 @@ setup$data$Group = gl(3,1,length = nrow(setup$data))
 # BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1+Fixed2 + Fixed3|Sire)+(Group|animal), #
 #                                   data,priors,run_parameters,A_mats = list(animal = A),
 #                                   setup = setup))
+# setup$Y[1:3] = NA
 BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), #
                                   data,priors=priors,run_parameters=run_parameters,A_mats = list(animal = A),
                                   setup = setup))

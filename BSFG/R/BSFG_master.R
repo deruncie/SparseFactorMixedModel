@@ -119,11 +119,11 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	}
 
 	# use data_model to get dimensions, names of Y
-	if(data_model == 'missing_data') {
+	if(is.character(data_model) && data_model == 'missing_data') {
 	  data_model = missing_data_model
 	  data_model_parameters = list(Y_missing = Matrix(is.na(Y)))
 	}
-	Eta = data_model(Y,data_model_parameters)
+	Eta = data_model(Y,data_model_parameters)$Eta
 	p = ncol(Eta)
 	traitnames = colnames(Y)
 
@@ -250,8 +250,6 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 
 	data_matrices = list(
 	  Y          = Y,
-	  data_model = data_model,
-	  data_model_parameters  = data_model_parameters,
 	  X          = X,
 	  X_F        = X_F,
 	  Z_matrices = Z_matrices,
@@ -268,6 +266,9 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	  Mean_Y = Mean_Y,
 	  VY     = VY
 	)
+
+	run_parameters$data_model = data_model
+	run_parameters$data_model_parameters = data_model_parameters
 
 
 	# ----------------------------- #
@@ -379,20 +380,27 @@ plot.BSFG_state = function(BSFG_state,file = 'diagnostics_polts.pdf'){
 #' @param data_model_parameters List of parameters necessary for the data model.
 #'      Here, a Matrix of coordinates of NAs in Y
 #' @param current_state current_state from BSFG_state
+#' @param data_matrices from BSFG_state
 #' @return Eta matrix of latent data: n x p
-missing_data_model = function(Y,data_model_parameters,current_state = NULL){
-  with(c(data_model_parameters,current_state),{
-    if(sum(Y_missing) == 0) return(Y)
-    if(is.null(current_state)) {
-      n = nrow(Y)
-      p = ncol(Y)
-      Eta_mean = matrix(0,n,p)
-      resids = matrix(rnorm(n*p),n,p)
-    } else{
-      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
-      resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
-    }
-    Eta[Y_missing] = Eta_mean[Y_missing] + resids[Y_missing]
-    Eta
+missing_data_model = function(Y,data_model_parameters,current_state = list(),data_matrices = NULL){
+  current_state = with(c(data_model_parameters,data_matrices),{
+    current_state_names = c('Eta',names(current_state))  # parameters to add
+    current_state = within(current_state,{
+            Eta = Y
+            if(sum(Y_missing) == 0) return(Y)
+            n = nrow(Y)
+            p = ncol(Y)
+            if(length(current_state) == 0) {
+              Eta_mean = matrix(0,n,p)
+              resids = matrix(rnorm(n*p),n,p)
+            } else{
+              Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+              resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+              resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+            }
+            missing_indices = which(Y_missing)
+            Eta[missing_indices] = Eta_mean[missing_indices] + resids[missing_indices]
+    })
+    current_state[current_state_names]
   })
 }

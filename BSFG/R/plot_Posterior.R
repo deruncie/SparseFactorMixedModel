@@ -257,7 +257,7 @@ get_posteriorMean = function(BSFG_state,parameter = c('Lambda','F','F_a','F_h2',
 #' @return array of HPDintervals. The dimensions correspond to the dimensions in Posterior
 #'     (the first dimension holds the lower and upper bounds, the other two the matrix of parameters)
 HPDinterval.BSFG_state = function(obj,prob,parameter = 'F_h2',samples = NULL){
-  post_samples = load_posterior_param(BSFG_state,parameter)
+  post_samples = load_posterior_param(obj,parameter)
   if(!is.null(samples)) post_samples = post_samples[samples,,]
   intervals = apply(post_samples,3,function(x) HPDinterval(mcmc(x)))
   dims = dim(post_samples)[-1]
