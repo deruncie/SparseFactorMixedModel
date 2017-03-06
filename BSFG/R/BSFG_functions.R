@@ -134,7 +134,7 @@ reorder_factors = function(BSFG_state){
 
 	for(param in reorder_params){
 		if(! param %in% names(Posterior)) next
-		if(dim(Posterior[[param]])[3] == 0) next
+		if(dim(Posterior[[param]])[1] == 0) next
 		Posterior[[param]] = Posterior[[param]][,,factor_order,drop=FALSE]
 	}
 
