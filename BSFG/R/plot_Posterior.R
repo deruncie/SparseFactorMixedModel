@@ -66,12 +66,26 @@ plot_factor_correlations = function(Lambda, sim_Lambda){
   axis(2,at=seq(0,1,length=nrow(cors)),labels = c('best',(nrow(cors)-1):1),las=2)
 }
 
-plot_element_wise_correlations = function(actual_G, estimated_G, main = NULL){
+plot_element_wise_covariances = function(actual_G, estimated_G, main = NULL){
+  actual_G = actual_G[upper.tri(actual_G)]
+  estimated_G = estimated_G[upper.tri(estimated_G)]
   xlim = ylim = range(c(actual_G,estimated_G))
-  i = 1:prod(dim(actual_G))
+  i = 1:length(actual_G)
   i = sample(i,min(10000,length(i)))
   # i = order(-c(abs(actual_G)))[1:1000]
-  plot(c(actual_G)[i],c(estimated_G)[i],xlim = xlim,ylim=ylim,main = main,xlab = 'actual',ylab = 'estimated')
+  plot(actual_G[i],estimated_G[i],xlim = xlim,ylim=ylim,main = main,xlab = 'actual',ylab = 'estimated')
+  abline(0,1)
+}
+
+
+plot_diagonal_covariances = function(actual_G, estimated_G, main = NULL){
+  actual_G = diag(actual_G)
+  estimated_G = diag(estimated_G)
+  xlim = ylim = range(c(actual_G,estimated_G))
+  i = 1:length(actual_G)
+  i = sample(i,min(10000,length(i)))
+  # i = order(-c(abs(actual_G)))[1:1000]
+  plot(actual_G[i],estimated_G[i],xlim = xlim,ylim=ylim,main = main,xlab = 'actual',ylab = 'estimated')
   abline(0,1)
 }
 
@@ -111,11 +125,13 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
     G_act = setup$G
     RE_name = rownames(F_h2)[re]
     if(is.null(RE_name)) RE_name = 'Va'
-    plot_element_wise_correlations(G_act, G_est, main = sprintf('G: %s elements',RE_name))
+    plot_element_wise_covariances(G_act, G_est, main = sprintf('G: %s elements',RE_name))
+    plot_diagonal_covariances(G_act, G_est, main = sprintf('G: %s diagonal',RE_name))
   })
   E_est = tcrossprod(sweep(Lambda,2,sqrt(1-colSums(F_h2)),'*')) + diag(c((1-colSums(current_state$resid_h2))/current_state$tot_Eta_prec))
   E_act = setup$R
-  plot_element_wise_correlations(E_act, E_est,main = 'E elements')
+  plot_element_wise_covariances(E_act, E_est,main = 'E elements')
+  plot_diagonal_covariances(E_act, E_est,main = 'E diagonal')
 
   # factor h2s
   plot_factor_h2s(F_h2)
@@ -185,9 +201,13 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
   setup = BSFG_state$setup
   Posterior = BSFG_state$Posterior
   p = dim(Posterior$Lambda)[1]
-  plot_element_wise_correlations(setup$R, calc_posterior_mean_cov(Posterior,'Ve'),main = 'E elements')
+  estimated_R = calc_posterior_mean_cov(Posterior,'Ve')
+  plot_element_wise_covariances(setup$R, estimated_R,main = 'E elements')
+  plot_diagonal_covariances(setup$R, estimated_R,main = 'E diagonal')
   for(random_effect in 1:dim(Posterior$F_h2)[2]) {
-    plot_element_wise_correlations(setup$G, calc_posterior_mean_cov(Posterior,random_effect),main = sprintf('G: %s elements',random_effect))
+    estimated_G = calc_posterior_mean_cov(Posterior,random_effect)
+    plot_element_wise_covariances(setup$G, estimated_G,main = sprintf('G: %s elements',random_effect))
+    plot_diagonal_covariances(setup$G, estimated_G,main = sprintf('G: %s diagonal',random_effect))
   }
 
   plot_factor_correlations(calc_posterior_mean_Lambda(Posterior),setup$error_factor_Lambda)
