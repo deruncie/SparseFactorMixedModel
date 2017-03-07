@@ -143,10 +143,8 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     )
 
     # Initialize Eta
-    #    Here, Eta = Y.
-    #    With missing data, Eta is complete data
-    #    Eta could be parameters of a Y-level model (independent across individuals)
-    current_state = data_model(Y,data_model_parameters,current_state,BSFG_state$data_matrices)
+    data_model_state = data_model(Y,data_model_parameters,current_state,BSFG_state$data_matrices)
+    current_state[names(data_model_state)] = data_model_state
 
 
 # ----------------------- #

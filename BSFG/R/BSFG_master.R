@@ -383,9 +383,11 @@ plot.BSFG_state = function(BSFG_state,file = 'diagnostics_polts.pdf'){
 #' @param data_matrices from BSFG_state
 #' @return Eta matrix of latent data: n x p
 missing_data_model = function(Y,data_model_parameters,current_state = list(),data_matrices = NULL){
-  current_state = with(c(data_model_parameters,data_matrices),{
-    current_state_names = c('Eta',names(current_state))  # parameters to add
-    current_state = within(current_state,{
+  new_variables = c('Eta')
+  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
+  # current_state = with(c(data_model_parameters,data_matrices),{
+  #   current_state_names = c('Eta',names(current_state))  # parameters to add
+  #   current_state = within(current_state,{
             Eta = Y
             if(sum(Y_missing) == 0) return(Y)
             n = nrow(Y)
@@ -400,7 +402,9 @@ missing_data_model = function(Y,data_model_parameters,current_state = list(),dat
             }
             missing_indices = which(Y_missing)
             Eta[missing_indices] = Eta_mean[missing_indices] + resids[missing_indices]
+            return(list(Eta = Eta))
     })
-    current_state[current_state_names]
-  })
+  return(data_model_state[new_variables])
+  #   current_state[current_state_names]
+  # })
 }

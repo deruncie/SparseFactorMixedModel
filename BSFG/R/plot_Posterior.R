@@ -68,7 +68,10 @@ plot_factor_correlations = function(Lambda, sim_Lambda){
 
 plot_element_wise_correlations = function(actual_G, estimated_G, main = NULL){
   xlim = ylim = range(c(actual_G,estimated_G))
-  plot(c(actual_G),c(estimated_G),xlim = xlim,ylim=ylim,main = main,xlab = 'actual',ylab = 'estimated')
+  i = 1:prod(dim(actual_G))
+  i = sample(i,min(10000,length(i)))
+  # i = order(-c(abs(actual_G)))[1:1000]
+  plot(c(actual_G)[i],c(estimated_G)[i],xlim = xlim,ylim=ylim,main = main,xlab = 'actual',ylab = 'estimated')
   abline(0,1)
 }
 
@@ -123,10 +126,12 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
     B_factor = BSFG_state$current_state$B_F   %*% t(BSFG_state$current_state$Lambda)
     plot(c(B),c(setup$B))
     abline(0,1)
-    plot(c(B_factor),c(setup$B_F %*% t(setup$error_factor_Lambda)))
-    abline(0,1)
-    xlim = ylim = range(c(B[-1,],B_factor))
-    plot(c(B_factor),c(B[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
+    if(dim(B_factor)[1] > 1) {
+      plot(c(B_factor),c(setup$B_F %*% t(setup$error_factor_Lambda)))
+      abline(0,1)
+      xlim = ylim = range(c(B[-1,],B_factor))
+      plot(c(B_factor),c(B[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
+    }
   }
 }
 
@@ -181,8 +186,8 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
   Posterior = BSFG_state$Posterior
   p = dim(Posterior$Lambda)[1]
   plot_element_wise_correlations(setup$R, calc_posterior_mean_cov(Posterior,'Ve'),main = 'E elements')
-  for(RE_name in dimnames(Posterior$F_h2)[[2]]) {
-    plot_element_wise_correlations(setup$G, calc_posterior_mean_cov(Posterior,RE_name),main = sprintf('G: %s elements',RE_name))
+  for(random_effect in 1:dim(Posterior$F_h2)[2]) {
+    plot_element_wise_correlations(setup$G, calc_posterior_mean_cov(Posterior,random_effect),main = sprintf('G: %s elements',random_effect))
   }
 
   plot_factor_correlations(calc_posterior_mean_Lambda(Posterior),setup$error_factor_Lambda)
@@ -197,16 +202,18 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
     })
     plot(c(B_mean),c(setup$B))
     abline(0,1)
-    plot(c(B_factor_mean),c(setup$B_F %*% t(setup$error_factor_Lambda)))
-    abline(0,1)
-    xlim = ylim = range(c(B_mean[-1,],B_factor_mean))
-    plot(c(B_factor_mean),c(B_mean[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
-    B_f_HPD = HPDinterval(mcmc(Posterior$B_F[,1,]))
-    B_f_mean = colMeans(Posterior$B_F[,1,])
+    if(!is.null(setup$B_F)){
+      plot(c(B_factor_mean),c(setup$B_F %*% t(setup$error_factor_Lambda)))
+      abline(0,1)
+      xlim = ylim = range(c(B_mean[-1,],B_factor_mean))
+      plot(c(B_factor_mean),c(B_mean[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
+      B_f_HPD = HPDinterval(mcmc(Posterior$B_F[,1,]))
+      B_f_mean = colMeans(Posterior$B_F[,1,])
 
-    plot(1:length(B_f_mean),B_f_mean,xlim = c(1,length(B_f_mean)),ylim = range(B_f_HPD),xlab = '',main = 'Posterior B_F')
-    arrows(seq_along(B_f_mean),B_f_HPD[,1],seq_along(B_f_mean),B_f_HPD[,2],length=0)
-    abline(h=0)
+      plot(1:length(B_f_mean),B_f_mean,xlim = c(1,length(B_f_mean)),ylim = range(B_f_HPD),xlab = '',main = 'Posterior B_F')
+      arrows(seq_along(B_f_mean),B_f_HPD[,1],seq_along(B_f_mean),B_f_HPD[,2],length=0)
+      abline(h=0)
+    }
   }
 }
 
