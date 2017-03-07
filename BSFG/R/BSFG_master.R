@@ -389,19 +389,20 @@ missing_data_model = function(Y,data_model_parameters,current_state = list(),dat
   #   current_state_names = c('Eta',names(current_state))  # parameters to add
   #   current_state = within(current_state,{
             Eta = Y
-            if(sum(Y_missing) == 0) return(Y)
-            n = nrow(Y)
-            p = ncol(Y)
-            if(length(current_state) == 0) {
-              Eta_mean = matrix(0,n,p)
-              resids = matrix(rnorm(n*p),n,p)
-            } else{
-              Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
-              resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-              resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+            if(sum(Y_missing)  > 0){
+              n = nrow(Y)
+              p = ncol(Y)
+              if(length(current_state) == 0) {
+                Eta_mean = matrix(0,n,p)
+                resids = matrix(rnorm(n*p),n,p)
+              } else{
+                Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+                resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+                resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+              }
+              missing_indices = which(Y_missing)
+              Eta[missing_indices] = Eta_mean[missing_indices] + resids[missing_indices]
             }
-            missing_indices = which(Y_missing)
-            Eta[missing_indices] = Eta_mean[missing_indices] + resids[missing_indices]
             return(list(Eta = Eta))
     })
   return(data_model_state[new_variables])
