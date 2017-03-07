@@ -252,6 +252,7 @@ save_posterior_chunk = function(BSFG_state){
   Posterior$files = unique(c(Posterior$files,file_suffix))
   Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
   BSFG_state$Posterior = Posterior
+  save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
   return(BSFG_state)
 }
 
