@@ -42,8 +42,8 @@ priors = list(
     fixed_var = list(V = 1,     nu = 3),
     tot_Y_var = list(V = 0.5,   nu = 3),
     tot_F_var = list(V = 18/20, nu = 20),
-    delta_1   = list(V = 1/20,  nu = 3),
-    delta_2   = list(V = 1,     nu = 3),
+    delta_1   = list(shape = 2.1,  rate = 1/20),
+    delta_2   = list(shape = 3, rate = 1),
     Lambda_df =   3,
     h2_priors_factors   =   c(run_parameters$h2_divisions-1,rep(1,run_parameters$h2_divisions-1))/(2*(run_parameters$h2_divisions-1)),
     h2_priors_resids   =   c(0,rep(1,99))*dbeta(seq(0,1,length=102),2,2)[2:101]
@@ -58,7 +58,7 @@ setup$data$Group = gl(3,1,length = nrow(setup$data))
 #                                   data,priors,run_parameters,A_mats = list(animal = A),
 #                                   setup = setup))
 # setup$Y[1:3] = NA
-setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
+# setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
 BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), #
                                   data,priors=priors,run_parameters=run_parameters,A_mats = list(animal = A),
                                   setup = setup))

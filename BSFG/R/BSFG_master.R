@@ -64,7 +64,13 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'     by h2_divisions)
 #' @param data data.frame with n rows containing columns corresponding to the fixed and random
 #'   effects
-#' @param priors list providing hyperparameters for the model priors. T
+#' @param priors list providing hyperparameters for the model priors. This must include: for \code{fixed_var},
+#'     \code{tot_Eta_var}, and \code{tot_F_var}, a list of \code{V} and \code{nu}, which specify an inverse-gamma
+#'     distribution as in MCMCglmm. For \code{delta_1} and \code{delta_2} a list of \code{shape} and \rate{rate} for
+#'     a gamma distribution. For \code{Lambda_df}, the degrees of freedom of the implied t-distribution.
+#'     Discrete priors on \code{h2_priors_factors} and \code{h2_priors_resids} are also required for \code{sample_BSFG},
+#'     but can be appended to \code{BSFG_state$priors} after running \code{BSFG_init}. This is often easier if
+#'     the total number of h2 divisions is not known beforehand (ie when multiple random effects are used).
 #' @param run_parameters list providing various parameters for the model run. See \link{BSFG_control}
 #' @param A_mats list of covariance matrices for random effects. If none provided (and none provided
 #'   for A_inv_mats) for any of the random effects, A is assumed to be the identity.
@@ -274,20 +280,24 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	# ----------------------------- #
 	# ----- re-formulate priors --- #
 	# ----------------------------- #
-	if(any(sapply(priors, function(x) {try({return(x$nu <= 2)},silent=T);return(FALSE)}))) stop('priors nu must be > 2')
+	if(any(sapply(priors, function(x) {try({return(exists(x$nu) && x$nu <= 2)},silent=T);return(FALSE)}))) stop('priors nu must be > 2')
 	  # fixed effects
-	priors$fixed_prec_shape = with(priors$fixed_var,V * nu)
-	priors$fixed_prec_rate  = with(priors$fixed_var,nu - 2)
+	priors$fixed_prec_rate   = with(priors$fixed_var,V * nu)
+	priors$fixed_prec_shape  = with(priors$fixed_var,nu - 1)
 	  # total precision
-	priors$tot_Eta_prec_shape = with(priors$tot_Y_var,V * nu)
-	priors$tot_Eta_prec_rate  = with(priors$tot_Y_var,nu - 2)
-	priors$tot_F_prec_shape = with(priors$tot_F_var,V * nu)
-	priors$tot_F_prec_rate  = with(priors$tot_F_var,nu - 2)
+	priors$tot_Eta_prec_rate   = with(priors$tot_Y_var,V * nu)
+	priors$tot_Eta_prec_shape  = with(priors$tot_Y_var,nu - 1)
+	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
+	priors$tot_F_prec_shape    = with(priors$tot_F_var,nu - 1)
 	  # delta: column shrinkage of Lambda
-	priors$delta_1_shape    = with(priors$delta_1,V * nu)
-	priors$delta_1_rate     = with(priors$delta_1,nu - 2)
-	priors$delta_2_shape    = with(priors$delta_2,V * nu)
-	priors$delta_2_rate     = with(priors$delta_2,nu - 2)
+	# priors$delta_1_rate    = with(priors$delta_1,V * nu)
+	# priors$delta_1_shape   = with(priors$delta_1,nu - 1)
+	# priors$delta_2_rate    = with(priors$delta_2,V * nu)
+	# priors$delta_2_shape   = with(priors$delta_2,nu - 1)
+	priors$delta_1_rate    = priors$delta_1$rate
+	priors$delta_1_shape   = priors$delta_1$shape
+	priors$delta_2_rate    = priors$delta_2$rate
+	priors$delta_2_shape   = priors$delta_2$shape
 
 
 	# ----------------------------- #
@@ -371,41 +381,47 @@ plot.BSFG_state = function(BSFG_state,file = 'diagnostics_polts.pdf'){
 
 #' Sample missing data
 #'
-#' Function to sample missing data given model parameters. This is also a template
-#'     for data_model functions.
+#' Function to sample missing data given model parameters.
 #'
-#' Note: The model must return an appropriate Eta matrix, even if current_state is NULL
+#' This is also a template for \code{data_model} functions.
+#'
+#'    The function should draw a posterior sample for Eta (the (potentially) latent
+#'    data on the linear scale) given the factor model and the observed data. It returns a list
+#'    with Eta and any other variables associated with the data_model.
+#'    These variables are added to current_state, but are not currently saved in Posterior
+#'
+#'    Initial values, hyperparameters, and any helper functions / parameters can be passed
+#'    in \code{data_model_parameters}.
+#'
+#'    When run with an empty \code{current_state} and \code{data_matrices == NULL}, it should return
+#'    a matrix Eta of the correct dimensions, but the values are unimportant.
 #'
 #' @param Y data matrix n_Y x p_Y
 #' @param data_model_parameters List of parameters necessary for the data model.
 #'      Here, a Matrix of coordinates of NAs in Y
 #' @param current_state current_state from BSFG_state
 #' @param data_matrices from BSFG_state
+#' @return list of data_model variables including:
 #' @return Eta matrix of latent data: n x p
 missing_data_model = function(Y,data_model_parameters,current_state = list(),data_matrices = NULL){
   new_variables = c('Eta')
   data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
-  # current_state = with(c(data_model_parameters,data_matrices),{
-  #   current_state_names = c('Eta',names(current_state))  # parameters to add
-  #   current_state = within(current_state,{
-            Eta = Y
-            if(sum(Y_missing)  > 0){
-              n = nrow(Y)
-              p = ncol(Y)
-              if(length(current_state) == 0) {
-                Eta_mean = matrix(0,n,p)
-                resids = matrix(rnorm(n*p),n,p)
-              } else{
-                Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
-                resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-                resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
-              }
-              missing_indices = which(Y_missing)
-              Eta[missing_indices] = Eta_mean[missing_indices] + resids[missing_indices]
-            }
-            return(list(Eta = Eta))
+        Eta = Y
+        if(sum(Y_missing)  > 0){
+          n = nrow(Y)
+          p = ncol(Y)
+          if(length(current_state) == 0) {
+            Eta_mean = matrix(0,n,p)
+            resids = matrix(rnorm(n*p),n,p)
+          } else{
+            Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+            resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+            resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+          }
+          missing_indices = which(Y_missing)
+          Eta[missing_indices] = Eta_mean[missing_indices] + resids[missing_indices]
+        }
+        return(list(Eta = as.matrix(Eta)))
     })
   return(data_model_state[new_variables])
-  #   current_state[current_state_names]
-  # })
 }
