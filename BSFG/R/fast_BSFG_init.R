@@ -146,29 +146,25 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
             nrun           = 0,
             total_time     = 0
     	)
-    # print(names(current_state))
+    BSFG_state$current_state = current_state
 
     # Initialize Eta
-    #    Here, Eta = Y.
-    #    With missing data, Eta is complete data
-    #    Eta could be parameters of a Y-level model (independent across individuals)
-    data_model_state = data_model(Y,data_model_parameters,current_state,BSFG_state$data_matrices)
-    current_state[names(data_model_state)] = data_model_state
-    # print(names(current_state))
+    data_model_state = data_model(Y,data_model_parameters,BSFG_state)
+    BSFG_state$current_state[names(data_model_state$state)] = data_model_state$state
 
 # ----------------------- #
 # -Initialize Posterior-- #
 # ----------------------- #
     Posterior = list(
-      sample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B'),
-      posteriorMean_params = c('E_a'),
+      sample_params = unique(c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B',data_model_state$sample_params)),
+      posteriorMean_params = unique(c('E_a',data_model_state$posteriorMean_params)),
       total_samples = 0,
       folder = run_parameters$Posterior_folder,
       files = c()
       # per_trait_params = c('tot_Eta_prec','resid_h2','B','E_a')
     )
-    if(run_parameters$save_Eta) Posterior$sample_params = c(Posterior$sample_params,'Eta')
-    Posterior = reset_Posterior(Posterior,current_state)
+    Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
+    BSFG_state$Posterior = Posterior
 
 
 # ------------------------------------ #
@@ -227,8 +223,6 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 
     BSFG_state$run_variables = run_variables
     BSFG_state$RNG = RNG
-    BSFG_state$Posterior = Posterior
-    BSFG_state$current_state = current_state
 
     return(BSFG_state)
 }

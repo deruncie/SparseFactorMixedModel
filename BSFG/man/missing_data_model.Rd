@@ -4,8 +4,7 @@
 \alias{missing_data_model}
 \title{Sample missing data}
 \usage{
-missing_data_model(Y, data_model_parameters, current_state = list(),
-  data_matrices = NULL)
+missing_data_model(Y, data_model_parameters, BSFG_state = list())
 }
 \arguments{
 \item{Y}{data matrix n_Y x p_Y}

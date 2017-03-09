@@ -9,7 +9,6 @@
 #'   residuals? If so, the first column of the design matrix is dropped.
 #' @param simulation Is this a fit to simulated data? If so, a setup list will be expected providing
 #'   the true values
-#' @param save_Eta Should posterior samples of Eta be saved?
 #' @param scale_Y Should the Y values be centered and scaled? Recommend, except for simulated data.
 #' @param b0 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
 #' @param b1 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
@@ -29,7 +28,7 @@
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 #'
 BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder = 'Posterior',
-                        fixed_factors = c(T,F),save_Eta = F, simulation = c(F,T),scale_Y = c(T,F),
+                        fixed_factors = c(T,F),simulation = c(F,T),scale_Y = c(T,F),
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100,
                         burn = 100,
@@ -129,7 +128,7 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	  data_model = missing_data_model
 	  data_model_parameters = list(Y_missing = Matrix(is.na(Y)))
 	}
-	Eta = data_model(Y,data_model_parameters)$Eta
+	Eta = data_model(Y,data_model_parameters)$state$Eta
 	p = ncol(Eta)
 	traitnames = colnames(Y)
 
@@ -335,8 +334,6 @@ initialize_BSFG = function(BSFG_state,...){
 sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
-  Posterior      = BSFG_state$Posterior
-  current_state  = BSFG_state$current_state
   run_parameters = BSFG_state$run_parameters
   run_variables  = BSFG_state$run_variables
 
@@ -352,14 +349,14 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   save_freq    = run_parameters$save_freq
   burn         = run_parameters$burn
   thin         = run_parameters$thin
-  start_i      = current_state$nrun
+  start_i      = BSFG_state$current_state$nrun
 
   # ----------------------------------------------- #
   # ---Extend posterior matrices for new samples--- #
   # ----------------------------------------------- #
 
-  sp = (start_i + n_samples - burn)/thin - Posterior$total_samples
-  Posterior = expand_Posterior(Posterior,max(0,sp))
+  sp = (start_i + n_samples - burn)/thin - BSFG_state$Posterior$total_samples
+  BSFG_state$Posterior = expand_Posterior(BSFG_state$Posterior,max(0,sp))
 
   # ----------------------------------------------- #
   # --------------start gibbs sampling------------- #
@@ -367,36 +364,35 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
 
   start_time = Sys.time()
   for(i in start_i+(1:n_samples)){
-    current_state$nrun = i
-    current_state = sample_current_state(BSFG_state,current_state,ncores = ncores,...)
+    BSFG_state$current_state$nrun = i
+    BSFG_state$current_state = sample_current_state(BSFG_state,ncores = ncores,...)
 
     # -----Sample Lambda_prec ------------- #
-    current_state = sample_Lambda_prec(current_state,priors,run_variables)
+    BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
 
     # ----- sample Eta ----- #
-    data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,current_state,data_matrices)
-    current_state[names(data_model_state)] = data_model_state
+    data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,BSFG_state)$state
+    BSFG_state$current_state[names(data_model_state)] = data_model_state
 
     # -- adapt number of factors to samples ---#
-    current_state = update_k( current_state, priors, run_parameters, data_matrices)
+    BSFG_state$current_state = update_k(BSFG_state)
 
     # -- save sampled values (after thinning) -- #
     if( (i-burn) %% thin == 0 && i > burn) {
-      Posterior = save_posterior_sample(current_state, Posterior)
+      BSFG_state$Posterior = save_posterior_sample(BSFG_state)
     }
   }
   end_time = Sys.time()
   print(end_time - start_time)
-  current_state$total_time = current_state$total_time + end_time - start_time
+  BSFG_state$current_state$total_time = BSFG_state$current_state$total_time + end_time - start_time
 
   # ----------------------------------------------- #
   # ------------Save state for restart------------- #
   # ----------------------------------------------- #
 
+  current_state = BSFG_state$current_state
   save(current_state,file='current_state.RData')
 
-  BSFG_state$current_state = current_state
-  BSFG_state$Posterior = Posterior
   BSFG_state$RNG = list(
     Random.seed = .Random.seed,
     RNGkind = RNGkind()
@@ -408,7 +404,11 @@ sample_current_state = function(BSFG_state,...){
   UseMethod("sample_current_state",BSFG_state)
 }
 
-sample_Lambda_prec = function(current_state,priors,run_variables) {
+sample_Lambda_prec = function(BSFG_state) {
+  priors         = BSFG_state$priors
+  run_variables  = BSFG_state$run_variables
+  current_state  = BSFG_state$current_state
+
   current_state = with(c(priors,run_variables),within(current_state,{
 		Lambda2 = Lambda^2
 		Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
@@ -495,7 +495,10 @@ plot.BSFG_state = function(BSFG_state,file = 'diagnostics_polts.pdf'){
 #' @param data_matrices from BSFG_state
 #' @return list of data_model variables including:
 #' @return Eta matrix of latent data: n x p
-missing_data_model = function(Y,data_model_parameters,current_state = list(),data_matrices = NULL){
+missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
+  current_state = BSFG_state$current_state
+  data_matrices = BSFG_state$data_matrices
+
   new_variables = c('Eta')
   data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
         Eta = Y
@@ -515,5 +518,8 @@ missing_data_model = function(Y,data_model_parameters,current_state = list(),dat
         }
         return(list(Eta = as.matrix(Eta)))
     })
-  return(data_model_state[new_variables])
+  return(list(state = data_model_state[new_variables],
+              sample_params = c(),
+              posteriorMean_params = c('Eta')
+  ))
 }

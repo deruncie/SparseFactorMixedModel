@@ -1,8 +1,9 @@
-sample_current_state.fast_BSFG = function(BSFG_state,current_state,...) {
+sample_current_state.fast_BSFG = function(BSFG_state,...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
   run_parameters = BSFG_state$run_parameters
   run_variables  = BSFG_state$run_variables
+  current_state  = BSFG_state$current_state
 
 	current_state_names = names(current_state)
 	current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {

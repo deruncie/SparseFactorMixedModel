@@ -4,7 +4,7 @@
 \alias{update_k}
 \title{Checks if factors (columns of Lambda) can be safely dropped}
 \usage{
-update_k(current_state, priors, run_parameters, data_matrices)
+update_k(BSFG_state)
 }
 \description{
 Factors are dropped if \code{prop} faction of the \eqn{\lambda_{ij}} elements are less than

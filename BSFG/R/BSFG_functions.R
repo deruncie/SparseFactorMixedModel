@@ -35,7 +35,13 @@ load_simulation_data = function(file = NULL){
 #' previously stopped chains.
 #'
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
-update_k = function( current_state, priors,run_parameters,data_matrices) {
+# update_k = function( current_state, priors,run_parameters,data_matrices) {
+update_k = function( BSFG_state) {
+  data_matrices  = BSFG_state$data_matrices
+  priors         = BSFG_state$priors
+  run_parameters = BSFG_state$run_parameters
+  current_state  = BSFG_state$current_state
+
 	current_state_members = names(current_state)
 	current_state = with(c(priors,run_parameters,data_matrices),within(current_state, {
 		i = nrun
@@ -44,7 +50,6 @@ update_k = function( current_state, priors,run_parameters,data_matrices) {
 		r = nrow(F_a)
 		p = nrow(Lambda)
 		b_F = ncol(X_F)
-		# gene_rows = 1:p
 
 		prob = 1/exp(b0 + b1*i)                # probability of adapting
 		uu = runif(1)
@@ -147,14 +152,18 @@ reorder_factors = function(BSFG_state){
 #'
 #' Saves current state in Posterior
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
-save_posterior_sample = function(current_state, Posterior) {
+save_posterior_sample = function(BSFG_state) {
 	# All parameters in current are matrices.
 	# Posterior is a list of arrays.
 	# All factor parameters are matrices with ncol == k
 	# Posterior arrays are expanded / contracted as the number of factors changes (with update_k)
 
-  Posterior$total_samples = Posterior$total_samples + 1
+  current_state = BSFG_state$current_state
+  Posterior = BSFG_state$Posterior
+
+  total_samples = Posterior$total_samples + 1
   sp_num = Posterior$sp_num + 1
+  Posterior$total_samples = total_samples
   Posterior$sp_num = sp_num
 
 	current_state = within(current_state,{
@@ -180,7 +189,11 @@ save_posterior_sample = function(current_state, Posterior) {
 	}
 
 	for(param in Posterior$posteriorMean_params){
-		Posterior[[param]] = Posterior[[param]]*(sp_num - 1) + current_state[[param]]/sp_num
+	  # if(total_samples <= 1) {
+	  #   Posterior[[param]] = current_state[[param]]
+	  # } else {
+	  Posterior[[param]] = (Posterior[[param]]*(total_samples - 1) + current_state[[param]])/total_samples
+	  # }
 	}
 
 	return(Posterior)
@@ -192,8 +205,10 @@ reset_Posterior = function(Posterior,current_state){
     dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
   }
   for(param in Posterior$posteriorMean_params) {
-    Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
-    dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
+    if(Posterior$total_samples == 0) {
+      Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
+      dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
+    }
   }
   Posterior$sp_num = 0
   Posterior
@@ -218,8 +233,8 @@ clear_Posterior = function(BSFG_state) {
 
 	run_parameters$burn = run_parameters$burn + run_parameters$thin*Posterior$total_samples
 
+	Posterior$total_samples = 0
   Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
-  Posterior$total_samples = 0
 
   if(length(list.files(path = Posterior$folder))>0) system('rm Posterior/*')
   Posterior$files = c()

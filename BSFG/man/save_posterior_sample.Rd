@@ -4,7 +4,7 @@
 \alias{save_posterior_sample}
 \title{Saves current state in Posterior}
 \usage{
-save_posterior_sample(current_state, Posterior)
+save_posterior_sample(BSFG_state)
 }
 \description{
 Saves current state in Posterior
