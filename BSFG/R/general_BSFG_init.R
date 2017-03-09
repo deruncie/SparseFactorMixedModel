@@ -120,6 +120,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 # ---Save initial values- #
 # ----------------------- #
     current_state = list(
+        k              = k,
     		Lambda_prec    = Lambda_prec,
     		delta          = delta,
     		tauh           = tauh,

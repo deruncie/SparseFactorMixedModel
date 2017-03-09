@@ -370,6 +370,9 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
     current_state$nrun = i
     current_state = sample_current_state(BSFG_state,current_state,ncores = ncores,...)
 
+    # -----Sample Lambda_prec ------------- #
+    current_state = sample_Lambda_prec(current_state,priors,run_variables)
+
     # ----- sample Eta ----- #
     data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,current_state,data_matrices)
     current_state[names(data_model_state)] = data_model_state
@@ -404,10 +407,21 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
 sample_current_state = function(BSFG_state,...){
   UseMethod("sample_current_state",BSFG_state)
 }
-# sample_BSFG = function(BSFG_state,...){
-#   UseMethod("sample_BSFG",BSFG_state)
-# }
 
+sample_Lambda_prec = function(current_state,priors,run_variables) {
+  current_state = with(c(priors,run_variables),within(current_state,{
+		Lambda2 = Lambda^2
+		Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
+
+	 # # -----Sample delta, update tauh------ #
+		delta[] = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
+		tauh[]  = matrix(cumprod(delta),nrow=1)
+
+	 # # -----Update Plam-------------------- #
+		Plam[] = sweep(Lambda_prec,2,tauh,'*')
+  }))
+  return(current_state)
+}
 
 #' Print more detailed statistics on current BSFG state
 #'

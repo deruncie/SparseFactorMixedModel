@@ -124,6 +124,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # ---Save initial values- #
 # ----------------------- #
     current_state = list(
+            k              = k,
             Lambda_prec    = Lambda_prec,
             delta          = delta,
             tauh           = tauh,

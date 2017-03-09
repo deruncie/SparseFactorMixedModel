@@ -26,16 +26,6 @@ sample_current_state.fast_BSFG = function(BSFG_state,current_state,...) {
 		}
 		Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
 
- 	# # -----Sample Lambda_prec------------- #
-		Lambda2 = Lambda^2
-		Lambda_prec[] = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
-
-	 # # -----Sample delta, update tauh------ #
-		delta[] = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
-		tauh[]  = matrix(cumprod(delta),nrow=1)
-
-	 # # -----Update Plam-------------------- #
-		Plam = sweep(Lambda_prec,2,tauh,'*')
 
 	 # -----Sample resid_h2, tot_Eta_prec, E_a ---------------- #
 		#conditioning on W, B, F, Lambda, marginalizing over E_a
