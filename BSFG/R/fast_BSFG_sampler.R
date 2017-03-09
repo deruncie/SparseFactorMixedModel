@@ -1,212 +1,96 @@
-sample_BSFG.fast_BSFG = function(BSFG_state,n_samples,...) {
-	# -- Daniel Runcie -- #
-	#
-	# Gibbs sampler for genetic covariance estimation based on mixed effects
-	# model, with missing data
-	#
-	# Code for:
-	#
-	# Runcie and Mukherjee (2013) Dissecting high-dimensional traits
-	# with Bayesian sparse factor analysis of genetic covariance matrices.
-	# GENETICS.
-	#
-	# (c) July 30, 2013
-	#
-	# code based on original provided by Anirban Bhattacharya
-	#
-	#
-	# This function implements the BSF-G partially collapsed Gibbs sampler.
-	# Variable notation follows the Runcie and Mukherjee manuscript as closely
-	# as possible.
-	#
-	# All input and initialization functions are carried out by the function
-	# fast_BSFG_sampler_init See the documentation of that function for details.
-	#
-	# The sampler is designed to do a short-medium length run and then return
-	# the state of the chain. After assessing the progress of the chain,
-	# (optionally), the Posterior matrices can be reset, and the chain
-	# re-started where it left off. Right now, the random seed is not saved. Probably should
-	# be if I can figure out how.
-	#
-	# This function takes the following inputs:
-	#     data_matrices: struct holding the (should be imutable) data, design and incidence matrices:
-	#          Eta:  		Full phenotype data. n x p
-	# 		   X: 		Fixed effect design matrix. n x b
-	#          Z_1:     Random effect 1 incidence matrix. n x r
-	#          Y_missing: incidence matrix of missing data in Y
-	#     start_i: iteration number of the end of the last run.
-	#     draw_iter: frequency of updating diagnostic plots
-	#     burn: number of burnin samples
-	#     sp: total number of samples to collect
-	#     thin: thinning rate of chain
-	#     simulation: boolean. Is this a simulation?
-	#     params: struct with chain parameters.
-	#     priors: struct with all relevant prior hyperparameters
-	#     Posterior: struct with posterior matrices, or running posterior means.
-	#            Note: not sure how well posterior means work after re-starting chain. Probably not well.
-	#     current_state: current (initial) conditions of all model parameters
-	#
-	# Several diagnostic plots are produced during the run.
-	#     Their interpretation is described within the source codes:
-	#         draw_simulation_diagnostics.m: For simulated data with known true values
-	#         draw_results_diagnostics.m: Otherwise
-	#
+sample_current_state.fast_BSFG = function(BSFG_state,current_state,...) {
+  data_matrices  = BSFG_state$data_matrices
+  priors         = BSFG_state$priors
+  run_parameters = BSFG_state$run_parameters
+  run_variables  = BSFG_state$run_variables
 
-	data_matrices  = BSFG_state$data_matrices
-	params         = BSFG_state$params
-	priors         = BSFG_state$priors
-	Posterior      = BSFG_state$Posterior
-	current_state  = BSFG_state$current_state
-	run_parameters = BSFG_state$run_parameters
-	run_variables  = BSFG_state$run_variables
+	current_state_names = names(current_state)
+	current_state = within(c(current_state,priors,run_parameters, run_variables,data_matrices), {
+		k = ncol(Lambda)
 
-	# ----------------------------------------------- #
-	# -----------Reset Global Random Number Stream--- #
-	# ----------------------------------------------- #
-	do.call("RNGkind",as.list(BSFG_state$RNG$RNGkind))  ## must be first!
-	assign(".Random.seed", BSFG_state$RNG$Random.seed, .GlobalEnv)
+	 # -----Sample Lambda and B ------------------ #
+		#conditioning on F, marginalizing over E_a
 
-	# ----------------------------------------------- #
-	# ----------------Set up run--------------------- #
-	# ----------------------------------------------- #
-	save_freq    = run_parameters$save_freq
-	burn         = run_parameters$burn
-	thin         = run_parameters$thin
-	start_i      = current_state$nrun
-
-	# ----------------------------------------------- #
-	# ---Extend posterior matrices for new samples--- #
-	# ----------------------------------------------- #
-
-	sp = (start_i + n_samples - burn)/thin - Posterior$total_samples
-	Posterior = expand_Posterior(Posterior,max(0,sp))
-
-	# ----------------------------------------------- #
-	# --------------start gibbs sampling------------- #
-	# ----------------------------------------------- #
-
-	start_time = Sys.time()
-	for(i in start_i+(1:n_samples)){
-		current_state$nrun = i
-		current_state_names = names(current_state)
-		current_state = within(c(current_state,priors,run_parameters, run_variables,data_matrices), {
-			k = ncol(Lambda)
-
-
-		 # -----Sample Lambda and B ------------------ #
-			#conditioning on F, marginalizing over E_a
-
-			Design = as.matrix(cbind(X,F))
-			rows = b + k
-			prior_mean = matrix(0,rows,p)
-			if(b > 0) {
-			  prior_prec = rbind(matrix(prec_B,b,p),t(Plam))
-			} else{ # b == 0
-			  prior_prec = t(Plam)
-			}
-			coefs = sample_coefs_parallel_sparse_c( Eta,Design,resid_h2, tot_Eta_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
-
-			if(b > 0){
-				B[] = coefs[1:b,,drop=FALSE]
-			}
-			Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
-
-	 	# # -----Sample Lambda_prec------------- #
-			Lambda2 = Lambda^2
-			Lambda_prec[] = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
-
-		 # # -----Sample delta, update tauh------ #
-			delta[] = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
-			tauh[]  = matrix(cumprod(delta),nrow=1)
-
-		 # # -----Update Plam-------------------- #
-			Plam = sweep(Lambda_prec,2,tauh,'*')
-
-		 # -----Sample resid_h2, tot_Eta_prec, E_a ---------------- #
-			#conditioning on W, B, F, Lambda, marginalizing over E_a
-			Eta_tilde = as.matrix(Eta - X %*% B - F %*% t(Lambda))
-			tot_Eta_prec[] = sample_tot_prec_sparse_c(Eta_tilde,resid_h2,tot_Eta_prec_shape,tot_Eta_prec_rate,invert_aI_bZAZ)
-
-			resid_h2_index = sample_h2s_discrete_given_p_sparse_c(Eta_tilde,h2_divisions,h2_priors_resids,tot_Eta_prec,invert_aI_bZAZ)
-			resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
-
-			E_a[] = sample_randomEffects_parallel_sparse_c( Eta_tilde, Z, tot_Eta_prec, resid_h2, invert_aZZt_Ainv, 1)
-
-			resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-
-		# -----Sample Lambda and B_F ------------------ #
-			# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
-			if(b_F > 0){
-			  prior_mean = matrix(0,b_F,p)
-			  prior_prec = matrix(prec_B[-1],b_F,k)
-			  B_F = sample_coefs_parallel_sparse_c(F,X_F,F_h2, tot_F_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
-			  F_tilde = F - X_F %*% B_F # not sparse.
-			} else{
-			  F_tilde = F
-			}
-
-		 # -----Sample F_h2 and tot_F_prec, F_a -------------------- #
-			#conditioning on F, F_a
-			tot_F_prec[] = sample_tot_prec_sparse_c(F_tilde,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
-
-			F_h2_index = sample_h2s_discrete_given_p_sparse_c(F_tilde,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
-			F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
-
-	    F_a[] = sample_randomEffects_parallel_sparse_c(F_tilde,Z,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
-
-		 # -----Sample F----------------------- #
-			#conditioning on B, F_a,E_a,W,Lambda, F_h2
-			Eta_tilde = as.matrix(Eta - X %*% B - Z %*% E_a)
-			F_e_prec = tot_F_prec / (1-F_h2)
-			if(b_F > 0) {
-			  prior_mean = as.matrix(X_F %*% B_F + Z %*% F_a)
-			} else {
-			  prior_mean = as.matrix(Z %*% F_a)
-			}
-			F[] = sample_factors_scores_sparse_c( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec )
-
-		 # -----Sample prec_B------------- #
-			if(b > 1) {
-			  if(b_F > 0){
-			    B2 = cbind(B[-1,],B_F)^2
-			  } else{
-			    B2 = B[-1,,drop=FALSE]^2
-			  }
-			  prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
-			}
-	  })
-		current_state = current_state[current_state_names]
-
-		# ----- sample Eta ----- #
-		data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,current_state,data_matrices)
-		current_state[names(data_model_state)] = data_model_state
-
-	 # -- adapt number of factors to samples ---#
-		current_state = update_k( current_state, priors, run_parameters, data_matrices)
-
-	 # -- save sampled values (after thinning) -- #
-		if( (i-burn) %% thin == 0 && i > burn) {
-			Posterior = save_posterior_sample(current_state, Posterior)
+		Design = as.matrix(cbind(X,F))
+		rows = b + k
+		prior_mean = matrix(0,rows,p)
+		if(b > 0) {
+		  prior_prec = rbind(matrix(prec_B,b,p),t(Plam))
+		} else{ # b == 0
+		  prior_prec = t(Plam)
 		}
-	}
-	end_time = Sys.time()
-	print(end_time - start_time)
-	current_state$total_time = current_state$total_time + end_time - start_time
+		coefs = sample_coefs_parallel_sparse_c( Eta,Design,resid_h2, tot_Eta_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
 
+		if(b > 0){
+			B[] = coefs[1:b,,drop=FALSE]
+		}
+		Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
 
-	# ----------------------------------------------- #
-	# ------------Save state for restart------------- #
-	# ----------------------------------------------- #
+ 	# # -----Sample Lambda_prec------------- #
+		Lambda2 = Lambda^2
+		Lambda_prec[] = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
+	 # # -----Sample delta, update tauh------ #
+		delta[] = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2,times = 100)
+		tauh[]  = matrix(cumprod(delta),nrow=1)
 
-	save(current_state,file='current_state.RData')
+	 # # -----Update Plam-------------------- #
+		Plam = sweep(Lambda_prec,2,tauh,'*')
 
+	 # -----Sample resid_h2, tot_Eta_prec, E_a ---------------- #
+		#conditioning on W, B, F, Lambda, marginalizing over E_a
+		Eta_tilde = as.matrix(Eta - X %*% B - F %*% t(Lambda))
+		tot_Eta_prec[] = sample_tot_prec_sparse_c(Eta_tilde,resid_h2,tot_Eta_prec_shape,tot_Eta_prec_rate,invert_aI_bZAZ)
 
-	BSFG_state$current_state = current_state
-	BSFG_state$Posterior = Posterior
-	BSFG_state$RNG = list(
-		Random.seed = .Random.seed,
-		RNGkind = RNGkind()
-	)
-	return(BSFG_state)
+		resid_h2_index = sample_h2s_discrete_given_p_sparse_c(Eta_tilde,h2_divisions,h2_priors_resids,tot_Eta_prec,invert_aI_bZAZ)
+		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
+
+		E_a[] = sample_randomEffects_parallel_sparse_c( Eta_tilde, Z, tot_Eta_prec, resid_h2, invert_aZZt_Ainv, 1)
+
+		resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+
+	# -----Sample Lambda and B_F ------------------ #
+		# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
+		if(b_F > 0){
+		  prior_mean = matrix(0,b_F,p)
+		  prior_prec = matrix(prec_B[-1],b_F,k)
+		  B_F = sample_coefs_parallel_sparse_c(F,X_F,F_h2, tot_F_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
+		  F_tilde = F - X_F %*% B_F # not sparse.
+		} else{
+		  F_tilde = F
+		}
+
+	 # -----Sample F_h2 and tot_F_prec, F_a -------------------- #
+		#conditioning on F, F_a
+		tot_F_prec[] = sample_tot_prec_sparse_c(F_tilde,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
+
+		F_h2_index = sample_h2s_discrete_given_p_sparse_c(F_tilde,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
+		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
+
+    F_a[] = sample_randomEffects_parallel_sparse_c(F_tilde,Z,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
+
+	 # -----Sample F----------------------- #
+		#conditioning on B, F_a,E_a,W,Lambda, F_h2
+		Eta_tilde = as.matrix(Eta - X %*% B - Z %*% E_a)
+		F_e_prec = tot_F_prec / (1-F_h2)
+		if(b_F > 0) {
+		  prior_mean = as.matrix(X_F %*% B_F + Z %*% F_a)
+		} else {
+		  prior_mean = as.matrix(Z %*% F_a)
+		}
+		F[] = sample_factors_scores_sparse_c( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec )
+
+	 # -----Sample prec_B------------- #
+		if(b > 1) {
+		  if(b_F > 0){
+		    B2 = cbind(B[-1,],B_F)^2
+		  } else{
+		    B2 = B[-1,,drop=FALSE]^2
+		  }
+		  prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
+		}
+  })
+	current_state = current_state[current_state_names]
+
+	return(current_state)
 }

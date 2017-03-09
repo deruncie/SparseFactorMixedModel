@@ -327,9 +327,82 @@ initialize_BSFG = function(BSFG_state,...){
 #' Run BSFG Gibbs sampler
 #'
 #' Run MCMC chain for a specified number of iterations
-sample_BSFG = function(BSFG_state,...){
-  UseMethod("sample_BSFG",BSFG_state)
+sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
+  data_matrices  = BSFG_state$data_matrices
+  priors         = BSFG_state$priors
+  Posterior      = BSFG_state$Posterior
+  current_state  = BSFG_state$current_state
+  run_parameters = BSFG_state$run_parameters
+  run_variables  = BSFG_state$run_variables
+
+  # ----------------------------------------------- #
+  # -----------Reset Global Random Number Stream--- #
+  # ----------------------------------------------- #
+  do.call("RNGkind",as.list(BSFG_state$RNG$RNGkind))  ## must be first!
+  assign(".Random.seed", BSFG_state$RNG$Random.seed, .GlobalEnv)
+
+  # ----------------------------------------------- #
+  # ----------------Set up run--------------------- #
+  # ----------------------------------------------- #
+  save_freq    = run_parameters$save_freq
+  burn         = run_parameters$burn
+  thin         = run_parameters$thin
+  start_i      = current_state$nrun
+
+  # ----------------------------------------------- #
+  # ---Extend posterior matrices for new samples--- #
+  # ----------------------------------------------- #
+
+  sp = (start_i + n_samples - burn)/thin - Posterior$total_samples
+  Posterior = expand_Posterior(Posterior,max(0,sp))
+
+  # ----------------------------------------------- #
+  # --------------start gibbs sampling------------- #
+  # ----------------------------------------------- #
+
+  start_time = Sys.time()
+  for(i in start_i+(1:n_samples)){
+    current_state$nrun = i
+    current_state = sample_current_state(BSFG_state,current_state,...)
+
+    # ----- sample Eta ----- #
+    data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,current_state,data_matrices)
+    current_state[names(data_model_state)] = data_model_state
+
+    # -- adapt number of factors to samples ---#
+    current_state = update_k( current_state, priors, run_parameters, data_matrices)
+
+    # -- save sampled values (after thinning) -- #
+    if( (i-burn) %% thin == 0 && i > burn) {
+      Posterior = save_posterior_sample(current_state, Posterior)
+    }
+  }
+  end_time = Sys.time()
+  print(end_time - start_time)
+  current_state$total_time = current_state$total_time + end_time - start_time
+
+  # ----------------------------------------------- #
+  # ------------Save state for restart------------- #
+  # ----------------------------------------------- #
+
+  save(current_state,file='current_state.RData')
+
+  BSFG_state$current_state = current_state
+  BSFG_state$Posterior = Posterior
+  BSFG_state$RNG = list(
+    Random.seed = .Random.seed,
+    RNGkind = RNGkind()
+  )
+  return(BSFG_state)
 }
+
+sample_current_state = function(BSFG_state,...){
+  UseMethod("sample_current_state",BSFG_state)
+}
+# sample_BSFG = function(BSFG_state,...){
+#   UseMethod("sample_BSFG",BSFG_state)
+# }
+
 
 #' Print more detailed statistics on current BSFG state
 #'

@@ -4,7 +4,7 @@
 \alias{sample_BSFG}
 \title{Run BSFG Gibbs sampler}
 \usage{
-sample_BSFG(BSFG_state, ...)
+sample_BSFG(BSFG_state, n_samples, ncores = detectCores(), ...)
 }
 \description{
 Run MCMC chain for a specified number of iterations

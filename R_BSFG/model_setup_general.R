@@ -98,3 +98,7 @@ Eta = get_posteriorMean(BSFG_state,'Eta')
 Lambda = get_posteriorMean(BSFG_state,'Lambda')
 F = get_posteriorMean(BSFG_state,'F')
 F_a = get_posteriorMean(BSFG_state,'F_a')
+B = get_posteriorMean(BSFG_state,'B')
+tot_Eta_prec = get_posteriorMean(BSFG_state,'tot_Eta_prec')
+
+LLt2 = matrix(rowMeans(apply(BSFG_state$Posterior$Lambda[sample(1:dim(BSFG_state$Posterior$Lambda)[1],50),,],1,tcrossprod)),dim(BSFG_state$Posterior$Lambda)[2])
