@@ -327,6 +327,11 @@ initialize_BSFG = function(BSFG_state,...){
 #' Run BSFG Gibbs sampler
 #'
 #' Run MCMC chain for a specified number of iterations
+#'
+#' @param BSFG_state BSFG_state object of current chain
+#' @param n_samples Number of iterations to add to the chain (not number of posterior samples to draw.
+#'     This is determined by n_samples / thin)
+#' @ncores Number of cores to use for computations. Only used in general_BSFG sampler.
 sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
@@ -363,7 +368,7 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   start_time = Sys.time()
   for(i in start_i+(1:n_samples)){
     current_state$nrun = i
-    current_state = sample_current_state(BSFG_state,current_state,...)
+    current_state = sample_current_state(BSFG_state,current_state,ncores = ncores,...)
 
     # ----- sample Eta ----- #
     data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,current_state,data_matrices)

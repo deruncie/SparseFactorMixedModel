@@ -5,7 +5,7 @@ sample_current_state.fast_BSFG = function(BSFG_state,current_state,...) {
   run_variables  = BSFG_state$run_variables
 
 	current_state_names = names(current_state)
-	current_state = within(c(current_state,priors,run_parameters, run_variables,data_matrices), {
+	current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {
 		k = ncol(Lambda)
 
 	 # -----Sample Lambda and B ------------------ #
@@ -89,7 +89,7 @@ sample_current_state.fast_BSFG = function(BSFG_state,current_state,...) {
 		  }
 		  prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
 		}
-  })
+  }))
 	current_state = current_state[current_state_names]
 
 	return(current_state)

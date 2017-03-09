@@ -6,6 +6,12 @@
 \usage{
 sample_BSFG(BSFG_state, n_samples, ncores = detectCores(), ...)
 }
+\arguments{
+\item{BSFG_state}{BSFG_state object of current chain}
+
+\item{n_samples}{Number of iterations to add to the chain (not number of posterior samples to draw.
+This is determined by n_samples / thin)}
+}
 \description{
 Run MCMC chain for a specified number of iterations
 }

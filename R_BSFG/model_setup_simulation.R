@@ -102,7 +102,7 @@ for(i  in 1:70) {
     #     BSFG_sampler(BSFG_state,2,1),
     #     times = 10
     #     )
-    BSFG_state = sample_BSFG(BSFG_state,n_samples,1)
+    BSFG_state = sample_BSFG(BSFG_state,n_samples,ncores=1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
     }
