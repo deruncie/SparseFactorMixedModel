@@ -11,6 +11,8 @@ sample_BSFG(BSFG_state, n_samples, ncores = detectCores(), ...)
 
 \item{n_samples}{Number of iterations to add to the chain (not number of posterior samples to draw.
 This is determined by n_samples / thin)}
+
+\item{ncores}{Number of cores to use for computations. Only used in general_BSFG sampler.}
 }
 \description{
 Run MCMC chain for a specified number of iterations

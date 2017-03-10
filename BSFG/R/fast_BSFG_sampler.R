@@ -1,4 +1,4 @@
-sample_current_state.fast_BSFG = function(BSFG_state,...) {
+sample_factor_model.fast_BSFG = function(BSFG_state,...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
   run_parameters = BSFG_state$run_parameters

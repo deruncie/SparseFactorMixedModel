@@ -128,6 +128,10 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	  data_model = missing_data_model
 	  data_model_parameters = list(Y_missing = Matrix(is.na(Y)))
 	}
+	if(is.character(data_model) && data_model == 'voom_RNAseq') {
+	  data_model = voom_model()
+	  data_model_parameters$Y_std = Y * data_model_parameters$prec_Y
+	}
 	Eta = data_model(Y,data_model_parameters)$state$Eta
 	p = ncol(Eta)
 	traitnames = colnames(Y)
@@ -330,7 +334,7 @@ initialize_BSFG = function(BSFG_state,...){
 #' @param BSFG_state BSFG_state object of current chain
 #' @param n_samples Number of iterations to add to the chain (not number of posterior samples to draw.
 #'     This is determined by n_samples / thin)
-#' @ncores Number of cores to use for computations. Only used in general_BSFG sampler.
+#' @param ncores Number of cores to use for computations. Only used in general_BSFG sampler.
 sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
@@ -365,7 +369,7 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   start_time = Sys.time()
   for(i in start_i+(1:n_samples)){
     BSFG_state$current_state$nrun = i
-    BSFG_state$current_state = sample_current_state(BSFG_state,ncores = ncores,...)
+    BSFG_state$current_state = sample_factor_model(BSFG_state,ncores = ncores,...)
 
     # -----Sample Lambda_prec ------------- #
     BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
@@ -400,8 +404,8 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   return(BSFG_state)
 }
 
-sample_current_state = function(BSFG_state,...){
-  UseMethod("sample_current_state",BSFG_state)
+sample_factor_model = function(BSFG_state,...){
+  UseMethod("sample_factor_model",BSFG_state)
 }
 
 sample_Lambda_prec = function(BSFG_state) {
@@ -469,57 +473,4 @@ plot.BSFG_state = function(BSFG_state,file = 'diagnostics_polts.pdf'){
     plot_diagnostics(BSFG_state)
   }
   dev.off()
-}
-
-#' Sample missing data
-#'
-#' Function to sample missing data given model parameters.
-#'
-#' This is also a template for \code{data_model} functions.
-#'
-#'    The function should draw a posterior sample for Eta (the (potentially) latent
-#'    data on the linear scale) given the factor model and the observed data. It returns a list
-#'    with Eta and any other variables associated with the data_model.
-#'    These variables are added to current_state, but are not currently saved in Posterior
-#'
-#'    Initial values, hyperparameters, and any helper functions / parameters can be passed
-#'    in \code{data_model_parameters}.
-#'
-#'    When run with an empty \code{current_state} and \code{data_matrices == NULL}, it should return
-#'    a matrix Eta of the correct dimensions, but the values are unimportant.
-#'
-#' @param Y data matrix n_Y x p_Y
-#' @param data_model_parameters List of parameters necessary for the data model.
-#'      Here, a Matrix of coordinates of NAs in Y
-#' @param current_state current_state from BSFG_state
-#' @param data_matrices from BSFG_state
-#' @return list of data_model variables including:
-#' @return Eta matrix of latent data: n x p
-missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
-  current_state = BSFG_state$current_state
-  data_matrices = BSFG_state$data_matrices
-
-  new_variables = c('Eta')
-  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
-        Eta = Y
-        if(sum(Y_missing)  > 0){
-          n = nrow(Y)
-          p = ncol(Y)
-          if(length(current_state) == 0) {
-            Eta_mean = matrix(0,n,p)
-            resids = matrix(rnorm(n*p),n,p)
-          } else{
-            Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
-            resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-            resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
-          }
-          missing_indices = which(Y_missing)
-          Eta[missing_indices] = Eta_mean[missing_indices] + resids[missing_indices]
-        }
-        return(list(Eta = as.matrix(Eta)))
-    })
-  return(list(state = data_model_state[new_variables],
-              sample_params = c(),
-              posteriorMean_params = c('Eta')
-  ))
 }

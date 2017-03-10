@@ -1,4 +1,4 @@
-sample_current_state.general_BSFG = function(BSFG_state,ncores = detectCores(),...) {
+sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),...) {
 	data_matrices  = BSFG_state$data_matrices
 	priors         = BSFG_state$priors
 	run_parameters = BSFG_state$run_parameters
