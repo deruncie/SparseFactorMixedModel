@@ -47,7 +47,7 @@ prepare_simulation2 = function(A_chol,A,Lambda,factor_h2s,E_a_prec,resid_Y_prec,
 counter = 0
 
 #sample_size simulations
-num_reps = 10
+num_reps = 5
 p = 100
 k=10
 
@@ -104,7 +104,7 @@ for(rep in 1:num_reps){
     factor_h2s[seq(1,k,by=2)]=0  # make 5 of them to be zero
     
     g_cols = factor_h2s>0  # will this step makes lambda matrix to be different in pops?????
-    Lambda =Lambda[do.call("order", unname(split(-abs(Lambda[,cols[factor_h2s>0]]), col(Lambda[,cols[factor_h2s>0]])))),]
+    #Lambda =Lambda[do.call("order", unname(split(-abs(Lambda[,cols[factor_h2s>0]]), col(Lambda[,cols[factor_h2s>0]])))),]
     # reordering lambda
     
     name = paste(pop,rep,sep='_')

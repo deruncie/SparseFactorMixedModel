@@ -34,7 +34,7 @@ fast_BSFG_sampler_init_comb = function(priors,run_parameters){
     load('../setup.RData')
   }
   
-  #k = priors$k_init
+  k = priors$k_init
   
   simulation = F
   if('gen_factor_Lambda' %in% names(setup)){
@@ -79,7 +79,7 @@ fast_BSFG_sampler_init_comb = function(priors,run_parameters){
   W_prec_shape = priors$W_prec_shape
   W_prec_rate  = priors$W_prec_rate
   p = ncol(Y[[1]]) 
-  k = p
+  #k = p
 
   #normalize Y to have zero mean and unit variances among observed values,
   #allowing for NaNs.

@@ -81,9 +81,9 @@ sample_Lambda_comb = function( Y,X,B,Z_2,W,F,resid_Y_prec, E_a_prec,Plam,invert_
   
   
   for(j in 1:p) {
-    means = matrix(0,nr=p,nc=1)
-    Qlam = matrix(0,p,p)
-    # Is this part correct????????????????????
+    #means = matrix(0,nr=p,nc=1)
+    means = matrix(0,nr=k,nc=1)
+    Qlam = matrix(0,k,k)
     Y_tilde = list();
     for(pop in pops){
       #conditioning on W, B, F, marginalizing over E _a
