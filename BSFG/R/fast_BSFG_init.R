@@ -185,7 +185,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 
     result = svd(Z %*% A %*% t(Z))
     invert_aI_bZAZ = list(
-        U = Matrix(result$u),
+        U = Matrix(result$u,sparse=T),
         s = result$d
     )
 
@@ -199,7 +199,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     result = GSVD_2_c(as.matrix(chol(ZZt)),as.matrix(chol_Ainv))
 
     invert_aZZt_Ainv = list(
-        U = drop0(Matrix(t(solve(result$X))),tol = 1e-14),
+        U = drop0(Matrix(t(solve(result$X)),sparse=T),tol = 1e-14),
         # U = t(solve(result$X)),
 			s1 = diag(result$C)^2,
 			s2 = diag(result$S)^2
