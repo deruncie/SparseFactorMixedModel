@@ -113,6 +113,7 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	Y_missing = Matrix(is.na(Y))
 
 	# scale Y
+	if(!is(Y,'matrix'))	Y = as.matrix(Y)
 	if(run_parameters$scale_Y){
 	  Mean_Y = colMeans(Y,na.rm=T)
 	  VY = apply(Y,2,var,na.rm=T)
