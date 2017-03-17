@@ -16,14 +16,16 @@ trace_plot = function(data,main = NULL,ylim = NULL){
 
 # draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Posterior,Lambda,F_h2,E_a_prec,resid_Y_prec){
 draw_simulation_diagnostics = function(BSFG_state){
-    sp_num = dim(BSFG_state$Posterior$Lambda)[3]
+    sp_num = dim(BSFG_state$Posterior$Lambda)[2]
     run_parameters = BSFG_state$run_parameters
     run_variables = BSFG_state$run_variables
     Posterior = BSFG_state$Posterior
     Lambda = BSFG_state$current_state$Lambda
     F_h2 = BSFG_state$current_state$F_h2
-    E_a_prec = BSFG_state$current_state$tot_Y_prec / BSFG_state$current_state$resid_h2
-    resid_Y_prec = BSFG_state$current_state$tot_Y_prec / (1-BSFG_state$current_state$resid_h2)
+    # E_a_prec = BSFG_state$current_state$tot_Y_prec / BSFG_state$current_state$resid_h2
+    # resid_Y_prec = BSFG_state$current_state$tot_Y_prec / (1-BSFG_state$current_state$resid_h2)
+    E_a_prec = BSFG_state$current_state$E_a_prec
+    resid_Y_prec = BSFG_state$current_state$resid_Y_prec
 
     devices = dev.list()
     while(length(devices) < 4){
@@ -83,75 +85,77 @@ draw_simulation_diagnostics = function(BSFG_state){
         f2_row=4;
         f2_col=4;
         par(mfrow=c(f2_row,f2_col))
-        for(k in 1:(min(2*f2_row,dim(Posterior$Lambda)[2]))) {
-            o = order(-abs(rowMeans(Posterior$Lambda[,k,max(1,sp_num-100):sp_num])))
-            traces = Posterior$Lambda[o[1:5],k,1:sp_num]
-            trace_plot(traces,main = sprintf('l_%d,.',k),ylim = c(-1,1)*max(abs(traces)))            
+        for(k in 0:(min(2*f2_row,nrow(Posterior$Lambda)/p)-1)) {
+            o = order(-abs(rowMeans(Posterior$Lambda[(1:p)+k*p,max(1,sp_num-100):sp_num])))
+            traces = Posterior$Lambda[o[1:5]+k*p,1:sp_num]
+            trace_plot(traces)
+            
         }
 
     	dev.set(devices[3])
-    	# Figure of trace plots and histograms of the factor heritablities
+        # Figure of trace plots and histograms of the factor heritablities
         f4_row=4;
         f4_col=4;
         par(mfrow=c(f4_row,f4_col))
-        for(k in 1:min(2*f4_row,dim(Posterior$Lambda)[2])) {
-            h2s = Posterior$F_h2[1,k,1:sp_num]
+        for(k in 1:min(2*f4_row,nrow(Posterior$F_h2))) {
+            h2s = Posterior$F_h2[k,1:sp_num]
             if(sum(h2s[!is.na(h2s)])==0) {
                 next
             }
-            plot(h2s,type='l',main = "plot of h2s",ylim = c(0,1))
+            plot(h2s,type='l',main = "plot of h2s")
             hist(h2s,breaks=100,xlim=c(-0.1,1),main = "histogram of h2s")
         }
 
-        k = dim(Posterior$Lambda)[2]
-        h2s = Posterior$F_h2[1,,1:sp_num]
-        G_Lambda_est = matrix(0,p,k)
+        k = nrow(Posterior$Lambda)/p;
+        h2s = Posterior$F_h2[,1:sp_num]
+        G_Lambdas = array(0,dim = dim(Posterior$Lambda))
         Lambda_est = matrix(0,p,k)
         G_est = E_est = matrix(0,p,p)
         for(j in 1:sp_num) {
-            Lj = Posterior$Lambda[,,j]
-            h2j = Posterior$F_h2[1,,j];
+            Lj = matrix(Posterior$Lambda[,j],p,k);
+            h2j = Posterior$F_h2[,j];
             G_Lj = Lj %*%  diag(sqrt(h2j));
-            G_Lambda_est = G_Lambda_est + G_Lj/sp_num
-            Gj = G_Lj %*%  t(G_Lj) + diag(Posterior$resid_h2[1,,j]/Posterior$tot_Y_prec[1,,j])
+            G_Lambdas[,j] = c(G_Lj)
+            Gj = G_Lj %*%  t(G_Lj) + diag(1/Posterior$E_a_prec[,j])
             G_est = G_est + Gj/sp_num
             
-            E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag((1-Posterior$resid_h2[1,,j])/Posterior$tot_Y_prec[1,,j])
+            E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag(1/Posterior$resid_Y_prec[,j])
             E_est = E_est + E_Lj/sp_num;
-            Lambda_est = Lambda_est + Lj/sp_num;
+            Lambda_est = Lambda_est + matrix(Posterior$Lambda[,j],p,k)/sp_num;
         }
+        G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
 
         dev.set(devices[4])
         par(mfrow=c(3,3))
-        cors = abs(cor(G_Lambda_est,actual_E_Lambda))
-    	cors=rbind(cors,apply(cors,2,max))
-    	cors = cbind(cors,apply(cors,1,max))
-    	image(cors[,ncol(cors):1],zlim=c(0,1),main = "cor of G_lambda vs act_E_lambda")
+        cors = abs(cor(G_Lambda,actual_E_Lambda))
+        cors=rbind(cors,apply(cors,2,max))
+        cors = cbind(cors,apply(cors,1,max))
+        image(cors[,ncol(cors):1],zlim=c(0,1),main = "cor of G_lambda vs act_E_lambda")
 
-    	image(CovToCor(G_est),zlim=c(-1,1),main = "G_est")
-    	image(CovToCor(E_est),zlim=c(-1,1),main = "E_est")
+        image(CovToCor(G_est),zlim=c(-1,1),main = "G_est")
+        image(CovToCor(E_est),zlim=c(-1,1),main = "E_est")
 
-    	clim=max(0.1,min(.75,max(max(abs(G_Lambda_est)))))
-    	clims=c(-clim,clim)
-    	image(t(G_Lambda_est),zlim=clims,main = "G_lambda")
+        clim=max(0.1,min(.75,max(max(abs(G_Lambda)))))
+        clims=c(-clim,clim)
+        image(t(G_Lambda),zlim=clims,main = "G_lambda")
 
-    	image(t(actual_G_Lambda),zlim=clims,main = "act_G_lambda")
+        image(t(actual_G_Lambda),zlim=clims,main = "act_G_lambda")
 
-    	plot(c(G_est),c(G_act),main = "G_est vs G_act");abline(0,1)
+        plot(c(G_est),c(G_act),main = "G_est vs G_act");abline(0,1)
         plot(c(E_est),c(E_act),main = "E_est vs E_act");abline(0,1)
 
         plot(diag(G_est)/(diag(G_est)+diag(E_est)),h2s_act,xlim=c(0,1),ylim=c(0,1),main = "h2s_est vs h2s_act")
         abline(0,1)
 
-    	F_h2 = rowMeans(Posterior$F_h2[1,,1:sp_num])
-    	E_h2 = 1-F_h2
-    	plot(F_h2,type='l',ylim=c(0,1),main = "F_h2 vs E_h2")
-    	lines(E_h2,col=2)
+        F_h2 = rowMeans(Posterior$F_h2[,1:sp_num])
+        E_h2 = 1-F_h2
+        plot(F_h2,type='l',ylim=c(0,1),main = "F_h2 vs E_h2")
+        lines(E_h2,col=2)
     }
 }
 
 draw_results_diagnostics = function(BSFG_state){
-    sp_num = dim(BSFG_state$Posterior$Lambda)[3]
+    sp_num = dim(BSFG_state$Posterior$Lambda)[2]
     run_parameters = BSFG_state$run_parameters
     run_variables = BSFG_state$run_variables
     Posterior = BSFG_state$Posterior
@@ -204,54 +208,63 @@ draw_results_diagnostics = function(BSFG_state){
         f2_row=4;
         f2_col=4;
         par(mfrow=c(f2_row,f2_col))
-        for(k in 1:(min(2*f2_row,dim(Posterior$Lambda)[2]))) {
-            o = order(-abs(rowMeans(Posterior$Lambda[,k,max(1,sp_num-100):sp_num])))
-            traces = Posterior$Lambda[o[1:5],k,1:sp_num]
-            trace_plot(traces,main = sprintf('l_%d,.',k),ylim = c(-1,1)*max(abs(traces)))            
+        
+        # for(k in 0:(min(2*f2_row,nrow(Posterior$Lambda)/p)-1)) {
+        for(k in 0:(f2_row*f2_col-1)){
+            if(k >= nrow(Posterior$Lambda)/p) next
+            o = order(-abs(rowMeans(Posterior$Lambda[(1:p)+k*p,max(1,sp_num-100):sp_num])))
+            traces = Posterior$Lambda[o[1:5]+k*p,1:sp_num]
+            trace_plot(traces,main = sprintf('l_%d,.',k),ylim = c(-1,1)*max(abs(traces)))
+            abline(h=0)            
         }
-
-        dev.set(devices[3])
+        #dev.off()
+        
+        #dev.set(devices[3])
         # Figure of trace plots and histograms of the factor heritablities
         f4_row=4;
         f4_col=4;
+        #pdf('trace plots and histograms of the factor heritablities.pdf')
         par(mfrow=c(f4_row,f4_col))
-        for(k in 1:min(2*f4_row,dim(Posterior$Lambda)[2])) {
-            h2s = Posterior$F_h2[1,k,1:sp_num]
+                
+        for(k in 1:min(2*f4_row,nrow(Posterior$F_h2))) {
+            h2s = Posterior$F_h2[k,1:sp_num]
             if(sum(h2s[!is.na(h2s)])==0) {
                 next
             }
-            plot(h2s,type='l',main = "plot of h2s",ylim = c(0,1))
+            plot(h2s,type='l', main = "plot of h2s")
             hist(h2s,breaks=100,xlim=c(-0.1,1),main = "histogram of h2s")
         }
 
-        k = dim(Posterior$Lambda)[2]
-        h2s = Posterior$F_h2[1,,1:sp_num]
-        G_Lambda_est = matrix(0,p,k)
+        k = nrow(Posterior$Lambda)/p;
+        h2s = Posterior$F_h2[,1:sp_num]
+        G_Lambdas = array(0,dim = dim(Posterior$Lambda))
         Lambda_est = matrix(0,p,k)
         G_est = E_est = matrix(0,p,p)
         traces_G = matrix(,p*(p+1)/2,sp_num)
         traces_G_cor = matrix(,p*(p+1)/2,sp_num)
         traces_E = matrix(,p*(p+1)/2,sp_num)
+   
         for(j in 1:sp_num) {
-            Lj = Posterior$Lambda[,,j]
-            h2j = Posterior$F_h2[1,,j];
-            G_Lj = Lj %*%  diag(sqrt(h2j));
-            G_Lambda_est = G_Lambda_est + G_Lj/sp_num
-            Gj = G_Lj %*%  t(G_Lj) + diag(Posterior$resid_h2[1,,j]/Posterior$tot_Y_prec[1,,j])
+            Lj = matrix(Posterior$Lambda[,j],p,k)
+            h2j = Posterior$F_h2[,j]
+            G_Lj = Lj %*%  diag(sqrt(h2j))
+            G_Lambdas[,j] = c(G_Lj)
+            Gj = G_Lj %*%  t(G_Lj) + diag(1/Posterior$E_a_prec[,j])
             G_est = G_est + Gj/sp_num
             library(gdata)
             traces_G[,j] = lowerTriangle(Gj,diag = TRUE)
             traces_G_cor[,j] = lowerTriangle(CovToCor(Gj),diag = TRUE)
             
-            E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag((1-Posterior$resid_h2[1,,j])/Posterior$tot_Y_prec[1,,j])
+            E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag(1/Posterior$resid_Y_prec[,j])
             E_est = E_est + E_Lj/sp_num;
-            Lambda_est = Lambda_est + Lj/sp_num;
+            Lambda_est = Lambda_est + matrix(Posterior$Lambda[,j],p,k)/sp_num;
             traces_E[,j] = lowerTriangle(E_Lj,diag = TRUE)
         }
+        G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
         #dev.off()
 
         # Figure of posterior mean estimates
-        dev.set(devices[4])
+        #dev.set(devices[4])
         #pdf('Figure of posterior mean estimates.pdf')
         par(mfrow=c(2,2))
         #plot 1-2: visualize posterior mean genetic and residual correlation matrices
@@ -264,11 +277,12 @@ draw_results_diagnostics = function(BSFG_state){
         image(t(Lambda),zlim=clims, main="transpose of lambda")
 
         # plot 4: posterior mean factor heritabilities
-        F_h2 = rowMeans(Posterior$F_h2[1,,1:sp_num])
+        F_h2 = rowMeans(Posterior$F_h2[,1:sp_num])
         E_h2 = 1-F_h2
         plot(F_h2,type='l',ylim=c(0,1),main = "F_h2 vs E_h2",col="blue")
         lines(E_h2,col="red")
         legend("topright",legend = c("F_h2","E_h2"),col = c("blue","red"),text.col = c("blue","red"),bty = "n",pch = 1)
+        #dev.off()
         #dev.off()
         
         #plot 5: trace plot of G_est
