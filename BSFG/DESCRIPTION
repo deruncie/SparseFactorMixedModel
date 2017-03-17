@@ -24,7 +24,8 @@ Imports:
   compiler
 Suggests:
   R.matlab,
-  MCMCpack
+  MCMCpack,
+  splines
 LinkingTo: 
   Rcpp,
   RcppArmadillo,

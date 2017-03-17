@@ -124,7 +124,7 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       if(!exists(degree)) degree = NULL
       if(!exists(intercept)) intercept = NULL
       covariate = observations$covariate
-      coefficients = bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
+      coefficients = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
 
       model_matrices = tapply(1:nrow(coefficients),observations$ID,function(x) {
         list(
@@ -157,14 +157,16 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
     },mc.cores = ncores))
 
     Y_fitted = do.call(c,mclapply(1:n,function(i) {
-      model_matrices[[i]]$X %*% t(Eta[i,])
+      y_fitted = model_matrices[[i]]$X %*% t(Eta[i,])
+      if(is(y_fitted,'Matrix')) y_fitted = y_fitted@x
+      y_fitted
     },mc.cores = ncores))
 
     Y_tilde = Y - Y_fitted
 
     resid_Y_prec = rgamma(1,shape = resid_Y_prec_shape + 0.5*n*p, rate = resid_Y_prec_rate + 0.5*sum(Y_tilde^2))
 
-    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model.matrices = model.matrices))
+    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model.matrices = model.matrices, coefficients = coefficients))
   })
   return(list(state = data_model_state,
               sample_params = c(),
