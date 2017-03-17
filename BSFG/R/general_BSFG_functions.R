@@ -37,7 +37,9 @@ sample_MME_single_diagA = function(y, W, Wp, prior_mean,prior_prec,Cholesky_R,ch
 	theta_star = prior_mean + randn_theta/sqrt(prior_prec)
 	e_star = (chol_R) %*% randn_e / sqrt(tot_Y_prec)
 	W_theta_star = W %*% theta_star
-	y_resid = y - W_theta_star - e_star@x
+	if(is(W_theta_star,'Matrix')) W_theta_star = W_theta_star@x
+	if(is(e_star,'Matrix')) e_star = e_star@x
+	y_resid = y - W_theta_star - e_star
 	if(!is.null(R_Perm)) {
 		y_resid_p = R_Perm %*% y_resid
 	} else{
@@ -50,8 +52,9 @@ sample_MME_single_diagA = function(y, W, Wp, prior_mean,prior_prec,Cholesky_R,ch
 	WtRinvy = crossprod(RinvSqW, solve(Cholesky_R,y_resid_p,'L')) * tot_Y_prec
 
 	theta_tilda = solve(C,WtRinvy)
+	if(is(theta_tilda,'Matrix')) theta_tilda = theta_tilda@x
 
-	theta = theta_tilda@x + theta_star
+	theta = theta_tilda + theta_star
 	theta
 }
 sample_MME_single_diagA = compiler::cmpfun(sample_MME_single_diagA)
@@ -69,12 +72,16 @@ sample_MME_multiple_diagR = function(Y,W,Cholesky_C,pe,chol_A_inv,tot_Y_prec, ra
 	theta_star = solve(chol_A_inv,randn_theta)
 	e_star = sweep(randn_e,2,sqrt(pe),'/')
 	W_theta_star = W %*% theta_star
-	Y_resid = Y - W_theta_star@x - e_star
+
+	if(is(W_theta_star,'Matrix')) W_theta_star = W_theta_star@x
+	if(is(theta_star,'Matrix')) theta_star = theta_star@x
+
+	Y_resid = Y - W_theta_star - e_star
 	WtRiy = crossprod(W,sweep(Y_resid,2,pe,'*'))
 
 	theta_tilda = solve(Cholesky_C,WtRiy)
 
-	theta = sweep(matrix(theta_tilda@x,nc=p),2,tot_Y_prec,'/') + theta_star@x
+	theta = sweep(matrix(theta_tilda@x,nc=p),2,tot_Y_prec,'/') + theta_star
 
 	return(theta)
 }

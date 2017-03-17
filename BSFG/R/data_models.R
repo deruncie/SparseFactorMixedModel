@@ -99,7 +99,6 @@ voom_model = function(Y,data_model_parameters,BSFG_state = list()){
 
 #' Sample Eta given B-splines individual-level model
 #'
-#' **Not yet functional**.
 #' Eta is a matrix of individual-level parmaters for a B-spline with
 #'    equivalent knots over all individuals
 #'
@@ -108,9 +107,10 @@ voom_model = function(Y,data_model_parameters,BSFG_state = list()){
 #'     as resid_Y_prec, Eta_mean and resid_Eta_prec are updated each iteraction.
 #'
 #' @param Y a vector of observation. Pre-scaled and centered if desired.
-#' @param data_model_parameters a list including a data.frame with columns: \code{ID} and \code{covariate}
-#'     and the variables df, knots, degree and intercept. Empty values will use the defaults
-#'     for \code{bs()}. The data.frame should be ordered by ID.
+#' @param data_model_parameters a list including:
+#'     \code{observations}, a data.frame with columns: \code{ID} and \code{covariate}, ordered by ID.
+#'     and the variables df, knots, degree and intercept.
+#'     Empty values will use the defaults for \code{bs()}.
 bs_model = function(Y,data_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
@@ -123,18 +123,16 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       if(!exists(knots)) knots = NULL
       if(!exists(degree)) degree = NULL
       if(!exists(intercept)) intercept = NULL
+      covariate = observations$covariate
       coefficients = bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
 
-      if(!exists(ncores)) ncores = 1
-
-      model.matrices = tapply(1:nrow(coefficients),ID,function(x) {
-        X = Matrix(coefficients[x,])
-        XtX = crossprod(X)
-        Diagonal(XtX) = rep(1,ncol(X))
-        Cholesky_XtX = Cholesky(XtX)
-        return(list(X=X,XtX = XtX))
-        # svd_XtX = svd(crossprod(X))
-        # return(list(U = Matrix, s = svd_XtX$d))
+      model_matrices = tapply(1:nrow(coefficients),observations$ID,function(x) {
+        list(
+          X = Matrix(coefficients[x,]),
+          y = Y[x,],
+          Cholesky_R = Cholesky(Diagonal(length(x))),
+          chol_R = Diagonal(length(x))
+        )
       })
 
       n = length(model.matrices)
@@ -149,18 +147,17 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       if(!exists(resid_Y_prec)) resid_Y_prec = matrix(1)
     }
 
+    if(!exists(ncores)) ncores = 1
     Eta = do.call(rbind,mclapply(1:n,function(i) {
-      with(model.matrices[[i]],{
-        ## should be able to use sample_MME_multiple_diagR, need to work out maths
-        # Sigm_inv = XtX*precY;
-        # Diagonal(Sigma_inv) = Diagonal(Sigma_inv) + resid_Y_prec
-        # chol_Sigma_inv = update(Cholesky_XtX,Sigma_inv)
-        # Eta_hat = backXtY*precY + sweep(Eta_mean,2,resid_Eta_prec,'*')
-      })
+      X = model_matrices[[i]]$X
+      y = model_matrices[[i]]$y
+      Cholesky_R = model_matrices[[i]]$Cholesky_R
+      chol_R = model_matrices[[i]]$chol_R
+      eta_i = sample_MME_single_diagA(y,X,X,Eta_mean[i,],resid_Eta_prec,Cholesky_R,chol_R,R_Perm = NULL,resid_Y_prec)
     },mc.cores = ncores))
 
     Y_fitted = do.call(c,mclapply(1:n,function(i) {
-      model.matrices[[i]] %*% t(Eta[i,])
+      model_matrices[[i]]$X %*% t(Eta[i,])
     },mc.cores = ncores))
 
     Y_tilde = Y - Y_fitted

@@ -9,12 +9,12 @@ bs_model(Y, data_model_parameters, BSFG_state = list())
 \arguments{
 \item{Y}{a vector of observation. Pre-scaled and centered if desired.}
 
-\item{data_model_parameters}{a list including a data.frame with columns: \code{ID} and \code{covariate}
-and the variables df, knots, degree and intercept. Empty values will use the defaults
-for \code{bs()}. The data.frame should be ordered by ID.}
+\item{data_model_parameters}{a list including:
+\code{observations}, a data.frame with columns: \code{ID} and \code{covariate}, ordered by ID.
+and the variables df, knots, degree and intercept.
+Empty values will use the defaults for \code{bs()}.}
 }
 \description{
-**Not yet functional**.
 Eta is a matrix of individual-level parmaters for a B-spline with
    equivalent knots over all individuals
 }
