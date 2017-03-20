@@ -5,8 +5,6 @@
 #' @param sampler specify the sampler to use. fast_BSFG is much faster, but only allows one random
 #'   effect. If more are specified in \code{BSFG_init}, this is switched to general_BSFG.
 #' @param Posterior_folder folder to save posterior sample chunk files
-#' @param fixed_factors should the fixed effect model be applied to factors as well as the factor
-#'   residuals? If so, the first column of the design matrix is dropped.
 #' @param simulation Is this a fit to simulated data? If so, a setup list will be expected providing
 #'   the true values
 #' @param scale_Y Should the Y values be centered and scaled? Recommend, except for simulated data.
@@ -28,7 +26,7 @@
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 #'
 BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder = 'Posterior',
-                        fixed_factors = c(T,F),simulation = c(F,T),scale_Y = c(T,F),
+                        simulation = c(F,T),scale_Y = c(T,F),
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100,
                         burn = 100,
@@ -63,6 +61,11 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'     by h2_divisions)
 #' @param data data.frame with n rows containing columns corresponding to the fixed and random
 #'   effects
+#' @param factor_model_fixed Fixed effect model formula specific to the latent factors. Optional. If NULL,
+#'     the fixed effects for the latent factors will be the same as for Eta, except that the intercept
+#'     will be removed. If a formula is provided (no random effects allowed), the model will be applied to
+#'     each factor, again with the intercept dropped (or set to zero). Note: Random effects in \code{model}
+#'     are applied to both Eta and F.
 #' @param priors list providing hyperparameters for the model priors. This must include: for \code{fixed_var},
 #'     \code{tot_Eta_var}, and \code{tot_F_var}, a list of \code{V} and \code{nu}, which specify an inverse-gamma
 #'     distribution as in MCMCglmm. For \code{delta_1} and \code{delta_2} a list of \code{shape} and \rate{rate} for
@@ -97,8 +100,10 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'   parameters
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
 #'
-BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
+BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
                      data_model = 'missing_data', data_model_parameters = NULL,
+                     posteriorSample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B'),
+                     posteriorMean_params = c('E_a'),
                      sampler = c('fast_BSFG','general_BSFG'), ncores = detectCores(),simulation = c(F,T),setup = NULL,verbose=T) {
 
   # ----------------------------- #
@@ -133,31 +138,32 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	  data_model = voom_model()
 	  data_model_parameters$Y_std = Y * data_model_parameters$prec_Y
 	}
-	Eta = data_model(Y,data_model_parameters)$state$Eta
+	data_model_state = data_model(Y,data_model_parameters)
+	Eta = data_model_state$state$Eta
 	p = ncol(Eta)
 	traitnames = colnames(Y)
 
-	# check that all terms in model are in data
-	if(!all(all.vars(model) %in% colnames(data))) {
-	  terms = all.vars(model)
+	# if factor_model_fixed not specified, use fixed effects from model for both
+	if(is.null(factor_model_fixed)) factor_model_fixed = nobars(model)
+
+	# check that there are no random effects specifed in factor_model_fixed
+	if(length(findbars(factor_model_fixed))) stop('Do not specify random effects in `factor_model_fixed`. Random effects for factors taken from `model`')
+
+	# check that all terms in models are in data
+	terms = c(all.vars(model),all.vars(factor_model_fixed))
+	if(!all(terms %in% colnames(data))) {
 	  missing_terms = terms[!terms %in% colnames(data)]
 	  stop(sprintf('terms %s missing from data',paste(missing_terms,sep=', ')))
 	}
 
 	# build X from fixed model
-	  # for residuals
+	  # for Eta
 	X = model.matrix(nobars(model),data)
 	b = ncol(X)
 
-	  # for factors.
-	  #   If fixed_factors, then fixed effects are modeled for factors
-	  #     in this case, the prior variance should be modeled
-	  #   If fixed_factors == F, then an empty matrix
-	if(run_parameters$fixed_factors){
-	  X_F = X[,-1,drop=FALSE]
-	} else{
-	  X_F = matrix(0,nr = n, ncol = 0)
-	}
+    # for F
+	  # note we drop a column to force intercept to be zero
+	X_F = model.matrix(factor_model_fixed,data)[,-1,drop = FALSE]
 	b_F = ncol(X_F)
 
 	# use lme4 functions to parse random effects
@@ -319,6 +325,25 @@ BSFG_init = function(Y, model, data, priors, run_parameters, A_mats = NULL, A_in
 	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',run_parameters$sampler))
 
 	BSFG_state = initialize_BSFG(BSFG_state, A_mats, chol_Ai_mats,verbose=verbose,ncores=ncores)
+
+	# Initialize Eta
+	data_model_state = data_model(Y,data_model_parameters,BSFG_state)
+	BSFG_state$current_state[names(data_model_state$state)] = data_model_state$state
+
+	# ----------------------- #
+	# -Initialize Posterior-- #
+	# ----------------------- #
+	Posterior = list(
+	  posteriorSample_params = unique(c(posteriorSample_params,data_model_state$posteriorSample_params)),
+	  posteriorMean_params = unique(c(posteriorMean_params,data_model_state$posteriorMean_params)),
+	  # per_trait_params = c('tot_Eta_prec','resid_h2','B'),
+	  total_samples = 0,
+	  folder = run_parameters$Posterior_folder,
+	  files = c()
+	)
+	Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
+	BSFG_state$Posterior = Posterior
+
 
 	return(BSFG_state)
 }

@@ -1,9 +1,6 @@
 initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,
 									ncores = detectCores(),verbose=T,...){
 
-    data_model            = BSFG_state$run_parameters$data_model
-    data_model_parameters = BSFG_state$run_parameters$data_model_parameters
-
     Y          = BSFG_state$data_matrices$Y
     X_F        = BSFG_state$data_matrices$X_F
     Z_matrices = BSFG_state$data_matrices$Z_matrices
@@ -143,26 +140,6 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     		total_time     = 0
     )
     BSFG_state$current_state = current_state
-
-    # Initialize Eta
-    data_model_state = data_model(Y,data_model_parameters,BSFG_state)
-    BSFG_state$current_state[names(data_model_state)] = data_model_state
-
-
-# ----------------------- #
-# -Initialize Posterior-- #
-# ----------------------- #
-    Posterior = list(
-        sample_params = unique(c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B',data_model_state$sample_params)),
-        posteriorMean_params = unique(c('E_a',data_model_state$posteriorMean_params)),
-        per_trait_params = c('tot_Eta_prec','resid_h2','B'),
-        total_samples = 0,
-        folder = run_parameters$Posterior_folder,
-        files = c()
-        # per_trait_params = c('tot_Eta_prec','resid_h2','B','E_a')
-    )
-    Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
-    BSFG_state$Posterior = Posterior
 
 # ------------------------------------ #
 # ----Precalculate ZAZts, chol_As ---- #

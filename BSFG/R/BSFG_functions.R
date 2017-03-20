@@ -176,7 +176,7 @@ save_posterior_sample = function(BSFG_state) {
 
 	sp = dim(Posterior$Lambda)[1]
 
-	for(param in Posterior$sample_params){
+	for(param in Posterior$posteriorSample_params){
 		ncol_current = ncol(current_state[[param]])
 		ncol_Posterior = dim(Posterior[[param]])[3]
 		if(ncol_current > ncol_Posterior){
@@ -200,7 +200,7 @@ save_posterior_sample = function(BSFG_state) {
 }
 
 reset_Posterior = function(Posterior,current_state){
-  for(param in Posterior$sample_params){
+  for(param in Posterior$posteriorSample_params){
     Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
     dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
   }
@@ -215,7 +215,7 @@ reset_Posterior = function(Posterior,current_state){
 }
 
 expand_Posterior = function(Posterior,size){
-	for(param in Posterior$sample_params){
+	for(param in Posterior$posteriorSample_params){
 		Posterior[[param]] = abind(Posterior[[param]],array(NA,dim = c(size,dim(Posterior[[param]])[2:3])),along = 1)
 	}
 	Posterior
@@ -259,7 +259,7 @@ save_posterior_chunk = function(BSFG_state){
   if(!dir.exists(folder)) dir.create(folder)
 
   file_suffix = sprintf('%d.RData',Posterior$total_samples)
-  res = sapply(c(Posterior$sample_params,Posterior$posteriorMean_params),function(param) {
+  res = sapply(c(Posterior$posteriorSample_params,Posterior$posteriorMean_params),function(param) {
     file_name = sprintf('%s/%s_%s',folder,param,file_suffix)
     samples = Posterior[[param]]
     if(dim(samples)[1] > 0) save(samples,file = file_name)
@@ -329,7 +329,7 @@ load_posterior_param = function(BSFG_state,param){
 #' @return Posterior list, as part of a BSFG_state object
 reload_Posterior = function(BSFG_state){
   Posterior = BSFG_state$Posterior
-  for(param in c(Posterior$sample_params,Posterior$posteriorMean_params)){
+  for(param in c(Posterior$posteriorSample_params,Posterior$posteriorMean_params)){
     Posterior[[param]] = load_posterior_param(BSFG_state,param)
   }
   Posterior

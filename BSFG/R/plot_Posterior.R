@@ -216,13 +216,13 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
 
   if(dim(setup$B)[1] > 1) {
     B_mean = apply(Posterior$B,c(2,3),mean)
-    B_factor_mean = with(c(Posterior,BSFG_state$data_matrices), {
-      if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
-      matrix(rowMeans(sapply(1:total_samples,function(i) B_F[i,,] %*% t(Lambda[i,,]))),nrow = ncol(X_F))
-    })
     plot(c(B_mean),c(setup$B))
     abline(0,1)
-    if(!is.null(setup$B_F)){
+    if(!is.null(setup$B_F) & ncol(BSFG_state$data_matrices$X_F) == nrow(setup$B_F)){
+      B_factor_mean = with(c(Posterior,BSFG_state$data_matrices), {
+        if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
+        matrix(rowMeans(sapply(1:total_samples,function(i) B_F[i,,] %*% t(Lambda[i,,]))),nrow = ncol(X_F))
+      })
       plot(c(B_factor_mean),c(setup$B_F %*% t(setup$error_factor_Lambda)))
       abline(0,1)
       xlim = ylim = range(c(B_mean[-1,],B_factor_mean))

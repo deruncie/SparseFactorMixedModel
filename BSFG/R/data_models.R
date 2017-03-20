@@ -23,7 +23,7 @@
 #'    empty, will return a default set of parameters of the appropriate size for model initialization.
 #' @return list of data_model variables including:
 #' @return state a list of parameters associated with the data_model. Here, only the matrix Eta
-#' @return sample_params a list of parameter names to record posterior samples of
+#' @return posteriorSample_params a list of parameter names to record posterior samples of
 #' @return posteriorMean_params a list of parameters to record the posterior mean, but not save individual
 #'     posterior samples
 missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
@@ -50,7 +50,7 @@ missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
     return(list(Eta = as.matrix(Eta)))
   })
   return(list(state = data_model_state[new_variables],
-              sample_params = c(),
+              posteriorSample_params = c(),
               posteriorMean_params = c('Eta')
   ))
 }
@@ -90,7 +90,7 @@ voom_model = function(Y,data_model_parameters,BSFG_state = list()){
     return(list(Eta = as.matrix(Eta)))
   })
   return(list(state = data_model_state[new_variables],
-              sample_params = c(),
+              posteriorSample_params = c(),
               posteriorMean_params = c('Eta')
              )
          )
@@ -169,7 +169,7 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
     return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model.matrices = model.matrices, coefficients = coefficients))
   })
   return(list(state = data_model_state,
-              sample_params = c(),
+              posteriorSample_params = c(),
               posteriorMean_params = c('Eta','resid_Y_prec')
   )
   )
