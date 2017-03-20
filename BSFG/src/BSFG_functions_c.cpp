@@ -29,7 +29,7 @@ arma::mat sample_coefs_parallel_sparse_c(
 					arma::vec tot_Y_prec,
 					arma::mat prior_mean,
 					arma::mat prior_prec,
-					List invert_aI_bZAZ,
+					List invert_aI_bZKZ,
 					int grainSize) {
 
 	// Sample regression coefficients
@@ -71,8 +71,8 @@ arma::mat sample_coefs_parallel_sparse_c(
 	int p = tot_Y_prec.n_elem;
 	int b = W.n_cols;
 
-	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZAZ["U"]);
-	arma::vec s = as<arma::vec>(invert_aI_bZAZ["s"]);
+	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
+	arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
 
 	arma::mat WtU = W.t() * U;
 	arma::mat UtY = U.t() * Y;
@@ -90,11 +90,11 @@ arma::rowvec sample_tot_prec_sparse_c (arma::mat Y,
 					   arma::vec h2,
 					   double tot_Y_prec_shape,
 					   double tot_Y_prec_rate,
-					   List invert_aI_bZAZ
+					   List invert_aI_bZKZ
 					  ) {
 
-	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZAZ["U"]);
-	arma::vec s = as<arma::vec>(invert_aI_bZAZ["s"]);
+	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
+	arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
 
 	arma::mat UtY = U.t() * Y;
 
@@ -117,10 +117,10 @@ arma::rowvec sample_h2s_discrete_given_p_sparse_c (arma::mat Y,
 						int h2_divisions,
 						arma::vec h2_priors,
 						arma::vec Tot_prec,
-						List invert_aI_bZAZ){
+						List invert_aI_bZKZ){
 
-	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZAZ["U"]);
-	arma::vec s = as<arma::vec>(invert_aI_bZAZ["s"]);
+	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
+	arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
 
 	int p = Y.n_cols;
 	int n = Y.n_rows;
@@ -156,22 +156,22 @@ arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Y,
 				arma::sp_mat Z,
 				arma::vec tot_prec,
 				arma::vec h2,
-				List invert_aZZt_Ainv,
+				List invert_aZZt_Kinv,
 				int grainSize ) {
 	//samples genetic effects on factors (F_a) conditional on the factor scores F:
 	// F_i = F_{a_i} + E_i, E_i~N(0,s2*(1-h2)*I) for each latent trait i
 	// U_i = zeros(r,1) if h2_i = 0
 	// it is assumed that s2 = 1 because this scaling factor is absorbed in
 	// Lambda
-	// invert_aZZt_Ainv has parameters to diagonalize a*Z*Z' + b*I for fast
+	// invert_aZZt_Kinv has parameters to diagonalize a*Z*Z' + b*I for fast
 	// inversion:
 
 	arma::vec a_prec = tot_prec / h2;
 	arma::vec e_prec = tot_prec / (1-h2);
 
-	arma::sp_mat U = as<arma::sp_mat>(invert_aZZt_Ainv["U"]);
-	arma::vec s1 = as<arma::vec>(invert_aZZt_Ainv["s1"]);
-	arma::vec s2 = as<arma::vec>(invert_aZZt_Ainv["s2"]);
+	arma::sp_mat U = as<arma::sp_mat>(invert_aZZt_Kinv["U"]);
+	arma::vec s1 = as<arma::vec>(invert_aZZt_Kinv["s1"]);
+	arma::vec s2 = as<arma::vec>(invert_aZZt_Kinv["s2"]);
 
 	int p = Y.n_cols;
 	int r = Z.n_cols;
@@ -214,15 +214,15 @@ arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Y,
 arma::mat sample_means_parallel_c(arma::mat Y_tilde,
 				   arma::vec resid_Y_prec,
 				   arma::vec E_a_prec,
-				   List invert_aA_bZtZ,
+				   List invert_aK_bZtZ,
 				   int grainSize ) {
 	// when used to sample [B;E_a]:
 	//  W - F*Lambda' = X*B + Z_1*E_a + E, arma::vec(E)~N(0,kron(Psi_E,In)).
 	//  Note: conditioning on F, Lambda and W.
 	// The vector [b_j;E_{a_j}] is sampled simultaneously. Each trait is sampled separately because their
 	// conditional posteriors factor into independent MVNs.
-	// note:invert_aA_bZtZ has parameters to diagonalize mixed model equations for fast inversion:
-	// inv(a*blkdiag(fixed_effects_prec*eye(b),Ainv) + b*[X Z_1]'[X Z_1]) = U*diag(1./(a.*s1+b.*s2))*U'
+	// note:invert_aK_bZtZ has parameters to diagonalize mixed model equations for fast inversion:
+	// inv(a*blkdiag(fixed_effects_prec*eye(b),Kinv) + b*[X Z_1]'[X Z_1]) = U*diag(1./(a.*s1+b.*s2))*U'
 	// Z_U = [X Z_1]*U, which doesn't change each iteration.
 
 	struct sampleColumn : public Worker {
@@ -244,10 +244,10 @@ arma::mat sample_means_parallel_c(arma::mat Y_tilde,
 		}
 	};
 
-	arma::mat U = as<arma::mat>(invert_aA_bZtZ["U"]);
-	arma::vec s1 = as<arma::vec>(invert_aA_bZtZ["s1"]);
-	arma::vec s2 = as<arma::vec>(invert_aA_bZtZ["s2"]);
-	arma::mat Z_U = as<arma::mat>(invert_aA_bZtZ["Z_U"]);
+	arma::mat U = as<arma::mat>(invert_aK_bZtZ["U"]);
+	arma::vec s1 = as<arma::vec>(invert_aK_bZtZ["s1"]);
+	arma::vec s2 = as<arma::vec>(invert_aK_bZtZ["s2"]);
+	arma::mat Z_U = as<arma::mat>(invert_aK_bZtZ["Z_U"]);
 
 	// int n = Y_tilde.n_rows;
 	int p = Y_tilde.n_cols;
@@ -287,11 +287,11 @@ arma::mat sample_factors_scores_sparse_c(arma::mat Y_tilde,
 }
 
 // [[Rcpp::export()]]
-List GSVD_2_c(arma::mat A, arma::mat B){
+List GSVD_2_c(arma::mat K, arma::mat B){
 	int n = B.n_cols;
 	arma::mat U,V;
 	arma::vec d;
-	svd(U,d,V,A * inv(B));
+	svd(U,d,V,K * inv(B));
 
 	arma::vec norm_factor = sqrt(ones(n) + d%d);
 

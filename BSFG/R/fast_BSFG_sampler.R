@@ -20,7 +20,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		} else{ # b == 0
 		  prior_prec = t(Plam)
 		}
-		coefs = sample_coefs_parallel_sparse_c( Eta,Design,resid_h2, tot_Eta_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
+		coefs = sample_coefs_parallel_sparse_c( Eta,Design,resid_h2, tot_Eta_prec,prior_mean,prior_prec,invert_aI_bZKZ,1)
 
 		if(b > 0){
 			B[] = coefs[1:b,,drop=FALSE]
@@ -31,12 +31,12 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 	 # -----Sample resid_h2, tot_Eta_prec, E_a ---------------- #
 		#conditioning on W, B, F, Lambda, marginalizing over E_a
 		Eta_tilde = as.matrix(Eta - X %*% B - F %*% t(Lambda))
-		tot_Eta_prec[] = sample_tot_prec_sparse_c(Eta_tilde,resid_h2,tot_Eta_prec_shape,tot_Eta_prec_rate,invert_aI_bZAZ)
+		tot_Eta_prec[] = sample_tot_prec_sparse_c(Eta_tilde,resid_h2,tot_Eta_prec_shape,tot_Eta_prec_rate,invert_aI_bZKZ)
 
-		resid_h2_index = sample_h2s_discrete_given_p_sparse_c(Eta_tilde,h2_divisions,h2_priors_resids,tot_Eta_prec,invert_aI_bZAZ)
+		resid_h2_index = sample_h2s_discrete_given_p_sparse_c(Eta_tilde,h2_divisions,h2_priors_resids,tot_Eta_prec,invert_aI_bZKZ)
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
 
-		E_a[] = sample_randomEffects_parallel_sparse_c( Eta_tilde, Z, tot_Eta_prec, resid_h2, invert_aZZt_Ainv, 1)
+		E_a[] = sample_randomEffects_parallel_sparse_c( Eta_tilde, Z, tot_Eta_prec, resid_h2, invert_aZZt_Kinv, 1)
 
 		resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
 
@@ -45,7 +45,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		if(b_F > 0){
 		  prior_mean = matrix(0,b_F,p)
 		  prior_prec = matrix(prec_B[-1],b_F,k)
-		  B_F = sample_coefs_parallel_sparse_c(F,X_F,F_h2, tot_F_prec,prior_mean,prior_prec,invert_aI_bZAZ,1)
+		  B_F = sample_coefs_parallel_sparse_c(F,X_F,F_h2, tot_F_prec,prior_mean,prior_prec,invert_aI_bZKZ,1)
 		  F_tilde = F - X_F %*% B_F # not sparse.
 		} else{
 		  F_tilde = F
@@ -53,12 +53,12 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 
 	 # -----Sample F_h2 and tot_F_prec, F_a -------------------- #
 		#conditioning on F, F_a
-		tot_F_prec[] = sample_tot_prec_sparse_c(F_tilde,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZAZ)
+		tot_F_prec[] = sample_tot_prec_sparse_c(F_tilde,F_h2,tot_F_prec_shape,tot_F_prec_rate,invert_aI_bZKZ)
 
-		F_h2_index = sample_h2s_discrete_given_p_sparse_c(F_tilde,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZAZ)
+		F_h2_index = sample_h2s_discrete_given_p_sparse_c(F_tilde,h2_divisions,h2_priors_factors,tot_F_prec,invert_aI_bZKZ)
 		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    F_a[] = sample_randomEffects_parallel_sparse_c(F_tilde,Z,tot_F_prec, F_h2, invert_aZZt_Ainv, 1)
+    F_a[] = sample_randomEffects_parallel_sparse_c(F_tilde,Z,tot_F_prec, F_h2, invert_aZZt_Kinv, 1)
 
 	 # -----Sample F----------------------- #
 		#conditioning on B, F_a,E_a,W,Lambda, F_h2

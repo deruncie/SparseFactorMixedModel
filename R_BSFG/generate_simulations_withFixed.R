@@ -5,8 +5,8 @@ simulate_data = function(
 							Lambda,			# p x K matrix
 							X,				# n x b matrix
 							Z1,				# n x r matrix
-							A1_chol,		# r x r upper triangle chol matrix
-							F_vars,			# K x 3 matrix of fixed, A and E vars for factors
+							K1_chol,		# r x r upper triangle chol matrix
+							F_vars,			# K x 3 matrix of fixed, K and E vars for factors
 							E_h2,			# p vector of residual heritabilities
 							mu,				# p vector of global means
 							B,				# b x p residual fixed effects
@@ -17,17 +17,17 @@ simulate_data = function(
   r = ncol(Z1)
   p = nrow(Lambda)
   K = ncol(Lambda)
-  
-  E_A1 = t(A1_chol) %*% matrix(rnorm(r*p),r,p) %*% diag(E_h2)
-  F_A1 = t(A1_chol) %*% matrix(rnorm(r*k),r,k) %*% diag(F_vars[,2])
-  
+
+  E_A1 = t(K1_chol) %*% matrix(rnorm(r*p),r,p) %*% diag(E_h2)
+  F_A1 = t(K1_chol) %*% matrix(rnorm(r*k),r,k) %*% diag(F_vars[,2])
+
   E_R = matrix(rnorm(n*p),n,p) %*% diag(1-E_h2)
   F_R = matrix(rnorm(n*k),n,k) %*% diag(F_vars[,3])
-  
+
   E = X %*% B + Z1 %*% E_A1 + E_R
   F = X %*% B_F + Z1 %*% F_A1 + F_R
   Y = matrix(1,n,1) %*% matrix(mu,1,p) + F %*% t(Lambda) + E %*% diag(sqrt(sigma2_Resid))
-  
+
   return(Y)
 }
 
@@ -36,7 +36,7 @@ save_sim = function(
 						Lambda = Lambda,
 						X = X,
 						Z1 = Z1,
-						A1_chol = A1_chol,
+						K1_chol = K1_chol,
 						F_vars = F_vars,
 						E_h2 = E_h2,
 						mu = mu,
@@ -48,7 +48,7 @@ save_sim = function(
 	F_h2 = F_vars[,2]/(F_vars[,2]+F_vars[,3])
 	sigma2_Resid = rgamma(p,3,6)
 
-	Y = simulate_data(Lambda,X,Z1,A1_chol,F_vars,E_h2,mu,B,B_F,sigma2_Resid)
+	Y = simulate_data(Lambda,X,Z1,K1_chol,F_vars,E_h2,mu,B,B_F,sigma2_Resid)
 	sim_data = list(
 					n      = n,
 					k      = k,
@@ -58,7 +58,7 @@ save_sim = function(
 					Y      = Y,
 					X      = X,
 					Z1     = Z1,
-					A1     = A1,
+					K1     = K1,
 					B      = B,
 					B_F    = B_F,
 					mu     = mu,
@@ -87,8 +87,8 @@ p = 100
 sample_info = data.frame(Line = gl(n_Lines,n_Reps*n_TRT),TRT = rep(c(0,1),each = n_Reps), Rep = c(1:n_Reps))
 Z1 = model.matrix(~Line+0,sample_info)
 X = model.matrix(~TRT+0,sample_info)
-A1 = diag(1,ncol(Z1))
-A1_chol = chol(A1)
+K1 = diag(1,ncol(Z1))
+K1_chol = chol(K1)
 
 Lambda = cbind(
 	c(rep(1,floor(p/3)),rep(0,p-floor(p/3))),
@@ -114,7 +114,7 @@ for(rep in 1:sim_reps){
 	F_vars = cbind(F_vars,1-rowSums(F_vars))
 	E_h2 = runif(p,0,.7)
 
-	save_sim(sim_ID, Lambda, X, Z1, A1_chol, F_vars, E_h2, mu, B, B_F, sigma2_Resid)
+	save_sim(sim_ID, Lambda, X, Z1, K1_chol, F_vars, E_h2, mu, B, B_F, sigma2_Resid)
 
 	# Set 2. Factor fixed effects
 		# first factor is 100% fixed. Remainder have 0% fixed
@@ -128,7 +128,7 @@ for(rep in 1:sim_reps){
 	F_vars[1,3] = 0
 	E_h2 = runif(p,0,.7)
 
-	save_sim(sim_ID, Lambda, X, Z1, A1_chol, F_vars, E_h2, mu, B, B_F, sigma2_Resid)
+	save_sim(sim_ID, Lambda, X, Z1, K1_chol, F_vars, E_h2, mu, B, B_F, sigma2_Resid)
 
 
 
@@ -145,7 +145,7 @@ for(rep in 1:sim_reps){
 	F_vars[which_fixed,1] = 0.5
 	F_vars[which_fixed,-1] = 0.5 * F_vars[which_fixed,-1]
 
-	save_sim(sim_ID, Lambda, X, Z1, A1_chol, F_vars, E_h2, mu, B, B_F, sigma2_Resid)
+	save_sim(sim_ID, Lambda, X, Z1, K1_chol, F_vars, E_h2, mu, B, B_F, sigma2_Resid)
 
 	# Set 4. 2 joint fixed and random factors at 50% each. Rest only random
 
@@ -160,6 +160,6 @@ for(rep in 1:sim_reps){
 	F_vars[which_fixed,1] = 0.5
 	F_vars[which_fixed,-1] = 0.5 * F_vars[which_fixed,-1]
 
-	save_sim(sim_ID, Lambda, X, Z1, A1_chol, F_vars, E_h2, mu, B, B_F, sigma2_Resid)
+	save_sim(sim_ID, Lambda, X, Z1, K1_chol, F_vars, E_h2, mu, B, B_F, sigma2_Resid)
 
 }

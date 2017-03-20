@@ -1,14 +1,14 @@
-#' Sample from Mixed Model equations given a diagonal A matrix
+#' Sample from Mixed Model equations given a diagonal K matrix
 #'
-#' Sample from Mixed Model equations given a diagonal A matrix with sparse but non-diagonal R
+#' Sample from Mixed Model equations given a diagonal K matrix with sparse but non-diagonal R
 #'
 #' This function draws a sample of the vector \eqn{theta} given the model:
 #'     \deqn{y = W\theta + e}
-#'     \deqn{\theta \sim N_b(\mu,A)} \deqn{e \sim N(0,R)} The algorithm follows that shown in the
+#'     \deqn{\theta \sim N_b(\mu,K)} \deqn{e \sim N(0,R)} The algorithm follows that shown in the
 #'     MCMCglmm course notes. This involves solving:
 #'     \deqn{\tilde{\theta} = C^{-1}W'R^{-1}(1 - W\theta_{*} - e_{*})}
-#'     \deqn{C = W'R^{-1}W + A^{-1}}
-#'     \deqn{\theta_{*} \sim N(\mu,A), e_{*} \sim N(0,R)}
+#'     \deqn{C = W'R^{-1}W + K^{-1}}
+#'     \deqn{\theta_{*} \sim N(\mu,K), e_{*} \sim N(0,R)}
 #'
 #' To speed up the calculations, \eqn{R_hat = R*tot_Y_prec = P' L L' P} is pre-calculated, and used
 #' in place of \eqn{R^{-1}}.
@@ -17,7 +17,7 @@
 #' @param W matrix of size n x b
 #' @param Wp \eqn{R_perm * W} (see below)
 #' @param prior_mean the vector \eqn{\mu}
-#' @param prior_prec the diagonal of the matrix A^{-1}. All elements must be > 0
+#' @param prior_prec the diagonal of the matrix K^{-1}. All elements must be > 0
 #' @param Cholesky_R Cholesky decomposition of the sparse matrix R calculated by
 #'   \code{Cholesky(R_hat,perm=T,super=T)}. The factorization is  \eqn{P' L L' P}. R_hat here is
 #'   \eqn{R*tot_Y_prec}, i.e., the covariance up to normalization by the total variance.
@@ -25,7 +25,7 @@
 #' @param R_Perm either \code{NULL} if \eqn{P} is diagonal, or the \eqn{P} matrix.
 #' @param tot_Y_prec the inverse of the total variance
 #'
-sample_MME_single_diagA = function(y, W, Wp, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec,randn_theta = NULL, randn_e = NULL) {
+sample_MME_single_diagK = function(y, W, Wp, prior_mean,prior_prec,Cholesky_R,chol_R,R_Perm,tot_Y_prec,randn_theta = NULL, randn_e = NULL) {
 	n = length(y)
 	n_theta = length(prior_prec)
 	if(is.null(randn_theta)) {
@@ -57,19 +57,19 @@ sample_MME_single_diagA = function(y, W, Wp, prior_mean,prior_prec,Cholesky_R,ch
 	theta = theta_tilda + theta_star
 	theta
 }
-sample_MME_single_diagA = compiler::cmpfun(sample_MME_single_diagA)
+sample_MME_single_diagK = compiler::cmpfun(sample_MME_single_diagK)
 
-sample_MME_multiple_diagR = function(Y,W,Cholesky_C,pe,chol_A_inv,tot_Y_prec, randn_theta = NULL, randn_e = NULL){
+sample_MME_multiple_diagR = function(Y,W,Cholesky_C,pe,chol_K_inv,tot_Y_prec, randn_theta = NULL, randn_e = NULL){
 	n = nrow(Y)
 	p = ncol(Y)
-	n_theta = nrow(chol_A_inv)
+	n_theta = nrow(chol_K_inv)
 	if(is.null(randn_theta)) {
 	  randn_theta = matrix(rnorm(n_theta*p),ncol = p)
 	}
 	if(is.null(randn_e)) {
 	  randn_e = matrix(rnorm(n*p), ncol = p)
 	}
-	theta_star = solve(chol_A_inv,randn_theta)
+	theta_star = solve(chol_K_inv,randn_theta)
 	e_star = sweep(randn_e,2,sqrt(pe),'/')
 	W_theta_star = W %*% theta_star
 
@@ -107,7 +107,7 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, t
 	res = mclapply(1:p,function(j) {
 		Cholesky_R = Sigma_Choleskys[[h2s_index[j]]]$Cholesky_Sigma
 		chol_R = Sigma_Choleskys[[h2s_index[j]]]$chol_Sigma
-		theta_j = sample_MME_single_diagA(Y[,j], W, Wp, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j], randn_theta[,j],randn_e[,j])
+		theta_j = sample_MME_single_diagK(Y[,j], W, Wp, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Y_prec[j], randn_theta[,j],randn_e[,j])
 		theta_j
 	},mc.cores = ncores)
 	res = do.call(cbind,res)
@@ -115,7 +115,7 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, t
 }
 sample_MME_fixedEffects = compiler::cmpfun(sample_MME_fixedEffects)
 
-sample_MME_ZAZts = function(Y, W, tot_Y_prec, randomEffect_C_Choleskys, h2s, h2s_index, chol_Ai_mats,ncores){
+sample_MME_ZKZts = function(Y, W, tot_Y_prec, randomEffect_C_Choleskys, h2s, h2s_index, chol_Ki_mats,ncores){
 	# using method described in MCMC Course notes
 	Y = as.matrix(Y)
 	p = ncol(Y)
@@ -131,15 +131,15 @@ sample_MME_ZAZts = function(Y, W, tot_Y_prec, randomEffect_C_Choleskys, h2s, h2s
 	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))
 	thetas = mclapply(seq_along(unique_h2s),function(j){
 		Cholesky_C = randomEffect_C_Choleskys[[unique_h2s[j]]]$Cholesky_C
-		chol_A_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_A_inv * sqrt(tot_Y_prec[j])
+		chol_K_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_K_inv * sqrt(tot_Y_prec[j])
 		traits_j = unique_h2s_index[[j]]
-		sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_A_inv,tot_Y_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
+		sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_K_inv,tot_Y_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
 	},mc.cores = ncores)
 	theta = do.call(cbind,thetas)
 	theta = theta[,order(unlist(unique_h2s_index))]
 	theta
 }
-sample_MME_ZAZts = compiler::cmpfun(sample_MME_ZAZts)
+sample_MME_ZKZts = compiler::cmpfun(sample_MME_ZKZts)
 
 sample_tot_prec = function(Y, tot_Y_prec_shape, tot_Y_prec_rate, Sigma_Choleskys,Sigma_Perm, h2s_index,ncores){
 	n = nrow(Y)

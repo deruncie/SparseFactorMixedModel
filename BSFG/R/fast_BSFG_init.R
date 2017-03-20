@@ -1,4 +1,4 @@
-initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,verbose=T,...){
+initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = NULL,verbose=T,...){
 
     Y          = BSFG_state$data_matrices$Y
     X_F        = BSFG_state$data_matrices$X_F
@@ -79,6 +79,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     #       sd = 1./sqrt(E_a_prec)' on each row
     E_a = matrix(rnorm(p*r,0,sqrt(resid_h2 * tot_Eta_prec)),nr = r,nc = p, byrow = T)
     colnames(E_a) = traitnames
+    rownames(E_a) = colnames(Z)
 
     # Latent factor variances
     tot_F_prec = with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
@@ -92,6 +93,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
     #       mean = 0
     #       sd = sqrt(F_h2') for each row.
     F_a = matrix(rnorm(k*r,0,sqrt(F_h2)),nr = r,nc = k, byrow = T)
+    rownames(F_a) = colnames(Z)
 
     # Factor fixed effects
     B_F = matrix(rnorm(b_F * k),b_F,k)
@@ -151,32 +153,34 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 
     # recover()
     #invert the random effect covariance matrices
-    A = A_mats[[1]]
-    chol_Ainv = chol_Ai_mats[[1]]
+    K = K_mats[[1]]
+    chol_Kinv = chol_Ki_mats[[1]]
 
-    #pre-calculate transformation parameters to diagonalize aI + bZAZ for fast
-    #inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
-    #uses singular value decomposition of ZAZ for stability when ZAZ is low
+    #pre-calculate transformation parameters to diagonalize aI + bZKZ for fast
+    #inversion: inv(aI + bZKZ) = 1/b*U*diag(1./(s+a/b))*U'
+    #uses singular value decomposition of ZKZ for stability when ZKZ is low
     #rank
 #     XZ = [X_f Z  ]
-#     [U,S,~]          = svd(XZ*blkdiag(1e6*eye(b_f),A)*XZ')
+#     [U,S,~]          = svd(XZ*blkdiag(1e6*eye(b_f),K)*XZ')
 
-    result = svd(Z %*% A %*% t(Z))
-    invert_aI_bZAZ = list(
+    result = svd(Z %*% K %*% t(Z))
+    invert_aI_bZKZ = list(
         U = Matrix(result$u,sparse=T),
         s = result$d
     )
 
     #genetic effect variances of factor traits
-    # diagonalizing a*Z  '*Z   + b*Ainv for fast inversion
+    # diagonalizing a*Z  '*Z   + b*Kinv for fast inversion
     #diagonalize mixed model equations for fast inversion:
-    # inv(a*Z  '*Z   + b*Ainv) = U*diag(1./(a.*s1+b.*s2))*U'
+    # inv(a*Z  '*Z   + b*Kinv) = U*diag(1./(a.*s1+b.*s2))*U'
     #similar to fixed effects + random effects 1 above, but no fixed effects.
+
     ZZt = crossprod(Z)
+    svd_ZZt = svd(ZZt)
+    ZZt_sqrt = t(sweep(svd_ZZt$u,2,sqrt(svd_ZZt$d),'*'))
+    result = GSVD_2_c(ZZt_sqrt,as.matrix(chol_Kinv))
 
-    result = GSVD_2_c(as.matrix(chol(ZZt)),as.matrix(chol_Ainv))
-
-    invert_aZZt_Ainv = list(
+    invert_aZZt_Kinv = list(
         U = drop0(Matrix(t(solve(result$X)),sparse=T),tol = 1e-14),
         # U = t(solve(result$X)),
 			s1 = diag(result$C)^2,
@@ -189,9 +193,9 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = N
 # ----------------------------- #
 
     run_variables = c(run_variables,list(
-      chol_Ainv        = chol_Ainv,
-			invert_aI_bZAZ   = invert_aI_bZAZ,
-			invert_aZZt_Ainv = invert_aZZt_Ainv
+      chol_Kinv        = chol_Kinv,
+			invert_aI_bZKZ   = invert_aI_bZKZ,
+			invert_aZZt_Kinv = invert_aZZt_Kinv
     ))
 
     RNG = list(

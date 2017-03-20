@@ -53,7 +53,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @param model RHS of a model. The syntax is similar to \link{lmer}.
 #'     Random effects are specified by (1+factor | group), with the left side of the '|' a design
 #'     matrix, and the right side a random effect factor (group). For each random effect factor, a
-#'     covariance matrix (\code{A_mats}) or precision matrix (\code{A_inv_mats}) can be provided.
+#'     covariance matrix (\code{K_mats}) or precision matrix (\code{K_inv_mats}) can be provided.
 #'     Unlike in \code{lmer}, each variable or covariate in the design matrix is given an
 #'     independent random effect (ie no covariance among random effects is modeled), so two bars '||'
 #'     gives an identical model to one bar.
@@ -74,10 +74,10 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'     but can be appended to \code{BSFG_state$priors} after running \code{BSFG_init}. This is often easier if
 #'     the total number of h2 divisions is not known beforehand (ie when multiple random effects are used).
 #' @param run_parameters list providing various parameters for the model run. See \link{BSFG_control}
-#' @param A_mats list of covariance matrices for random effects. If none provided (and none provided
-#'   for A_inv_mats) for any of the random effects, A is assumed to be the identity.
-#' @param A_inv_mats list of precision matrices for random effects. If none provided (and none
-#'   provided for A_mats) for any of the random effects, A is assumed to be the identity.
+#' @param K_mats list of covariance matrices for random effects. If none provided (and none provided
+#'   for K_inv_mats) for any of the random effects, K is assumed to be the identity.
+#' @param K_inv_mats list of precision matrices for random effects. If none provided (and none
+#'   provided for K_mats) for any of the random effects, K is assumed to be the identity.
 #' @param data_model either a character vector identifying a provided data_model
 #'     (ex. 'missing_data' calls \link{missing_data_model}),
 #'     or a function modeled after \code{missing_data_model} (see code by typing this into the console)
@@ -100,7 +100,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'   parameters
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
 #'
-BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, A_mats = NULL, A_inv_mats = NULL,
+BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
                      data_model = 'missing_data', data_model_parameters = NULL,
                      posteriorSample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B'),
                      posteriorMean_params = c('E_a'),
@@ -156,6 +156,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  stop(sprintf('terms %s missing from data',paste(missing_terms,sep=', ')))
 	}
 
+	# -------- Fixed effects ---------- #
+
 	# build X from fixed model
 	  # for Eta
 	X = model.matrix(nobars(model),data)
@@ -166,9 +168,33 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	X_F = model.matrix(factor_model_fixed,data)[,-1,drop = FALSE]
 	b_F = ncol(X_F)
 
+
+	# -------- Random effects ---------- #
+	# ensure that only K or K_inv provided for each random effect
+	# check that all IDs from data are in rownames of K or K_inv
+	# add IDs from K or K_inv to levels data[[re]] for IDs not in data
+
+	RE_levels = list() # a list of levels for each of the random effects
+	if(is.null(K_mats)) K_mats = list()
+	for(re in names(K_mats)) {
+	  if(is.null(rownames(K_mats[[re]]))) stop(sprintf('K %s must have rownames',re))
+	  if(re %in% names(K_inv_mats)) stop(sprintf('Both K and Kinv provided for %s. Please provide only one for each random effect',re))
+	  RE_levels[[re]] = rownames(K_mats[[re]])
+	}
+	for(re in names(K_inv_mats)) {
+	  if(is.null(rownames(K_inv_mats[[re]]))) stop(sprintf('K_inv %s must have rownames',re))
+	  RE_levels[[re]] = rownames(K_inv_mats[[re]])
+	}
+	for(re in names(RE_levels)){
+	  if(!re %in% colnames(data)) stop(sprintf('Column "%s" required in data',re))
+	  data[[re]] = as.factor(data[[re]]) # ensure 'data[[re]]' is a factor
+	  if(!all(levels(data[[re]]) %in% RE_levels[[re]])) stop(sprintf('Levels of random effect %s missing from provided %s',re,c('K_inv','K')[(re %in% names(K_mats))+1]))
+	  data[[re]] = factor(data[[re]],levels = RE_levels[[re]]) # add levels to data[[re]]
+	}
+
 	# use lme4 functions to parse random effects
 	#  note: correlated random effects are not allowed. Will convert to un-correlated REs
-	RE_terms = mkReTrms(findbars(model),data)  # extracts terms and builds Zt matrices
+	RE_terms = mkReTrms(findbars(model),data,drop.unused.levels = FALSE)  # extracts terms and builds Zt matrices
 
 	Z_matrices = list()
 	RE_names = c()
@@ -176,7 +202,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	for(i in 1:length(RE_terms$cnms)){
 	  term = names(RE_terms$cnms)[i]
 	  n_factors = length(RE_terms$cnms[[i]])  # number of factors for this grouping factor
-	  RE_covs = c(RE_covs,rep(term,n_factors)) # name of covariance for this grouping factor (for A_mats)
+	  RE_covs = c(RE_covs,rep(term,n_factors)) # name of covariance for this grouping factor (for K_mats)
 	  if(sum(names(RE_terms$cnms) == term) > 1 || n_factors > 1) {
 	    RE_names = c(RE_names,paste(term,RE_terms$cnms[[i]],sep='.'))  # name of variance component
 	  } else{
@@ -199,52 +225,53 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	}
 
 	  # function to ensure that covariance matrices are sparse and symmetric
-	fix_A = function(x) forceSymmetric(drop0(x,tol = 1e-10))
+	fix_K = function(x) forceSymmetric(drop0(x,tol = 1e-10))
 
-	  # construct A matrices for each random effect
-	if(is.null(A_mats)) A_mats = list()
+	  # construct K matrices for each random effect
 	for(i in 1:length(RE_names)){
 	  re = RE_covs[i]
 	  re_name = RE_names[i]
-	  if(re %in% names(A_mats)) {
-	    A = A_mats[[re]]
-	  } else if(re %in% names(A_inv_mats)){
-	    A_mats[[re]] = solve(A_inv_mats[[re]])
-	    rownames(A_mats[[re]]) = rownames(A_inv_mats[[re]])
-	    A = A_mats[[re]]
+	  if(re %in% names(K_mats)) {
+	    K = K_mats[[re]]
+	  } else if(re %in% names(K_inv_mats)){
+	    K_mats[[re]] = solve(K_inv_mats[[re]])
+	    rownames(K_mats[[re]]) = rownames(K_inv_mats[[re]])
+	    K = K_mats[[re]]
 	  } else{
-	    A_mats[[re]] = Diagonal(ncol(Z_matrices[[re_name]]))
-	    rownames(A_mats[[re]]) = levels(data[[re]])
-	    A = A_mats[[re]]
+	    K_mats[[re]] = Diagonal(ncol(Z_matrices[[re_name]]))
+	    rownames(K_mats[[re]]) = levels(data[[re]])
+	    K = K_mats[[re]]
 	  }
-	  if(is.null(rownames(A))) stop('A must have rownames')
-	  index = match(colnames(Z_matrices[[re_name]]),rownames(A)) # A must have rownames
-	  if(any(is.na(index))) stop(sprintf('levels missing from covarince of random effect %s',re))
-	  stopifnot(length(index) == ncol(Z_matrices[[re_name]]))
-	  A_mats[[re_name]] = fix_A(A[index,index])
+	  # if(is.null(rownames(K))) stop('K must have rownames')
+	  # index = match(colnames(Z_matrices[[re_name]]),rownames(K)) # K must have rownames
+	  # if(any(is.na(index))) stop(sprintf('levels missing from covarince of random effect %s',re))
+	  # stopifnot(length(index) == ncol(Z_matrices[[re_name]]))
+	  # K_mats[[re_name]] = fix_K(K[index,index])
+	  K_mats[[re_name]] = fix_K(K)
 	}
-	A_mats = A_mats[RE_names]
+	K_mats = K_mats[RE_names]
 
-	  # construct A_inverse matrices for each random effect
-	if(is.null(A_inv_mats)) A_inv_mats = list()
-	Ai_mats = list()
+	  # construct K_inverse matrices for each random effect
+	if(is.null(K_inv_mats)) K_inv_mats = list()
+	Ki_mats = list()
 	for(i in 1:length(RE_names)){
 	  re = RE_covs[i]
 	  re_name = RE_names[i]
-	  if(re %in% names(A_inv_mats)){
-	    Ai = A_inv_mats[[re]]
+	  if(re %in% names(K_inv_mats)){
+	    Ki = K_inv_mats[[re]]
 	  } else {
-	    A_inv_mats[[re_name]] = solve(A_mats[[re_name]])
-	    rownames(A_inv_mats[[re_name]]) = rownames(A_mats[[re_name]])
-	    Ai = A_inv_mats[[re_name]]
+	    K_inv_mats[[re_name]] = solve(K_mats[[re_name]])
+	    rownames(K_inv_mats[[re_name]]) = rownames(K_mats[[re_name]])
+	    Ki = K_inv_mats[[re_name]]
 	  }
-	  if(is.null(rownames(Ai))) stop('A_inv must have rownames')
-	  index = match(colnames(Z_matrices[[re_name]]),rownames(Ai)) # iA must have rownames
-	  Ai_mats[[re_name]] = fix_A(Ai[index,index])
+	  # if(is.null(rownames(Ki))) stop('K_inv must have rownames')
+	  # index = match(colnames(Z_matrices[[re_name]]),rownames(Ki)) # Ki must have rownames
+	  # Ki_mats[[re_name]] = fix_K(Ki[index,index])
+	  Ki_mats[[re_name]] = fix_K(Ki)
 	}
-	# names(Ai_mats) = RE_names
-	  # cholesky decompositions (L'L) of each A_inverse matrix
-	chol_Ai_mats = lapply(Ai_mats,chol)
+	# names(Ki_mats) = RE_names
+	  # cholesky decompositions (L'L) of each K_inverse matrix
+	chol_Ki_mats = lapply(Ki_mats,chol)
 
 	  # table of possible h2s for each random effect
 	  #   These are percentages of the total residual variance accounted for by each random effect
@@ -270,7 +297,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  X_F        = X_F,
 	  Z_matrices = Z_matrices,
 	  Z          = Z,
-	  h2s_matrix = h2s_matrix
+	  h2s_matrix = h2s_matrix,
+	  data       = data
 	)
 
 	run_variables = list(
@@ -324,7 +352,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	)
 	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',run_parameters$sampler))
 
-	BSFG_state = initialize_BSFG(BSFG_state, A_mats, chol_Ai_mats,verbose=verbose,ncores=ncores)
+	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,verbose=verbose,ncores=ncores)
 
 	# Initialize Eta
 	data_model_state = data_model(Y,data_model_parameters,BSFG_state)

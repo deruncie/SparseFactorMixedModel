@@ -1,4 +1,4 @@
-initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats = NULL,
+initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = NULL,
 									ncores = detectCores(),verbose=T,...){
 
     Y          = BSFG_state$data_matrices$Y
@@ -85,6 +85,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     }
     F = as.matrix(F)
     F_a = do.call(rbind,F_a)
+    rownames(F_a) = colnames(Z)
 
   # residuals
      # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
@@ -103,6 +104,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     	matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Eta_prec)),ncol = p, byrow = T)
     }))
     colnames(E_a) = traitnames
+    rownames(E_a) = colnames(Z)
 
   # Fixed effects
     B = matrix(rnorm(b*p), ncol = p)
@@ -142,58 +144,58 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
     BSFG_state$current_state = current_state
 
 # ------------------------------------ #
-# ----Precalculate ZAZts, chol_As ---- #
+# ----Precalculate ZKZts, chol_Ks ---- #
 # ------------------------------------ #
   if(verbose) print('Pre-calculating matrices')
 
 	#C
 	# recover()
 	ZtZ = crossprod(Z)
-	make_Chol_Ai = function(chol_Ai_mats,h2s){
+	make_Chol_Ki = function(chol_Ki_mats,h2s){
 		do.call(bdiag,lapply(1:length(h2s),function(i) {
-			if(h2s[i] == 0) return(Diagonal(nrow(chol_Ai_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
-			chol_Ai = chol_Ai_mats[[i]]
-			chol_Ai@x = chol_Ai@x / sqrt(h2s[i])
-			chol_Ai
+			if(h2s[i] == 0) return(Diagonal(nrow(chol_Ki_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
+			chol_Ki = chol_Ki_mats[[i]]
+			chol_Ki@x = chol_Ki@x / sqrt(h2s[i])
+			chol_Ki
 		}))
 	}
 
 	# setup of symbolic Cholesky of C
 	print('creating randomEffects_C')
 
-	Ai = forceSymmetric(crossprod(make_Chol_Ai(chol_Ai_mats,rep(1,n_RE)/(n_RE+1))))
-	Cholesky_C = Cholesky(ZtZ + Ai)
+	Ki = forceSymmetric(crossprod(make_Chol_Ki(chol_Ki_mats,rep(1,n_RE)/(n_RE+1))))
+	Cholesky_C = Cholesky(ZtZ + Ki)
 
 	randomEffect_C_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
 		if(i %% 100 == 0 && verbose) print(sprintf('randomEffects_C %d of %d',i,ncol(h2s_matrix)))
 		h2s = h2s_matrix[,i]
-		chol_A_inv = make_Chol_Ai(chol_Ai_mats,h2s)
-		Ai = crossprod(chol_A_inv)
+		chol_K_inv = make_Chol_Ki(chol_Ki_mats,h2s)
+		Ki = crossprod(chol_K_inv)
 		C = ZtZ/(1-sum(h2s))
-		C = C + Ai
+		C = C + Ki
 		Cholesky_C_i = update(Cholesky_C,forceSymmetric(C))
 
-		return(list(Cholesky_C = Cholesky_C_i, chol_A_inv = chol_A_inv))
+		return(list(Cholesky_C = Cholesky_C_i, chol_K_inv = chol_K_inv))
 	},mc.cores = ncores)
 
 	# Sigma
-	ZAZts = list()
+	ZKZts = list()
 	for(i in 1:n_RE){
-		ZAZts[[i]] = forceSymmetric(Z_matrices[[i]] %*% A_mats[[i]] %*% t(Z_matrices[[i]]))
+		ZKZts[[i]] = forceSymmetric(Z_matrices[[i]] %*% K_mats[[i]] %*% t(Z_matrices[[i]]))
 	}
 
 
-	make_Sigma = function(ZAZts,h2s){
+	make_Sigma = function(ZKZts,h2s){
 		R = 0
 		for(i in 1:length(h2s)){
-			R = R + h2s[i]*ZAZts[[i]]
+			R = R + h2s[i]*ZKZts[[i]]
 		}
 		forceSymmetric(R + (1-sum(h2s)) * Diagonal(nrow(R)))
 	}
 
 	# setup of symbolic Cholesky of Sigma
 	print('creating Sigma_Choleskys')
-	Sigma = make_Sigma(ZAZts,h2s_matrix[,2])
+	Sigma = make_Sigma(ZKZts,h2s_matrix[,2])
 	Cholesky_Sigma_base = Cholesky(Sigma,perm=T,super=T)
 	stopifnot(!isLDL(Cholesky_Sigma_base))
 	Sigma_Perm = expand(Cholesky_Sigma_base)$P
@@ -201,7 +203,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 
 	Sigma_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
 		if(i %% 100 == 0 && verbose) print(sprintf('Sigma_Choleskys %d of %d',i,ncol(h2s_matrix)))
-		Sigma = forceSymmetric(make_Sigma(ZAZts,h2s_matrix[,i]))
+		Sigma = forceSymmetric(make_Sigma(ZKZts,h2s_matrix[,i]))
 		stopifnot(class(Sigma) == 'dsCMatrix')
 		Cholesky_Sigma = update(Cholesky_Sigma_base,Sigma)
 		log_det = 2*determinant(Cholesky_Sigma,logarithm=T)$modulus
@@ -221,7 +223,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, A_mats = NULL, chol_Ai_mats 
 			Sigma_Choleskys          = Sigma_Choleskys,
 			Sigma_Perm               = Sigma_Perm,
 			randomEffect_C_Choleskys = randomEffect_C_Choleskys,
-			chol_Ai_mats             = chol_Ai_mats
+			chol_Ki_mats             = chol_Ki_mats
     ))
 
     RNG = list(

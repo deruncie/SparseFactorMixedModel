@@ -7,12 +7,12 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, k, k_G, i_Va = 0.2, i_V
   children = !is.na(pedigree[,3])
 
   #generate A matrix as 2* kinship matrix from whole pedigree
-  Ainv = forceSymmetric(inverseA(pedigree)$Ainv)
-  A = forceSymmetric(solve(Ainv))
-  rownames(A) = rownames(Ainv)
-  A = A[children,children]
+  Kinv = forceSymmetric(inverseA(pedigree)$Ainv)
+  K = forceSymmetric(solve(Kinv))
+  rownames(K) = rownames(Kinv)
+  K = K[children,children]
 
-  A_chol = chol(A)
+  K_chol = chol(K)
 
   # Lambda matrix
   factor_h2s = rep(0,k)
@@ -36,7 +36,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, k, k_G, i_Va = 0.2, i_V
   R = tcrossprod(sweep(Lambda,2,sqrt(1-factor_h2s),'*')) + diag((1-resid_h2)/tot_Y_prec)
 
   # fixed effect design
-  n = nrow(A)
+  n = nrow(K)
   X = cbind(1,matrix(rnorm(n*(b-1)),nrow=n))
   colnames_X = 'intercept'
   if(b > 1) colnames_X = c(colnames_X,paste0('Fixed',1:max(1,(b-1))))
@@ -44,7 +44,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, k, k_G, i_Va = 0.2, i_V
   X_F = X[,-1]
 
   # RE design
-  data = data.frame(X,Sire=factor(pedigree$sire[children]),animal = factor(pedigree$id[children]))
+  data = droplevels(data.frame(X,Sire=factor(pedigree$sire[children]),animal = as.factor(pedigree$id[children])))
   Z = diag(1,n)
   # Z = model.matrix(~0+Sire,data)
   # r = ncol(Z)
@@ -52,11 +52,11 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, k, k_G, i_Va = 0.2, i_V
   B_F = matrix(rnorm((b-1)*k),nrow = (b-1),ncol=k)
   B = rbind(rnorm(p),matrix(0,(b-1),p))
 
-  F_a = A_chol %*% matrix(rnorm(n*k,0,sqrt(factor_h2s)),n,k,byrow=T)
+  F_a = K_chol %*% matrix(rnorm(n*k,0,sqrt(factor_h2s)),n,k,byrow=T)
 
   F = X_F %*% B_F + Z %*% F_a + matrix(rnorm(n*k,0,sqrt(1-factor_h2s)),n,k,byrow=T)
 
-  E_a = A_chol %*% matrix(rnorm(n*p,0,sqrt(resid_h2/tot_Y_prec)),n,p,byrow=T)
+  E_a = K_chol %*% matrix(rnorm(n*p,0,sqrt(resid_h2/tot_Y_prec)),n,p,byrow=T)
 
   Y = X %*% B + F %*% t(Lambda) + E_a + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
   Y = as.matrix(Y)
@@ -66,7 +66,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, k, k_G, i_Va = 0.2, i_V
   setup = list(
     Y = Y,
     data = data,
-    A = A,
+    K = K,
     B = B,
     B_F = B_F,
     error_factor_Lambda = Lambda,

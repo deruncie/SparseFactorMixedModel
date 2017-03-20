@@ -15,14 +15,14 @@ load_simulation_data = function(file = NULL){
       load(file)
     }
     Y = setup$Y
-    A = setup$A
-    r = dim(A)[1]
+    K = setup$A
+    r = dim(K)[1]
     n = nrow(Y)
     if(dim(setup$X)[1] != n) setup$X = t(setup$X)
     data = data.frame(animal = gl(r,n/r))
-    rownames(A) = data$animal
+    rownames(K) = data$animal
     if(is.null(colnames(Y))) colnames(Y) = paste('Trait',1:ncol(Y),sep='_')
-    return(list(Y = Y, data = data, A_mats = list(animal = A),setup = setup))
+    return(list(Y = Y, data = data, K_mats = list(animal = K),setup = setup))
 }
 
 

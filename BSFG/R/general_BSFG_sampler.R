@@ -34,7 +34,7 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
 		# E_a_prec = tot_Eta_prec / colSums(resid_h2)
 
-		E_a[] = sample_MME_ZAZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ai_mats,ncores)
+		E_a[] = sample_MME_ZKZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ki_mats,ncores)
 
 
 		# -----Sample Lambda and B_F ------------------ #
@@ -55,7 +55,7 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores)
 		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-		F_a[] = sample_MME_ZAZts(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ai_mats,ncores)
+		F_a[] = sample_MME_ZKZts(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ki_mats,ncores)
 
 	 # -----Sample F----------------------- #
 		#conditioning on B, F_a,E_a,Lambda, F_h2
