@@ -19,7 +19,6 @@ run_parameters = list(
     # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
     save_Eta     = F,
-    fixed_factors = FALSE,
     simulation   = FALSE,
     scale_Y      = TRUE,
     b0           = 1,
@@ -46,7 +45,7 @@ priors = list(
 
 print('Initializing')
 
-BSFG_state = BSFG_init(Y, model=~1 + (1|Line),data,priors,run_parameters)#,A_mats = list(Line = setup$A))
+BSFG_state = BSFG_init(Y, model=~1 + (1|Line),data,factor_model_fixed = NULL,priors=priors,run_parameters=run_parameters)#,A_mats = list(Line = setup$A))
 
 # h2_divisions = run_parameters$h2_divisions
 # BSFG_state$priors$Resid_discrete_priors = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
