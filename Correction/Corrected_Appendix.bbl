@@ -1,0 +1,46 @@
+\begin{thebibliography}{}
+
+\bibitem[\protect\citeauthoryear{Ayroles, Carbone, Stone, Jordan, Lyman,
+  Magwire, Rollmann, Duncan, Lawrence, Anholt, and Mackay}{\textsc{Ayroles}
+  {\em et~al.\@}}{2009}]{Ayroles:2009gd}
+\textsc{Ayroles, J.~F.}, \textsc{M.~A. Carbone}, \textsc{E.~A. Stone},
+  \textsc{K.~W. Jordan}, \textsc{R.~F. Lyman}, \textsc{M.~M. Magwire},
+  \textsc{S.~M. Rollmann}, \textsc{L.~H. Duncan}, \textsc{F.~Lawrence},
+  \textsc{R.~R.~H. Anholt}, and \textsc{T.~F.~C. Mackay}, 2009\ \ {Systems
+  genetics of complex traits in Drosophila melanogaster}.
+\newblock Nat Genet~{\em 41\/}(3)\textbf{:}\ 299--307.
+
+\bibitem[\protect\citeauthoryear{Bhattacharya and Dunson}{\textsc{Bhattacharya}
+  and \textsc{Dunson}}{2011}]{Bhattacharya:2011gh}
+\textsc{Bhattacharya, A.} and \textsc{D.~B. Dunson}, 2011\ \ {Sparse Bayesian
+  infinite factor models}.
+\newblock Biometrika~{\em 98\/}(2)\textbf{:}\ 291--306.
+
+\bibitem[\protect\citeauthoryear{Blows, Chenoweth, and Hine}{\textsc{Blows}
+  {\em et~al.\@}}{2004}]{Blows:2004ui}
+\textsc{Blows, M.~W.}, \textsc{S.~F. Chenoweth}, and \textsc{E.~Hine}, 2004\ \
+  {Orientation of the genetic variance-covariance matrix and the fitness
+  surface for multiple male sexually selected traits}.
+\newblock The American Naturalist~{\em 163\/}(3)\textbf{:}\ 329--340.
+
+\bibitem[\protect\citeauthoryear{Krzanowski}{\textsc{Krzanowski}}{1979}]{Krzanowski:1979cx}
+\textsc{Krzanowski, W.~J.}, 1979\ \ {Between-Groups Comparison of Principal
+  Components}.
+\newblock J Am Stat Assoc~{\em 74\/}(367)\textbf{:}\ 703--707.
+
+\bibitem[\protect\citeauthoryear{Stone and Ayroles}{\textsc{Stone} and
+  \textsc{Ayroles}}{2009}]{Stone:2009jx}
+\textsc{Stone, E.~A.} and \textsc{J.~F. Ayroles}, 2009\ \ {Modulated modularity
+  clustering as an exploratory tool for functional genomic inference.}
+\newblock PLoS Genet~{\em 5\/}(5)\textbf{:}\ e1000479.
+
+\bibitem[\protect\citeauthoryear{van Dyk and Park}{\textsc{van Dyk} and
+  \textsc{Park}}{2011}]{vanDyk:2011vb}
+\textsc{van Dyk, D.~A.} and \textsc{T.~Park}, 2011\ \ {Partially collapsed
+  Gibbs sampling {\&} path-adaptive Metropolis-Hastings in high-energy
+  astrophysics}.
+\newblock In S.~Brooks, A.~Gelman, G.~Jones, and X.-L. Meng (Eds.), {\em
+  Handbook of Markov Chain Monte Carlo}, pp.\  383--397. New York, NY: Chapman
+  {\&} Hall/CRC Handbooks of Modern Statistical Methods.
+
+\end{thebibliography}

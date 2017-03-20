@@ -13,10 +13,12 @@ on website: [](http://www2.stat.duke.edu/~sayan/bfgr/index.shtml)
 - should be able to replicate all analyses from paper (up to Monte-carlo error in Gibbs and in simulations)
 
 #### V1.1
-- Fixed calculation of genetic and interaction specific effects. The calculation and corresponding text of the paper missed $A^{-1}$. This should not greatly affect the results of the analyses presented in the paper, but will need to check. It doesn't affect Ayroles analysis.
+- Fixed calculation of genetic and interaction specific effects. The calculation and corresponding text of the paper missed $A^{-1}$. 
+This mistake, as well as other errors in the paper are documented [here](Correction/Correction_items.pdf). 
+A re-analysis of the simulations presented in the paper and an updated Appendix are presented [here](Correction/Corrected_Appendix.pdf).
 
 #### V2.0
-Nearly complete re-write of the model code, but should maintain identical function (I believe)
+Nearly complete re-write of the model code, but should maintain identical function \
 - variables have been re-named to more closely correspond to the paper
 - sampler function has been re-written to only sample.
 - A new function initializes the sampler, only run once

@@ -1,0 +1,37 @@
+\documentclass[11pt]{amsart}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{letterpaper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{epstopdf}
+\usepackage{hyperref}
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+
+\begin{document}
+%\maketitle
+
+We note the following errors in the \textbf{Appendix}:
+
+\begin{enumerate}
+\item Gibbs update 1: $\textbf{F}$ should be defined as $\mathbf{F} = \mathbf{Z}\mathbf{F}_a + \mathbf{F}_r$, not $\mathbf{F} = \mathbf{F}_a + \mathbf{F}_r$
+
+\item Gibbs update 1:  $\mathbf{C}$ and $\mathbf{C}^*$ should be defined as: $\mathbf{C} = \psi^{-1}_{r_j}\mathbf{F}^T\mathbf{F} + \mbox{Diag}(\psi^{-1}_{jl}\tau^{-1}_j)$ and $\mathbf{C}^* = \mathbf{F}^T(\psi_{r_j}\mathbf{I}_n + \psi_{a_j}\mathbf{ZAZ}^T)^{-1}\mathbf{F} + \mbox{Diag}(\psi^{-1}_{jl}\tau^{-1}_j)$, for $j$ fixed, and $l \in 1\dots k^*$. The diagonalization of the inverse is thus: $$(\psi_{r_j}\mathbf{I}_n + \psi_{a_j}\mathbf{ZAZ}^T)^{-1} = \mathbf{U}\;\mbox{Diag}(1/(\psi_{r_j} + \psi_{a_j}s_{ii}))\mathbf{U}^T$$.
+
+\item Gibbs update 4: $\mathbf{ZF}_j$ should be replaced by $\mathbf{Z}^T\mathbf{F}_j$ in the expression for the full conditional, and $\mathbf{ZZ}^T$ should be replaced by $\mathbf{Z}^T\mathbf{Z}$ in the expression for $\mathbf{C}^*$.
+
+\item \label{Ainv} Gibbs update 8: The $\mathbf{A}^{-1}$ term in the conditional posterior of the precision of the residual genetic effects of trait $j$ was omitted. The conditional posterior should read:
+\begin{align*}
+\pi(\psi^{-1}_{a_j}\mid \mathbf{e}_{a_j}) \sim \mbox{Ga}\left(a_g + \frac{r}{2},b_g + \frac{1}{2} \mathbf{e}^T_{a_j}\;\mathbf{A}^{-1} \mathbf{e}_{a_j}\right).
+\end{align*}
+\end{enumerate}
+
+Of these errors, only item~\ref{Ainv} was entered incorrectly in the MATLAB code used to perform all analyses in the manuscript. This omission had no effect on Figure 5 because in that analysis, $\mathbf{A} = \mathbf{I}_r$. However, in the simulation results, $\mathbf{A} \neq \mathbf{I}_r$, so the presented results could change slightly. We have re-run all analyses with corrected code. Figures produced using new simulations are very similar to those originally published, and no conclusions change.
+
+We have uploaded an updated \textbf{Appendix}, updated versions of all figures, and corrected MATLAB code, to the website cited in the paper, as well as to the github archive: \url{https://github.com/deruncie/SparseFactorMixedModel}.
+
+
+
+\end{document}  

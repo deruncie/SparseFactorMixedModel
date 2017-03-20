@@ -1,0 +1,46 @@
+This is BibTeX, Version 0.99d (TeX Live 2014)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: Corrected_Appendix.aux
+The style file: mychicago.bst
+Database file #1: References/paper_library3.bib
+You've used 6 entries,
+            2869 wiz_defined-function locations,
+            669 strings with 6334 characters,
+and the built_in function-call counts, 5522 in all, are:
+= -- 429
+> -- 454
+< -- 1
++ -- 142
+- -- 158
+* -- 615
+:= -- 944
+add.period$ -- 13
+call.type$ -- 6
+change.case$ -- 45
+chr.to.int$ -- 6
+cite$ -- 6
+duplicate$ -- 173
+empty$ -- 332
+format.name$ -- 178
+if$ -- 1028
+int.to.chr$ -- 1
+int.to.str$ -- 0
+missing$ -- 6
+newline$ -- 27
+num.names$ -- 62
+pop$ -- 36
+preamble$ -- 1
+purify$ -- 87
+quote$ -- 0
+skip$ -- 137
+stack$ -- 0
+substring$ -- 276
+swap$ -- 96
+text.length$ -- 1
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 120
+warning$ -- 0
+while$ -- 65
+width$ -- 0
+write$ -- 77
