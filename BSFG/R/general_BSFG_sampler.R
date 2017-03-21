@@ -36,7 +36,6 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 
 		E_a[] = sample_MME_ZKZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ki_mats,ncores)
 
-
 		# -----Sample Lambda and B_F ------------------ #
 		# F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
 		if(b_F > 0){
