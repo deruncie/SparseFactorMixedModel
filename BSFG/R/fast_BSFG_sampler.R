@@ -44,7 +44,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
 		if(b_F > 0){
 		  prior_mean = matrix(0,b_F,p)
-		  prior_prec = matrix(prec_B[-1],b_F,k)
+		  prior_prec = matrix(prec_B_F,b_F,k)
 		  B_F = sample_coefs_parallel_sparse_c(F,X_F,F_h2, tot_F_prec,prior_mean,prior_prec,invert_aI_bZKZ,1)
 		  F_tilde = F - X_F %*% B_F # not sparse.
 		} else{
@@ -71,15 +71,6 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		}
 		F[] = sample_factors_scores_sparse_c( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec )
 
-	 # -----Sample prec_B------------- #
-		if(b > 1) {
-		  if(b_F > 0){
-		    B2 = cbind(B[-1,],B_F)^2
-		  } else{
-		    B2 = B[-1,,drop=FALSE]^2
-		  }
-		  prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
-		}
   }))
 	current_state = current_state[current_state_names]
 

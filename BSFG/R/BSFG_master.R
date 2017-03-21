@@ -102,7 +102,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
                      data_model = 'missing_data', data_model_parameters = NULL,
-                     posteriorSample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B'),
+                     posteriorSample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'prec_B','prec_B_F'),
                      posteriorMean_params = c('E_a'),
                      sampler = c('fast_BSFG','general_BSFG'), ncores = detectCores(),simulation = c(F,T),setup = NULL,verbose=T) {
 
@@ -428,6 +428,9 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
     # -----Sample Lambda_prec ------------- #
     BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
 
+    # -----Sample prec_B ------------- #
+    BSFG_state$current_state = sample_prec_B(BSFG_state)
+
     # ----- sample Eta ----- #
     data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,BSFG_state)$state
     BSFG_state$current_state[names(data_model_state)] = data_model_state
@@ -477,6 +480,25 @@ sample_Lambda_prec = function(BSFG_state) {
 
 	 # # -----Update Plam-------------------- #
 		Plam[] = sweep(Lambda_prec,2,tauh,'*')
+  }))
+  return(current_state)
+}
+
+sample_prec_B = function(BSFG_state){
+  priors         = BSFG_state$priors
+  run_variables  = BSFG_state$run_variables
+  current_state  = BSFG_state$current_state
+
+  current_state = with(c(priors,run_variables),within(current_state,{
+    if(b > 1) {
+      if(b_F > 0){
+        B2 = cbind(B[-1,],B_F)^2
+      } else{
+        B2 = B[-1,,drop=FALSE]^2
+      }
+      prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
+      prec_B_F[1,] = prec_B[1,-1]
+    }
   }))
   return(current_state)
 }

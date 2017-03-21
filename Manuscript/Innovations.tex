@@ -10,10 +10,13 @@
 \newcommand*{\B}[1]{\ifmmode\bm{#1}\else\textbf{#1}\fi}
 \DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
 
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=black,urlcolor=black]{hyperref}
 \title{Updates to BSFG}                % Activate to display a given date or no date
 
 \begin{document}
 \maketitle
+\tableofcontents
+\label{TOC}
 
 \section{abstract}
 The linear mixed effect model is a workhorse of modern statistical genetics: including GWAS, QTL analysis, Genomic Prediction, Evolutionary Genetics, transcriptomics, growth curve analysis, etc. 
@@ -22,7 +25,7 @@ Widely available software has made analyses with thousands (or millions) of indi
 available methods are that most are limited to one (or a few) responses per individual, and most only allow a single random effect (besides the residual). Also, while methods appropriate for identically distributed Gaussian variables are common, methods applicable to other distributions, or non-linear response functions are less common. Here, we propose a general model for high-dimensional linear mixed effect models, which we call SLAMglmm and provide as an extendible R package. SLAMglmm builds on our earlier work (Runcie and Mukherjee 2013) that proposed using sparse factor models to efficiently estimate genetic covariance matrices for high dimensional traits from data on related individuals. We build on the earlier model in four key ways:
 
 \begin{enumerate}
-\item Fully generalize the mixed effect model, allowing multiple random effects for both the individual traits and the latent factor traits, and "fixed" effects per-trait and per-factor.
+\item Fully generalize the mixed effect model, allowing multiple random effects for both the individual traits and the latent factor traits, and ``fixed" effects per-trait and per-factor.
 \item Adapted the discrete prior structure for random effects used for the latent factor traits to the individual traits. This allows more intuitive prior elicitation, especially in models with multiple random effects.
 \item Developed a new, more efficient Gibbs sampler for mixed effect models that greatly improves mixing and posterior convergence.
 \item Added a new level between observed data and the linear mixed effect model based on a flexible link distribution. We develop link distributions for several disparate data types below including: partially missing observations, multiple-probe-per gene data, RNAseq data, time-series data.
@@ -38,7 +41,7 @@ The SLAMglmm model is specified as:
 \label{effect_model}
 \begin{split}
 \B{y}_i &\sim g(\B{\eta}_i,\Sigma_{i},\theta_y) \\
-[\eta_1, \eta_2, \dots, \eta_n]^T = \B{H} &=  \B{F}\B{\Lambda}^T + \B{X}\B{B} + \sum \B{Z}_i \B{U}_{R_i} + \B{E} \\
+[\eta_1, \eta_2, \dots, \eta_n]^T = \B{H} &=  \B{F}\B{\Lambda}^T + \B{X}\B{B} + \sum \B{Z}_i \B{U}_{R_i} + \B{E}_R \\
 \B{F} &= \B{X}_F\B{B}_F + \sum \B{Z}_i \B{U}_{F_i} + \B{E}_F 
 \end{split}
 \end{align}
@@ -51,7 +54,7 @@ In~\ref{effect_model}, $\B{H}$ and $\B{F}$ are $n \times p$ and $n \times k$ mat
 \subsubsection{fixed effects}
 The matrices $\B{B}$ and $\B{B}_F$ are $b \times p$ and $b_F \times k$ matrices of fixed effect coefficients for each of the $p + k$ latent traits, corresponding to the fixed effect design matrices $\B{X}$ and $\B{X}_F$. Fixed effects are used to model the effect of individual-level covariates and design features such as sex, gender, or environment. In BSFG, we allowed fixed effects only for the $p$ observational-level traits (ie $\B{B}$), and modeled them with a flat prior (independent Gaussian distributions with variance = $10^6$). Here, we generalize this to allow fixed effects for the $k$. However, by simply introducing $\B{X}_F$ with similarly flat priors, the $\B{B}$ and $\B{B}_F$ would not be identifiable, as all association between the covariates and $\B{H}$ could be explained by $\B{B}$. However, for each covariate, we propose that solutions in which the $k$ latent factor traits $\B{F}$ explain the covariate effects on several observation-level traits $\B{H}$ should be favored, so we model the set of parameters $[\B{b}_{j\bullet}, \B{b}_{F_{j\bullet}}]^T$ as:
 \begin{align}\begin{split}
-[\B{b}_{j\bullet}, \B{b}_{F_{j\bullet}}]^T &\sim \mbox{N}_{p+k}(0,\sigma^2_{b_i}\B{I}) \\
+[\B{b}_{j\bullet}, \B{b}_{F_{j\bullet}}]^T &\sim \mbox{N}_{p+k}(0,\sigma^2_{b_i}\B{I}_{p+k}) \\
 \sigma^2_{b_i} &\sim \mbox{iG}(\alpha_b,\beta_b)
 \end{split} \end{align}
 
@@ -91,7 +94,7 @@ The central statistical challenge of large multivariate mixed effect models is t
 As proposed for BSFG, SLAMglmm uses a hierarchical sparse-factor structural equation model to explain the among-trait covariance structure. This model structure prioritizes the strongest, most important covariance signals in the data. A key development in BSFG was the idea that a single set of factors $\B{\Lambda}$ could be used to explain both the additive-genetic and residual covariances, with the the factors re-weighted for each covariance matrix:
 \begin{align}\begin{split}
 \B{G} &= \B{\Lambda \Sigma_{h^2} \Lambda^T} + \Psi_G \\
-\B{R} &= \B{\Lambda (\B{I} - \Sigma_{h^2}) \Lambda^T} + \Psi_G \\
+\B{R} &= \B{\Lambda (\B{I}_k - \Sigma_{h^2}) \Lambda^T} + \Psi_G \\
 \end{split} \end{align}
 
 This ``sharing" of the factors between the covariance matrices does not force them to be similar: whenever one of the diagonal elements of $\B{\Sigma_{h^2}}$ ($\sigma_{h^2_j}$) equals $0$($1$), the column contributes only to the residual (additive-genetic) covariance matrix. But when the same factor contributes to both covariances, the same $\B{\lambda}_j$ parameters can be re-used.
@@ -99,16 +102,119 @@ This ``sharing" of the factors between the covariance matrices does not force th
 SLAMglmm uses this same strategy to efficiently estimate a set of $R+1$ covariance matrices for the $R$ random effects and the residuals. Each diagonal element of the $\B{\Sigma^F_{h^2_i}}$ matrices is allowed to equal 0 or 1, but can also take values in between, providing flexible sharing of covariance components among random effects:
 \begin{align}\begin{split}
 \;\B{\Sigma}_i &= \B{\Lambda \Sigma^F_{h^2_i} \Lambda^T} + \Sigma^R_{h^2_i}\Psi^R \\
-\;\B{\Sigma}_R &= \B{\Lambda (\B{I} - \sum \Sigma^F_{h^2_i}) \Lambda^T} + (\B{I} - \sum \Sigma^R_{h^2_i})\Psi^R 
+\;\B{\Sigma}_R &= \B{\Lambda (\B{I}_k - \sum \Sigma^F_{h^2_i}) \Lambda^T} + (\B{I}_p - \sum \Sigma^R_{h^2_i})\Psi^R 
 \end{split} \end{align}
 
 SLAMglmm also extends BSFG by leveraging the latent factors to estimate the fixed effects. If the the same sets of traits are associated with the fixed effect covariates as distinguish the random effect groupings (or residuals), the same factors can also be used to explain the fixed effect responses. These factor - covariate associations can be explored directly (ex sex or condition effects on the latent traits), or used to provide more robust fixed effect coefficients for the observation-level traits.
 
 \subsection{prior elicitation}
+\label{random_effect_priors}
 Intuitive prior distributions are important for effective prior elicitation in Bayesian models. In most implementations of mixed effect models, inverse-Gamma priors are used for the variance components. This prior form is useful because of conjugacy to the likelihood. However, specifying hyperparameters for multiple variance components of this form can be difficult, especially when the prior information is highly diffuse. Gibbs samplers based on inverse-Gamma priors are known to have poor mixing properties, and so ``parameter-expanded" forms are commonly used (ex. \emph{MCMCglmm}, Gelman et al 2006?). These problems are exacerbated in the multivariate mixed model. The conjugate distribution of the covariance of multivariate random effects is the inverse-Wishart distribution, which is particularly difficult to use to specify vague knowledge and is generally not very flexible.
 
-In BSFG, we used inverse-Gamma priors for the residual variances of each of the $p$ observational-level traits, but used a recently proposed re-formulation of the random effect model in terms of heritability and total variance to specify priors for the factor variances (Zhou?). Heritability ($\sigma^2_a / \sigma^2_p$) as a proportion of variance is more intuitive and easier to visualize than a variance, and is independent of the scale of the data, making prior elicitation easier. We used a discrete prior directly on heritability to permit highly flexible prior distributions. 
+In BSFG, we avoided the inverse-Wishart distribution by the hierarchical structure, with prior covariance specified through the prior on $\B{\Lambda}$. We did use inverse-Gamma priors for the residual variances of each of the $p$ observational-level traits, but used a recently proposed re-formulation of the random effect model in terms of heritability and total variance to specify priors for the factor variances (Zhou?). Heritability ($h^2 = \sigma^2_a / (\sigma^2_p)$) defined as the proportion of variance attributable to genetics, is more intuitive and easier to visualize than a variance, and is independent of the scale of the data, making prior elicitation easier. We used a discrete prior directly on heritability to permit highly flexible prior distributions. This discrete prior also facilitates a highly efficient partially collapsed Gibbs sampler for the factor traits which we described in Runcie and Mukherjee 2013 and detail below in section~\ref{Gibbs_sampler}
 
-In SLAMglmm, we extend this idea to the observational-level traits as well. 
+ %However, because the total factor-variance was constrained to equal one, a single parameter per factor was necessary to specify $\sigma^2_a$ and $\sigma^2_e$.
+
+In SLAMglmm, we extend this re-formulation of the mixed effect model to the observational-level traits as well. Conditional on the latent factors, the covariance of a single trait ($j$) is:
+\begin{align} \begin{split}
+\sigma(\B{\eta}_{\bullet j}) | \B{\Lambda}, \B{F}, \B{B} = \B{P} &= \sum \sigma^2_{R_{i_j}} \B{K}_i + \sigma^2_{R_{e_j}}\B{I}_n \\
+&= \sigma^2_{R_{P_j}} (\sum h^2_{R_{i_j}} \B{K}_i + (1 - \sum h^2_{R_{i_j}})\B{I}_n) 
+\end{split} \end{align}
+
+\noindent and we let $\B{\Sigma}^R_i = \mbox{Diag}(h^2_{R_{i_j}})$ and $\B{\Psi}^R = \mbox{Diag}(\sigma^2_{R_{P_j}})$.
+
+Thus, for each trait, we specify a total variance $\sigma^2_{R_{P_j}}$, and then a set of $R$ variance fractions $h^2_{R_{i_j}}$ corresponding to each random effect, the sum of which is less than 1. For prior elicitation, we specify a joint prior on these $R$ variance fractions using an evenly spaced grid over all valid combinations, and then can elicit priors based on marginal distributions or over the full space. The prior on $\sigma^2_{R_{i_j}}$ is an independent inverse-Gamma distribution for conjugacy. 
+
+Extending the formulation of BSFG, the random effect structure of each of the $k$ the factors is specified similarly, conditional on the fixed effects:
+\begin{align} \begin{split}
+\sigma(\B{f}_{\bullet j} ) | \B{B}_F &= \sum \sigma^2_{F_{i_j}} \B{K}_i + \sigma^2_{F_{e_j}}\B{I}_n \\
+&= (\sum h^2_{F_{i_j}} \B{K}_i + (1 - \sum h^2_{F_{i_j}})\B{I}_n) 
+\end{split} \end{align}
+\noindent with the exception that we constrain $\sigma^2_{F_{P_j}} = 1$ for identifiability. Actually, to improve mixing of $\B{\Lambda}$ and $\B{F}$, we implement the parameter expansion proposed by (Dunson?) for factor models by allowing $\sigma^2_{F_{P_j}} \neq1$, but then correcting $\B{F}, \B{U_F}$, and $\B{\Lambda}$ by this factor in the posterior (see~\ref{Gibbs_sampler}).
+
+\subsection{Gibbs sampler}
+\label{Gibbs_sampler}
+In the SLAMglmm R package we develop and a new Gibbs sampler with considerable performance enhancements both in per-iteration speed and especially in parameter mixing relative to BSFG. The key feature of the sampler is that by re-parameterizing the random effects in terms of proportions of variance rather than variance components, and restricting the prior to a discrete set of variance proportions ($h^2_{i_j}$'s), we can sample these proportions directly in a single Gibbs step, marginalizing over all random effects. The individual random effects can be sampled afterwards conditioning on the current values of the $h^2_{i_j}$'s. This significantly reduces the posterior correlation between the random effects and their variance components, a feature that has long plagued MCMC algorithms for mixed effect models (MCMCglmm, Gelman (2006)?). The Gibbs algorithm iterates through the following steps:
+\begin{enumerate}
+\item Sample $\B{B}$ and $\B{\Lambda}$ jointly, conditioning on $\B{F}, \B{\Sigma}^R_{h^2}, \B{\Psi}^R$, and the prior precisions of $\B{B}$ and $\B{\Lambda}$, but marginalizing over $\B{U}_{R_i}$ and $\B{E}_{R_i}$.
+\item Sample $\B{\Psi}^R$, conditioning on $\B{B}, \B{\Lambda},\B{F}$, and $\B{\Sigma}^R_{h^2}$, still marginalizing over $\B{U}_{R_i}$ and $\B{E}_{R_i}$.
+\item Sample $\B{\Sigma}^R_{h^2}$ jointly, conditioning on $\B{B}, \B{\Lambda},\B{F}$, and $\B{\Psi}^R$, still marginalizing over $\B{U}_{R_i}$ and $\B{E}_{R_i}$.
+\item Finally, sample the $\B{U}_{R_i}$ jointly, conditioning on $\B{B}, \B{\Lambda},\B{F}, \B{\Psi}^R$, and $\B{\Sigma}^R_{h^2}$.
+\item Sample $\B{B}_F$, conditioning on $\B{F}, \B{\Sigma}^F_{h^2}, \B{\Psi}^F$, and the prior precisions of $\B{B}$, but marginalizing over $\B{U}_{F_i}$ and $\B{E}_F$.
+\item Sample $\B{\Psi}^F$, conditioning on $\B{F}, \B{\Sigma}^F_{h^2}$, and $\B{B}_F$, still marginalizing over $\B{U}_{F_i}$ and $\B{E}_F$.
+\item Sample $\B{\Sigma}^F_{h^2}$ jointly, conditioning on $\B{F}, \B{\Psi}^F$, and $\B{B}_F$, still marginalizing over $\B{U}_{F_i}$ and $\B{E}_F$.
+\item Finally, sample $\B{U}_{F_i}$ jointly, conditioning on $\B{F}, \B{\Sigma}^F_{h^2}, \B{\Psi}^F$, and $\B{B}_F$.
+\item Sample $\B{F}$, conditioning on all other parameters.
+\item Sample precisions parameters of $\B{B}$ and $\B{\Lambda}$.
+\item Sample $\B{H}$ conditioning on all other parameters and the observed data $\B{y}_i$.
+\item Normalize $\B{F}, \B{U}_{F_i}$ by $\B{\Psi}^{F^{1/2}}$ so that $\B{F}$ has unit total variance. Similarly, normalize $\B{\Lambda}$ by $\B{\Psi}^{F^{-1/2}}$
+\end{enumerate}
+
+The key feature of this Gibbs algorithm is the partial collapsing over the random effect parameters in steps 1-3 and 5-7. This dramatically improves mixing of the sampler. Step 7 is (nearly) identical to the BSFG Gibbs sampler, but the other steps are new in SLAMglmm.
+
+The collapsed sampling in this algorithm is facilitated by several computational tricks avoiding repeated matrix inversions. 
+
+The first involves the method used by \emph{MCMCglmm} to sample location effects from the mixed model equations using only a single cholesky decomposition. This algorithm is used in steps 1, 4, 5, and 8.
+
+The second uses the fact that the number of covariance matrices for the $p$ observation-level and $k$ factor traits is limited by the discrete prior structure, up to a scalar factor determined by $\B{\Psi}^R$ or $\B{\Psi}^F$. Unless many random effects are specified, and the discrete prior has many divisions, the number of possible covariance matrices is typically much smaller than the  number of traits times the number of iterations necessary to generate sufficient posterior samples. Therefore computational speed ups are possible by pre-calculating matrix inversions and cholesky decompositions of every possible covariance matrix up-front (which can be done in a parallel fashion), and then re-using the decompositions repeatedly across traits and Gibbs iterations.
+This technique is facilitated by the fact that all possible covariance matrices use the have the same patters of non-zero entries, so a sparse symbolic Cholesky decomposition can be used to speed up the matrix inversions once the first decomposition has been calculated. Sparse matrices are used throughout the implementation of SLAMglmm for efficient computation.
+
+Finally, in the specific case when only a single random effect is used, additional speed up can be achieved by pre-calculating matrices that diagonalize $\B{ZKZ}^T$ and the pair $\B{Z}^T\B{Z}$ and $\B{K}^{-1}$ allowing the mixed model equations to be solved without matrix inversions. The SLAMglmm package implements two Gibbs samplers, one ('general') that works with any number of random effects, and one ('fast') optimized for a single random effect.
+
+\section{Case studies}
+\label{link_functions}
+Here, we describe several case studies that demonstrate potential uses of SLAMglmm, based on different link distributions $g$.
+
+\subsection{Partial missing data}
+In the original BSFG paper, we analyzed the Ayroles 2009 gene expression data in conjunction with data on the fitness of each line. Since flies with expression data were not evaluated for fitness, and flies with fitness data were not evaluated for gene expression, we treated the un-observed traits for each fly as missing data and included a step in the Gibbs sampler to impute these missing values conditional on the current state of the model parameters. This was possible because conditional on all other parameters, each missing data point followed an independent Gaussian distribution.
+
+Here, we generalize this imputation step as the following link distribution:
+\begin{align} \begin{split}
+\eta_{ij} &\sim \Bigg\{\begin{array}{l l}
+y_{ij} & \mbox{ if } y_{ij} \mbox{ is observed} \\
+\mbox{N}(\hat{\eta_{ij}},\sigma^2_{R_{i_j}}(1-\sum h^2_{R_{i_j}})) & \mbox{ if } y_{ij} \mbox{ is not observed}
+\end{array} \\
+\hat{\eta_{ij}} &= \B{x}_{\bullet i} \B{B} + \B{f}_{\bullet i} \B{\Lambda}^T + \sum \B{Z}_i \B{u}_{F_{\bullet i}}
+\end{split}\end{align}
+
+\noindent Updates for $\B{\eta}_i$ for only those un-observed traits are independent draws from a univariate Gaussian distribution. 
+
+\subsection{Multiple probes per trait}
+Microarrays for measuring gene expression commonly have multiple separate probes per gene on the same slide. These probes provide technical replication for gene (transcript) quantification. However, conditional on transcript expression, probes on the same gene, and probes on different genes should be uncorrelated (once arrays are normalized). In this case, we use the link distribution to move from the observational data (probes per transcript per individual, $\B{y}_i$ a $(p d) \times 1$ vector with $d$ probes per transcript to a multivariate (correlated) mixed effect model on the transcripts ($\B{\eta}_i$, a $p \times 1$ vector). The link distribution is:
+\begin{align} \begin{split}
+\B{y}_i &\sim \mbox{N}(\B{X}_Y \B{\eta}_i, \B{\Psi}^P) \\
+\;\B{\eta}_i &\sim \mbox{N}(\hat{\B{\eta_{ij}}},\sigma^2_{R_{i_j}}(1-\sum h^2_{R_{i_j}}))
+\end{split}\end{align}
+
+\noindent with $\hat{\B{\eta}_i}$ specified as above, and $\B{\Psi}^P$ a $pd \times pd$ diagonal matrix of probe-specific technical variances. Updates for $\B{\eta}_i$ are independent draws from a univariate Gaussian distribution. Updates for the diagonal elements of $\B{\Psi}^P$ are independent draws from an inverse-Gamma distribution, based on a conjugate prior.
+
+This model was used in a study by Hine et al (submitted) on gene expression pleiotropy in mutation-accumulation lines of Drosophila.
+
+\subsection{RNAseq data}
+RNAseq data are counts of transcript (or transcript fragments). These counts are expected to follow a Poisson distribution around the true transcript expression. Most methods for analyzing RNAseq data rely on a generalized linear models of either over-dispersed Poisson or Negative-Binomial distributions to account for this expected sampling distribution. However, recent research has shown that it is more important to accurately model the observation-specific variances than the exact form of the sampling distribution, and that when log-transformed, heteroscedastic linear models generally outperform the generalized linear models with Poisson of NB distributions. This technique is implemented in the \emph{voom} function of the \emph{limma} package originally designed for microarray data. \emph{voom} performs the log-transformation on RNAseq counts, and then uses a spline function to estimate the mean-variance relationship across all genes, with optional sample-specific weights as well. The log-counts-per-million estimate as well as a precision-weight for each observation are outputted. \emph{limma} provides limited support for mixed effect models (single repeated measures random effects for balanced data, I think), but does not consider among-gene covariance.
+
+We propose to model RNAseq data following the \emph{voom} method by linking observations $\B{y}_i$ to latent true transcript log-cpm $\B{\eta}_i$ using the estimated observation-specific precision weights:
+
+\begin{align} \begin{split}
+\B{y}_i &\sim \mbox{N}(\B{\eta}_i, \B{\Psi}^w_i) \\
+\;\B{\eta}_i &\sim \mbox{N}(\hat{\B{\eta_{ij}}},\sigma^2_{R_{i_j}}(1-\sum h^2_{R_{i_j}}))
+\end{split}\end{align}
+
+\noindent with $\hat{\B{\eta}_i}$ specified as above, and $\B{\Psi}^w_i$ a $p \times p$ diagonal matrix of transcript-specific inverse-precision weights for the $p$ genes of sample $i$. Updates for $\B{\eta}_i$ are independent draws from a univariate Gaussian distribution.
+
+\subsection{Time-series data}
+The above link-distributions cover a wide range of potential applications for SLAMglmm. However, potentially more interesting applications involve considerations of more complex observations of individual subjects, such as time-series data, growth model analysis, or shape analysis. The general idea of this set of applications is that a (potentially non-)linear model with parameters $\B{\eta}_i$ could be fit to the vector of observations $\B{y}_i$ of each individual separately. But these individual-specific parameters (potentially after pre-defined non-linear transformations) could be modeled as correlated latent traits using SLAMglmm. This way highly-parameterized models could be ``regularized" based on expected similarities among individuals based on the fixed and random effects.
+
+A motivating example is time-series measurements on an individual. Time series data has an inherent covariance structure. However, a popular approach is to approximate this covariance using splines for each individual (sometimes termed Random Regression). Here, we implement Random Regression using b-splines in SLAMglmm. In particular, a b-spline basis is calculated spanning the range of observation times across all individuals, potentially with a large number of knots. Using this basis function,
+design matrices $\B{X}^s_i$ are calculated for each individual. It is not necessary that all individuals have the same number of observations, or are observed at the same time. The link distribution is:
+\begin{align} \begin{split}
+\B{y}_i &\sim \mbox{N}(\B{X}^s_i \B{\eta}_i, \sigma^2_y \B{I}_{n_i}) \\
+\;\B{\eta}_i &\sim \mbox{N}(\hat{\B{\eta_{ij}}},\sigma^2_{R_{i_j}}(1-\sum h^2_{R_{i_j}}))
+\end{split}\end{align}
+
+\noindent with $\hat{\B{\eta}_i}$ specified as above, and $\sigma^2_y$ is a single observation-level variance for all observations. This could potentially be generalized to be a function of time. Updates for $\B{\eta}_i$ are independent draws from a univariate Gaussian distribution.
+
+
+
 
 \end{document}  

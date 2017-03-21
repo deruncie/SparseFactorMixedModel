@@ -41,13 +41,12 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		# F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
 		if(b_F > 0){
 			prior_mean = matrix(0,b_F,p)
-			prior_prec = matrix(prec_B[-1],b_F,k)
+			prior_prec = matrix(prec_B_F,b_F,k)
 			B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, Sigma_Perm, F_h2_index, tot_F_prec, prior_mean, prior_prec,ncores)
 			F_tilde = F - X_F %*% B_F
 		} else{
 		  F_tilde = F
 		}
-
 	 # -----Sample tot_F_prec, F_h2, F_a ---------------- #
 		#conditioning on B, F, Lambda, F_h2, tot_F_prec
 
@@ -69,15 +68,6 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		}
 		F[] = sample_factors_scores_sparse_c( Eta_tilde, as.matrix(prior_mean),Lambda,resid_Eta_prec,F_e_prec )
 
-	 # -----Sample prec_B------------- #
-		if(b > 1) {
-		  if(b_F > 0){
-		    B2 = cbind(B[-1,],B_F)^2
-		  } else{
-		    B2 = B[-1,,drop=FALSE]^2
-		  }
-		  prec_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
-		}
   }))
 	current_state = current_state[current_state_names]
 

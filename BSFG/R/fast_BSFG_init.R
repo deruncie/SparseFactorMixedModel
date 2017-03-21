@@ -114,8 +114,10 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
 
     if(b > 0) {
       prec_B = matrix(c(0,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
+      prec_B_F = prec_B[1,-1,drop=FALSE]
     } else{
-      prec_B = matrix(0,ncol=1,nrow=1)
+      prec_B = matrix(0,ncol=0,nrow=1)
+      prec_B_F = prec_B
     }
 
 
@@ -141,6 +143,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
             B              = B,
             B_F            = B_F,
             prec_B         = prec_B,
+            prec_B_F       = prec_B_F,
             traitnames     = traitnames,
             nrun           = 0,
             total_time     = 0
