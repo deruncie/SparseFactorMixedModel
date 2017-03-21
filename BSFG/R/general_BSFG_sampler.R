@@ -15,7 +15,7 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		rows = b + k
 		prior_mean = matrix(0,rows,p)
 		if(b > 0) {
-		  prior_prec = rbind(matrix(prec_B,b,p),t(Plam))
+		  prior_prec = rbind(prec_B,t(Plam))
 		} else{ # b == 0
 		  prior_prec = t(Plam)
 		}
@@ -40,7 +40,7 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		# F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
 		if(b_F > 0){
 			prior_mean = matrix(0,b_F,p)
-			prior_prec = matrix(prec_B_F,b_F,k)
+			prior_prec = prec_B_F
 			B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, Sigma_Perm, F_h2_index, tot_F_prec, prior_mean, prior_prec,ncores)
 			F_tilde = F - X_F %*% B_F
 		} else{

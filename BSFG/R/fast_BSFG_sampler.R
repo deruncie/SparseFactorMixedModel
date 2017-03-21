@@ -16,7 +16,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		rows = b + k
 		prior_mean = matrix(0,rows,p)
 		if(b > 0) {
-		  prior_prec = rbind(matrix(prec_B,b,p),t(Plam))
+		  prior_prec = rbind(prec_B,t(Plam))
 		} else{ # b == 0
 		  prior_prec = t(Plam)
 		}
@@ -44,7 +44,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
 		if(b_F > 0){
 		  prior_mean = matrix(0,b_F,p)
-		  prior_prec = matrix(prec_B_F,b_F,k)
+		  prior_prec = prec_B_F
 		  B_F = sample_coefs_parallel_sparse_c(F,X_F,F_h2, tot_F_prec,prior_mean,prior_prec,invert_aI_bZKZ,1)
 		  F_tilde = F - X_F %*% B_F # not sparse.
 		} else{

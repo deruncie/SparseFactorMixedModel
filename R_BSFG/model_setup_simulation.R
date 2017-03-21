@@ -20,8 +20,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = list(
-    # sampler = 'fast_BSFG',
-    sampler = 'general_BSFG',
+    sampler = 'fast_BSFG',
+    # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
     simulation   = T,
     scale_Y      = FALSE,
@@ -43,6 +43,8 @@ priors = list(
     delta_1   = list(shape = 2.1,  rate = 1/20),
     delta_2   = list(shape = 3, rate = 1),
     Lambda_df =   3,
+    B_df =   3,
+    B_F_df =   3,
     h2_priors_factors   =   c(run_parameters$h2_divisions-1,rep(1,run_parameters$h2_divisions-1))/(2*(run_parameters$h2_divisions-1)),
     h2_priors_resids   =   c(0,rep(1,99))*dbeta(seq(0,1,length=102),2,2)[2:101]
 )

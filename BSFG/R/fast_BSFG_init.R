@@ -113,12 +113,14 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     colnames(B) = traitnames
 
     if(b > 0) {
-      prec_B = matrix(c(0,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
-      prec_B_F = prec_B[1,-1,drop=FALSE]
+      tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
+      tau_B_F = tau_B[1,-1,drop=FALSE]
     } else{
-      prec_B = matrix(0,ncol=0,nrow=1)
-      prec_B_F = prec_B
+      tau_B = matrix(0,ncol=0,nrow=1)
+      tau_B_F = tau_B
     }
+    prec_B = matrix(tau_B,nrow = b, ncol = p)
+    prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
 
 
 # ----------------------- #
@@ -142,6 +144,8 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
             E_a            = E_a,
             B              = B,
             B_F            = B_F,
+            tau_B          = tau_B,
+            tau_B_F        = tau_B_F,
             prec_B         = prec_B,
             prec_B_F       = prec_B_F,
             traitnames     = traitnames,

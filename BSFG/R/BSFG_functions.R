@@ -70,6 +70,7 @@ update_k = function( BSFG_state) {
 				tot_F_prec    = cbind(tot_F_prec,1)
 				F_a           = cbind(F_a,rnorm(r,0,sqrt(sum(F_h2[,k]))))
 				B_F           = cbind(B_F,rnorm(b_F,0,1))
+				prec_B_F      = cbind(prec_B_F,c(tau_B_F))
 				F             = cbind(F,rnorm(n,X_F %*% B_F[,k] + as.matrix(Z %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
@@ -96,6 +97,7 @@ update_k = function( BSFG_state) {
 				tot_F_prec = tot_F_prec[,nonred,drop=FALSE]
 				F_a = F_a[,nonred,drop=FALSE]
 				B_F = B_F[,nonred,drop=FALSE]
+				prec_B_F = prec_B_F[,nonred,drop=FALSE]
 			}
 		}
 	}))
