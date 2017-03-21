@@ -71,21 +71,21 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     F_h2_index = sample(1:ncol(h2s_matrix),k,replace=T)
     F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    F_a = lapply(RE_names,function(effect){
+    U_F = lapply(RE_names,function(effect){
     	matrix(rnorm(r_RE[effect] * k, 0, sqrt(F_h2[effect,] / tot_F_prec)),ncol = k, byrow = T)
     })
-    names(F_a) = RE_names
+    names(U_F) = RE_names
 
     # Factor fixed effects
     B_F = matrix(rnorm(b_F * k),b_F,k)
 
     F = X_F %*% B_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
     for(effect in RE_names) {
-    	F = F + Z_matrices[[effect]] %*% F_a[[effect]]
+    	F = F + Z_matrices[[effect]] %*% U_F[[effect]]
     }
     F = as.matrix(F)
-    F_a = do.call(rbind,F_a)
-    rownames(F_a) = colnames(Z)
+    U_F = do.call(rbind,U_F)
+    rownames(U_F) = colnames(Z)
 
   # residuals
      # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
@@ -100,11 +100,11 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
     resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
 
-    E_a = do.call(rbind,lapply(RE_names,function(effect){
+    U_R = do.call(rbind,lapply(RE_names,function(effect){
     	matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Eta_prec)),ncol = p, byrow = T)
     }))
-    colnames(E_a) = traitnames
-    rownames(E_a) = colnames(Z)
+    colnames(U_R) = traitnames
+    rownames(U_R) = colnames(Z)
 
   # Fixed effects
     B = matrix(rnorm(b*p), ncol = p)
@@ -133,12 +133,12 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     		tot_F_prec     = tot_F_prec,
     		F_h2_index     = F_h2_index,
     		F_h2           = F_h2,
-    		F_a            = F_a,
+    		U_F            = U_F,
     		F              = F,
     		tot_Eta_prec     = tot_Eta_prec,
     		resid_h2_index = resid_h2_index,
     		resid_h2       = resid_h2,
-    		E_a            = E_a,
+    		U_R            = U_R,
     		B              = B,
     		B_F            = B_F,
     		tau_B          = tau_B,

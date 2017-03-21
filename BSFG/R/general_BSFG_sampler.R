@@ -26,15 +26,15 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
 
 
-	 # -----Sample tot_Eta_prec, resid_h2, E_a ---------------- #
+	 # -----Sample tot_Eta_prec, resid_h2, U_R ---------------- #
 		#conditioning on B, F, Lambda, resid_h2, tot_Eta_prec
 		Eta_tilde = Eta - X %*% B - F %*% t(Lambda)
 		tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
 		resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
-		# E_a_prec = tot_Eta_prec / colSums(resid_h2)
+		# U_R_prec = tot_Eta_prec / colSums(resid_h2)
 
-		E_a[] = sample_MME_ZKZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ki_mats,ncores)
+		U_R[] = sample_MME_ZKZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ki_mats,ncores)
 
 		# -----Sample Lambda and B_F ------------------ #
 		# F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
@@ -46,24 +46,24 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		} else{
 		  F_tilde = F
 		}
-	 # -----Sample tot_F_prec, F_h2, F_a ---------------- #
+	 # -----Sample tot_F_prec, F_h2, U_F ---------------- #
 		#conditioning on B, F, Lambda, F_h2, tot_F_prec
 
 		tot_F_prec[] = sample_tot_prec(F_tilde, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,ncores)
 		F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores)
 		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-		F_a[] = sample_MME_ZKZts(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ki_mats,ncores)
+		U_F[] = sample_MME_ZKZts(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ki_mats,ncores)
 
 	 # -----Sample F----------------------- #
-		#conditioning on B, F_a,E_a,Lambda, F_h2
-		Eta_tilde = as.matrix(Eta - X %*% B - Z %*% E_a)
+		#conditioning on B, U_F,U_R,Lambda, F_h2
+		Eta_tilde = as.matrix(Eta - X %*% B - Z %*% U_R)
 		F_e_prec = tot_F_prec / (1-colSums(F_h2))
 		resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
 		if(b_F > 0) {
-		  prior_mean = X_F %*% B_F + Z %*% F_a
+		  prior_mean = X_F %*% B_F + Z %*% U_F
 		} else {
-		  prior_mean = Z %*% F_a
+		  prior_mean = Z %*% U_F
 		}
 		F[] = sample_factors_scores_sparse_c( Eta_tilde, as.matrix(prior_mean),Lambda,resid_Eta_prec,F_e_prec )
 

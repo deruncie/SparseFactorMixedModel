@@ -76,10 +76,10 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     # Genetic effects not accounted for by factors.
     #   Prior: Normal distribution on each element.
     #       mean = 0
-    #       sd = 1./sqrt(E_a_prec)' on each row
-    E_a = matrix(rnorm(p*r,0,sqrt(resid_h2 * tot_Eta_prec)),nr = r,nc = p, byrow = T)
-    colnames(E_a) = traitnames
-    rownames(E_a) = colnames(Z)
+    #       sd = 1./sqrt(U_R_prec)' on each row
+    U_R = matrix(rnorm(p*r,0,sqrt(resid_h2 * tot_Eta_prec)),nr = r,nc = p, byrow = T)
+    colnames(U_R) = traitnames
+    rownames(U_R) = colnames(Z)
 
     # Latent factor variances
     tot_F_prec = with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
@@ -92,8 +92,8 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
 	#  Prior: Normal distribution for each element
     #       mean = 0
     #       sd = sqrt(F_h2') for each row.
-    F_a = matrix(rnorm(k*r,0,sqrt(F_h2)),nr = r,nc = k, byrow = T)
-    rownames(F_a) = colnames(Z)
+    U_F = matrix(rnorm(k*r,0,sqrt(F_h2)),nr = r,nc = k, byrow = T)
+    rownames(U_F) = colnames(Z)
 
     # Factor fixed effects
     B_F = matrix(rnorm(b_F * k),b_F,k)
@@ -101,9 +101,9 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     # Full Factor scores. Combination of genetic and residual variation on
     # each factor.
 	#  Prior: Normal distribution for each element
-    #       mean = Z   * F_a
+    #       mean = Z   * U_F
     #       sd = sqrt(1-F_h2') for each row.
-    F = as.matrix(X_F %*% B_F + Z %*% F_a + matrix(rnorm(k*n,0,sqrt(1-F_h2)),nr = n,nc = k, byrow = T))
+    F = as.matrix(X_F %*% B_F + Z %*% U_F + matrix(rnorm(k*n,0,sqrt(1-F_h2)),nr = n,nc = k, byrow = T))
 
     # Fixed effect coefficients.
 	#  Prior: Normal distribution for each element
@@ -139,9 +139,9 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
             tot_F_prec     = tot_F_prec,
             F_h2_index     = F_h2_index,
             F_h2           = F_h2,
-            F_a            = F_a,
+            U_F            = U_F,
             F              = F,
-            E_a            = E_a,
+            U_R            = U_R,
             B              = B,
             B_F            = B_F,
             tau_B          = tau_B,

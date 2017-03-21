@@ -102,8 +102,8 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
                      data_model = 'missing_data', data_model_parameters = NULL,
-                     posteriorSample_params = c('Lambda','F_a','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F'),
-                     posteriorMean_params = c('E_a'),
+                     posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F'),
+                     posteriorMean_params = c('U_R'),
                      sampler = c('fast_BSFG','general_BSFG'), ncores = detectCores(),simulation = c(F,T),setup = NULL,verbose=T) {
 
   # ----------------------------- #

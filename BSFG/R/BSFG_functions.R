@@ -47,7 +47,7 @@ update_k = function( BSFG_state) {
 		i = nrun
 		n = nrow(F)
 		k = ncol(Lambda)
-		r = nrow(F_a)
+		r = nrow(U_F)
 		p = nrow(Lambda)
 		b_F = ncol(X_F)
 
@@ -68,10 +68,10 @@ update_k = function( BSFG_state) {
 				F_h2_index    = c(F_h2_index,sample(1:ncol(h2s_matrix),1))
 				F_h2          = h2s_matrix[,F_h2_index,drop=FALSE]
 				tot_F_prec    = cbind(tot_F_prec,1)
-				F_a           = cbind(F_a,rnorm(r,0,sqrt(sum(F_h2[,k]))))
+				U_F           = cbind(U_F,rnorm(r,0,sqrt(sum(F_h2[,k]))))
 				B_F           = cbind(B_F,rnorm(b_F,0,1))
 				prec_B_F      = cbind(prec_B_F,c(tau_B_F))
-				F             = cbind(F,rnorm(n,X_F %*% B_F[,k] + as.matrix(Z %*% F_a[,k]),sqrt(1-sum(F_h2[,k]))))
+				F             = cbind(F,rnorm(n,X_F %*% B_F[,k] + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
 			} else if(num > 0) { # drop redundant columns
 				nonred = which(vec == 0) # non-redundant loadings columns
 				while(length(nonred) < 2) {
@@ -95,7 +95,7 @@ update_k = function( BSFG_state) {
 				F_h2 = F_h2[,nonred,drop=FALSE]
 				F_h2_index = F_h2_index[nonred]
 				tot_F_prec = tot_F_prec[,nonred,drop=FALSE]
-				F_a = F_a[,nonred,drop=FALSE]
+				U_F = U_F[,nonred,drop=FALSE]
 				B_F = B_F[,nonred,drop=FALSE]
 				prec_B_F = prec_B_F[,nonred,drop=FALSE]
 			}
@@ -125,7 +125,7 @@ reorder_factors = function(BSFG_state){
 
 	reorder_params = c('Lambda','Lambda_prec','Plam',
 						'delta','tauh',
-						'F','B_F','F_a','F_h2','F_a_prec','F_e_prec','tot_F_prec'
+						'F','B_F','U_F','F_h2','U_F_prec','F_e_prec','tot_F_prec'
 						)
 
 	# reorder currrent state
@@ -171,7 +171,7 @@ save_posterior_sample = function(BSFG_state) {
 	current_state = within(current_state,{
 		# transform variables so that the variance of each column of F is 1.
 		F_var = 1/tot_F_prec
-		F_a = sweep(F_a,2,sqrt(F_var),'/')
+		U_F = sweep(U_F,2,sqrt(F_var),'/')
 		F = sweep(F,2,sqrt(F_var),'/')
 		Lambda = sweep(Lambda,2,sqrt(F_var),'*')
 	})

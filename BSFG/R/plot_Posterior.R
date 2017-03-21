@@ -102,7 +102,7 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
   current_state = within(BSFG_state$current_state,{
     # transform variables so that the variance of each column of F is 1.
     F_var = 1/tot_F_prec
-    F_a = sweep(F_a,2,sqrt(F_var),'/')
+    U_F = sweep(U_F,2,sqrt(F_var),'/')
     F = sweep(F,2,sqrt(F_var),'/')
     Lambda = sweep(Lambda,2,sqrt(F_var),'*')
   })
@@ -110,7 +110,7 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
   Lambda = current_state$Lambda
   F_h2 = current_state$F_h2
   if(is.null(dim(F_h2))) F_h2 = matrix(F_h2,nrow=1)
-  E_a_prec = current_state$tot_Eta_prec / current_state$resid_h2
+  U_R_prec = current_state$tot_Eta_prec / current_state$resid_h2
   resid_Eta_prec = current_state$tot_Eta_prec / (1-current_state$resid_h2)
   p = run_variables$p
 
@@ -128,10 +128,10 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
     plot_element_wise_covariances(G_act, G_est, main = sprintf('G: %s elements',RE_name))
     plot_diagonal_covariances(G_act, G_est, main = sprintf('G: %s diagonal',RE_name))
   })
-  E_est = tcrossprod(sweep(Lambda,2,sqrt(1-colSums(F_h2)),'*')) + diag(c((1-colSums(current_state$resid_h2))/current_state$tot_Eta_prec))
-  E_act = setup$R
-  plot_element_wise_covariances(E_act, E_est,main = 'E elements')
-  plot_diagonal_covariances(E_act, E_est,main = 'E diagonal')
+  U_R_est = tcrossprod(sweep(Lambda,2,sqrt(1-colSums(F_h2)),'*')) + diag(c((1-colSums(current_state$resid_h2))/current_state$tot_Eta_prec))
+  U_R_act = setup$R
+  plot_element_wise_covariances(U_R_act, U_R_est,main = 'E elements')
+  plot_diagonal_covariances(U_R_act, U_R_est,main = 'E diagonal')
 
   # factor h2s
   plot_factor_h2s(F_h2)
@@ -268,7 +268,7 @@ plot_diagnostics = function(BSFG_state){
 #' @param samples (optionally) a vector of sample indices (for example, to exclude samples prior
 #'    to convergence, or to thin saved samples)
 #' @return matrix of posterior means of same dimension as parameter in current_state
-get_posteriorMean = function(BSFG_state,parameter = c('Lambda','F','F_a','F_h2','B','B_F'),samples = NULL){
+get_posteriorMean = function(BSFG_state,parameter = c('Lambda','F','U_F','F_h2','B','B_F'),samples = NULL){
   post_samples = load_posterior_param(BSFG_state,parameter)
   if(!is.null(samples)) post_samples = post_samples[samples,,]
   return(apply(post_samples,c(2,3),mean))

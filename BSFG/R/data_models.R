@@ -40,7 +40,7 @@ missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
         Eta_mean = matrix(0,n,p)
         resids = matrix(rnorm(n*p),n,p)
       } else{
-        Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+        Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
         resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
         resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
       }
@@ -79,7 +79,7 @@ voom_model = function(Y,data_model_parameters,BSFG_state = list()){
     if(length(current_state) > 0){
       n = nrow(Y)
       p = ncol(Y)
-      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
       prec = sweep(prec_Y,2,resid_Eta_prec,'+')
       # Y_std = Y * prec_Y. This is calculated once in the initialization.
@@ -142,7 +142,7 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       resid_Eta_prec = matrix(0,1,p)
       resid_Y_prec = 1  # only a single precision parameter for the data_model?
     } else{
-      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
       if(!exists(resid_Y_prec)) resid_Y_prec = matrix(1)
     }
