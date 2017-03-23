@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.15 (TeX Live 2014) (preloaded format=pdflatex 2014.5.25)  21 MAR 2017 15:59
+This is pdfTeX, Version 3.14159265-2.6-1.40.15 (TeX Live 2014) (preloaded format=pdflatex 2014.5.25)  23 MAR 2017 13:53
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -429,13 +429,13 @@ LaTeX Info: Redefining \nameref on input line 16.
 
  [1{/usr/local/texlive/2014/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [2] 
 [3] [4]
-Overfull \hbox (13.91263pt too wide) in paragraph at lines 120--121
+Overfull \hbox (13.91263pt too wide) in paragraph at lines 122--123
 []\OT1/cmr/m/n/10.95 In SLAMglmm, we ex-tend this re-formulation of the mixed e
 f-fect model to the observational-
  []
 
 [5]
-Overfull \hbox (5.17554pt too wide) in paragraph at lines 145--146
+Overfull \hbox (5.17554pt too wide) in paragraph at lines 147--148
 []\OT1/cmr/m/n/10.95 Sample $\OML/cmm/b/it/10.95 B[]$\OT1/cmr/m/n/10.95 , con-d
 i-tion-ing on $\OML/cmm/b/it/10.95 F\OML/cmm/m/it/10.95 ; \OT1/cmr/bx/n/10.95 ^
 ^F[]\OML/cmm/m/it/10.95 ; \OT1/cmr/bx/n/10.95 	[]$\OT1/cmr/m/n/10.95 , and the 
@@ -444,33 +444,25 @@ prior pre-ci-sions of $\OML/cmm/b/it/10.95 B$\OT1/cmr/m/n/10.95 , but marginal-
  []
 
 [6] [7] [8] [9]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 231.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 235.
  [10]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 231.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 235.
  (./Innovations.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 231.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 231.
-
-
-Package rerunfilecheck Warning: File `Innovations.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `Innovations.out':
-(rerunfilecheck)             Before: 98DE809D7CAF10F9DAF91B1C1E0C4FEC;795
-(rerunfilecheck)             After:  1CE5C4F2B8798B593691BB61535C76A2;963.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 231.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 235.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 235.
+Package rerunfilecheck Info: File `Innovations.out' has not changed.
+(rerunfilecheck)             Checksum: 1CE5C4F2B8798B593691BB61535C76A2;963.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 235.
  ) 
 Here is how much of TeX's memory you used:
- 7049 strings out of 493117
- 100235 string characters out of 6135433
- 197264 words of memory out of 5000000
- 10192 multiletter control sequences out of 15000+600000
+ 7050 strings out of 493117
+ 100260 string characters out of 6135433
+ 199264 words of memory out of 5000000
+ 10194 multiletter control sequences out of 15000+600000
  15732 words of font info for 58 fonts, out of 8000000 for 9000
  1302 hyphenation exceptions out of 8191
- 42i,21n,31p,1322b,404s stack positions out of 5000i,500n,10000p,200000b,80000s
-</usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmbsy10.pf
-b></usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
+ 42i,21n,31p,1343b,404s stack positions out of 5000i,500n,10000p,200000b,80000s
+</usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
 ></usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx6.pfb><
 /usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb><
 /usr/local/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></
@@ -487,10 +479,10 @@ ocal/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/lo
 cal/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/loca
 l/texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/
 texlive/2014/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb>
-Output written on Innovations.pdf (10 pages, 228754 bytes).
+Output written on Innovations.pdf (10 pages, 221576 bytes).
 PDF statistics:
- 238 PDF objects out of 1000 (max. 8388607)
- 205 compressed objects within 3 object streams
- 58 named destinations out of 1000 (max. 500000)
- 97 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 241 PDF objects out of 1000 (max. 8388607)
+ 209 compressed objects within 3 object streams
+ 57 named destinations out of 1000 (max. 500000)
+ 113 words of extra memory for PDF output out of 10000 (max. 10000000)
 

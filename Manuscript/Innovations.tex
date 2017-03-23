@@ -41,7 +41,7 @@ The SLAMglmm model is specified as:
 \label{effect_model}
 \begin{split}
 \B{y}_i &\sim g(\B{\eta}_i,\Sigma_{i},\theta_y) \\
-[\eta_1, \eta_2, \dots, \eta_n]^T = \B{H} &=  \B{F}\B{\Lambda}^T + \B{X}\B{B} + \sum \B{Z}_i \B{U}_{R_i} + \B{E}_R \\
+[\B{\eta}_1, \B{\eta}_2, \dots, \B{\eta}_n]^T = \B{H} &=  \B{F}\B{\Lambda}^T + \B{X}\B{B} + \sum \B{Z}_i \B{U}_{R_i} + \B{E}_R \\
 \B{F} &= \B{X}_F\B{B}_F + \sum \B{Z}_i \B{U}_{F_i} + \B{E}_F 
 \end{split}
 \end{align}
@@ -49,13 +49,13 @@ The SLAMglmm model is specified as:
 Here, $\B{y}_i$ is a vector of observations for the $i$th individual. 
 $\B{\eta}_i$ is a vector of $p$ potentially unobserved characteristics (traits) for the $i$th individual. These may correspond directly to the elements of $\B{y}_i$, or may be parameters of a more complicated function / distribution $g$. $\B{H}$ is an $n \times p$ matrix of these characteristics for the $n$ individuals. In the original BSFG model, $g$ was the identity function, so $\B{Y} = \B{H}$. The utility of this hierarchical specification will be demonstrated below.
 
-In~\ref{effect_model}, $\B{H}$ and $\B{F}$ are $n \times p$ and $n \times k$ matrices of latent traits for the $n$ individuals. These $p+k$ latent traits are related through a structural equation model given by the $p \times k$ factor loadings matrix $\B{\Lambda}$.  This structural equation model is the key feature of SLAMglmm (and BSFG), as the paths described by $\B{\Lambda}$ explain all of the covariance among the $p + k$ traits; the $k$ traits $\B{F} = [\B{f}_1, \B{f}_2,\dots, \B{f}_k]$ are assumed to be independent, and the $p$ traits $\B{H} = [\B{\eta}_{\bullet 1}, \B{\eta}_{\bullet 2},\dots,\B{\eta}_{\bullet p}]$ are conditionally independent, conditional on $\B{F}$. Through priors on $\B{\Lambda}$ (and $k$), we impose sparsity on the among-trait covariances for all random effects, ensuring that the model can scale efficiently with increasing numbers of traits.
+In~\ref{effect_model}, $\B{H}$ and $\B{F}$ are $n \times p$ and $n \times k$ matrices of latent traits for the $n$ individuals. These $p+k$ latent traits are related through a structural equation model given by the $p \times k$ factor loadings matrix $\B{\Lambda}$.  This structural equation model is the key feature of SLAMglmm (and BSFG), as the paths described by $\B{\Lambda}$ explain all of the covariance among the $p + k$ traits; the $k$ traits $\B{F} = [\B{f}_1, \B{f}_2,\dots, \B{f}_k]$ are assumed to be independent, and the $p$ traits $\B{H} = [\B{\eta}_{\bullet 1}, \B{\eta}_{\bullet 2},\dots,\B{\eta}_{\bullet p}]$ are conditionally independent, conditional on $\B{F}$ and $\B{\Lambda}$. Through priors on $\B{\Lambda}$ (and $k$), we impose sparsity on the among-trait covariances for all random effects, ensuring that the model can scale efficiently with increasing numbers of traits.
 
 \subsubsection{fixed effects}
-The matrices $\B{B}$ and $\B{B}_F$ are $b \times p$ and $b_F \times k$ matrices of fixed effect coefficients for each of the $p + k$ latent traits, corresponding to the fixed effect design matrices $\B{X}$ and $\B{X}_F$. Fixed effects are used to model the effect of individual-level covariates and design features such as sex, gender, or environment. In BSFG, we allowed fixed effects only for the $p$ observational-level traits (ie $\B{B}$), and modeled them with a flat prior (independent Gaussian distributions with variance = $10^6$). Here, we generalize this to allow fixed effects for the $k$ factors. However, by simply introducing $\B{X}_F$ with similarly flat priors, the $\B{B}$ and $\B{B}_F$ would not be identifiable, as all association between the covariates and $\B{H}$ could be explained by $\B{B}$. Here, we address this problem by favoring solutions with fewer large coefficients in $\B{B}$ and $\B{B}_F$, such a small number of factor coefficients in $\B{B}_F$ that can explain the trait-covariate associations for many traits are favored over a larger number of trait-specific coefficients in $\B{B}$. We apply ARD-type priors to $\B{B}$ and $\B{B}_F$ to favor these sparser solutions, with covariate-specific (row) shrinkage on the coefficients of each matrix:
+The matrices $\B{B}$ and $\B{B}_F$ are $b \times p$ and $b_F \times k$ matrices of fixed effect coefficients for each of the $p + k$ latent traits, corresponding to the fixed effect design matrices $\B{X}$ and $\B{X}_F$. Fixed effects are used to model the effect of individual-level covariates and design features such as sex, gender, or environment. In BSFG, we allowed fixed effects only for the $p$ observational-level traits (ie $\B{B}$), and modeled them with a flat prior (independent Gaussian distributions with variance = $10^6$). Here, we generalize this to allow fixed effects for the $k$ factors. However, by simply introducing $\B{X}_F$ with similarly flat priors, the $\B{B}$ and $\B{B}_F$ would not be identifiable, as all association between the covariates and $\B{H}$ could be explained by $\B{B}$. Here, we address this problem by favoring solutions with fewer large coefficients in $\B{B}$ and $\B{B}_F$; solutions with a small number of factor coefficients in $\B{B}_F$ that explain the trait-covariate associations for many traits are favored over solutions with a larger number of trait-specific coefficients in $\B{B}$. We apply ARD-type priors to $\B{B}$ and $\B{B}_F$ to favor these sparser solutions, with covariate-specific (row) shrinkage on the coefficients of each matrix:
 \begin{align}\begin{split}
-\B{B} &= [b_{ij} \sim \mbox{N}(0,\tau^{-1}_{B_i} \psi^{-1}_{B_{ij}})], i \in 1\dots b, j \in 1\dots p \\
-\B{B}_F &= [b_{ij} \sim \mbox{N}(0,\tau^{-1}_{B^F_i} \psi^{-1}_{B^F_{ij}})], i \in 1\dots b_F, j \in 1\dots k\\
+\B{B} &= [b_{ij}],\;\; b_{ij} \sim \mbox{N}(0,\tau^{-1}_{B_i} \psi^{-1}_{B_{ij}}), i \in 1\dots b, j \in 1\dots p \\
+\B{B}_F &= [b^F_{ij}],\;\; b^F_{ij} \sim \mbox{N}(0,\tau^{-1}_{B^F_i} \psi^{-1}_{B^F_{ij}}), i \in 1\dots b_F, j \in 1\dots k\\
 \tau_{B_i} &\sim Ga(\alpha_b, \beta_b), \tau_{B^F_i} \sim Ga(\alpha_{b_F}, \beta_{b_F}) \\
 \psi_{B_{ij}} &\sim Ga(\nu_b/2, \nu_b/2), \psi_{B^F_{ij}} \sim Ga(\nu_{b_F}/2, \nu_{b_F}/2)
 \end{split} \end{align}
@@ -67,15 +67,17 @@ However we impose two additional constraints. First, we assume that the first co
 Second, we force the intercept of each of the $\B{f}_j$ traits to be zero by setting $\B{B}_{F_{1\bullet}} = 0$ and the corresponding variance to be zero as well.
 
 \subsubsection{random effects}
-The matrices $\B{U}_{R_i}$ and $\B{U}_{F_i}$ are $r \times p$ and $r \times k$ coefficient matrices for the $i$th random effect. As in BSFG, these are modeled with Matrix normal distributions):
+The matrices $\B{U}_{R_i}$ and $\B{U}_{F_i}$ are $r \times p$ and $r \times k$ coefficient matrices for the $i$th random effect. As in BSFG, columns of these matrices are independent multivariate normal distributions:
 \begin{align} \begin{split}
-\B{U}_{R_i} &\sim \mbox{MN}_{r,p}(\B{0};\B{K}_i,\B{\Sigma}^R_{h^2_{i}}\B{\Psi}^R) \\
-\B{U}_{F_i} &\sim \mbox{MN}_{r,k}(\B{0};\B{K}_i,\B{\Sigma}^F_{h^2_{i}})
+\B{U}_{R_i} &= [\B{u}_{1_i}, \B{u}_{2_i},\dots,\B{u}_{p_i}],\;\; \B{u}_{j_i} \sim \mbox{N}_{r_i}(\B{0},\sigma^2_{R_j}h^2_{R_{i_j}}\B{K}_i) \\
+\B{U}_{F_i} &=  [\B{u}^F_{1_i}, \B{u}^F_{2_i},\dots,\B{u}^F_{k_i}],\;\; \B{u}^F_{j_i} \sim \mbox{N}_{r_i}(\B{0},h^2_{F_{i_j}}\B{K}_i)\\
+\;\B{\Sigma}^R_{h^2_i} &= \mbox{Diag}(h^2_{R_{i_j}}),\;\;\B{\Psi}^R = \mbox{Diag}(\sigma^2_{R_{i_j}}) \\
+\;\B{\Sigma}^F_{h^2_i} &= \mbox{Diag}(h^2_{F_{i_j}})
 \end{split} \end{align}
 
 \noindent where the $\B{K}_i, i \in 1\dots R$ are $r_i \times r$ ``kinship" matrices describing expected covariances of random effects. These replace the additive-genetic covariance matrix $\B{A}$ used in BSFG, and could be any positive-definite matrices. The number of levels for each of the $R$ random effects, $r_i$ may not equal $n$. The design matrices $\B{Z}_i$ are $n \times r_i$ matrices linking each random effect level to a corresponding individual. BSFG allowed only a single random effect for the factors, although a second random effect was used for the $p$ observational-level traits in one example. 
 
-The among-trait covariance specification is also new relative to BSFG. $\B{\Sigma}^F_{h^2_i}$ is equivalent to $\B{\Sigma}_{h^2}$ from BSFG, ie a $k \times k$ diagonal matrix specifying the heritability (or percentage of variation explained by the additive-genetic covariance matrix) of each of the $k$ latent factors. In SLAMglmm, $\B{\Sigma}^F_{h^2_i}$ is also diagonal, specifying the percentage of variation in each of the $k$ latent factors explained by each of the $R$ random effects. $\B{\Sigma}^R_{h^2_i}$ is a similar $p \times p$ matrix for the residuals of each of the $p$ observational-level traits $\B{H}$, accounting for the latent factor traits. $\B{\Psi}^R$ is a $p \times p$ diagonal matrix of total residual variances for each for the $p$ traits. This random effect specification is elaborated below in section~\ref{random_effect_priors}.
+The specification of the column-variances of $\B{U}_{R_i}$ is new relative to BSFG (this replaces $\B{E}_a$). Instead of a single $\sigma^2_{a_j}$, we decompose this variance into a total variance $\sigma^2_{R_j}$ and a percentage of the total attributable to the $i$th random effect $h^2_{R_{i_j}} = \sigma^2_{a_i}/\sigma^2_p$. This is now identical to the random effect variance specification for the factors $\B{f}_j$, except that for the factors $\sigma^2_{F_j} = 1$. This re-parameterization makes prior elicitation easier, as elaborated below in section~\ref{random_effect_priors}.
 
 \subsubsection{link distribution}
 Several link distributions are described below in section~\ref{link_functions}. 
@@ -85,7 +87,7 @@ Beyond the identity $\B{y}_i = \B{\eta}_i$, the next simplest link function is o
 \end{align}
 
 \subsubsection{prior on factors}
-We use the same prior on $\B{\Lambda}$ as in BSFG. This is the ``infinite factor model" prior proposed by Bhattacharya and Dunson (2011) that imposes increasing column-wise shrinkage on higher order columns, which imposes sparsity by shrinking the number of important factors (ie paths), as well as element-wise shrinkage on each element of $\B{\Lambda}$ through and ARD-type prior. Other priors such as the \emph{TPD} prior of Engelhardt could be substituted.
+We use the same prior on $\B{\Lambda}$ as in BSFG. This is the ``infinite factor model" prior proposed by Bhattacharya and Dunson (2011) that imposes increasing column-wise shrinkage on higher order columns, which imposes sparsity by shrinking the number of important factors (ie paths), as well as element-wise shrinkage on each element of $\B{\Lambda}$ through and ARD-type prior. Other priors such as the \emph{TPB} prior of Engelhardt could be substituted. 
 
 \section{New concepts}
 As mentioned above, SLAMglmm proposes three new features that together greatly facility the analysis of high-dimensional linear mixed effect models. These are described more here:
@@ -93,27 +95,27 @@ As mentioned above, SLAMglmm proposes three new features that together greatly f
 \subsection{Structural equation models of among-trait covariances}
 The central statistical challenge of large multivariate mixed effect models is that the number of parameters necessary to specify the among-trait covariance matrices grows as $p\times(p-1)/2 \times (R+1)$ with the number of traits and the number of random effects. Unconstrained estimates of all these covariance parameters requires an unrealistic number of observations for even moderately-sized trait vectors,
 
-As proposed for BSFG, SLAMglmm uses a hierarchical sparse-factor structural equation model to explain the among-trait covariance structure. This model structure prioritizes the strongest, most important covariance signals in the data. A key development in BSFG was the idea that a single set of factors $\B{\Lambda}$ could be used to explain both the additive-genetic and residual covariances, with the the factors re-weighted for each covariance matrix:
+As proposed for BSFG, SLAMglmm uses a hierarchical sparse-factor structural equation model to explain the among-trait covariance structure. This prioritizes the strongest, most important covariance signals in the data. A key development in BSFG was the idea that a single set of factors $\B{\Lambda}$ could be used to explain both the additive-genetic and residual covariances, with the the factors re-weighted for each covariance matrix:
 \begin{align}\begin{split}
-\B{G} &= \B{\Lambda \Sigma_{h^2} \Lambda^T} + \Psi_G \\
-\B{R} &= \B{\Lambda (\B{I}_k - \Sigma_{h^2}) \Lambda^T} + \Psi_G \\
+\B{G} &= \B{\Lambda} \B{\Sigma}_{h^2} \B{\Lambda}^T + \B{\Psi}_G \\
+\B{R} &= \B{\Lambda} (\B{I}_k - \B{\Sigma}_{h^2}) \B{\Lambda}^T + \B{\Psi}_R 
 \end{split} \end{align}
 
 This ``sharing" of the factors between the covariance matrices does not force them to be similar: whenever one of the diagonal elements of $\B{\Sigma_{h^2}}$ ($\sigma_{h^2_j}$) equals $0$($1$), the column contributes only to the residual (additive-genetic) covariance matrix. But when the same factor contributes to both covariances, the same $\B{\lambda}_j$ parameters can be re-used.
 
 SLAMglmm uses this same strategy to efficiently estimate a set of $R+1$ covariance matrices for the $R$ random effects and the residuals. Each diagonal element of the $\B{\Sigma^F_{h^2_i}}$ matrices is allowed to equal 0 or 1, but can also take values in between, providing flexible sharing of covariance components among random effects:
 \begin{align}\begin{split}
-\;\B{\Sigma}_i &= \B{\Lambda \Sigma^F_{h^2_i} \Lambda^T} + \Sigma^R_{h^2_i}\Psi^R \\
-\;\B{\Sigma}_R &= \B{\Lambda (\B{I}_k - \sum \Sigma^F_{h^2_i}) \Lambda^T} + (\B{I}_p - \sum \Sigma^R_{h^2_i})\Psi^R 
+\;\B{\Sigma}_i &= \B{\Lambda} \B{\Sigma}^F_{h^2_i} \B{\Lambda}^T + \B{\Sigma}^R_{h^2_i}\B{\Psi}^R \\
+\;\B{\Sigma}_R &= \B{\Lambda} (\B{I}_k - \sum \B{\Sigma}^F_{h^2_i}) \B{\Lambda}^T + (\B{I}_p - \sum \B{\Sigma}^R_{h^2_i})\B{\Psi}^R 
 \end{split} \end{align}
 
 SLAMglmm also extends BSFG by leveraging the latent factors to estimate the fixed effects. If the the same sets of traits are associated with the fixed effect covariates as distinguish the random effect groupings (or residuals), the same factors can also be used to explain the fixed effect responses. These factor - covariate associations can be explored directly (ex sex or condition effects on the latent traits), or used to provide more robust fixed effect coefficients for the observation-level traits.
 
 \subsection{prior elicitation}
 \label{random_effect_priors}
-Intuitive prior distributions are important for effective prior elicitation in Bayesian models. In most implementations of mixed effect models, inverse-Gamma priors are used for the variance components. This prior form is useful because of conjugacy to the likelihood. However, specifying hyperparameters for multiple variance components of this form can be difficult, especially when the prior information is highly diffuse. Gibbs samplers based on inverse-Gamma priors are known to have poor mixing properties, and so ``parameter-expanded" forms are commonly used (ex. \emph{MCMCglmm}, Gelman et al 2006?). These problems are exacerbated in the multivariate mixed model. The conjugate distribution of the covariance of multivariate random effects is the inverse-Wishart distribution, which is particularly difficult to use to specify vague knowledge and is generally not very flexible.
+Intuitive prior distributions are important for effective prior elicitation in Bayesian models. In most implementations of mixed effect models, inverse-Gamma priors are used for the variance components. This prior form is useful because of conjugacy to the likelihood. However, specifying hyperparameters for multiple variance components of this form can be difficult, especially when the prior information is highly diffuse. Gibbs samplers based on inverse-Gamma priors are known to have poor mixing properties, and so ``parameter-expanded" forms are commonly used (ex. \emph{MCMCglmm}, Gelman et al 2006?), which improve computation, but can complicate prior elicitation. These problems are exacerbated in the multivariate mixed model. The conjugate distribution of the covariance of multivariate random effects is the inverse-Wishart distribution, which is particularly difficult to use to specify vague knowledge and is generally not very flexible.
 
-In BSFG, we avoided the inverse-Wishart distribution by the hierarchical structure, with prior covariance specified through the prior on $\B{\Lambda}$. We did use inverse-Gamma priors for the residual variances of each of the $p$ observational-level traits, but used a recently proposed re-formulation of the random effect model in terms of heritability and total variance to specify priors for the factor variances (Zhou?). Heritability ($h^2 = \sigma^2_a / (\sigma^2_p)$) defined as the proportion of variance attributable to genetics, is more intuitive and easier to visualize than a variance, and is independent of the scale of the data, making prior elicitation easier. We used a discrete prior directly on heritability to permit highly flexible prior distributions. This discrete prior also facilitates a highly efficient partially collapsed Gibbs sampler for the factor traits which we described in Runcie and Mukherjee 2013 and detail below in section~\ref{Gibbs_sampler}
+In BSFG, we avoided the inverse-Wishart distribution by the hierarchical factor structure, with prior covariance specified through the prior on $\B{\Lambda}$. For the residual variances of each of the $p$ observational-level traits, we did use inverse-Gamma priors. But for priors for the factor variances, we used a recently proposed re-formulation of the random effect model in terms of heritability and total variance (Zhou?). Heritability ($h^2 = \sigma^2_a / (\sigma^2_p)$) defined as the proportion of variance attributable to genetics, is more intuitive and easier to visualize than a variance, and is independent of the scale of the data, making prior elicitation easier. We used a discrete prior directly on heritability to permit highly flexible prior distributions. This discrete prior also facilitates a highly efficient partially collapsed Gibbs sampler for the factor traits which we described in Runcie and Mukherjee 2013 and detail below in section~\ref{Gibbs_sampler}
 
  %However, because the total factor-variance was constrained to equal one, a single parameter per factor was necessary to specify $\sigma^2_a$ and $\sigma^2_e$.
 
@@ -130,13 +132,13 @@ Thus, for each trait, we specify a total variance $\sigma^2_{R_{P_j}}$, and then
 Extending the formulation of BSFG, the random effect structure of each of the $k$ the factors is specified similarly, conditional on the fixed effects:
 \begin{align} \begin{split}
 \sigma(\B{f}_{\bullet j} ) | \B{B}_F &= \sum \sigma^2_{F_{i_j}} \B{K}_i + \sigma^2_{F_{e_j}}\B{I}_n \\
-&= (\sum h^2_{F_{i_j}} \B{K}_i + (1 - \sum h^2_{F_{i_j}})\B{I}_n) 
+&= \sigma^2_{F_{P_j}} (\sum h^2_{F_{i_j}} \B{K}_i + (1 - \sum h^2_{F_{i_j}})\B{I}_n) 
 \end{split} \end{align}
 \noindent with the exception that we constrain $\sigma^2_{F_{P_j}} = 1$ for identifiability. Actually, to improve mixing of $\B{\Lambda}$ and $\B{F}$, we implement the parameter expansion proposed by (Dunson?) for factor models by allowing $\sigma^2_{F_{P_j}} \neq1$, but then correcting $\B{F}, \B{U_F}$, and $\B{\Lambda}$ by this factor in the posterior (see~\ref{Gibbs_sampler}).
 
 \subsection{Gibbs sampler}
 \label{Gibbs_sampler}
-In the SLAMglmm R package we develop and a new Gibbs sampler with considerable performance enhancements both in per-iteration speed and especially in parameter mixing relative to BSFG. The key feature of the sampler is that by re-parameterizing the random effects in terms of proportions of variance rather than variance components, and restricting the prior to a discrete set of variance proportions ($h^2_{i_j}$'s), we can sample these proportions directly in a single Gibbs step, marginalizing over all random effects. The individual random effects can be sampled afterwards conditioning on the current values of the $h^2_{i_j}$'s. This significantly reduces the posterior correlation between the random effects and their variance components, a feature that has long plagued MCMC algorithms for mixed effect models (MCMCglmm, Gelman (2006)?). The Gibbs algorithm iterates through the following steps:
+In the SLAMglmm R package we develop a new Gibbs sampler with considerable performance enhancements both in per-iteration speed and especially in parameter mixing relative to BSFG. The key feature of the sampler is that by re-parameterizing the random effects in terms of proportions of variance rather than variance components, and restricting the prior to a discrete set of variance proportions ($h^2_{i_j}$'s), we can sample these proportions directly in a single Gibbs step, marginalizing over all random effects. The individual random effects can be sampled afterwards conditioning on the current values of the $h^2_{i_j}$'s. This partial collapsing of the Gibbs sampler (XX) significantly reduces the posterior correlation between the random effects and their variance components, a feature that has long plagued MCMC algorithms for mixed effect models (MCMCglmm, Gelman (2006)?). The Gibbs algorithm iterates through the following steps:
 \begin{enumerate}
 \item Sample $\B{B}$ and $\B{\Lambda}$ jointly, conditioning on $\B{F}, \B{\Sigma}^R_{h^2}, \B{\Psi}^R$, and the prior precisions of $\B{B}$ and $\B{\Lambda}$, but marginalizing over $\B{U}_{R_i}$ and $\B{E}_{R_i}$.
 \item Sample $\B{\Psi}^R$, conditioning on $\B{B}, \B{\Lambda},\B{F}$, and $\B{\Sigma}^R_{h^2}$, still marginalizing over $\B{U}_{R_i}$ and $\B{E}_{R_i}$.
@@ -149,8 +151,10 @@ In the SLAMglmm R package we develop and a new Gibbs sampler with considerable p
 \item Sample $\B{F}$, conditioning on all other parameters.
 \item Sample precision parameters of $\B{B}$ and $\B{\Lambda}$.
 \item Sample $\B{H} = [\B{\eta}_i]^T$ conditioning on all other parameters and the observed data $\B{y}_i$.
-\item Normalize $\B{F}, \B{U}_{F_i}$ by post-multiplying by$\B{\Psi}^{F^{-1/2}}$ so that $\B{F}$ has unit total variance. Similarly, normalize $\B{\Lambda}$ by post-multiplying by $\B{\Psi}^{F^{1/2}}$ to keep the product $\B{F\Lambda}^T$ the same.
 \end{enumerate}
+
+Outside of the Gibbs iteration, posterior samples of $\B{F}, \B{U}_{F_i}$ are re-normalized by post-multiplying by$\B{\Psi}^{F^{-1/2}}$ so that $\B{F}$ has unit total variance. Similarly, posterior samples of $\B{\Lambda}$ are re-nomralized by post-multiplying by $\B{\Psi}^{F^{1/2}}$ to keep the product $\B{F\Lambda}^T$ the same.
+
 
 The key feature of this Gibbs algorithm is the partial collapsing over the random effect parameters in steps 1-3 and 5-7. This dramatically improves mixing of the sampler. Step 7 is (nearly) identical to the BSFG Gibbs sampler, but the other steps are new in SLAMglmm.
 

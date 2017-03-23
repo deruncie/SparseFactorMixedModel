@@ -7,3 +7,5 @@ sourceCpp*
 .Rhistory
 *.Rapp.history
 *.RData
+*.log
+*.synctex.gz
