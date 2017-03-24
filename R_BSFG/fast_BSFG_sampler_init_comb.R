@@ -32,6 +32,8 @@ fast_BSFG_sampler_init_comb = function(priors,run_parameters){
   # ----------------------- #
   if(file.exists('../setup.RData')) {
     load('../setup.RData')
+    Y = lapply(setup, function(x) x$Y)
+    Mean_Y = colMeans(do.call(rbind,Y),na.rm = TRUE)
   }
   
   k = priors$k_init
@@ -87,7 +89,7 @@ fast_BSFG_sampler_init_comb = function(priors,run_parameters){
   r[[pop]] = ncol(Z_1[[pop]])
   
   Y_missing = is.na(Y[[pop]])        # matrix recording missing data in Y
-  Mean_Y = colMeans(Y[[pop]],na.rm=T)
+  #Mean_Y = colMeans(Y[[pop]],na.rm=T)
   VY = apply(Y[[pop]],2,var,na.rm=T)
   # Don't remove the mean and standardize the variance if it's a
   # simulation because this makes comparing to the simulated values more
