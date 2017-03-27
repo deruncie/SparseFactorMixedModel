@@ -6,6 +6,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
     h2s_matrix = BSFG_state$data_matrices$h2s_matrix
+    cis_effects_index = BSFG_state$data_matrices$cis_effects_index
 
     RE_names   = rownames(h2s_matrix)
     n_RE       = length(RE_names)
@@ -20,6 +21,9 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     r_RE = BSFG_state$run_variables$r_RE
     b    = BSFG_state$run_variables$b
     b_F  = BSFG_state$run_variables$b_F
+
+    # cis effects
+    cis_effects = matrix(rnorm(length(cis_effects_index),0,1),nrow=1)
 
 
 # ----------------------------- #
@@ -111,14 +115,14 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     colnames(B) = traitnames
 
     if(b > 0) {
-      general_prec_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
-      general_prec_B_F = general_prec_B[1,-1,drop=FALSE]
+      tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
+      tau_B_F = tau_B[1,-1,drop=FALSE]
     } else{
-      general_prec_B = matrix(0,ncol=0,nrow=1)
-      general_prec_B_F = general_prec_B
+      tau_B = matrix(0,ncol=0,nrow=1)
+      tau_B_F = tau_B
     }
-    prec_B = matrix(general_prec_B,nrow = b, ncol = p)
-    prec_B_F = matrix(general_prec_B_F,nrow = b_F, ncol = k)
+    prec_B = matrix(tau_B,nrow = b, ncol = p)
+    prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
 
 # ----------------------- #
 # ---Save initial values- #
@@ -145,6 +149,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     		tau_B_F        = tau_B_F,
     		prec_B         = prec_B,
     		prec_B_F       = prec_B_F,
+    		cis_effects    = cis_effects,
     		traitnames     = traitnames,
     		nrun           = 0,
     		total_time     = 0

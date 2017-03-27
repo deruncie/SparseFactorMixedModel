@@ -87,6 +87,14 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @param data_model_parameters a list of parameters necessary for computing \code{data_model}.
 #'     Ex. Y_missing for the missing_data model.
 #'     If \code{data_model == 'missing_data'}, Y_missing is computed automatically.
+#' @param X_resid a design matrix. Alternative method for specifying fixed effects for \code{model}.
+#'     Care must be taken with the intercept if both a fixed effect model is specified for in both
+#'     \code{model} and \code{X_resid}.
+#' @param X_factor a design matrix. Alternative method for specifying \code{factor_model_fixed}
+#' @param cis_genotypes a list of design matrices of length \code{p} (ie number of columns of \code{Eta})
+#'     This is used to specify trait-specific fixed effects, such a cis-genotypes
+#' @param posteriorSample_params A character vector giving names of parameters to save all posterior samples
+#' @param posteriorMean_params A character vector giving names of parameters to save only the posterior mean.
 #' @param ncores for \code{general_BSFG}, number of cores to use during initialization.
 #' @param setup optional - a list of known values for Lambda (error_factor_lambda), h2, factor_h2s
 #' @param verbose should progress in initialization be reported?
@@ -101,10 +109,10 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
 #'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
-                     data_model = 'missing_data', data_model_parameters = NULL,
-                     posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F'),
+                     data_model = 'missing_data', data_model_parameters = NULL, X_resid = NULL, X_factor = NULL, cis_genotypes = NULL,
+                     posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects'),
                      posteriorMean_params = c('U_R'),
-                     sampler = c('fast_BSFG','general_BSFG'), ncores = detectCores(),simulation = c(F,T),setup = NULL,verbose=T) {
+                     ncores = detectCores(),simulation = c(F,T),setup = NULL,verbose=T) {
 
   # ----------------------------- #
   # ---- build model matrices --- #
@@ -161,13 +169,21 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	# build X from fixed model
 	  # for Eta
 	X = model.matrix(nobars(model),data)
+	X = cbind(X, X_resid) # add in X_resid if provided.
 	b = ncol(X)
 
     # for F
 	  # note we drop a column to force intercept to be zero
 	X_F = model.matrix(factor_model_fixed,data)[,-1,drop = FALSE]
+	X_F = cbind(X_F,X_factor)
 	b_F = ncol(X_F)
 
+	# -------- cis genotypes ---------- #
+	if(is.null(cis_genotypes)){
+	  cis_effects_index = NULL
+	} else{
+	  cis_effects_index = do.call(c,sapply(1:length(cis_genotypes),function(j) rep(j,ncol(cis_genotypes[[j]]))))
+	}
 
 	# -------- Random effects ---------- #
 	# ensure that only K or K_inv provided for each random effect
@@ -242,11 +258,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	    rownames(K_mats[[re]]) = levels(data[[re]])
 	    K = K_mats[[re]]
 	  }
-	  # if(is.null(rownames(K))) stop('K must have rownames')
-	  # index = match(colnames(Z_matrices[[re_name]]),rownames(K)) # K must have rownames
-	  # if(any(is.na(index))) stop(sprintf('levels missing from covarince of random effect %s',re))
-	  # stopifnot(length(index) == ncol(Z_matrices[[re_name]]))
-	  # K_mats[[re_name]] = fix_K(K[index,index])
 	  K_mats[[re_name]] = fix_K(K)
 	}
 	K_mats = K_mats[RE_names]
@@ -264,9 +275,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	    rownames(K_inv_mats[[re_name]]) = rownames(K_mats[[re_name]])
 	    Ki = K_inv_mats[[re_name]]
 	  }
-	  # if(is.null(rownames(Ki))) stop('K_inv must have rownames')
-	  # index = match(colnames(Z_matrices[[re_name]]),rownames(Ki)) # Ki must have rownames
-	  # Ki_mats[[re_name]] = fix_K(Ki[index,index])
 	  Ki_mats[[re_name]] = fix_K(Ki)
 	}
 	# names(Ki_mats) = RE_names
@@ -298,6 +306,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  Z_matrices = Z_matrices,
 	  Z          = Z,
 	  h2s_matrix = h2s_matrix,
+	  cis_genotypes = cis_genotypes,
+	  cis_effects_index = cis_effects_index,
 	  data       = data
 	)
 

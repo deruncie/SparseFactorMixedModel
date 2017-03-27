@@ -174,3 +174,162 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
   )
   )
 }
+
+probe_gene_model = function(Y,data_model_parameters,BSFG_state = list()){
+  current_state = BSFG_state$current_state
+  data_matrices = BSFG_state$data_matrices
+  new_variables = c('Eta','resid_Y_prec','mu_probe')
+  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
+    p = nrow(Z_Y)
+    n = nrow(Y)
+
+    if(!exists('Eta') || !all(dim(Eta) == c(n,p))) Eta = matrix(0,n,p)
+    if(!exists('resid_Y_prec')) resid_Y_prec = rep(1,ncol(Y))
+
+    Y_tilde = Y - Eta %*% Z_Y
+    mu_probe = colMeans(Y_tilde) + rnorm(ncol(Y))/sqrt(n*resid_Y_prec)
+
+    Y_tilde = sweep(Y,2,mu_probe,'-')
+    Y_std = sweep(Y_tilde,2,resid_Y_prec,'*')
+
+    if(!exists('tot_Eta_prec')){
+      sum_Y_prec = Z_Y %*% resid_Y_prec
+      prec = sum_Y_prec@x
+      post_mean = sweep(Y_std %*% t(Z_Y),2,prec,'/')
+      resid = sweep(matrix(rnorm(n*p),n,p),2,sqrt(prec),'/')
+    } else{
+      resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+
+      Eta_mean_std = sweep(Eta_mean,2,resid_Eta_prec,'*')
+      sum_Y_prec = Z_Y %*% resid_Y_prec
+      prec = sum_Y_prec@x + resid_Eta_prec
+
+      post_mean = sweep(Y_std %*% t(Z_Y) + Eta_mean_std,2,prec,'/')
+      resid = sweep(matrix(rnorm(n*p),n,p),2,sqrt(prec),'/')
+    }
+    Eta = as.matrix(post_mean) + resid
+
+    Y_tilde = Y_tilde - Eta %*% Z_Y
+    resid_Y_prec = rgamma(ncol(Y),shape = resid_Y_prec_shape + 0.5*nrow(Y),
+                          rate = resid_Y_prec_rate + 0.5 * colSums(Y_tilde^2))
+    return(list(Eta = Eta, mu_probe = mu_probe, resid_Y_prec = resid_Y_prec))
+  })
+  return(list(state = data_model_state[new_variables],
+              posteriorSample_params = c(),
+              posteriorMean_params = c('Eta','resid_Y_prec','mu_probe')
+  )
+  )
+}
+
+
+#' Sample Eta given gene-specific cis-eQTL genotypes
+#'
+#' Eta is a matrix of gene expression residuals after accounting for cis-eQTL
+#'
+#' This function should pre-calculate design matrices for each individual (assuming they are all
+#'     unique), as well as SVDs for efficient repeated solvings of the posterior distributions
+#'     as resid_Y_prec, Eta_mean and resid_Eta_prec are updated each iteraction.
+#'
+#' @param Y a vector of observation. Pre-scaled and centered if desired.
+#' @param data_model_parameters a list of model matrices for the cis-genotypes of each gene.
+#'      If named, the names should correspond to the column names of Y
+# cis_eQTL_model = function(Y,data_model_parameters,BSFG_state = list()){
+#   current_state = BSFG_state$current_state
+#   data_matrices = BSFG_state$data_matrices
+#
+#   new_variables = c('Eta')
+#   data_model_state = with(data_matrices,current_state),{
+#
+#     if(length(current_state) == 0){
+#       # prep model matrices
+#       if(!is.null(names(data_model_parameters))) {
+#         if(is.null(colnames(Y)) & length(data_model_parameters) == ncol(Y)) colnames(Y) = colnames(data_model_parameters)
+#         if(!all(colnames(Y) %in% colnames(data_model_parameters))) stop('column names of Y and cis-genotype names do not match')
+#       } else{
+#         if(is.null(colnames(Y))){
+#           if(!length(data_model_parameters) == ncol(Y)) stop('wrong number of cis-genotypes provided')
+#           colnames(Y) = names(data_model_parameters) = 1:ncol(Y)
+#         }
+#       }
+#       model_matrices = lapply(colnames(Y),function(i) {
+#         X = model.matrix(~0+data_model_parameters[[i]])
+#         XtX = crossprod(X)
+#         XtXiXt = solve(XtX) %*% t(X)
+#         chol_XtX = chol(XtX)
+#         return(list(X = X, XtXiXt = XtXiXt, chol_XtX = chol_XtX))
+#       })
+#       names(model_matrices) = colnames(Y)
+#
+#       cis_to_gene = names(model_matrices)[sapply(model_matrices,function(x) ncol(chol_XtX))]
+#
+#       p = ncol(Y)
+#       n = nrow(Y)
+#
+#       Eta = Eta_mean = matrix(0,n,p)
+#       resid_Eta_prec = matrix(0,1,p)
+#       resid_Y_prec = matrix(rep(1,p),dimnames = list(NULL,colnames(Y)))  # only a single precision parameter for the data_model?
+#     } else{
+#       Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
+#       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+#       if(!exists(resid_Y_prec)) resid_Y_prec = matrix(rep(1,p),dimnames = list(NULL,colnames(Y)))
+#     }
+#
+#     # sample cis_effects conditional on Eta
+#     Y_tilde_Eta = Y - Eta
+#     cis_effects = lapply(colnames(Y),function(i) {
+#       cis_mean = model_matrices[[i]]$XtXiXt %*% Y_tilde_Eta[,i]
+#       cis_effect = cis_mean + backsolve(model_matrices[[i]]$chol_XtX,rnorm(length(cis_mean))) * sqrt(resid_Y_prec[i])
+#       cis_effect
+#     })
+#     cis_means = sapply(colnames(Y),function(i) model_matrices[[i]]$X %*% cis_effects[[i]])
+#
+#     # sample Eta conditional on cis_effects
+#     Y_tilde_cis = Y - cis_means
+#     Y_std = sweep(Y_tilde_cis,2,resid_Y_prec,'*')
+#
+#     Eta_mean_std = sweep(Eta_mean,2,resid_Eta_prec,'*')
+#     prec = resid_Y_prec + resid_Eta_prec
+#
+#     post_mean = sweep(Y_std + Eta_mean_std,2,prec,'/')
+#     resid = sweep(matrix(rnorm(n*p),n,p),2,sqrt(prec),'/')
+#     Eta = as.matrix(post_mean) + resid
+#   }
+#
+#   Y_tilde = Y_tilde - Eta %*% Z_Y
+#   resid_Y_prec = rgamma(ncol(Y),shape = resid_Y_prec_shape + 0.5*nrow(Y),
+#                         rate = resid_Y_prec_rate + 0.5 * colSums(Y_tilde^2))
+#   return(list(Eta = Eta, mu_probe = mu_probe, resid_Y_prec = resid_Y_prec))
+# })
+#
+#
+#
+#     if(!exists(ncores)) ncores = 1
+#     Eta = do.call(rbind,mclapply(1:n,function(i) {
+#       X = model_matrices[[i]]$X
+#       y = model_matrices[[i]]$y
+#       Cholesky_R = model_matrices[[i]]$Cholesky_R
+#       chol_R = model_matrices[[i]]$chol_R
+#       eta_i = sample_MME_single_diagA(y,X,X,Eta_mean[i,],resid_Eta_prec,Cholesky_R,chol_R,R_Perm = NULL,resid_Y_prec)
+#     },mc.cores = ncores))
+#
+#     Y_fitted = do.call(c,mclapply(1:n,function(i) {
+#       y_fitted = model_matrices[[i]]$X %*% t(Eta[i,])
+#       if(is(y_fitted,'Matrix')) y_fitted = y_fitted@x
+#       y_fitted
+#     },mc.cores = ncores))
+#
+#     Y_tilde = Y - Y_fitted
+#
+#     resid_Y_prec = rgamma(1,shape = resid_Y_prec_shape + 0.5*n*p, rate = resid_Y_prec_rate + 0.5*sum(Y_tilde^2))
+#
+#     return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model.matrices = model.matrices, coefficients = coefficients))
+#   })
+#   return(list(state = data_model_state,
+#               posteriorSample_params = c(),
+#               posteriorMean_params = c('Eta','resid_Y_prec')
+#   )
+#   )
+# }
+
+

@@ -5,6 +5,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
     h2s_matrix = BSFG_state$data_matrices$h2s_matrix
+    cis_effects_index = BSFG_state$data_matrices$cis_effects_index
 
     RE_names   = rownames(h2s_matrix)
     n_RE       = length(RE_names)
@@ -122,6 +123,8 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     prec_B = matrix(tau_B,nrow = b, ncol = p)
     prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
 
+    # cis effects
+    cis_effects = matrix(rnorm(length(cis_effects_index),0,1),nrow=1)
 
 # ----------------------- #
 # ---Save initial values- #
@@ -148,6 +151,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
             tau_B_F        = tau_B_F,
             prec_B         = prec_B,
             prec_B_F       = prec_B_F,
+            cis_effects    = cis_effects,
             traitnames     = traitnames,
             nrun           = 0,
             total_time     = 0

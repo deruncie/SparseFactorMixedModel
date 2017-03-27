@@ -19,16 +19,34 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		} else{ # b == 0
 		  prior_prec = t(Plam)
 		}
-		coefs = sample_MME_fixedEffects(Eta,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,ncores)
-		if(b > 0){
-			B[] = coefs[1:b,,drop=FALSE]
+		if(is.null(cis_genotypes)){
+		  coefs = sample_MME_fixedEffects(Eta,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,ncores)
+		  if(b > 0){
+		    B[] = coefs[1:b,,drop=FALSE]
+		  }
+		  Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
+		  XB = X %*% B
+		} else{
+		  XB = matrix(0,ncol = p, nrow = n)
+  		for(j in 1:p){
+  		  cis_X_j = cis_genotypes[[j]]
+  		  Design_j = cbind(Design,cis_X_j)
+  		  prior_mean_j = rbind(prior_mean[,j,drop=FALSE],0)
+  		  prior_prec_j = rbind(prior_prec[,j,drop=FALSE],1e-10)
+  		  coefs_j = sample_MME_fixedEffects(Eta[,j,drop=FALSE],Design_j,Sigma_Choleskys, Sigma_Perm,  resid_h2_index[j], tot_Eta_prec[,j,drop=FALSE], prior_mean_j, prior_prec_j,ncores)
+  		  if(b > 0){
+  		    B[,j] = coefs_j[1:b]
+  		  }
+  		  Lambda[,j] = coefs_j[b+1:p]
+  		  cis_effects[,cis_effects_index[j]] = coefs_j[-c(1:(p+b))]
+  		  XB[,j] = X %*% B[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]]
+  		}
 		}
-		Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
 
 
 	 # -----Sample tot_Eta_prec, resid_h2, U_R ---------------- #
 		#conditioning on B, F, Lambda, resid_h2, tot_Eta_prec
-		Eta_tilde = Eta - X %*% B - F %*% t(Lambda)
+		Eta_tilde = Eta - XB - F %*% t(Lambda)
 		tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
 		resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
@@ -42,7 +60,8 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 			prior_mean = matrix(0,b_F,p)
 			prior_prec = prec_B_F
 			B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, Sigma_Perm, F_h2_index, tot_F_prec, prior_mean, prior_prec,ncores)
-			F_tilde = F - X_F %*% B_F
+			XFBF = X_F %*% B_F
+			F_tilde = F - XFBF
 		} else{
 		  F_tilde = F
 		}
@@ -57,11 +76,11 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 
 	 # -----Sample F----------------------- #
 		#conditioning on B, U_F,U_R,Lambda, F_h2
-		Eta_tilde = as.matrix(Eta - X %*% B - Z %*% U_R)
+		Eta_tilde = as.matrix(Eta - XB - Z %*% U_R)
 		F_e_prec = tot_F_prec / (1-colSums(F_h2))
 		resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
 		if(b_F > 0) {
-		  prior_mean = X_F %*% B_F + Z %*% U_F
+		  prior_mean = XFBF + Z %*% U_F
 		} else {
 		  prior_mean = Z %*% U_F
 		}
