@@ -34,12 +34,12 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		    Design_j = cbind(Design,cis_X_j)
 		    prior_mean_j = rbind(prior_mean[,j,drop=FALSE],0)
 		    prior_prec_j = rbind(prior_prec[,j,drop=FALSE],1e-10)
-		    coefs_j = sample_coefs_parallel_sparse_c( Eta[,j,drop=FALSE],Design,resid_h2[,j,drop=FALSE], tot_Eta_prec[,j,drop=FALSE],prior_mean_j,prior_prec_j,invert_aI_bZKZ,1)
+		    coefs_j = sample_coefs_parallel_sparse_c( Eta[,j,drop=FALSE],Design_j,resid_h2[,j,drop=FALSE], tot_Eta_prec[,j,drop=FALSE],prior_mean_j,prior_prec_j,invert_aI_bZKZ,1)
 		    if(b > 0){
 		      B[,j] = coefs_j[1:b]
 		    }
-		    Lambda[,j] = coefs_j[b+1:p]
-		    cis_effects[,cis_effects_index[j]] = coefs_j[-c(1:(p+b))]
+		    Lambda[j,] = coefs_j[b+1:k]
+		    cis_effects[,cis_effects_index[j]] = coefs_j[-c(1:(b+k))]
 		    XB[,j] = X %*% B[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]]
 		  }
 		}

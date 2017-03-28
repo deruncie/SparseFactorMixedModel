@@ -37,7 +37,7 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
   		  if(b > 0){
   		    B[,j] = coefs_j[1:b]
   		  }
-  		  Lambda[,j] = coefs_j[b+1:p]
+  		  Lambda[j,] = coefs_j[b+1:p]
   		  cis_effects[,cis_effects_index[j]] = coefs_j[-c(1:(p+b))]
   		  XB[,j] = X %*% B[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]]
   		}

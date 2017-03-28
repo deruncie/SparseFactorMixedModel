@@ -149,6 +149,11 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
       plot(c(B_factor),c(B[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
     }
   }
+
+  # cis_effects
+  if(length(setup$cis_effects) == length(BSFG_state$current_state$cis_effects)){
+    plot(setup$cis_effects,BSFG_state$current_state$cis_effects);abline(0,1)
+  }
 }
 
 plot_fixed_effects = function(B_act, B_resid,B_factor,B_total){

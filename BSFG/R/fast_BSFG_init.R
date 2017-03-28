@@ -171,8 +171,6 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     #inversion: inv(aI + bZKZ) = 1/b*U*diag(1./(s+a/b))*U'
     #uses singular value decomposition of ZKZ for stability when ZKZ is low
     #rank
-#     XZ = [X_f Z  ]
-#     [U,S,~]          = svd(XZ*blkdiag(1e6*eye(b_f),K)*XZ')
 
     result = svd(Z %*% K %*% t(Z))
     invert_aI_bZKZ = list(

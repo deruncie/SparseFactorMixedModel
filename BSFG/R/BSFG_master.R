@@ -112,7 +112,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
                      data_model = 'missing_data', data_model_parameters = NULL, X_resid = NULL, X_factor = NULL, cis_genotypes = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects'),
                      posteriorMean_params = c('U_R'),
-                     ncores = detectCores(),simulation = c(F,T),setup = NULL,verbose=T) {
+                     ncores = detectCores(),setup = NULL,verbose=T) {
 
   # ----------------------------- #
   # ---- build model matrices --- #
@@ -182,7 +182,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	if(is.null(cis_genotypes)){
 	  cis_effects_index = NULL
 	} else{
-	  cis_effects_index = do.call(c,sapply(1:length(cis_genotypes),function(j) rep(j,ncol(cis_genotypes[[j]]))))
+	  cis_effects_index = do.call(c,lapply(1:length(cis_genotypes),function(j) rep(j,ncol(cis_genotypes[[j]]))))
 	}
 
 	# -------- Random effects ---------- #
@@ -522,7 +522,7 @@ sample_prec_B_ARD = function(BSFG_state){
   current_state = with(c(priors,run_variables),within(current_state,{
     if(b > 1) {
       B2 = B^2
-      tau_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums((B2 * prec_B/c(tau_B))[-1,])/2)
+      tau_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums((B2 * prec_B/c(tau_B))[-1,,drop=FALSE])/2)
       prec_B[-1,] = matrix(rgamma((b-1)*p,shape = (B_df + 1)/2,rate = (B_df + B2[-1,,drop=FALSE]*tau_B[-1])/2),nr = (b-1),nc = p)
       prec_B[-1,] = prec_B[-1,]*tau_B[-1]
     }
