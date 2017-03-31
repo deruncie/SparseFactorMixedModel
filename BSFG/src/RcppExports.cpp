@@ -7,96 +7,96 @@
 using namespace Rcpp;
 
 // sample_coefs_parallel_sparse_c
-arma::mat sample_coefs_parallel_sparse_c(arma::mat Y, arma::mat W, arma::vec h2, arma::vec tot_Y_prec, arma::mat prior_mean, arma::mat prior_prec, List invert_aI_bZKZ, int grainSize);
-RcppExport SEXP BSFG_sample_coefs_parallel_sparse_c(SEXP YSEXP, SEXP WSEXP, SEXP h2SEXP, SEXP tot_Y_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP invert_aI_bZKZSEXP, SEXP grainSizeSEXP) {
+arma::mat sample_coefs_parallel_sparse_c(arma::mat Eta, arma::mat W, arma::vec h2, arma::vec tot_Eta_prec, arma::mat prior_mean, arma::mat prior_prec, List invert_aI_bZKZ, int grainSize);
+RcppExport SEXP BSFG_sample_coefs_parallel_sparse_c(SEXP EtaSEXP, SEXP WSEXP, SEXP h2SEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP invert_aI_bZKZSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Eta(EtaSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type W(WSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type h2(h2SEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type tot_Y_prec(tot_Y_precSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type tot_Eta_prec(tot_Eta_precSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type prior_mean(prior_meanSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type prior_prec(prior_precSEXP);
     Rcpp::traits::input_parameter< List >::type invert_aI_bZKZ(invert_aI_bZKZSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_coefs_parallel_sparse_c(Y, W, h2, tot_Y_prec, prior_mean, prior_prec, invert_aI_bZKZ, grainSize));
+    rcpp_result_gen = Rcpp::wrap(sample_coefs_parallel_sparse_c(Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, invert_aI_bZKZ, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }
 // sample_tot_prec_sparse_c
-arma::rowvec sample_tot_prec_sparse_c(arma::mat Y, arma::vec h2, double tot_Y_prec_shape, double tot_Y_prec_rate, List invert_aI_bZKZ);
-RcppExport SEXP BSFG_sample_tot_prec_sparse_c(SEXP YSEXP, SEXP h2SEXP, SEXP tot_Y_prec_shapeSEXP, SEXP tot_Y_prec_rateSEXP, SEXP invert_aI_bZKZSEXP) {
+arma::rowvec sample_tot_prec_sparse_c(arma::mat Eta, arma::vec h2, double tot_Eta_prec_shape, double tot_Eta_prec_rate, List invert_aI_bZKZ);
+RcppExport SEXP BSFG_sample_tot_prec_sparse_c(SEXP EtaSEXP, SEXP h2SEXP, SEXP tot_Eta_prec_shapeSEXP, SEXP tot_Eta_prec_rateSEXP, SEXP invert_aI_bZKZSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Eta(EtaSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type h2(h2SEXP);
-    Rcpp::traits::input_parameter< double >::type tot_Y_prec_shape(tot_Y_prec_shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type tot_Y_prec_rate(tot_Y_prec_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type tot_Eta_prec_shape(tot_Eta_prec_shapeSEXP);
+    Rcpp::traits::input_parameter< double >::type tot_Eta_prec_rate(tot_Eta_prec_rateSEXP);
     Rcpp::traits::input_parameter< List >::type invert_aI_bZKZ(invert_aI_bZKZSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_tot_prec_sparse_c(Y, h2, tot_Y_prec_shape, tot_Y_prec_rate, invert_aI_bZKZ));
+    rcpp_result_gen = Rcpp::wrap(sample_tot_prec_sparse_c(Eta, h2, tot_Eta_prec_shape, tot_Eta_prec_rate, invert_aI_bZKZ));
     return rcpp_result_gen;
 END_RCPP
 }
 // sample_h2s_discrete_given_p_sparse_c
-arma::rowvec sample_h2s_discrete_given_p_sparse_c(arma::mat Y, int h2_divisions, arma::vec h2_priors, arma::vec Tot_prec, List invert_aI_bZKZ);
-RcppExport SEXP BSFG_sample_h2s_discrete_given_p_sparse_c(SEXP YSEXP, SEXP h2_divisionsSEXP, SEXP h2_priorsSEXP, SEXP Tot_precSEXP, SEXP invert_aI_bZKZSEXP) {
+arma::rowvec sample_h2s_discrete_given_p_sparse_c(arma::mat Eta, int h2_divisions, arma::vec h2_priors, arma::vec Tot_prec, List invert_aI_bZKZ);
+RcppExport SEXP BSFG_sample_h2s_discrete_given_p_sparse_c(SEXP EtaSEXP, SEXP h2_divisionsSEXP, SEXP h2_priorsSEXP, SEXP Tot_precSEXP, SEXP invert_aI_bZKZSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Eta(EtaSEXP);
     Rcpp::traits::input_parameter< int >::type h2_divisions(h2_divisionsSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type h2_priors(h2_priorsSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type Tot_prec(Tot_precSEXP);
     Rcpp::traits::input_parameter< List >::type invert_aI_bZKZ(invert_aI_bZKZSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_h2s_discrete_given_p_sparse_c(Y, h2_divisions, h2_priors, Tot_prec, invert_aI_bZKZ));
+    rcpp_result_gen = Rcpp::wrap(sample_h2s_discrete_given_p_sparse_c(Eta, h2_divisions, h2_priors, Tot_prec, invert_aI_bZKZ));
     return rcpp_result_gen;
 END_RCPP
 }
 // sample_randomEffects_parallel_sparse_c
-arma::mat sample_randomEffects_parallel_sparse_c(arma::mat Y, arma::sp_mat Z, arma::vec tot_prec, arma::vec h2, List invert_aZZt_Kinv, int grainSize);
-RcppExport SEXP BSFG_sample_randomEffects_parallel_sparse_c(SEXP YSEXP, SEXP ZSEXP, SEXP tot_precSEXP, SEXP h2SEXP, SEXP invert_aZZt_KinvSEXP, SEXP grainSizeSEXP) {
+arma::mat sample_randomEffects_parallel_sparse_c(arma::mat Eta, arma::sp_mat Z, arma::vec tot_prec, arma::vec h2, List invert_aZZt_Kinv, int grainSize);
+RcppExport SEXP BSFG_sample_randomEffects_parallel_sparse_c(SEXP EtaSEXP, SEXP ZSEXP, SEXP tot_precSEXP, SEXP h2SEXP, SEXP invert_aZZt_KinvSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Eta(EtaSEXP);
     Rcpp::traits::input_parameter< arma::sp_mat >::type Z(ZSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type tot_prec(tot_precSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type h2(h2SEXP);
     Rcpp::traits::input_parameter< List >::type invert_aZZt_Kinv(invert_aZZt_KinvSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_randomEffects_parallel_sparse_c(Y, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize));
+    rcpp_result_gen = Rcpp::wrap(sample_randomEffects_parallel_sparse_c(Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }
 // sample_means_parallel_c
-arma::mat sample_means_parallel_c(arma::mat Y_tilde, arma::vec resid_Y_prec, arma::vec E_a_prec, List invert_aK_bZtZ, int grainSize);
-RcppExport SEXP BSFG_sample_means_parallel_c(SEXP Y_tildeSEXP, SEXP resid_Y_precSEXP, SEXP E_a_precSEXP, SEXP invert_aK_bZtZSEXP, SEXP grainSizeSEXP) {
+arma::mat sample_means_parallel_c(arma::mat Eta_tilde, arma::vec resid_Eta_prec, arma::vec E_a_prec, List invert_aK_bZtZ, int grainSize);
+RcppExport SEXP BSFG_sample_means_parallel_c(SEXP Eta_tildeSEXP, SEXP resid_Eta_precSEXP, SEXP E_a_precSEXP, SEXP invert_aK_bZtZSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type Y_tilde(Y_tildeSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type resid_Y_prec(resid_Y_precSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Eta_tilde(Eta_tildeSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type resid_Eta_prec(resid_Eta_precSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type E_a_prec(E_a_precSEXP);
     Rcpp::traits::input_parameter< List >::type invert_aK_bZtZ(invert_aK_bZtZSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_means_parallel_c(Y_tilde, resid_Y_prec, E_a_prec, invert_aK_bZtZ, grainSize));
+    rcpp_result_gen = Rcpp::wrap(sample_means_parallel_c(Eta_tilde, resid_Eta_prec, E_a_prec, invert_aK_bZtZ, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }
 // sample_factors_scores_sparse_c
-arma::mat sample_factors_scores_sparse_c(arma::mat Y_tilde, arma::mat prior_mean, arma::mat Lambda, arma::vec resid_Y_prec, arma::vec F_e_prec);
-RcppExport SEXP BSFG_sample_factors_scores_sparse_c(SEXP Y_tildeSEXP, SEXP prior_meanSEXP, SEXP LambdaSEXP, SEXP resid_Y_precSEXP, SEXP F_e_precSEXP) {
+arma::mat sample_factors_scores_sparse_c(arma::mat Eta_tilde, arma::mat prior_mean, arma::mat Lambda, arma::vec resid_Eta_prec, arma::vec F_e_prec);
+RcppExport SEXP BSFG_sample_factors_scores_sparse_c(SEXP Eta_tildeSEXP, SEXP prior_meanSEXP, SEXP LambdaSEXP, SEXP resid_Eta_precSEXP, SEXP F_e_precSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type Y_tilde(Y_tildeSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Eta_tilde(Eta_tildeSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type prior_mean(prior_meanSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type Lambda(LambdaSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type resid_Y_prec(resid_Y_precSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type resid_Eta_prec(resid_Eta_precSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type F_e_prec(F_e_precSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_factors_scores_sparse_c(Y_tilde, prior_mean, Lambda, resid_Y_prec, F_e_prec));
+    rcpp_result_gen = Rcpp::wrap(sample_factors_scores_sparse_c(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec));
     return rcpp_result_gen;
 END_RCPP
 }

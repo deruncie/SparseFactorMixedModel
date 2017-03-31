@@ -151,7 +151,7 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
   }
 
   # cis_effects
-  if(length(setup$cis_effects) == length(BSFG_state$current_state$cis_effects)){
+  if(length(setup$cis_effects) > 0 &&  length(setup$cis_effects) == length(BSFG_state$current_state$cis_effects)){
     plot(setup$cis_effects,BSFG_state$current_state$cis_effects);abline(0,1)
   }
 }

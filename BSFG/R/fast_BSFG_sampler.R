@@ -21,7 +21,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		  prior_prec = t(Plam)
 		}
 		if(is.null(cis_genotypes)){
-		  coefs = sample_coefs_parallel_sparse_c( Eta,Design,resid_h2, tot_Eta_prec,prior_mean,prior_prec,invert_aI_bZKZ,1)
+		  coefs <- sample_coefs_parallel_sparse_c( Eta,Design,resid_h2, tot_Eta_prec,prior_mean,prior_prec,invert_aI_bZKZ,1)
 		  if(b > 0){
 		    B[] = coefs[1:b,,drop=FALSE]
 		  }

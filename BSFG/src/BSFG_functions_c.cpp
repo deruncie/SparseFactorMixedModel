@@ -20,100 +20,118 @@ arma::mat sweep_times(arma::mat x, int MARGIN, arma::vec STATS){
 	return(x);
 }
 
-
 // [[Rcpp::export()]]
 arma::mat sample_coefs_parallel_sparse_c(
-					arma::mat Y,
-					arma::mat W,
-					arma::vec h2,
-					arma::vec tot_Y_prec,
-					arma::mat prior_mean,
-					arma::mat prior_prec,
-					List invert_aI_bZKZ,
-					int grainSize) {
+    arma::mat Eta,
+    arma::mat W,
+    arma::vec h2,
+    arma::vec tot_Eta_prec,
+    arma::mat prior_mean,
+    arma::mat prior_prec,
+    List invert_aI_bZKZ,
+    int grainSize) {
 
-	// Sample regression coefficients
-	// columns of matrices are independent
-	// each column conditional posterior is a MVN due to conjugacy
+  // Sample regression coefficients
+  // columns of matrices are independent
+  // each column conditional posterior is a MVN due to conjugacy
 
 
-	struct sampleColumn : public Worker {
-		arma::mat WtU, UtY, prior_prec, Z;
-		arma::vec h2, tot_Y_prec, s;
-		int b;
-		arma::mat &coefs;
+  struct sampleColumn : public Worker {
+    arma::mat UtW, UtEta, prior_prec, randn_theta, randn_e;
+    arma::vec h2, tot_Eta_prec, s;
+    int b,n;
+    arma::mat &coefs;
 
-		sampleColumn(arma::mat WtU, arma::mat UtY, arma::mat prior_prec, arma::mat Z, arma::vec h2, arma::vec tot_Y_prec, arma::vec s, int b, arma::mat &coefs) :
-			WtU(WtU), UtY(UtY), prior_prec(prior_prec), Z(Z), h2(h2), tot_Y_prec(tot_Y_prec), s(s), b(b), coefs(coefs) {}
+    sampleColumn(arma::mat UtW, arma::mat UtEta, arma::mat prior_prec, arma::vec h2, arma::vec tot_Eta_prec,
+                 arma::mat randn_theta, arma::mat randn_e,
+                 arma::vec s, int b, int n,
+                 arma::mat &coefs) :
+      UtW(UtW), UtEta(UtEta), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
+      h2(h2), tot_Eta_prec(tot_Eta_prec),
+      s(s), b(b), n(n),
+      coefs(coefs) {}
 
-      	void operator()(std::size_t begin, std::size_t end) {
-			arma::mat WtUDi, Q, cholQ;
-			arma::vec means,v,m,y,z;
-			for(std::size_t j = begin; j < end; j++){
-				WtUDi = tot_Y_prec(j) * sweep_times(WtU,2,1.0/(h2(j) * s + (1-h2(j))));
-				means = WtUDi * UtY.col(j);
-				Q = WtUDi * WtU.t();
-				for(int i = 0; i < b; i++) {
-					Q(i,i) += prior_prec(i,j);
-				}
+    void operator()(std::size_t begin, std::size_t end) {
+      arma::mat RinvSqUtW, WtURinvy;
+      arma::vec R_sq_diag, theta_star, e_star, UtW_theta_star, y_resid, theta_tilda;
+      for(std::size_t j = begin; j < end; j++){
+        R_sq_diag = sqrt((h2(j) * s + (1-h2(j)))/tot_Eta_prec(j));
+        theta_star = randn_theta.col(j)/sqrt(prior_prec.col(j));
+        e_star = randn_e.col(j) / sqrt(R_sq_diag);
+        UtW_theta_star = UtW * theta_star;
+        y_resid = UtEta.col(j) - UtW_theta_star - e_star;
+        RinvSqUtW = sweep_times(UtW,1,1.0/R_sq_diag);
+        WtURinvy = RinvSqUtW.t() * (y_resid/R_sq_diag);
 
-				cholQ = chol(Q);
-				v = solve(cholQ.t(),means);
-				m = solve(cholQ,v);
-				z = Z.col(j);
-				y = solve(cholQ,z);
+        if(b < n) {
+         arma::mat C = RinvSqUtW.t() * RinvSqUtW ;
+          for(int i = 0; i < b; i++) {
+            C(i,i) += prior_prec(i,j);
+          }
+          theta_tilda = solve(C,WtURinvy);
+        } else{
+          arma::mat VAi = sweep_times(UtW,2,1.0/prior_prec.col(j)); // using Binomial Inverse Theorem if b > n
+          arma::mat inner = VAi*UtW.t();
+          for(int i = 0; i < n; i++) {
+            inner(i,i) += (h2(j) * s(i) + (1-h2(j))) / tot_Eta_prec(j);
+          }
+          arma::mat outer = VAi.t() * solve(inner,VAi);
+          theta_tilda = WtURinvy / prior_prec.col(j) - (outer * WtURinvy);
+        }
 
-				coefs.col(j) = y + m;
-			}
-		}
-	};
+        coefs.col(j) = theta_tilda + theta_star;
+      }
+    }
+  };
 
-	int p = tot_Y_prec.n_elem;
-	int b = W.n_cols;
+  int p = tot_Eta_prec.n_elem;
+  int b = W.n_cols;
+  int n = W.n_rows;
 
-	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
-	arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
+  arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
+  arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
 
-	arma::mat WtU = W.t() * U;
-	arma::mat UtY = U.t() * Y;
+  arma::mat UtW = U.t() * W;
+  arma::mat UtEta = U.t() * Eta;
 
-	arma::mat Z = randn(b,p);
-	arma::mat coefs = zeros(b,p);
+  arma::mat randn_theta = randn(b,p);
+  arma::mat randn_e = randn(n,p);
+  arma::mat coefs = zeros(b,p);
 
-	sampleColumn sampler(WtU, UtY, prior_prec, Z, h2, tot_Y_prec, s, b, coefs);
-	RcppParallel::parallelFor(0,p,sampler,grainSize);
-	return(coefs);
+  sampleColumn sampler(UtW, UtEta, prior_prec, h2, tot_Eta_prec, randn_theta,randn_e, s, b, n, coefs);
+  RcppParallel::parallelFor(0,p,sampler,grainSize);
+  return(coefs);
 }
 
 // [[Rcpp::export()]]
-arma::rowvec sample_tot_prec_sparse_c (arma::mat Y,
+arma::rowvec sample_tot_prec_sparse_c (arma::mat Eta,
 					   arma::vec h2,
-					   double tot_Y_prec_shape,
-					   double tot_Y_prec_rate,
+					   double tot_Eta_prec_shape,
+					   double tot_Eta_prec_rate,
 					   List invert_aI_bZKZ
 					  ) {
 
 	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
 	arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
 
-	arma::mat UtY = U.t() * Y;
+	arma::mat UtEta = U.t() * Eta;
 
-	int n = Y.n_rows;
-	int p = Y.n_cols;
+	int n = Eta.n_rows;
+	int p = Eta.n_cols;
 
-	arma::vec tot_Y_prec = zeros(p);
+	arma::vec tot_Eta_prec = zeros(p);
 
 	for(int i = 0; i < p; i++){
 		arma::vec Sigma_sqrt = sqrt(h2(i) * s + (1.0 - h2(i)));
-		arma::vec SiUtY_i = UtY.col(i) / Sigma_sqrt;
-		arma::vec prec = randg(1,distr_param(tot_Y_prec_shape + n/2, 1.0/(tot_Y_prec_rate + 0.5 * dot(SiUtY_i,SiUtY_i))));
-		tot_Y_prec(i) = prec(0);
+		arma::vec SiUtEta_i = UtEta.col(i) / Sigma_sqrt;
+		arma::vec prec = randg(1,distr_param(tot_Eta_prec_shape + n/2, 1.0/(tot_Eta_prec_rate + 0.5 * dot(SiUtEta_i,SiUtEta_i))));
+		tot_Eta_prec(i) = prec(0);
 	}
-	return(tot_Y_prec.t());
+	return(tot_Eta_prec.t());
 }
 
 // [[Rcpp::export()]]
-arma::rowvec sample_h2s_discrete_given_p_sparse_c (arma::mat Y,
+arma::rowvec sample_h2s_discrete_given_p_sparse_c (arma::mat Eta,
 						int h2_divisions,
 						arma::vec h2_priors,
 						arma::vec Tot_prec,
@@ -122,12 +140,12 @@ arma::rowvec sample_h2s_discrete_given_p_sparse_c (arma::mat Y,
 	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
 	arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
 
-	int p = Y.n_cols;
-	int n = Y.n_rows;
+	int p = Eta.n_cols;
+	int n = Eta.n_rows;
 	arma::vec h2_index = zeros(p);
 
 	arma::mat log_ps = zeros(p,h2_divisions);
-	arma::mat std_scores_b = sweep_times(Y.t() * U,1,sqrt(Tot_prec));
+	arma::mat std_scores_b = sweep_times(Eta.t() * U,1,sqrt(Tot_prec));
 
 	arma::vec s2s;
 	arma::mat scores_2;
@@ -152,7 +170,7 @@ arma::rowvec sample_h2s_discrete_given_p_sparse_c (arma::mat Y,
 }
 
 // [[Rcpp::export()]]
-arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Y,
+arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Eta,
 				arma::sp_mat Z,
 				arma::vec tot_prec,
 				arma::vec h2,
@@ -173,9 +191,9 @@ arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Y,
 	arma::vec s1 = as<arma::vec>(invert_aZZt_Kinv["s1"]);
 	arma::vec s2 = as<arma::vec>(invert_aZZt_Kinv["s2"]);
 
-	int p = Y.n_cols;
+	int p = Eta.n_cols;
 	int r = Z.n_cols;
-	arma::mat b = U.t() * Z.t() * sweep_times(Y,2,e_prec);
+	arma::mat b = U.t() * Z.t() * sweep_times(Eta,2,e_prec);
 
 	arma::mat z = randn(r,p);
 	// Environment stats("package:stats");
@@ -211,8 +229,8 @@ arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Y,
 }
 
 // [[Rcpp::export()]]
-arma::mat sample_means_parallel_c(arma::mat Y_tilde,
-				   arma::vec resid_Y_prec,
+arma::mat sample_means_parallel_c(arma::mat Eta_tilde,
+				   arma::vec resid_Eta_prec,
 				   arma::vec E_a_prec,
 				   List invert_aK_bZtZ,
 				   int grainSize ) {
@@ -226,18 +244,18 @@ arma::mat sample_means_parallel_c(arma::mat Y_tilde,
 	// Z_U = [X Z_1]*U, which doesn't change each iteration.
 
 	struct sampleColumn : public Worker {
-		arma::vec E_a_prec, resid_Y_prec, s1, s2;
+		arma::vec E_a_prec, resid_Eta_prec, s1, s2;
 		arma::mat means, Zlams, U;
 
 		arma::mat &location_sample;
 
-		sampleColumn(arma::vec E_a_prec, arma::vec resid_Y_prec, arma::vec s1, arma::vec s2, arma::mat means, arma::mat Zlams, arma::mat U, arma::mat &location_sample)
-			: E_a_prec(E_a_prec), resid_Y_prec(resid_Y_prec), s1(s1), s2(s2), means(means), Zlams(Zlams),U(U), location_sample(location_sample) {}
+		sampleColumn(arma::vec E_a_prec, arma::vec resid_Eta_prec, arma::vec s1, arma::vec s2, arma::mat means, arma::mat Zlams, arma::mat U, arma::mat &location_sample)
+			: E_a_prec(E_a_prec), resid_Eta_prec(resid_Eta_prec), s1(s1), s2(s2), means(means), Zlams(Zlams),U(U), location_sample(location_sample) {}
 
       	void operator()(std::size_t begin, std::size_t end) {
 			arma::vec d, mlam;
 			for(std::size_t j = begin; j < end; j++){
-				d = s1*E_a_prec(j) + s2*resid_Y_prec(j);
+				d = s1*E_a_prec(j) + s2*resid_Eta_prec(j);
 				mlam = means.col(j) /d;
 				location_sample.col(j) = U * (mlam + Zlams.col(j)/sqrt(d));
 			}
@@ -249,35 +267,35 @@ arma::mat sample_means_parallel_c(arma::mat Y_tilde,
 	arma::vec s2 = as<arma::vec>(invert_aK_bZtZ["s2"]);
 	arma::mat Z_U = as<arma::mat>(invert_aK_bZtZ["Z_U"]);
 
-	// int n = Y_tilde.n_rows;
-	int p = Y_tilde.n_cols;
+	// int n = Eta_tilde.n_rows;
+	int p = Eta_tilde.n_cols;
 	int br = Z_U.n_cols;
 
-	arma::mat means = sweep_times(Z_U.t() * Y_tilde,2,resid_Y_prec);
+	arma::mat means = sweep_times(Z_U.t() * Eta_tilde,2,resid_Eta_prec);
 	arma::mat location_sample = zeros(br,p);
 
 	arma::mat Zlams = randn(br,p);
 
-	sampleColumn sampler(E_a_prec,resid_Y_prec,s1,s2,means,Zlams,U,location_sample);
+	sampleColumn sampler(E_a_prec,resid_Eta_prec,s1,s2,means,Zlams,U,location_sample);
 	RcppParallel::parallelFor(0,p,sampler,grainSize);
 
 	return(location_sample);
 }
 
 // [[Rcpp::export()]]
-arma::mat sample_factors_scores_sparse_c(arma::mat Y_tilde,
+arma::mat sample_factors_scores_sparse_c(arma::mat Eta_tilde,
                                          arma::mat prior_mean,
                                          arma::mat Lambda,
-                                         arma::vec resid_Y_prec,
+                                         arma::vec resid_Eta_prec,
                                          arma::vec F_e_prec
 ) {
   //Sample factor scores given factor loadings (F_a), factor residual variances (F_e_prec) and
   //phenotype residuals
-  arma::mat Lmsg = sweep_times(Lambda,1,resid_Y_prec);
+  arma::mat Lmsg = sweep_times(Lambda,1,resid_Eta_prec);
   arma::mat S = chol(Lambda.t() * Lmsg + diagmat(F_e_prec));
   arma::mat tS = S.t();
 
-  arma::mat Meta = trans(solve(tS,trans(Y_tilde * Lmsg + sweep_times(prior_mean,2,F_e_prec))));
+  arma::mat Meta = trans(solve(tS,trans(Eta_tilde * Lmsg + sweep_times(prior_mean,2,F_e_prec))));
 
   arma::mat Zlams = randn(Meta.n_rows,Meta.n_cols);
 

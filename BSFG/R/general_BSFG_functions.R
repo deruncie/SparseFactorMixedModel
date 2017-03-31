@@ -47,11 +47,19 @@ sample_MME_single_diagK = function(y, W, Wp, prior_mean,prior_prec,Cholesky_R,ch
 	}
 
 	RinvSqW = solve(Cholesky_R,Wp,'L')
-	C = crossprod(RinvSqW) * tot_Eta_prec
-	diag(C) = diag(C) + prior_prec
 	WtRinvy = crossprod(RinvSqW, solve(Cholesky_R,y_resid_p,'L')) * tot_Eta_prec
 
-	theta_tilda = solve(C,WtRinvy)
+	if(ncol(Wp) < nrow(Wp)) {
+  	C = crossprod(RinvSqW) * tot_Eta_prec
+  	diag(C) = diag(C) + prior_prec
+  	theta_tilda = solve(C,WtRinvy)
+	} else{
+	  R = tcrossprod(chol_R)/tot_Eta_prec
+	  AiU = t(Wp)/prior_prec
+	  inner = AiU %*% solve(R + Wp %*% AiU,t(AiU))
+	  WtRinvy = WtRinvy@x
+	  theta_tilda = WtRinvy/prior_prec - (inner %*% WtRinvy)@x
+	}
 	if(is(theta_tilda,'Matrix')) theta_tilda = theta_tilda@x
 
 	theta = theta_tilda + theta_star

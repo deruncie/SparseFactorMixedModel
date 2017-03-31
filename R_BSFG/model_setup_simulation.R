@@ -20,8 +20,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = list(
-    # sampler = 'fast_BSFG',
-    sampler = 'general_BSFG',
+    sampler = 'fast_BSFG',
+    # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
     simulation   = T,
     scale_Y      = FALSE,
