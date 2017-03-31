@@ -52,7 +52,7 @@ sim_data$data = with(sim_data,data.frame(TRT = X[,'TRT'],Line = colnames(Z1)[app
 sim_data$B = rbind(sim_data$mu,sim_data$B)
 BSFG_state = with(sim_data,BSFG_init(Y, model=~TRT+(1|Line), data, #factor_model_fixed = ~1,
                                   priors=priors,run_parameters=run_parameters,
-                                  cis_genotypes = lapply(1:ncol(cisGenotypes),function(x) matrix(cisGenotypes[,x],ncol=1)),
+                                  # cis_genotypes = lapply(1:ncol(cisGenotypes),function(x) matrix(cisGenotypes[,x],ncol=1)),
                                   setup = sim_data))
 BSFG_state$current_state$F_h2
 
