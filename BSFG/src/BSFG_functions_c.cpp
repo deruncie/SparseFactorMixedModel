@@ -228,59 +228,6 @@ arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Eta,
 	return(effects);
 }
 
-// [[Rcpp::export()]]
-arma::mat sample_means_parallel_c(arma::mat Eta_tilde,
-				   arma::vec resid_Eta_prec,
-				   arma::vec E_a_prec,
-				   List invert_aK_bZtZ,
-				   int grainSize ) {
-	// when used to sample [B;E_a]:
-	//  W - F*Lambda' = X*B + Z_1*E_a + E, arma::vec(E)~N(0,kron(Psi_E,In)).
-	//  Note: conditioning on F, Lambda and W.
-	// The vector [b_j;E_{a_j}] is sampled simultaneously. Each trait is sampled separately because their
-	// conditional posteriors factor into independent MVNs.
-	// note:invert_aK_bZtZ has parameters to diagonalize mixed model equations for fast inversion:
-	// inv(a*blkdiag(fixed_effects_prec*eye(b),Kinv) + b*[X Z_1]'[X Z_1]) = U*diag(1./(a.*s1+b.*s2))*U'
-	// Z_U = [X Z_1]*U, which doesn't change each iteration.
-
-	struct sampleColumn : public Worker {
-		arma::vec E_a_prec, resid_Eta_prec, s1, s2;
-		arma::mat means, Zlams, U;
-
-		arma::mat &location_sample;
-
-		sampleColumn(arma::vec E_a_prec, arma::vec resid_Eta_prec, arma::vec s1, arma::vec s2, arma::mat means, arma::mat Zlams, arma::mat U, arma::mat &location_sample)
-			: E_a_prec(E_a_prec), resid_Eta_prec(resid_Eta_prec), s1(s1), s2(s2), means(means), Zlams(Zlams),U(U), location_sample(location_sample) {}
-
-      	void operator()(std::size_t begin, std::size_t end) {
-			arma::vec d, mlam;
-			for(std::size_t j = begin; j < end; j++){
-				d = s1*E_a_prec(j) + s2*resid_Eta_prec(j);
-				mlam = means.col(j) /d;
-				location_sample.col(j) = U * (mlam + Zlams.col(j)/sqrt(d));
-			}
-		}
-	};
-
-	arma::mat U = as<arma::mat>(invert_aK_bZtZ["U"]);
-	arma::vec s1 = as<arma::vec>(invert_aK_bZtZ["s1"]);
-	arma::vec s2 = as<arma::vec>(invert_aK_bZtZ["s2"]);
-	arma::mat Z_U = as<arma::mat>(invert_aK_bZtZ["Z_U"]);
-
-	// int n = Eta_tilde.n_rows;
-	int p = Eta_tilde.n_cols;
-	int br = Z_U.n_cols;
-
-	arma::mat means = sweep_times(Z_U.t() * Eta_tilde,2,resid_Eta_prec);
-	arma::mat location_sample = zeros(br,p);
-
-	arma::mat Zlams = randn(br,p);
-
-	sampleColumn sampler(E_a_prec,resid_Eta_prec,s1,s2,means,Zlams,U,location_sample);
-	RcppParallel::parallelFor(0,p,sampler,grainSize);
-
-	return(location_sample);
-}
 
 // [[Rcpp::export()]]
 arma::mat sample_factors_scores_sparse_c(arma::mat Eta_tilde,

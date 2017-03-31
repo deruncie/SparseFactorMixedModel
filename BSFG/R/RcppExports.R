@@ -17,10 +17,6 @@ sample_randomEffects_parallel_sparse_c <- function(Eta, Z, tot_prec, h2, invert_
     .Call('BSFG_sample_randomEffects_parallel_sparse_c', PACKAGE = 'BSFG', Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize)
 }
 
-sample_means_parallel_c <- function(Eta_tilde, resid_Eta_prec, E_a_prec, invert_aK_bZtZ, grainSize) {
-    .Call('BSFG_sample_means_parallel_c', PACKAGE = 'BSFG', Eta_tilde, resid_Eta_prec, E_a_prec, invert_aK_bZtZ, grainSize)
-}
-
 sample_factors_scores_sparse_c <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec) {
     .Call('BSFG_sample_factors_scores_sparse_c', PACKAGE = 'BSFG', Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec)
 }

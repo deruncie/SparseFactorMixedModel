@@ -70,21 +70,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// sample_means_parallel_c
-arma::mat sample_means_parallel_c(arma::mat Eta_tilde, arma::vec resid_Eta_prec, arma::vec E_a_prec, List invert_aK_bZtZ, int grainSize);
-RcppExport SEXP BSFG_sample_means_parallel_c(SEXP Eta_tildeSEXP, SEXP resid_Eta_precSEXP, SEXP E_a_precSEXP, SEXP invert_aK_bZtZSEXP, SEXP grainSizeSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type Eta_tilde(Eta_tildeSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type resid_Eta_prec(resid_Eta_precSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type E_a_prec(E_a_precSEXP);
-    Rcpp::traits::input_parameter< List >::type invert_aK_bZtZ(invert_aK_bZtZSEXP);
-    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_means_parallel_c(Eta_tilde, resid_Eta_prec, E_a_prec, invert_aK_bZtZ, grainSize));
-    return rcpp_result_gen;
-END_RCPP
-}
 // sample_factors_scores_sparse_c
 arma::mat sample_factors_scores_sparse_c(arma::mat Eta_tilde, arma::mat prior_mean, arma::mat Lambda, arma::vec resid_Eta_prec, arma::vec F_e_prec);
 RcppExport SEXP BSFG_sample_factors_scores_sparse_c(SEXP Eta_tildeSEXP, SEXP prior_meanSEXP, SEXP LambdaSEXP, SEXP resid_Eta_precSEXP, SEXP F_e_precSEXP) {

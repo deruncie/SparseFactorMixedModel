@@ -4,7 +4,7 @@ library(BSFG)
 
 # set the directory to the location of the setup.RData or setup.mat file
 
-setwd("~/Box Sync/DER_projects/BSFG/R_BSFG/Sim_FE3_1")
+setwd("~/Box Sync/DER_projects/BSFG/R_BSFG/Sim_FE1_1")
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
 rep = "2"
@@ -15,8 +15,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = list(
-    # sampler = 'fast_BSFG',
-    sampler = 'general_BSFG',
+    sampler = 'fast_BSFG',
+    # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
     simulation   = T,
     scale_Y      = FALSE,
