@@ -68,7 +68,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'     are applied to both Eta and F.
 #' @param priors list providing hyperparameters for the model priors. This must include: for \code{fixed_var},
 #'     \code{tot_Eta_var}, and \code{tot_F_var}, a list of \code{V} and \code{nu}, which specify an inverse-gamma
-#'     distribution as in MCMCglmm. For \code{delta_1} and \code{delta_2} a list of \code{shape} and \rate{rate} for
+#'     distribution as in MCMCglmm. For \code{delta_1} and \code{delta_2} a list of \code{shape} and \code{rate} for
 #'     a gamma distribution. For \code{Lambda_df}, the degrees of freedom of the implied t-distribution.
 #'     Discrete priors on \code{h2_priors_factors} and \code{h2_priors_resids} are also required for \code{sample_BSFG},
 #'     but can be appended to \code{BSFG_state$priors} after running \code{BSFG_init}. This is often easier if

@@ -7,20 +7,20 @@
 using namespace Rcpp;
 
 // sample_coefs_parallel_sparse_c
-arma::mat sample_coefs_parallel_sparse_c(arma::mat Y, arma::mat W, arma::vec h2, arma::vec tot_Y_prec, arma::mat prior_mean, arma::mat prior_prec, List invert_aI_bZKZ, int grainSize);
-RcppExport SEXP BSFG_sample_coefs_parallel_sparse_c(SEXP YSEXP, SEXP WSEXP, SEXP h2SEXP, SEXP tot_Y_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP invert_aI_bZKZSEXP, SEXP grainSizeSEXP) {
+arma::mat sample_coefs_parallel_sparse_c(arma::mat Eta, arma::mat W, arma::vec h2, arma::vec tot_Eta_prec, arma::mat prior_mean, arma::mat prior_prec, List invert_aI_bZKZ, int grainSize);
+RcppExport SEXP BSFG_sample_coefs_parallel_sparse_c(SEXP EtaSEXP, SEXP WSEXP, SEXP h2SEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP invert_aI_bZKZSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type Eta(EtaSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type W(WSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type h2(h2SEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type tot_Y_prec(tot_Y_precSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type tot_Eta_prec(tot_Eta_precSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type prior_mean(prior_meanSEXP);
     Rcpp::traits::input_parameter< arma::mat >::type prior_prec(prior_precSEXP);
     Rcpp::traits::input_parameter< List >::type invert_aI_bZKZ(invert_aI_bZKZSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_coefs_parallel_sparse_c(Y, W, h2, tot_Y_prec, prior_mean, prior_prec, invert_aI_bZKZ, grainSize));
+    rcpp_result_gen = Rcpp::wrap(sample_coefs_parallel_sparse_c(Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, invert_aI_bZKZ, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }

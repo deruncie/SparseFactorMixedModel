@@ -124,6 +124,9 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     prec_B = matrix(tau_B,nrow = b, ncol = p)
     prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
 
+    # cis effects
+    cis_effects = matrix(rnorm(length(cis_effects_index),0,1),nrow=1)
+
 # ----------------------- #
 # ---Save initial values- #
 # ----------------------- #
