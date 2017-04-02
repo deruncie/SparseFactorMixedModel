@@ -9,10 +9,11 @@
 \contentsline {subsection}{\tocsubsection {}{3.1}{Structural equation models of among-trait covariances}}{4}{subsection.3.1}
 \contentsline {subsection}{\tocsubsection {}{3.2}{prior elicitation}}{5}{subsection.3.2}
 \contentsline {subsection}{\tocsubsection {}{3.3}{Gibbs sampler}}{6}{subsection.3.3}
-\contentsline {section}{\tocsection {}{4}{Case studies}}{7}{section.4}
-\contentsline {subsection}{\tocsubsection {}{4.1}{Partial missing data}}{7}{subsection.4.1}
+\contentsline {subsection}{\tocsubsection {}{3.4}{R package}}{7}{subsection.3.4}
+\contentsline {section}{\tocsection {}{4}{Case studies}}{8}{section.4}
+\contentsline {subsection}{\tocsubsection {}{4.1}{Partial missing data}}{8}{subsection.4.1}
 \contentsline {subsection}{\tocsubsection {}{4.2}{Multiple probes per trait}}{8}{subsection.4.2}
-\contentsline {subsection}{\tocsubsection {}{4.3}{RNAseq data}}{8}{subsection.4.3}
+\contentsline {subsection}{\tocsubsection {}{4.3}{RNAseq data}}{9}{subsection.4.3}
 \contentsline {subsection}{\tocsubsection {}{4.4}{Time-series data}}{9}{subsection.4.4}
-\contentsline {subsection}{\tocsubsection {}{4.5}{Genomic Selction}}{9}{subsection.4.5}
+\contentsline {subsection}{\tocsubsection {}{4.5}{Genomic Selction}}{10}{subsection.4.5}
 \contentsline {subsection}{\tocsubsection {}{4.6}{QTL mapping and GWAS for expression traits}}{10}{subsection.4.6}

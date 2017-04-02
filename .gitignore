@@ -9,3 +9,6 @@ sourceCpp*
 *.RData
 *.log
 *.synctex.gz
+*.aux
+*.out
+*.toc
