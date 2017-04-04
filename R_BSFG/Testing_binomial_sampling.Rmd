@@ -1,0 +1,95 @@
+---
+title: "Binomial sampling"
+output: html_notebook
+---
+
+
+Simulate data
+```{r}
+set.seed(1)
+n = 50
+p = 5
+X = matrix(rnorm(n*p),n,p)
+b = rnorm(p)
+eta = X %*% b + rnorm(n)
+N = 50
+
+logit = function(eta) exp(eta)/(1+exp(eta))
+y = rbinom(n,N,logit(eta))
+Y = do.call(c,lapply(y,function(x) c(rep(1,x),rep(0,N-x))))
+gm1 = glm(Y~X[rep(1:nrow(X),each = N),],family = 'binomial')
+plot(coef(gm1)[-1],b);abline(0,1)
+```
+
+```{r}
+library(MfUSampler)
+library(MCMCpack)
+library(microbenchmark)
+s = 2
+log_binom = function(beta,X,y,N,mu = 0.0, sigma = s){
+  Xbeta = X %*% beta
+  # Xbeta = beta  # for p=1
+  eXbeta = exp(Xbeta)
+  p = eXbeta/(1+eXbeta)
+  return( sum(y*log(p) + (N-y)*log(1-p))
+           - sum((beta - mu)^2)/(2*sigma^2)
+           )
+}
+log_binom(b,X,y,N)
+nsmp <- 100
+beta.ini <- rep(0.0, p)
+beta.smp <- array(NA, dim=c(nsmp,p))
+for (i in 1:nsmp) {
+  beta.ini <- MfU.Sample(beta.ini, f=log_binom, uni.sampler="slice", X=X, y=y,N=N)#,control = MfU.Control(length(beta.ini),slice.lower = -10,slice.upper=10))
+ beta.smp[i,] <- beta.ini
+}
+hist(logit(rnorm(1e6,0,s)),breaks = seq(0,1,length=100))
+hist(logit(X %*% t(beta.smp)),breaks = seq(0,1,length=100))
+
+log_binom2 = function(beta,Xb1,X,y,N,mu = 0.0, sigma = s){
+  Xbeta = Xb1 + X %*% beta
+  # Xbeta = beta  # for p=1
+  eXbeta = exp(Xbeta)
+  p = eXbeta/(1+eXbeta)
+  return( sum(y*log(p) + (N-y)*log(1-p))
+           - sum((beta - mu)^2)/(2*sigma^2)
+           )
+}
+beta.ini <- rep(0.0, p)
+beta.smp2 = array(NA, dim=c(nsmp,p))
+for (i in 1:nsmp) {
+  for(j in 1:p){
+    beta.ini[j] <- MfU.Sample(beta.ini[j], f=log_binom2, uni.sampler="slice", X=X[,j,drop=FALSE], y=y, Xb1 = X[,-j] %*% beta.ini[-j],N=N)#,control = MfU.Control(length(beta.ini),slice.lower = -10,slice.upper=10))
+  }
+ beta.smp2[i,] <- beta.ini
+}
+plot(b,colMeans(beta.smp));abline(0,1)
+plot(b,colMeans(beta.smp2));abline(0,1)
+apply(beta.smp,2,effectiveSize)
+apply(beta.smp2,2,effectiveSize)
+cor(b,colMeans(beta.smp))
+cor(b,colMeans(beta.smp2))
+```
+```{r}
+plot(colMeans(beta.smp),b);abline(0,1)
+
+plot(mcmc(beta.smp))
+pairs(beta.smp)
+acf(beta.smp[,2])
+
+
+  microbenchmark(
+    MfU.Sample(beta.ini, f=log_binom, uni.sampler="slice", X=X, y=y,N=N),
+    {
+      for(j in 1:p){
+    beta.ini[j] <- MfU.Sample(beta.ini[j], f=log_binom2, uni.sampler="slice", X=X[,j,drop=FALSE], y=y, Xb1 = X[,-j] %*% beta.ini[-j],N=N)#,control = MfU.Control(length(beta.ini),slice.lower = -10,slice.upper=10))
+    }
+    }
+  )
+
+```
+
+```{r}
+
+```
+

@@ -108,14 +108,13 @@ voom_model = function(Y,data_model_parameters,BSFG_state = list()){
 #'
 #' @param Y a vector of observation. Pre-scaled and centered if desired.
 #' @param data_model_parameters a list including:
-#'     \code{observations}, a data.frame with columns: \code{ID} and \code{covariate}, ordered by ID.
+#'     \code{observations}, a data.frame with columns: \code{ID}, and \code{covariate}, ordered by ID.
 #'     and the variables df, knots, degree and intercept.
 #'     Empty values will use the defaults for \code{bs()}.
 bs_model = function(Y,data_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
-  new_variables = c('Eta')
   data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
 
     if(length(current_state) == 0){
@@ -171,6 +170,79 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
   return(list(state = data_model_state,
               posteriorSample_params = c(),
               posteriorMean_params = c('Eta','resid_Y_prec')
+  )
+  )
+}
+
+#' Sample Eta given B-splines individual-level model
+#'
+#' Eta is a matrix of individual-level parmaters for a B-spline with
+#'    equivalent knots over all individuals
+#'
+#' This function should pre-calculate design matrices for each individual (assuming they are all
+#'     unique), as well as SVDs for efficient repeated solvings of the posterior distributions
+#'     as resid_Y_prec, Eta_mean and resid_Eta_prec are updated each iteraction.
+#'
+#' @param Y a vector of observation. Pre-scaled and centered if desired.
+#' @param data_model_parameters a list including:
+#'     \code{observations}, a data.frame with columns: \code{ID}, \code{N} and \code{covariate}, ordered by ID.
+#'     and the variables df, knots, degree and intercept.
+#'     Empty values will use the defaults for \code{bs()}.
+bs_binomial_model = function(Y,data_model_parameters,BSFG_state = list()){
+  current_state = BSFG_state$current_state
+  data_matrices = BSFG_state$data_matrices
+
+  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
+
+  log_binom = function(beta,X,y,N,mu, sigma2){
+    Xbeta = X %*% beta
+    eXbeta = exp(Xbeta)
+    p = eXbeta/(1+eXbeta)
+    return( sum(y*log(p) + (N-y)*log(1-p))
+            - sum((beta - mu)^2)/(2*sigma2)
+    )
+  }
+
+    if(length(current_state) == 0){
+      if(!exists(df)) df = NULL
+      if(!exists(knots)) knots = NULL
+      if(!exists(degree)) degree = NULL
+      if(!exists(intercept)) intercept = NULL
+      covariate = observations$covariate
+      coefficients = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
+
+      model_matrices = tapply(1:nrow(coefficients),observations$ID,function(x) {
+        list(
+          X = Matrix(coefficients[x,]),
+          y = Y[x,],
+          N = observations$N[x]
+        )
+      })
+
+      n = length(model.matrices)
+      p = ncol(coefficients)
+
+      Eta = Eta_mean = matrix(0,n,p)
+      resid_Eta_prec = matrix(1,1,p)
+    } else{
+      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
+      resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+      if(!exists(resid_Y_prec)) resid_Y_prec = matrix(1)
+    }
+
+    if(!exists(ncores)) ncores = 1
+    Eta = do.call(rbind,mclapply(1:n,function(i) {
+      X = model_matrices[[i]]$X
+      y = model_matrices[[i]]$y
+      N = model_matrices[[i]]$N
+      eta_i = MfUSampler::MfU.Sample(Eta[i,], f=log_binom, uni.sampler="slice", X=X, y=y,N=N)
+    },mc.cores = ncores))
+
+    return(list(Eta = Eta, model.matrices = model.matrices, coefficients = coefficients))
+  })
+  return(list(state = data_model_state,
+              posteriorSample_params = c(),
+              posteriorMean_params = c('Eta')
   )
   )
 }
