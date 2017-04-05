@@ -5,12 +5,12 @@ sample_coefs_parallel_sparse_c <- function(UtEta, UtW, h2, tot_Eta_prec, s, prio
     .Call('BSFG_sample_coefs_parallel_sparse_c', PACKAGE = 'BSFG', UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, grainSize)
 }
 
-sample_tot_prec_sparse_c <- function(Eta, h2, tot_Eta_prec_shape, tot_Eta_prec_rate, invert_aI_bZKZ) {
-    .Call('BSFG_sample_tot_prec_sparse_c', PACKAGE = 'BSFG', Eta, h2, tot_Eta_prec_shape, tot_Eta_prec_rate, invert_aI_bZKZ)
+sample_tot_prec_sparse_c <- function(UtEta, h2, s, tot_Eta_prec_shape, tot_Eta_prec_rate) {
+    .Call('BSFG_sample_tot_prec_sparse_c', PACKAGE = 'BSFG', UtEta, h2, s, tot_Eta_prec_shape, tot_Eta_prec_rate)
 }
 
-sample_h2s_discrete_given_p_sparse_c <- function(Eta, h2_divisions, h2_priors, Tot_prec, invert_aI_bZKZ) {
-    .Call('BSFG_sample_h2s_discrete_given_p_sparse_c', PACKAGE = 'BSFG', Eta, h2_divisions, h2_priors, Tot_prec, invert_aI_bZKZ)
+sample_h2s_discrete_given_p_sparse_c <- function(UtEta, h2_divisions, h2_priors, Tot_prec, s) {
+    .Call('BSFG_sample_h2s_discrete_given_p_sparse_c', PACKAGE = 'BSFG', UtEta, h2_divisions, h2_priors, Tot_prec, s)
 }
 
 sample_randomEffects_parallel_sparse_c <- function(Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize) {

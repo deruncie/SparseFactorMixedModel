@@ -98,20 +98,20 @@ arma::mat sample_coefs_parallel_sparse_c(
 }
 
 // [[Rcpp::export()]]
-arma::rowvec sample_tot_prec_sparse_c (arma::mat Eta,
+arma::rowvec sample_tot_prec_sparse_c (arma::mat UtEta,
 					   arma::vec h2,
+					   arma::vec s,
 					   double tot_Eta_prec_shape,
-					   double tot_Eta_prec_rate,
-					   List invert_aI_bZKZ
+					   double tot_Eta_prec_rate					   // List invert_aI_bZKZ
 					  ) {
 
-	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
-	arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
+	// arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
+	// arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
+	//
+	// arma::mat UtEta = U.t() * Eta;
 
-	arma::mat UtEta = U.t() * Eta;
-
-	int n = Eta.n_rows;
-	int p = Eta.n_cols;
+	int n = UtEta.n_rows;
+	int p = UtEta.n_cols;
 
 	arma::vec tot_Eta_prec = zeros(p);
 
@@ -125,21 +125,22 @@ arma::rowvec sample_tot_prec_sparse_c (arma::mat Eta,
 }
 
 // [[Rcpp::export()]]
-arma::rowvec sample_h2s_discrete_given_p_sparse_c (arma::mat Eta,
-						int h2_divisions,
-						arma::vec h2_priors,
-						arma::vec Tot_prec,
-						List invert_aI_bZKZ){
+arma::rowvec sample_h2s_discrete_given_p_sparse_c (arma::mat UtEta,
+            				int h2_divisions,
+            				arma::vec h2_priors,
+            				arma::vec Tot_prec,
+            				arma::vec s            				// List invert_aI_bZKZ
+              ){
 
-	arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
-	arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
+	// arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
+	// arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
 
-	int p = Eta.n_cols;
-	int n = Eta.n_rows;
+	int p = UtEta.n_cols;
+	int n = UtEta.n_rows;
 	arma::vec h2_index = zeros(p);
 
 	arma::mat log_ps = zeros(p,h2_divisions);
-	arma::mat std_scores_b = sweep_times(Eta.t() * U,1,sqrt(Tot_prec));
+	arma::mat std_scores_b = sweep_times(UtEta.t(),1,sqrt(Tot_prec));
 
 	arma::vec s2s;
 	arma::mat scores_2;

@@ -8,7 +8,7 @@ library(BSFG)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 1
-new_halfSib_spline_simulation('Sim_FE_1', nSire=25,nRep=3,p=40, Time = 1:60, k=10, k_G=5, i_Va = 0.2, i_Ve = 0.2)
+new_halfSib_spline_simulation('Sim_FE_1', nSire=25,nRep=3,p=20, Time = 1:60, k=4, k_G=2, i_Va = 0.2, i_Ve = 0.2)
 set.seed(seed)
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
@@ -56,7 +56,7 @@ load('../setup.RData')
 # options(error=recover)
 BSFG_state = with(setup,BSFG_init(observations$Y, model=~X2+(1|animal), data, #factor_model_fixed = ~1,
                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
-                                  data_model = bs_model, data_model_parameters = list(observations = observations,df = 40,intercept = T,resid_Y_prec_shape = 2,resid_Y_prec_rate = 1),
+                                  data_model = bs_model, data_model_parameters = list(observations = observations,df = 20,intercept = T,resid_Y_prec_shape = 2,resid_Y_prec_rate = 1),
                                   setup = setup))
 BSFG_state$current_state$F_h2
 
@@ -109,6 +109,9 @@ BSFG_state$Posterior = reload_Posterior(BSFG_state)
 plot(BSFG_state$Posterior$Eta,setup$Eta);abline(0,1)
 setup$observations$Y_fitted = sapply(1:nrow(setup$observations),function(i) predict(BSFG_state$current_state$coefficients,newx = setup$observations$covariate[i]) %*% BSFG_state$Posterior$Eta[setup$observations$ID[i],])
 with(setup$observations,plot(Y,Y_fitted));abline(0,1)
+plot(c(with(BSFG_state$current_state,U_F %*% t(Lambda))),with(setup,c(as.matrix(U_F %*% t(error_factor_Lambda)))));abline(0,1)
+plot(c(with(BSFG_state$current_state,U_R + U_F %*% t(Lambda))),with(setup,c(as.matrix(U_R + U_F %*% t(error_factor_Lambda)))));abline(0,1)
+plot(BSFG_state$current_state$U_R,setup$U_R)
 
 ggplot(setup$observations,aes(x=covariate,y=Y)) + geom_line(aes(group = ID,color = ID))
 ggplot(setup$observations,aes(x=covariate,y=Y_fitted)) + geom_line(aes(group = ID,color = ID))
