@@ -35,10 +35,11 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		  XB = matrix(0,ncol = p, nrow = n)
 		  for(j in 1:p){
 		    cis_X_j = cis_genotypes[[j]]
-		    Design_j = cbind(Design,(Ut %*% cis_X_j)@x)
+		    UtDesign_j = Ut %*% cis_X_j
+		    if(is(UtDesign_j,'Matrix')) UtDesign_j = UtDesign_j@x
 		    prior_mean_j = rbind(prior_mean[,j,drop=FALSE],0)
 		    prior_prec_j = rbind(prior_prec[,j,drop=FALSE],1e-10)
-		    coefs_j = sample_coefs_parallel_sparse_c(UtEta[,j,drop=FALSE],Design_j,resid_h2[,j,drop=FALSE], tot_Eta_prec[,j,drop=FALSE],s,prior_mean_j,prior_prec_j,1)
+		    coefs_j = sample_coefs_parallel_sparse_c(UtEta[,j,drop=FALSE],cbind(UtDesign,UtDesign_j),resid_h2[,j,drop=FALSE], tot_Eta_prec[,j,drop=FALSE],s,prior_mean_j,prior_prec_j,1)
 		    if(b > 0){
 		      B[,j] = coefs_j[1:b]
 		    }

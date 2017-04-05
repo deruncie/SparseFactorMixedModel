@@ -129,8 +129,6 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
         list(
           X = coefficients[x,,drop=FALSE],
           y = Y[x,,drop=FALSE]
-          # Cholesky_R = Cholesky(Diagonal(length(x))),
-          # chol_R = Diagonal(length(x))
         )
       })
     }
@@ -152,14 +150,7 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
     Eta = do.call(cbind,mclapply(1:n,function(i) {
       X = model_matrices[[i]]$X
       y = model_matrices[[i]]$y
-      Cholesky_R = model_matrices[[i]]$Cholesky_R
-      chol_R = model_matrices[[i]]$chol_R
-      # eta_i = sample_MME_single_diagK(y,X,X,Eta_mean[i,],t(resid_Eta_prec),Cholesky_R,chol_R,R_Perm = NULL,resid_Y_prec[1])
       eta_i = sample_coefs_parallel_sparse_c(y,X,matrix(0),resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),1)
-      # recover()
-      # microbenchmark(sample_MME_single_diagK(y,X,X,Eta_mean[i,],t(resid_Eta_prec),Cholesky_R,chol_R,R_Perm = NULL,resid_Y_prec[1]),
-      #                sample_coefs_parallel_sparse_c(matrix(y),as.matrix(X),0/resid_Y_prec,
-      #                                               resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),1))
     },mc.cores = ncores))
     Eta = t(Eta)
 
@@ -210,39 +201,41 @@ bs_binomial_model = function(Y,data_model_parameters,BSFG_state = list()){
     )
   }
 
-    if(length(current_state) == 0){
-      if(!exists('df') || !is.numeric(df)) df = NULL
-      if(!exists('knots') || !is.numeric(knots)) knots = NULL
-      if(!exists('degree') || !is.numeric(degree)) degree = 3
-      if(!exists('intercept') || !is.numeric(intercept)) intercept = FALSE
-      covariate = observations$covariate
-      coefficients = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
+  if(!exists('model_matrices')){
+    if(!exists('df') || !is.numeric(df)) df = NULL
+    if(!exists('knots') || !is.numeric(knots)) knots = NULL
+    if(!exists('degree') || !is.numeric(degree)) degree = 3
+    if(!exists('intercept') || !is.numeric(intercept)) intercept = FALSE
+    covariate = observations$covariate
+    coefficients = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
 
-      model_matrices = tapply(1:nrow(coefficients),observations$ID,function(x) {
-        list(
-          X = Matrix(coefficients[x,]),
-          y = Y[x,],
-          N = observations$N[x]
-        )
-      })
+    model_matrices = tapply(1:nrow(observations),observations$ID,function(x) {
+      list(
+        X = Matrix(coefficients[x,]),
+        y = Y[x,],
+        N = observations$N[x]
+      )
+    })
+  }
 
-      n = length(model_matrices)
-      p = ncol(coefficients)
+  n = length(model_matrices)
+  p = ncol(coefficients)
 
-      Eta = Eta_mean = matrix(0,n,p)
-      resid_Eta_prec = matrix(1,1,p)
-    } else{
-      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
-      resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-    }
+  if(length(current_state) == 0){
+    Eta_mean = matrix(0,n,p)
+    resid_Eta_prec = matrix(1e-10,1,p)
+  } else{
+    Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
+    resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+  }
 
-    if(!exists(ncores)) ncores = 1
-    Eta = do.call(rbind,mclapply(1:n,function(i) {
-      X = model_matrices[[i]]$X
-      y = model_matrices[[i]]$y
-      N = model_matrices[[i]]$N
-      eta_i = MfUSampler::MfU.Sample(Eta[i,], f=log_binom, uni.sampler="slice", X=X, y=y,N=N)
-    },mc.cores = ncores))
+  if(!exists(ncores)) ncores = 1
+  Eta = do.call(rbind,mclapply(1:n,function(i) {
+    X = model_matrices[[i]]$X
+    y = model_matrices[[i]]$y
+    N = model_matrices[[i]]$N
+    eta_i = MfUSampler::MfU.Sample(Eta[i,], f=log_binom, uni.sampler="slice", X=X, y=y,N=N)
+  },mc.cores = ncores))
 
     return(list(Eta = Eta, model_matrices = model_matrices, coefficients = coefficients))
   })

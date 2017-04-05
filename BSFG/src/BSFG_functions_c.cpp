@@ -19,18 +19,6 @@ arma::mat sweep_times(arma::mat x, int MARGIN, arma::vec STATS){
 
   return(x);
 }
-// Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
-arma::sp_mat sweep_times_sp(arma::sp_mat x, int MARGIN, arma::vec STATS){
-  int m = x.n_rows;
-  int n = x.n_cols;
-  arma::mat sweep_mat;
-  if(MARGIN == 1) sweep_mat = repmat(STATS,1,n);
-  if(MARGIN == 2) sweep_mat = repmat(STATS.t(),m,1);
-
-  x = x % sweep_mat;
-
-  return(x);
-}
 
 // [[Rcpp::export()]]
 arma::mat sample_coefs_parallel_sparse_c(
@@ -218,14 +206,14 @@ arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Eta,
 		sampleColumn(arma::vec s1, arma::vec s2, arma::vec a_prec, arma::vec e_prec, arma::sp_mat U, arma::mat b, arma::mat z, arma::mat &effects)
 			: s1(s1), s2(s2), a_prec(a_prec), e_prec(e_prec), U(U), b(b), z(z), effects(effects) {}
 
-      	void operator()(std::size_t begin, std::size_t end) {
-			arma::vec d, mlam;
-			for(std::size_t j = begin; j < end; j++){
-				arma::vec d = s2*a_prec(j) + s1*e_prec(j);
-				arma::vec mlam = b.col(j) / d;
-				effects.col(j) = U * (mlam + z.col(j)/sqrt(d));
-			}
-		}
+      void operator()(std::size_t begin, std::size_t end) {
+  			arma::vec d, mlam;
+  			for(std::size_t j = begin; j < end; j++){
+  				arma::vec d = s2*a_prec(j) + s1*e_prec(j);
+  				arma::vec mlam = b.col(j) / d;
+  				effects.col(j) = U * (mlam + z.col(j)/sqrt(d));
+  			}
+	  	}
 	};
 
 	sampleColumn sampler(s1, s2, a_prec, e_prec, U, b, z, effects);
