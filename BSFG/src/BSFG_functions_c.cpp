@@ -9,26 +9,38 @@ using namespace arma;
 
 // Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
 arma::mat sweep_times(arma::mat x, int MARGIN, arma::vec STATS){
-	int m = x.n_rows;
-	int n = x.n_cols;
-	arma::mat sweep_mat;
-	if(MARGIN == 1) sweep_mat = repmat(STATS,1,n);
-	if(MARGIN == 2) sweep_mat = repmat(STATS.t(),m,1);
+  int m = x.n_rows;
+  int n = x.n_cols;
+  arma::mat sweep_mat;
+  if(MARGIN == 1) sweep_mat = repmat(STATS,1,n);
+  if(MARGIN == 2) sweep_mat = repmat(STATS.t(),m,1);
 
-	x = x % sweep_mat;
+  x = x % sweep_mat;
 
-	return(x);
+  return(x);
+}
+// Note: functions contain commented code to use R's random number generator for testing to ensure identical results to the R functions
+arma::sp_mat sweep_times_sp(arma::sp_mat x, int MARGIN, arma::vec STATS){
+  int m = x.n_rows;
+  int n = x.n_cols;
+  arma::mat sweep_mat;
+  if(MARGIN == 1) sweep_mat = repmat(STATS,1,n);
+  if(MARGIN == 2) sweep_mat = repmat(STATS.t(),m,1);
+
+  x = x % sweep_mat;
+
+  return(x);
 }
 
 // [[Rcpp::export()]]
 arma::mat sample_coefs_parallel_sparse_c(
-    arma::mat Eta,
-    arma::mat W,
+    arma::mat UtEta,
+    arma::mat UtW,
     arma::vec h2,
     arma::vec tot_Eta_prec,
+    arma::vec s,
     arma::mat prior_mean,
     arma::mat prior_prec,
-    List invert_aI_bZKZ,
     int grainSize) {
 
   // Sample regression coefficients
@@ -37,16 +49,16 @@ arma::mat sample_coefs_parallel_sparse_c(
 
 
   struct sampleColumn : public Worker {
-    arma::mat UtW, UtEta, prior_prec, randn_theta, randn_e;
+    arma::mat UtW, UtEta, prior_mean, prior_prec, randn_theta, randn_e;
     arma::vec h2, tot_Eta_prec, s;
     int b,n;
     arma::mat &coefs;
 
-    sampleColumn(arma::mat UtW, arma::mat UtEta, arma::mat prior_prec, arma::vec h2, arma::vec tot_Eta_prec,
+    sampleColumn(arma::mat UtW, arma::mat UtEta, arma::mat prior_mean, arma::mat prior_prec, arma::vec h2, arma::vec tot_Eta_prec,
                  arma::mat randn_theta, arma::mat randn_e,
                  arma::vec s, int b, int n,
                  arma::mat &coefs) :
-      UtW(UtW), UtEta(UtEta), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
+      UtW(UtW), UtEta(UtEta), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
       h2(h2), tot_Eta_prec(tot_Eta_prec),
       s(s), b(b), n(n),
       coefs(coefs) {}
@@ -56,7 +68,7 @@ arma::mat sample_coefs_parallel_sparse_c(
       arma::vec R_sq_diag, theta_star, e_star, UtW_theta_star, eta_resid, theta_tilda;
       for(std::size_t j = begin; j < end; j++){
         R_sq_diag = sqrt((h2(j) * s + (1-h2(j)))/tot_Eta_prec(j));
-        theta_star = randn_theta.col(j)/sqrt(prior_prec.col(j));
+        theta_star = randn_theta.col(j)/sqrt(prior_prec.col(j)) + prior_mean.col(j);
         e_star = randn_e.col(j) % R_sq_diag;
         UtW_theta_star = UtW * theta_star;
         eta_resid = UtEta.col(j) - UtW_theta_star - e_star;
@@ -64,7 +76,7 @@ arma::mat sample_coefs_parallel_sparse_c(
         WtURinvy = RinvSqUtW.t() * (eta_resid/R_sq_diag);
 
         if(b < n) {
-         arma::mat C = RinvSqUtW.t() * RinvSqUtW ;
+          arma::mat C = RinvSqUtW.t() * RinvSqUtW ;
           for(int i = 0; i < b; i++) {
             C(i,i) += prior_prec(i,j);
           }
@@ -85,20 +97,14 @@ arma::mat sample_coefs_parallel_sparse_c(
   };
 
   int p = tot_Eta_prec.n_elem;
-  int b = W.n_cols;
-  int n = W.n_rows;
-
-  arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
-  arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
-
-  arma::mat UtW = U.t() * W;
-  arma::mat UtEta = U.t() * Eta;
+  int b = UtW.n_cols;
+  int n = UtW.n_rows;
 
   arma::mat randn_theta = randn(b,p);
   arma::mat randn_e = randn(n,p);
   arma::mat coefs = zeros(b,p);
 
-  sampleColumn sampler(UtW, UtEta, prior_prec, h2, tot_Eta_prec, randn_theta,randn_e, s, b, n, coefs);
+  sampleColumn sampler(UtW, UtEta, prior_mean, prior_prec, h2, tot_Eta_prec, randn_theta,randn_e, s, b, n, coefs);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return(coefs);
 }
@@ -303,4 +309,21 @@ arma::rowvec sample_delta_c(
 	}
 	return(delta.t());
 }
+
+// [[Rcpp::export()]]
+double log_binom_c(
+                      arma::vec beta,
+                      arma::mat X,
+                      arma::vec y,
+                      arma::vec N,
+                      arma::vec mu,
+                      arma::vec sigma2
+) {
+  arma::vec Xbeta = X * beta;
+  arma::vec e_Xbeta = exp(Xbeta);
+  arma::vec p = e_Xbeta / (1.0 + e_Xbeta);
+  double ll = sum(y%log(p) + (N-y) % log(1.0-p)) - sum((beta - mu) % (beta - mu) / (2*sigma2));
+  return ll;
+}
+
 

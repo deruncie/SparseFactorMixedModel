@@ -117,55 +117,63 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
 
   data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
 
-    if(length(current_state) == 0){
-      if(!exists(df)) df = NULL
-      if(!exists(knots)) knots = NULL
-      if(!exists(degree)) degree = NULL
-      if(!exists(intercept)) intercept = NULL
+    if(!exists('model_matrices')){
+      if(!exists('df') || !is.numeric(df)) df = NULL
+      if(!exists('knots') || !is.numeric(knots)) knots = NULL
+      if(!exists('degree') || !is.numeric(degree)) degree = 3
+      if(!exists('intercept') || !is.numeric(intercept)) intercept = FALSE
       covariate = observations$covariate
       coefficients = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
 
-      model_matrices = tapply(1:nrow(coefficients),observations$ID,function(x) {
+      model_matrices = tapply(1:nrow(observations),observations$ID,function(x) {
         list(
-          X = Matrix(coefficients[x,]),
-          y = Y[x,],
-          Cholesky_R = Cholesky(Diagonal(length(x))),
-          chol_R = Diagonal(length(x))
+          X = coefficients[x,,drop=FALSE],
+          y = Y[x,,drop=FALSE]
+          # Cholesky_R = Cholesky(Diagonal(length(x))),
+          # chol_R = Diagonal(length(x))
         )
       })
+    }
 
-      n = length(model.matrices)
-      p = ncol(coefficients)
+    n = length(model_matrices)
+    p = ncol(coefficients)
 
+    if(length(current_state) == 0){
       Eta_mean = matrix(0,n,p)
-      resid_Eta_prec = matrix(0,1,p)
-      resid_Y_prec = 1  # only a single precision parameter for the data_model?
+      resid_Eta_prec = matrix(1e-10,1,p)
+      resid_Y_prec = matrix(1)  # only a single precision parameter for the data_model?
     } else{
       Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-      if(!exists(resid_Y_prec)) resid_Y_prec = matrix(1)
+      if(!exists('resid_Y_prec')) resid_Y_prec = matrix(1)
     }
 
-    if(!exists(ncores)) ncores = 1
-    Eta = do.call(rbind,mclapply(1:n,function(i) {
+    if(!exists('ncores')) ncores = 1
+    Eta = do.call(cbind,mclapply(1:n,function(i) {
       X = model_matrices[[i]]$X
       y = model_matrices[[i]]$y
       Cholesky_R = model_matrices[[i]]$Cholesky_R
       chol_R = model_matrices[[i]]$chol_R
-      eta_i = sample_MME_single_diagA(y,X,X,Eta_mean[i,],resid_Eta_prec,Cholesky_R,chol_R,R_Perm = NULL,resid_Y_prec)
+      # eta_i = sample_MME_single_diagK(y,X,X,Eta_mean[i,],t(resid_Eta_prec),Cholesky_R,chol_R,R_Perm = NULL,resid_Y_prec[1])
+      eta_i = sample_coefs_parallel_sparse_c(y,X,matrix(0),resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),1)
+      # recover()
+      # microbenchmark(sample_MME_single_diagK(y,X,X,Eta_mean[i,],t(resid_Eta_prec),Cholesky_R,chol_R,R_Perm = NULL,resid_Y_prec[1]),
+      #                sample_coefs_parallel_sparse_c(matrix(y),as.matrix(X),0/resid_Y_prec,
+      #                                               resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),1))
     },mc.cores = ncores))
+    Eta = t(Eta)
 
     Y_fitted = do.call(c,mclapply(1:n,function(i) {
-      y_fitted = model_matrices[[i]]$X %*% t(Eta[i,])
+      y_fitted = model_matrices[[i]]$X %*% Eta[i,]
       if(is(y_fitted,'Matrix')) y_fitted = y_fitted@x
       y_fitted
     },mc.cores = ncores))
 
     Y_tilde = Y - Y_fitted
 
-    resid_Y_prec = rgamma(1,shape = resid_Y_prec_shape + 0.5*n*p, rate = resid_Y_prec_rate + 0.5*sum(Y_tilde^2))
+    resid_Y_prec = matrix(rgamma(1,shape = resid_Y_prec_shape + 0.5*n*p, rate = resid_Y_prec_rate + 0.5*sum(Y_tilde^2)))
 
-    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model.matrices = model.matrices, coefficients = coefficients))
+    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, coefficients = coefficients))
   })
   return(list(state = data_model_state,
               posteriorSample_params = c(),
@@ -174,14 +182,13 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
   )
 }
 
-#' Sample Eta given B-splines individual-level model
+#' Sample Eta given B-splines individual-level model with binomial observations
 #'
 #' Eta is a matrix of individual-level parmaters for a B-spline with
 #'    equivalent knots over all individuals
 #'
 #' This function should pre-calculate design matrices for each individual (assuming they are all
-#'     unique), as well as SVDs for efficient repeated solvings of the posterior distributions
-#'     as resid_Y_prec, Eta_mean and resid_Eta_prec are updated each iteraction.
+#'     unique)
 #'
 #' @param Y a vector of observation. Pre-scaled and centered if desired.
 #' @param data_model_parameters a list including:
@@ -204,10 +211,10 @@ bs_binomial_model = function(Y,data_model_parameters,BSFG_state = list()){
   }
 
     if(length(current_state) == 0){
-      if(!exists(df)) df = NULL
-      if(!exists(knots)) knots = NULL
-      if(!exists(degree)) degree = NULL
-      if(!exists(intercept)) intercept = NULL
+      if(!exists('df') || !is.numeric(df)) df = NULL
+      if(!exists('knots') || !is.numeric(knots)) knots = NULL
+      if(!exists('degree') || !is.numeric(degree)) degree = 3
+      if(!exists('intercept') || !is.numeric(intercept)) intercept = FALSE
       covariate = observations$covariate
       coefficients = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
 
@@ -219,7 +226,7 @@ bs_binomial_model = function(Y,data_model_parameters,BSFG_state = list()){
         )
       })
 
-      n = length(model.matrices)
+      n = length(model_matrices)
       p = ncol(coefficients)
 
       Eta = Eta_mean = matrix(0,n,p)
@@ -227,7 +234,6 @@ bs_binomial_model = function(Y,data_model_parameters,BSFG_state = list()){
     } else{
       Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-      if(!exists(resid_Y_prec)) resid_Y_prec = matrix(1)
     }
 
     if(!exists(ncores)) ncores = 1
@@ -238,7 +244,7 @@ bs_binomial_model = function(Y,data_model_parameters,BSFG_state = list()){
       eta_i = MfUSampler::MfU.Sample(Eta[i,], f=log_binom, uni.sampler="slice", X=X, y=y,N=N)
     },mc.cores = ncores))
 
-    return(list(Eta = Eta, model.matrices = model.matrices, coefficients = coefficients))
+    return(list(Eta = Eta, model_matrices = model_matrices, coefficients = coefficients))
   })
   return(list(state = data_model_state,
               posteriorSample_params = c(),

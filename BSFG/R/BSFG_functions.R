@@ -295,8 +295,8 @@ load_posterior_param = function(BSFG_state,param){
     all_samples = array(0,dim = c(BSFG_state$Posterior$total_samples,samples_dim[2:3]))
     all_samples[1:samples_dim[1],,] = samples
     current_row = samples_dim[1]
+    if(current_row == 0) return(c())
   }
-  if(current_row == 0) return(c())
 
   # load other files
   if(length(param_files) > 1) {

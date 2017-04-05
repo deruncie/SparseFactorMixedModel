@@ -133,6 +133,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  Y = sweep(Y,2,Mean_Y,'-')
 	  Y = sweep(Y,2,sqrt(VY),'/')
 	} else {
+	  p_Y = dim(Y)[2]
 	  Mean_Y = rep(0,p_Y)
 	  VY = rep(1,p_Y)
 	}
@@ -574,7 +575,7 @@ print.BSFG_state = function(BSFG_state){
 #' Make plots of current BSFG state
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}},
 #'   \code{\link{print.BSFG_state}}, \code{\link{summary.BSFG_state}}
-plot.BSFG_state = function(BSFG_state,file = 'diagnostics_polts.pdf'){
+plot.BSFG_state = function(BSFG_state,file = 'diagnostics_plots.pdf'){
   pdf(file)
   if(BSFG_state$run_parameters$simulation){
     plot_diagnostics_simulation(BSFG_state)

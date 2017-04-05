@@ -8,7 +8,7 @@ Simulate data
 ```{r}
 set.seed(1)
 n = 50
-p = 5
+p = 20
 X = matrix(rnorm(n*p),n,p)
 b = rnorm(p)
 eta = X %*% b + rnorm(n)
@@ -32,10 +32,17 @@ log_binom = function(beta,X,y,N,mu = 0.0, sigma = s){
   eXbeta = exp(Xbeta)
   p = eXbeta/(1+eXbeta)
   return( sum(y*log(p) + (N-y)*log(1-p))
-           - sum((beta - mu)^2)/(2*sigma^2)
+           - sum((beta - mu)^2/(2*sigma^2))
            )
 }
+# cppFunction('NumericVector log_binom_c(NumericVector beta, NumericMatrix X, NumericVector y, IntegerVector N, NumericVector mu, NumericVector sigma2) {
+# beta()
+#   int sum = x + y + z;
+#   return sum;
+# }')
 log_binom(b,X,y,N)
+log_binom(b,X,y,rep(N,n),mu=rep(0,p),sigma = rep(s,p))
+log_binom_c(b,X,y,rep(N,n),mu=rep(0,p),sigma2 = rep(s^2,p))
 nsmp <- 100
 beta.ini <- rep(0.0, p)
 beta.smp <- array(NA, dim=c(nsmp,p))
@@ -77,9 +84,13 @@ plot(mcmc(beta.smp))
 pairs(beta.smp)
 acf(beta.smp[,2])
 
-
+NN = rep(N,n)
+muN = rep(0,p)
+s2 = rep(s^2,p)
+sN = rep(s,p)
   microbenchmark(
-    MfU.Sample(beta.ini, f=log_binom, uni.sampler="slice", X=X, y=y,N=N),
+    MfU.Sample(beta.ini, f=log_binom, uni.sampler="slice", X=X, y=y,N=NN, mu = muN,sigma = sN),
+    MfU.Sample(beta.ini, f=log_binom_c, uni.sampler="slice", X=X, y=y,N=NN, mu = muN,sigma2 = s2), # surprisingly, this is no faster.
     {
       for(j in 1:p){
     beta.ini[j] <- MfU.Sample(beta.ini[j], f=log_binom2, uni.sampler="slice", X=X[,j,drop=FALSE], y=y, Xb1 = X[,-j] %*% beta.ini[-j],N=N)#,control = MfU.Control(length(beta.ini),slice.lower = -10,slice.upper=10))

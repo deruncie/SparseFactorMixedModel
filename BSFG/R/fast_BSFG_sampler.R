@@ -13,6 +13,10 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		#conditioning on F, marginalizing over U_R
 
 		Design = as.matrix(cbind(X,F))
+		Ut = t(invert_aI_bZKZ$U)
+		s = invert_aI_bZKZ$s
+		UtEta = as.matrix(Ut %*% Eta)
+		UtDesign = as.matrix(Ut %*% Design)
 		rows = b + k
 		prior_mean = matrix(0,rows,p)
 		if(b > 0) {
@@ -21,7 +25,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		  prior_prec = t(Plam)
 		}
 		if(is.null(cis_genotypes)){
-		  coefs = sample_coefs_parallel_sparse_c( Eta,Design,resid_h2, tot_Eta_prec,prior_mean,prior_prec,invert_aI_bZKZ,1)
+		  coefs = sample_coefs_parallel_sparse_c( UtEta,UtDesign,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,1)
 		  if(b > 0){
 		    B[] = coefs[1:b,,drop=FALSE]
 		  }
@@ -31,16 +35,10 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		  XB = matrix(0,ncol = p, nrow = n)
 		  for(j in 1:p){
 		    cis_X_j = cis_genotypes[[j]]
-		    Design_j = cbind(Design,cis_X_j)
+		    Design_j = cbind(Design,(Ut %*% cis_X_j)@x)
 		    prior_mean_j = rbind(prior_mean[,j,drop=FALSE],0)
 		    prior_prec_j = rbind(prior_prec[,j,drop=FALSE],1e-10)
-		    coefs_j = sample_coefs_parallel_sparse_c(Eta[,j,drop=FALSE],Design_j,resid_h2[,j,drop=FALSE], tot_Eta_prec[,j,drop=FALSE],prior_mean_j,prior_prec_j,invert_aI_bZKZ,1)
-		    # j2 = rep(j,100)
-		    # prior_mean_j2 = rbind(prior_mean[,j2,drop=FALSE],0)
-		    # prior_prec_j2 = rbind(prior_prec[,j2,drop=FALSE],1e-10)
-		    # coefs_j = sample_coefs_parallel_sparse_c(Eta[,j2,drop=FALSE],Design_j,resid_h2[,j2,drop=FALSE], tot_Eta_prec[,j2,drop=FALSE],prior_mean_j2,prior_prec_j2,invert_aI_bZKZ,1)
-		    # coefs_j2 = sample_coefs_parallel_sparse_c2(Eta[,j2,drop=FALSE],Design_j,resid_h2[,j2,drop=FALSE], tot_Eta_prec[,j2,drop=FALSE],prior_mean_j2,prior_prec_j2,invert_aI_bZKZ,1)
-		    # recover()
+		    coefs_j = sample_coefs_parallel_sparse_c(UtEta[,j,drop=FALSE],Design_j,resid_h2[,j,drop=FALSE], tot_Eta_prec[,j,drop=FALSE],s,prior_mean_j,prior_prec_j,1)
 		    if(b > 0){
 		      B[,j] = coefs_j[1:b]
 		    }
@@ -68,7 +66,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,...) {
 		if(b_F > 0){
 		  prior_mean = matrix(0,b_F,p)
 		  prior_prec = prec_B_F
-		  B_F = sample_coefs_parallel_sparse_c(F,X_F,F_h2, tot_F_prec,prior_mean,prior_prec,invert_aI_bZKZ,1)
+		  B_F = sample_coefs_parallel_sparse_c(as.matrix(Ut %*% F),as.matrix(Ut %*% X_F),F_h2, tot_F_prec,s, prior_mean,prior_prec,1)
 		  XFBF = X_F %*% B_F
 		  F_tilde = F - XFBF # not sparse.
 		} else{
