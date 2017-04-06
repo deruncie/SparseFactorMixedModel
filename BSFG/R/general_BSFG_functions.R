@@ -139,7 +139,7 @@ sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h
 	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))
 	thetas = mclapply(seq_along(unique_h2s),function(j){
 		Cholesky_C = randomEffect_C_Choleskys[[unique_h2s[j]]]$Cholesky_C
-		chol_K_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_K_inv * sqrt(tot_Eta_prec[j])
+		chol_K_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_K_inv * sqrt(tot_Eta_prec[j])  # THIS IS WRONG !!!!!
 		traits_j = unique_h2s_index[[j]]
 		sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_K_inv,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
 	},mc.cores = ncores)
