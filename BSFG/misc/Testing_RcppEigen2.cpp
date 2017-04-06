@@ -53,7 +53,7 @@ VectorXd sample_MME_multiple_diagR_c(
 }
 
 
-VectorXd sample_MME_multiple_diagR2(
+VectorXd sample_MME_single_diagR(
     VectorXd Y,
     SpMat W,
     SpMat chol_C,
@@ -64,7 +64,6 @@ VectorXd sample_MME_multiple_diagR2(
     VectorXd randn_e
 ){
   VectorXd theta_star = chol_K_inv.triangularView<Upper>().solve(randn_theta);
-  // VectorXd e_star = randn_e * pe.cwiseSqrt().cwiseInverse().asDiagonal();
   VectorXd e_star = randn_e / sqrt(pe);
   MatrixXd W_theta_star = W * theta_star;
 
@@ -79,7 +78,7 @@ VectorXd sample_MME_multiple_diagR2(
 }
 
 // [[Rcpp::export]]
-VectorXd sample_MME_multiple_diagR_c2(
+VectorXd sample_MME_single_diagR_c(
     Map<VectorXd> Y,
     MSpMat W,
     MSpMat chol_C,
@@ -89,7 +88,7 @@ VectorXd sample_MME_multiple_diagR_c2(
     Map<VectorXd> randn_theta,
     Map<VectorXd> randn_e
 ){
-  return sample_MME_multiple_diagR2(Y,W,chol_C,pe,chol_K_inv,tot_Eta_prec,randn_theta,randn_e);
+  return sample_MME_single_diagR(Y,W,chol_C,pe,chol_K_inv,tot_Eta_prec,randn_theta,randn_e);
 }
 
 
@@ -108,6 +107,38 @@ VectorXd sample_MME_multiple_diagR_c2(
 //   }
 
 
+// // [[Rcpp::export()]]
+// MatrixXd sample_MME_ZKZts_c(
+//     Map<MatrixXd> Y,
+//     MSpMat W,
+//     Map<VectorXd> tot_Eta_prec,
+//     Rcpp::List chol_Cs,
+//     Rcpp::List chol_K_invs,
+//     Map<MatrixXd> h2s,
+//     Rcpp::IntegerVector h2s_index,
+//     Map<MatrixXd> randn_theta,
+//     Map<MatrixXd> randn_e,
+//     int grainSize) {
+//
+//   int b = randn_theta.rows();
+//   int p = randn_theta.cols();
+//
+//   MatrixXd coefs(b,p);
+//   VectorXd h2_e = 1.0 - h2s.colwise().sum().array();
+//   VectorXd pes = tot_Eta_prec.array() / h2_e.array();
+//
+//   // sampleColumn sampler(Y,W,chol_Cs,chol_K_invs,pes,tot_Eta_prec,h2s_index,randn_theta,randn_e,coefs);
+//   // RcppParallel::parallelFor(0,p,sampler,grainSize);
+//   for(int j = 0; j < p; j++){
+//     int h2_index = h2s_index[j] - 1;
+//     SpMat chol_C(Rcpp::as<MSpMat>(chol_Cs[h2_index]));
+//     SpMat chol_K_inv(Rcpp::as<MSpMat>(chol_K_invs[h2_index]));
+//     chol_K_inv *= sqrt(tot_Eta_prec[j]);
+//     coefs.col(j) = sample_MME_single_diagR(Y.col(j), W, chol_C, pes[j],chol_K_inv, tot_Eta_prec[j], randn_theta.col(j),randn_e.col(j));
+//   }
+//   return(coefs);
+// }
+
 // [[Rcpp::export()]]
 MatrixXd sample_MME_ZKZts_c(
     Map<MatrixXd> Y,
@@ -115,51 +146,54 @@ MatrixXd sample_MME_ZKZts_c(
     Map<VectorXd> tot_Eta_prec,
     Rcpp::List chol_Cs,
     Rcpp::List chol_K_invs,
-    Map<VectorXd> h2s,
+    Map<MatrixXd> h2s,
     Rcpp::IntegerVector h2s_index,
     Map<MatrixXd> randn_theta,
     Map<MatrixXd> randn_e,
     int grainSize) {
 
-  struct sampleColumn : public Worker {
-    MatrixXd Y, randn_theta, randn_e;
-    SpMat W;
-    Rcpp::List chol_Cs,chol_K_invs;
-    Rcpp::IntegerVector h2s_index;
-    VectorXd h2s,pes,tot_Eta_prec;
-    MatrixXd &coefs;
+    struct sampleColumn : public Worker {
+      MatrixXd Y;
+      SpMat W;
+      Rcpp::List chol_Cs,chol_K_invs;
+      VectorXd pes,tot_Eta_prec;
+      Rcpp::IntegerVector h2s_index;
+      MatrixXd randn_theta, randn_e;
+      MatrixXd &coefs;
 
-    sampleColumn(MatrixXd Y,
-                 SpMat W,
-                 Rcpp::List chol_Cs,
-                 VectorXd pes,
-                 VectorXd tot_Eta_prec,
-                 Rcpp::List chol_K_invs,
-                 Rcpp::IntegerVector h2s_index,
-                 MatrixXd randn_theta, MatrixXd randn_e,
-                 MatrixXd &coefs):
-      Y(Y), W(W), chol_Cs(chol_Cs), pes(pes), tot_Eta_prec(tot_Eta_prec), chol_K_invs(chol_K_invs),
-      randn_theta(randn_theta), randn_e(randn_e),
-      h2s_index(h2s_index), coefs(coefs) {}
+      sampleColumn(MatrixXd Y,
+                   SpMat W,
+                   Rcpp::List chol_Cs,
+                   Rcpp::List chol_K_invs,
+                   VectorXd pes,
+                   VectorXd tot_Eta_prec,
+                   Rcpp::IntegerVector h2s_index,
+                   MatrixXd randn_theta, MatrixXd randn_e,
+                   MatrixXd &coefs):
+        Y(Y), W(W),
+        chol_Cs(chol_Cs), chol_K_invs(chol_K_invs),
+        pes(pes), tot_Eta_prec(tot_Eta_prec),h2s_index(h2s_index),
+        randn_theta(randn_theta), randn_e(randn_e),
+        coefs(coefs) {}
 
-    void operator()(std::size_t begin, std::size_t end) {
-      for(std::size_t j = begin; j < end; j++){
-        int h2_index = h2s_index[j] - 1;
-        SpMat chol_C(Rcpp::as<MSpMat>(chol_Cs[h2_index]));
-        SpMat chol_K_inv(Rcpp::as<MSpMat>(chol_K_invs[h2_index]));
-        coefs.col(j) = sample_MME_multiple_diagR2(Y.col(j), W, chol_C, pes[j],chol_K_inv, tot_Eta_prec[j], randn_theta.col(j),randn_e.col(j));
+      void operator()(std::size_t begin, std::size_t end) {
+        for(std::size_t j = begin; j < end; j++){
+          int h2_index = h2s_index[j] - 1;
+          SpMat chol_C(Rcpp::as<MSpMat>(chol_Cs[h2_index]));
+          SpMat chol_K_inv(Rcpp::as<MSpMat>(chol_K_invs[h2_index]));
+          chol_K_inv *= sqrt(tot_Eta_prec[j]);
+          coefs.col(j) = sample_MME_single_diagR(Y.col(j), W, chol_C, pes[j],chol_K_inv, tot_Eta_prec[j], randn_theta.col(j),randn_e.col(j));
+        }
       }
-    }
-  };
-
+    };
   int b = randn_theta.rows();
   int p = randn_theta.cols();
 
   MatrixXd coefs(b,p);
-  VectorXd pes = tot_Eta_prec.array() / (1.0-h2s.colwise().sum().array());
+  VectorXd h2_e = 1.0 - h2s.colwise().sum().array();
+  VectorXd pes = tot_Eta_prec.array() / h2_e.array();
 
-  sampleColumn sampler(Y,W,chol_Cs,pes,tot_Eta_prec,chol_K_invs,h2s_index,randn_theta,randn_e,coefs);
+  sampleColumn sampler(Y,W,chol_Cs,chol_K_invs,pes,tot_Eta_prec,h2s_index,randn_theta,randn_e,coefs);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return(coefs);
 }
-

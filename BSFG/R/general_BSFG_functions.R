@@ -167,14 +167,20 @@ sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h
 	unique_h2s_index = lapply(unique_h2s,function(x) which(h2s_index == x))
 	thetas = mclapply(seq_along(unique_h2s),function(j){
 		Cholesky_C = randomEffect_C_Choleskys[[unique_h2s[j]]]$Cholesky_C
-		chol_K_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_K_inv * sqrt(tot_Eta_prec[j])
+		chol_K_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_K_inv * sqrt(tot_Eta_prec[j])  # this is wrong!!!!!
 		traits_j = unique_h2s_index[[j]]
 		# recover()
 		res1 = sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_K_inv,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
-		# chol_C = as(expand(Cholesky_C)$L,'dgCMatrix')
-		# chol_K_inv_2 = as(chol_K_inv,'dgCMatrix')
+		chol_C = as(expand(Cholesky_C)$L,'dgCMatrix')
+		chol_K_inv_2 = as(chol_K_inv,'dgCMatrix')
+		print(paste('asdf',chol_K_inv_2[11,11]))
 		# res2 = sample_MME_multiple_diagR_c(as.matrix(Y[,traits_j,drop=F]), W, chol_C, pes[traits_j], chol_K_inv_2,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
-		# res3 = sapply(traits_j,function(j) sample_MME_multiple_diagR_c2(as.matrix(Y[,j,drop=F]), W, chol_C, pes[j], chol_K_inv_2,tot_Eta_prec[j], randn_theta[,j,drop=F], randn_e[,j,drop=F]))
+		# res3 = sapply(traits_j,function(i) sample_MME_single_diagR_c(as.matrix(Y[,i,drop=F]), W, chol_C, pes[i], chol_K_inv_2,tot_Eta_prec[i], randn_theta[,i,drop=F], randn_e[,i,drop=F]))
+		res4 = sample_MME_ZKZts_c(as.matrix(Y[,traits_j,drop=F]), W, tot_Eta_prec[traits_j], chol_Cs, chol_K_invs,h2s[,traits_j,drop=FALSE],h2s_index[traits_j],randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F],1)
+		# res5 = sapply(traits_j,function(i) sample_MME_ZKZts_c(as.matrix(Y[,i,drop=F]), W, tot_Eta_prec[i], chol_Cs, chol_K_invs,h2s[,i,drop=FALSE],h2s_index[i],randn_theta[,i,drop=F], randn_e[,i,drop=F],1))
+		# plot(res3,res4);abline(0,1)
+		# plot(res3,res5);abline(0,1)
+		# plot(res4,res5);abline(0,1)
 		# plot(res1,res2);abline(0,1)
 		# plot(res1,res3);abline(0,1)
 		# microbenchmark(
@@ -182,14 +188,21 @@ sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h
 		#   sample_MME_multiple_diagR_c(as.matrix(Y[,traits_j,drop=F]), W, chol_C, pes[traits_j], chol_K_inv_2,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F]),
 		#   sapply(traits_j,function(j) sample_MME_multiple_diagR_c2(as.matrix(Y[,j,drop=F]), W, chol_C, pes[j], chol_K_inv_2,tot_Eta_prec[j], randn_theta[,j,drop=F], randn_e[,j,drop=F]))
 		# )
+		# colnames(res3) = traits_j
+		# res3
+		res1
 	},mc.cores = ncores)
 	theta = do.call(cbind,thetas)
 	theta = theta[,order(unlist(unique_h2s_index))]
 	theta
 
+	sapply(chol_Cs[unique_h2s],function(x) x[11,11])
+
+
 	chol_Cs = lapply(randomEffect_C_Choleskys,function(x) as(expand(x$Cholesky_C)$L,'dgCMatrix'))
 	chol_K_invs = lapply(randomEffect_C_Choleskys,function(x) as(x$chol_K_inv,'dgCMatrix'))
 	theta2 = sample_MME_ZKZts_c(Y,W,tot_Eta_prec,chol_Cs,chol_K_invs,h2s,h2s_index,randn_theta,randn_e,1)
+  plot(theta,theta2);abline(0,1)
 
 	microbenchmark({
 	  thetas = mclapply(seq_along(unique_h2s),function(j){
