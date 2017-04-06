@@ -115,11 +115,39 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, t
 	res = mclapply(1:p,function(j) {
 		Cholesky_R = Sigma_Choleskys[[h2s_index[j]]]$Cholesky_Sigma
 		chol_R = Sigma_Choleskys[[h2s_index[j]]]$chol_Sigma
+		# recover()
 		theta_j = sample_MME_single_diagK(Y[,j], W, Wp, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Eta_prec[j], randn_theta[,j],randn_e[,j])
-		theta_j
+		# chol_R_2 =as(chol_R,'dgCMatrix')
+		# theta_j2 = sample_MME_single_diagK_c(Y[,j],W,prior_mean[,j],prior_prec[,j],chol_R_2,tot_Eta_prec[j], randn_theta[,j],randn_e[,j])
+		# plot(theta_j,theta_j2);abline(0,1)
+		# microbenchmark(sample_MME_single_diagK(Y[,j], W, Wp, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Eta_prec[j], randn_theta[,j],randn_e[,j]),
+		#                sample_MME_single_diagK_c(Y[,j],W,prior_mean[,j],prior_prec[,j],chol_R_2,tot_Eta_prec[j], randn_theta[,j],randn_e[,j]))
+
 	},mc.cores = ncores)
 	res = do.call(cbind,res)
 	res
+
+	# chol_Rs = lapply(Sigma_Choleskys,function(x) as(x$chol_Sigma,'dgCMatrix'))
+	# res2 = sample_MME_fixedEffects_c(Y,W,chol_Rs,h2s_index,tot_Eta_prec,prior_mean,prior_prec,randn_theta,randn_e,1)
+	#
+	# microbenchmark({
+	#   res = mclapply(1:p,function(j) {
+	#     Cholesky_R = Sigma_Choleskys[[h2s_index[j]]]$Cholesky_Sigma
+	#     chol_R = Sigma_Choleskys[[h2s_index[j]]]$chol_Sigma
+	#     # recover()
+	#     theta_j = sample_MME_single_diagK(Y[,j], W, Wp, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Eta_prec[j], randn_theta[,j],randn_e[,j])
+	#     # chol_R_2 =as(chol_R,'dgCMatrix')
+	#     # theta_j2 = sample_MME_single_diagK_c(Y[,j],W,prior_mean[,j],prior_prec[,j],chol_R_2,tot_Eta_prec[j], randn_theta[,j],randn_e[,j])
+	#     # plot(theta_j,theta_j2);abline(0,1)
+	#     # microbenchmark(sample_MME_single_diagK(Y[,j], W, Wp, prior_mean[,j],prior_prec[,j],Cholesky_R,chol_R,Sigma_Perm,tot_Eta_prec[j], randn_theta[,j],randn_e[,j]),
+	#     #                sample_MME_single_diagK_c(Y[,j],W,prior_mean[,j],prior_prec[,j],chol_R_2,tot_Eta_prec[j], randn_theta[,j],randn_e[,j]))
+	#
+	#   },mc.cores = ncores)
+	#   res = do.call(cbind,res)
+	# },
+	# sample_MME_fixedEffects_c(Y,W,chol_Rs,h2s_index,tot_Eta_prec,prior_mean,prior_prec,randn_theta,randn_e,1)
+	# )
+
 }
 sample_MME_fixedEffects = compiler::cmpfun(sample_MME_fixedEffects)
 
@@ -141,11 +169,50 @@ sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h
 		Cholesky_C = randomEffect_C_Choleskys[[unique_h2s[j]]]$Cholesky_C
 		chol_K_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_K_inv * sqrt(tot_Eta_prec[j])
 		traits_j = unique_h2s_index[[j]]
-		sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_K_inv,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
+		# recover()
+		res1 = sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_K_inv,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
+		# chol_C = as(expand(Cholesky_C)$L,'dgCMatrix')
+		# chol_K_inv_2 = as(chol_K_inv,'dgCMatrix')
+		# res2 = sample_MME_multiple_diagR_c(as.matrix(Y[,traits_j,drop=F]), W, chol_C, pes[traits_j], chol_K_inv_2,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
+		# res3 = sapply(traits_j,function(j) sample_MME_multiple_diagR_c2(as.matrix(Y[,j,drop=F]), W, chol_C, pes[j], chol_K_inv_2,tot_Eta_prec[j], randn_theta[,j,drop=F], randn_e[,j,drop=F]))
+		# plot(res1,res2);abline(0,1)
+		# plot(res1,res3);abline(0,1)
+		# microbenchmark(
+		#   sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_K_inv,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F]),
+		#   sample_MME_multiple_diagR_c(as.matrix(Y[,traits_j,drop=F]), W, chol_C, pes[traits_j], chol_K_inv_2,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F]),
+		#   sapply(traits_j,function(j) sample_MME_multiple_diagR_c2(as.matrix(Y[,j,drop=F]), W, chol_C, pes[j], chol_K_inv_2,tot_Eta_prec[j], randn_theta[,j,drop=F], randn_e[,j,drop=F]))
+		# )
 	},mc.cores = ncores)
 	theta = do.call(cbind,thetas)
 	theta = theta[,order(unlist(unique_h2s_index))]
 	theta
+
+	chol_Cs = lapply(randomEffect_C_Choleskys,function(x) as(expand(x$Cholesky_C)$L,'dgCMatrix'))
+	chol_K_invs = lapply(randomEffect_C_Choleskys,function(x) as(x$chol_K_inv,'dgCMatrix'))
+	theta2 = sample_MME_ZKZts_c(Y,W,tot_Eta_prec,chol_Cs,chol_K_invs,h2s,h2s_index,randn_theta,randn_e,1)
+
+	microbenchmark({
+	  thetas = mclapply(seq_along(unique_h2s),function(j){
+	    Cholesky_C = randomEffect_C_Choleskys[[unique_h2s[j]]]$Cholesky_C
+	    chol_K_inv = randomEffect_C_Choleskys[[unique_h2s[j]]]$chol_K_inv * sqrt(tot_Eta_prec[j])
+	    traits_j = unique_h2s_index[[j]]
+	    # recover()
+	    res1 = sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_K_inv,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
+	    # chol_C = as(expand(Cholesky_C)$L,'dgCMatrix')
+	    # chol_K_inv_2 = as(chol_K_inv,'dgCMatrix')
+	    # res2 = sample_MME_multiple_diagR_c(as.matrix(Y[,traits_j,drop=F]), W, chol_C, pes[traits_j], chol_K_inv_2,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F])
+	    # res3 = sapply(traits_j,function(j) sample_MME_multiple_diagR_c2(as.matrix(Y[,j,drop=F]), W, chol_C, pes[j], chol_K_inv_2,tot_Eta_prec[j], randn_theta[,j,drop=F], randn_e[,j,drop=F]))
+	    # plot(res1,res2);abline(0,1)
+	    # plot(res1,res3);abline(0,1)
+	    # microbenchmark(
+	    #   sample_MME_multiple_diagR(as.matrix(Y[,traits_j,drop=F]), W, Cholesky_C, pes[traits_j], chol_K_inv,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F]),
+	    #   sample_MME_multiple_diagR_c(as.matrix(Y[,traits_j,drop=F]), W, chol_C, pes[traits_j], chol_K_inv_2,tot_Eta_prec[traits_j], randn_theta[,traits_j,drop=F], randn_e[,traits_j,drop=F]),
+	    #   sapply(traits_j,function(j) sample_MME_multiple_diagR_c2(as.matrix(Y[,j,drop=F]), W, chol_C, pes[j], chol_K_inv_2,tot_Eta_prec[j], randn_theta[,j,drop=F], randn_e[,j,drop=F]))
+	    # )
+	  },mc.cores = ncores)
+	},
+	sample_MME_ZKZts_c(Y,W,tot_Eta_prec,chol_Cs,chol_K_invs,h2s,h2s_index,randn_theta,randn_e,1)
+	)
 }
 sample_MME_ZKZts = compiler::cmpfun(sample_MME_ZKZts)
 

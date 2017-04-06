@@ -102,13 +102,8 @@ arma::rowvec sample_tot_prec_sparse_c (arma::mat UtEta,
 					   arma::vec h2,
 					   arma::vec s,
 					   double tot_Eta_prec_shape,
-					   double tot_Eta_prec_rate					   // List invert_aI_bZKZ
+					   double tot_Eta_prec_rate
 					  ) {
-
-	// arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
-	// arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
-	//
-	// arma::mat UtEta = U.t() * Eta;
 
 	int n = UtEta.n_rows;
 	int p = UtEta.n_cols;
@@ -129,11 +124,8 @@ arma::rowvec sample_h2s_discrete_given_p_sparse_c (arma::mat UtEta,
             				int h2_divisions,
             				arma::vec h2_priors,
             				arma::vec Tot_prec,
-            				arma::vec s            				// List invert_aI_bZKZ
+            				arma::vec s
               ){
-
-	// arma::sp_mat U = as<arma::sp_mat>(invert_aI_bZKZ["U"]);
-	// arma::vec s = as<arma::vec>(invert_aI_bZKZ["s"]);
 
 	int p = UtEta.n_cols;
 	int n = UtEta.n_rows;
@@ -176,7 +168,7 @@ arma::mat sample_randomEffects_parallel_sparse_c (arma::mat Eta,
 	// U_i = zeros(r,1) if h2_i = 0
 	// it is assumed that s2 = 1 because this scaling factor is absorbed in
 	// Lambda
-	// invert_aZZt_Kinv has parameters to diagonalize a*Z*Z' + b*I for fast
+	// invert_aZZt_Kinv has parameters to diagonalize a*Z*Z' + b*K for fast
 	// inversion:
 
 	arma::vec a_prec = tot_prec / h2;
