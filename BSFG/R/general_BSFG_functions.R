@@ -70,7 +70,7 @@ generate_candidate_states = function(h2s_matrix,step_size){
 }
 
 
-sample_h2s_discrete_MH = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_priors,h2s_matrix,h2_index,candidate_states,grainSize){
+sample_h2s_discrete_MH = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_priors,h2s_matrix,h2_index,step_size,grainSize){
 	# while this works, it is much slower than doing the full scan over all traits, at least for multiple traits
 	# testing with p=100, solving the whole set takes ~4-5x solving just 1. And this method requires doing each trait separately
 	# both methods are similarly easy to multiplex, so no advantage there either.
@@ -83,7 +83,7 @@ sample_h2s_discrete_MH = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_prior
 	r_draws = runif(p)
 	# state_draws = runif(p)
 	# chol_Sigmas = lapply(Sigma_Choleskys,function(x) as(expand(x$Cholesky_Sigma)$L,'dgCMatrix'))
-	h2s_index = sample_h2s_discrete_MH_c(Y,tot_Eta_prec,discrete_priors,h2_index,h2s_matrix,Sigma_Choleskys,candidate_states,r_draws,.2,grainSize)+1
+	h2s_index = sample_h2s_discrete_MH_c(Y,tot_Eta_prec,discrete_priors,h2_index,h2s_matrix,Sigma_Choleskys,r_draws,step_size,grainSize)+1
 
 	# h2_index = BSFG_state$current_state$resid_h2_index
 	# h2s_matrix = BSFG_state$data_matrices$h2s_matrix
