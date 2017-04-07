@@ -48,9 +48,11 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		#conditioning on B, F, Lambda, resid_h2, tot_Eta_prec
 		Eta_tilde = Eta - XB - F %*% t(Lambda)
 		tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
+
 		resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
+		# resid_h2_index = sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores)
+
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
-		# U_R_prec = tot_Eta_prec / colSums(resid_h2)
 
 		U_R[] = sample_MME_ZKZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ki_mats,ncores)
 

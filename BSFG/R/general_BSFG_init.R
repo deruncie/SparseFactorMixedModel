@@ -180,8 +180,8 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 	print('creating randomEffects_C')
 
 	Ki = forceSymmetric(crossprod(make_Chol_Ki(chol_Ki_mats,rep(1,n_RE)/(n_RE+1))))
-	Cholesky_C = Cholesky(ZtZ + Ki)
 
+	# recover()
 	randomEffect_C_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
 		if(i %% 100 == 0 && verbose) print(sprintf('randomEffects_C %d of %d',i,ncol(h2s_matrix)))
 		h2s = h2s_matrix[,i]
@@ -189,9 +189,10 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 		Ki = crossprod(chol_K_inv)
 		C = ZtZ/(1-sum(h2s))
 		C = C + Ki
-		Cholesky_C_i = update(Cholesky_C,forceSymmetric(C))
+		chol_Ci = as(chol(forceSymmetric(C)),'dgCMatrix')
+		chol_K_inv = as(chol_K_inv,'dgCMatrix')
 
-		return(list(Cholesky_C = Cholesky_C_i, chol_K_inv = chol_K_inv))
+		return(list(chol_C = chol_Ci, chol_K_inv = chol_K_inv))
 	},mc.cores = ncores)
 
 	# Sigma
@@ -212,23 +213,15 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 	# setup of symbolic Cholesky of Sigma
 	print('creating Sigma_Choleskys')
 	Sigma = make_Sigma(ZKZts,h2s_matrix[,2])
-	Cholesky_Sigma_base = Cholesky(Sigma,perm=T,super=T)
-	stopifnot(!isLDL(Cholesky_Sigma_base))
-	Sigma_Perm = expand(Cholesky_Sigma_base)$P
-	if(all(diag(Sigma_Perm))) Sigma_Perm = NULL
 
 	Sigma_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
 		if(i %% 100 == 0 && verbose) print(sprintf('Sigma_Choleskys %d of %d',i,ncol(h2s_matrix)))
 		Sigma = forceSymmetric(make_Sigma(ZKZts,h2s_matrix[,i]))
 		stopifnot(class(Sigma) == 'dsCMatrix')
-		Cholesky_Sigma = update(Cholesky_Sigma_base,Sigma)
-		log_det = 2*determinant(Cholesky_Sigma,logarithm=T)$modulus
-		if(is.null(Sigma_Perm)) {
-			chol_Sigma = expand(Cholesky_Sigma)$L
-		} else{
-			chol_Sigma = t(Sigma_Perm) %*% expand(Cholesky_Sigma)$L
-		}
-		list(log_det = log_det,Cholesky_Sigma = Cholesky_Sigma,chol_Sigma=chol_Sigma,Sigma = Sigma)
+		chol_Sigma = chol(Sigma)
+		log_det = 2*determinant(chol_Sigma,logarithm=T)$modulus
+		chol_Sigma = as(chol_Sigma,'dgCMatrix')
+		list(log_det = log_det,chol_Sigma=chol_Sigma,Sigma = Sigma)
 	},mc.cores = ncores)
 
 # ----------------------------- #
@@ -237,7 +230,6 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 
 	run_variables = c(run_variables,list(
 			Sigma_Choleskys          = Sigma_Choleskys,
-			Sigma_Perm               = Sigma_Perm,
 			randomEffect_C_Choleskys = randomEffect_C_Choleskys,
 			chol_Ki_mats             = chol_Ki_mats
     ))

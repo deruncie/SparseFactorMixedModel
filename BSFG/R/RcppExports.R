@@ -33,3 +33,35 @@ log_binom_c <- function(beta, X, y, N, mu, sigma2) {
     .Call('BSFG_log_binom_c', PACKAGE = 'BSFG', beta, X, y, N, mu, sigma2)
 }
 
+sample_MME_single_diagK_c <- function(y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {
+    .Call('BSFG_sample_MME_single_diagK_c', PACKAGE = 'BSFG', y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e)
+}
+
+sample_MME_fixedEffects_c <- function(Y, W, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, grainSize) {
+    .Call('BSFG_sample_MME_fixedEffects_c', PACKAGE = 'BSFG', Y, W, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
+}
+
+sample_MME_single_diagR <- function(Y, W, chol_C, pe, chol_K_inv, tot_Eta_prec, randn_theta, randn_e) {
+    .Call('BSFG_sample_MME_single_diagR', PACKAGE = 'BSFG', Y, W, chol_C, pe, chol_K_inv, tot_Eta_prec, randn_theta, randn_e)
+}
+
+sample_MME_ZKZts_c <- function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, randn_theta, randn_e, grainSize) {
+    .Call('BSFG_sample_MME_ZKZts_c', PACKAGE = 'BSFG', Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, randn_theta, randn_e, grainSize)
+}
+
+tot_prec_scores <- function(Y, Sigma_Choleskys, h2s_index, grainSize) {
+    .Call('BSFG_tot_prec_scores', PACKAGE = 'BSFG', Y, Sigma_Choleskys, h2s_index, grainSize)
+}
+
+log_p_h2s <- function(Y, tot_Eta_prec, Sigma_Choleskys, discrete_priors, grainSize) {
+    .Call('BSFG_log_p_h2s', PACKAGE = 'BSFG', Y, tot_Eta_prec, Sigma_Choleskys, discrete_priors, grainSize)
+}
+
+sample_h2s <- function(log_ps, rs, grainSize) {
+    .Call('BSFG_sample_h2s', PACKAGE = 'BSFG', log_ps, rs, grainSize)
+}
+
+sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, step_size, grainSize) {
+    .Call('BSFG_sample_h2s_discrete_MH_c', PACKAGE = 'BSFG', Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, step_size, grainSize)
+}
+
