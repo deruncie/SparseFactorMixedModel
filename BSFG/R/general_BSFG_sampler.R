@@ -20,7 +20,7 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		  prior_prec = t(Plam)
 		}
 		if(is.null(cis_genotypes)){
-		  coefs = sample_MME_fixedEffects(Eta,Design,Sigma_Choleskys, Sigma_Perm,  resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,ncores)
+		  coefs = sample_MME_fixedEffects(Eta,Design,Sigma_Choleskys, resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,ncores)
 		  if(b > 0){
 		    B[] = coefs[1:b,,drop=FALSE]
 		  }
@@ -33,7 +33,7 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
   		  Design_j = cbind(Design,cis_X_j)
   		  prior_mean_j = rbind(prior_mean[,j,drop=FALSE],0)
   		  prior_prec_j = rbind(prior_prec[,j,drop=FALSE],1e-10)
-  		  coefs_j = sample_MME_fixedEffects(Eta[,j,drop=FALSE],Design_j,Sigma_Choleskys, Sigma_Perm,  resid_h2_index[j], tot_Eta_prec[,j,drop=FALSE], prior_mean_j, prior_prec_j,ncores)
+  		  coefs_j = sample_MME_fixedEffects(Eta[,j,drop=FALSE],Design_j,Sigma_Choleskys,  resid_h2_index[j], tot_Eta_prec[,j,drop=FALSE], prior_mean_j, prior_prec_j,ncores)
   		  if(b > 0){
   		    B[,j] = coefs_j[1:b]
   		  }
@@ -47,36 +47,24 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 	 # -----Sample tot_Eta_prec, resid_h2, U_R ---------------- #
 		#conditioning on B, F, Lambda, resid_h2, tot_Eta_prec
 		Eta_tilde = Eta - XB - F %*% t(Lambda)
-		tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
+		tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, resid_h2_index,ncores)
 
-		# big_Sigma_Choleskys = rep(Sigma_Choleskys,5)
-		# big_Resid_discrete_priors = rep(Resid_discrete_priors,5)
-		# big_candidate_states_h2 = rep(candidate_states_h2,5)
-		# recover()
-		# resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
-		resid_h2_index = sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores)
-		# resid_h2_index2b = sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, big_Sigma_Choleskys,big_Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores)
-		# resid_h2_index3 = sample_h2s_discrete_MH2(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,candidate_states_h2,ncores)
-		#
-		# microbenchmark(
-		#   sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores),
-		#   sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores),
-		#   sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, big_Sigma_Choleskys,big_Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores),
-		#   sample_h2s_discrete_MH2(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,candidate_states_h2,ncores),
-		#   sample_h2s_discrete_MH2(Eta_tilde,tot_Eta_prec, big_Sigma_Choleskys,big_Resid_discrete_priors,h2s_matrix,resid_h2_index,big_candidate_states_h2,ncores),
-		#   times=10
-		# )
+		if(is.null(h2_step_size)) {
+		  resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, h2_priors_resids,ncores)
+		} else{
+		  resid_h2_index = sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,h2_priors_resids,h2s_matrix,resid_h2_index,h2_step_size,ncores)
+		}
 
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
 
-		U_R[] = sample_MME_ZKZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,chol_Ki_mats,ncores)
+		U_R[] = sample_MME_ZKZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,ncores)
 
 		# -----Sample Lambda and B_F ------------------ #
 		# F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
 		if(b_F > 0){
 			prior_mean = matrix(0,b_F,p)
 			prior_prec = prec_B_F
-			B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, Sigma_Perm, F_h2_index, tot_F_prec, prior_mean, prior_prec,ncores)
+			B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, F_h2_index, tot_F_prec, prior_mean, prior_prec,ncores)
 			XFBF = X_F %*% B_F
 			F_tilde = F - XFBF
 		} else{
@@ -85,11 +73,17 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 	 # -----Sample tot_F_prec, F_h2, U_F ---------------- #
 		#conditioning on B, F, Lambda, F_h2, tot_F_prec
 
-		tot_F_prec[] = sample_tot_prec(F_tilde, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, Sigma_Perm, F_h2_index,ncores)
-		F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys, Sigma_Perm, F_discrete_priors,ncores)
+		tot_F_prec[] = sample_tot_prec(F_tilde, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, F_h2_index,ncores)
+
+		if(is.null(h2_step_size)) {
+  		F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys,h2_priors_factors,ncores)
+		} else{
+		  F_h2_index = sample_h2s_discrete_MH(F_tilde,tot_F_prec, Sigma_Choleskys,h2_priors_factors,h2s_matrix,F_h2_index,h2_step_size,ncores)
+		}
+
 		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-		U_F[] = sample_MME_ZKZts(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,chol_Ki_mats,ncores)
+		U_F[] = sample_MME_ZKZts(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,ncores)
 
 	 # -----Sample F----------------------- #
 		#conditioning on B, U_F,U_R,Lambda, F_h2

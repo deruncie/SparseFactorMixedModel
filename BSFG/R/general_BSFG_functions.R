@@ -25,7 +25,7 @@
 #' @param R_Perm either \code{NULL} if \eqn{P} is diagonal, or the \eqn{P} matrix.
 #' @param tot_Eta_prec the inverse of the total variance
 #'
-sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, tot_Eta_prec, prior_mean, prior_prec,ncores){
+sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys,h2s_index, tot_Eta_prec, prior_mean, prior_prec,ncores){
 	# using method described in MCMC Course notes
 	p = ncol(Y)
 	n = nrow(Y)
@@ -40,7 +40,7 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, t
 	return(res)
 }
 
-sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, chol_Ki_mats,ncores){
+sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, ncores){
 	# using method described in MCMC Course notes
 	Y = as.matrix(Y)
 	p = ncol(Y)
@@ -54,7 +54,7 @@ sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h
 	theta = sample_MME_ZKZts_c(Y,W,tot_Eta_prec,randomEffect_C_Choleskys,h2s,h2s_index,randn_theta,randn_e,1)
 }
 
-sample_tot_prec = function(Y, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys,Sigma_Perm, h2s_index,ncores){
+sample_tot_prec = function(Y, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys,h2s_index,ncores){
 	n = nrow(Y)
 	p = ncol(Y)
 
@@ -90,28 +90,7 @@ sample_h2s_discrete_MH = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_prior
 	return(h2s_index)
 }
 
-sample_h2s_discrete_MH2 = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_priors,h2s_matrix,h2_index,candidate_states,grainSize){
-  # while this works, it is much slower than doing the full scan over all traits, at least for multiple traits
-  # testing with p=100, solving the whole set takes ~4-5x solving just 1. And this method requires doing each trait separately
-  # both methods are similarly easy to multiplex, so no advantage there either.
-  n = nrow(Y)
-  p = ncol(Y)
-  discrete_bins = length(discrete_priors)
-
-
-  # sample runif(p,0,1) before because parallel RNGs aren't consecutive.
-  r_draws = runif(p)
-  # state_draws = runif(p)
-  # chol_Sigmas = lapply(Sigma_Choleskys,function(x) as(expand(x$Cholesky_Sigma)$L,'dgCMatrix'))
-  h2s_index = sample_h2s_discrete_MH_c2(Y,tot_Eta_prec,discrete_priors,h2_index,h2s_matrix,Sigma_Choleskys,r_draws,candidate_states,grainSize)+1
-
-  # h2_index = BSFG_state$current_state$resid_h2_index
-  # h2s_matrix = BSFG_state$data_matrices$h2s_matrix
-  # step_size = 0.3
-  return(h2s_index)
-}
-
-sample_h2s_discrete = function(Y,tot_Eta_prec, Sigma_Choleskys,Sigma_Perm,discrete_priors,ncores){
+sample_h2s_discrete = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_priors,ncores){
 	n = nrow(Y)
 	p = ncol(Y)
 

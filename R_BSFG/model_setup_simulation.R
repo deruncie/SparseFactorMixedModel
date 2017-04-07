@@ -8,7 +8,7 @@ library(BSFG)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 1
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=1000, b=5, k=10, k_G=5, i_Va = 0.2, i_Ve = 0.2)
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, k=10, k_G=5, i_Va = 0.2, i_Ve = 0.2)
 set.seed(seed)
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
@@ -31,10 +31,12 @@ run_parameters = list(
     prop         = 1.00,
     k_init       = 20,
     h2_divisions = 500,
+    h2_step_size = 0.2,
     burn         = 100,
     thin         = 2
     )
 
+h2_divisions = run_parameters$h2_divisions
 priors = list(
     # fixed_var = list(V = 5e5,   nu = 2.001),
     fixed_var = list(V = 1,     nu = 3),
@@ -45,8 +47,8 @@ priors = list(
     Lambda_df =   3,
     B_df =   3,
     B_F_df =   3,
-    h2_priors_factors   =   c(run_parameters$h2_divisions-1,rep(1,run_parameters$h2_divisions-1))/(2*(run_parameters$h2_divisions-1)),
-    h2_priors_resids   =   c(0,rep(1,99))*dbeta(seq(0,1,length=102),2,2)[2:101]
+    h2_priors_factors   =   c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1)),
+    h2_priors_resids   =   c(0,rep(1,h2_divisions-1))*dbeta(seq(0,1,length=h2_divisions+2),2,2)[2:(h2_divisions+1)]
 )
 
 print('Initializing')
@@ -65,14 +67,14 @@ BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|anima
 BSFG_state$current_state$F_h2
 
 h2_divisions = run_parameters$h2_divisions
-BSFG_state$priors$Resid_discrete_priors = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
+BSFG_state$priors$h2_priors_resids = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
     h2s = h2s_matrix[,x]
     pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
 }))
-BSFG_state$priors$Resid_discrete_priors = BSFG_state$priors$Resid_discrete_priors/sum(BSFG_state$priors$Resid_discrete_priors)
-BSFG_state$priors$F_discrete_priors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
+BSFG_state$priors$h2_priors_resids = BSFG_state$priors$h2_priors_resids/sum(BSFG_state$priors$h2_priors_resids)
+BSFG_state$priors$h2_priors_factors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
 
-# BSFG_state$priors$F_discrete_priors = with(BSFG_state$data_matrices, sapply(1:nrow(h2s_matrix),function(x) {
+# BSFG_state$priors$h2_priors_factors = with(BSFG_state$data_matrices, sapply(1:nrow(h2s_matrix),function(x) {
 #     h2s = h2s_matrix[x,]
 #     pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
 # }))
@@ -94,7 +96,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 # Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
 # burn in
 
-n_samples = 10;
+n_samples = 100;
 for(i  in 1:70) {
     print(sprintf('Run %d',i))
     # microbenchmark(
