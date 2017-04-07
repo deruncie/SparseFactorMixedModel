@@ -80,14 +80,10 @@ sample_h2s_discrete_MH = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_prior
 
 	# sample runif(p,0,1) before because parallel RNGs aren't consecutive.
 	r_draws = runif(p)
-	# state_draws = runif(p)
-	# chol_Sigmas = lapply(Sigma_Choleskys,function(x) as(expand(x$Cholesky_Sigma)$L,'dgCMatrix'))
+
 	h2s_index = sample_h2s_discrete_MH_c(Y,tot_Eta_prec,discrete_priors,h2_index,h2s_matrix,Sigma_Choleskys,r_draws,step_size,grainSize)+1
 
-	# h2_index = BSFG_state$current_state$resid_h2_index
-	# h2s_matrix = BSFG_state$data_matrices$h2s_matrix
-	# step_size = 0.3
-	return(h2s_index)
+		return(h2s_index)
 }
 
 sample_h2s_discrete = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_priors,ncores){
