@@ -1,5 +1,3 @@
-// #include <RcppEigen.h>
-#include <RcppParallel.h>
 #include <math.h>
 #include "BSFG_types.h"
 
@@ -13,90 +11,90 @@ using namespace RcppParallel;
 // ---------- sample_MME_fixedEffects --------- //
 // -------------------------------------------- //
 
-Eigen::VectorXd sample_MME_single_diagK(
-    Eigen::VectorXd y,
-    Eigen::MatrixXd W,
-    Eigen::VectorXd prior_mean,
-    Eigen::VectorXd prior_prec,
+VectorXd sample_MME_single_diagK(
+    VectorXd y,
+    MatrixXd W,
+    VectorXd prior_mean,
+    VectorXd prior_prec,
     SpMat chol_R,
     double tot_Eta_prec,
-    Eigen::VectorXd randn_theta,
-    Eigen::VectorXd randn_e
+    VectorXd randn_theta,
+    VectorXd randn_e
 ){
 
-  Eigen::VectorXd theta_star = randn_theta.array() / prior_prec.cwiseSqrt().array();
+  VectorXd theta_star = randn_theta.array() / prior_prec.cwiseSqrt().array();
   theta_star += prior_mean;
-  Eigen::VectorXd e_star = chol_R * randn_e / sqrt(tot_Eta_prec);
-  Eigen::MatrixXd W_theta_star = W * theta_star;
-  Eigen::VectorXd y_resid = y - W_theta_star - e_star;
+  VectorXd e_star = chol_R * randn_e / sqrt(tot_Eta_prec);
+  MatrixXd W_theta_star = W * theta_star;
+  VectorXd y_resid = y - W_theta_star - e_star;
 
-  Eigen::MatrixXd RinvSqW = chol_R.triangularView<Lower>().solve(W);
-  Eigen::VectorXd WtRinvy = RinvSqW.transpose() * chol_R.triangularView<Lower>().solve(y_resid) * tot_Eta_prec;
+  MatrixXd RinvSqW = chol_R.triangularView<Lower>().solve(W);
+  VectorXd WtRinvy = RinvSqW.transpose() * chol_R.triangularView<Lower>().solve(y_resid) * tot_Eta_prec;
 
-  Eigen::VectorXd theta_tilda;
+  VectorXd theta_tilda;
 
   if(W.cols() < W.rows()) {
-    Eigen::MatrixXd C = RinvSqW.transpose() * RinvSqW * tot_Eta_prec;
+    MatrixXd C = RinvSqW.transpose() * RinvSqW * tot_Eta_prec;
     C.diagonal() = C.diagonal() + prior_prec;
     theta_tilda = C.householderQr().solve(WtRinvy);
   } else{
-    Eigen::MatrixXd R = chol_R * chol_R.transpose() / tot_Eta_prec;
-    Eigen::MatrixXd AiU = (W * prior_prec.cwiseInverse().asDiagonal()).transpose();
-    Eigen::MatrixXd R_VAiU = R + W * AiU;
-    Eigen::MatrixXd inner = AiU * R_VAiU.householderQr().solve(AiU.transpose());
+    MatrixXd R = chol_R * chol_R.transpose() / tot_Eta_prec;
+    MatrixXd AiU = (W * prior_prec.cwiseInverse().asDiagonal()).transpose();
+    MatrixXd R_VAiU = R + W * AiU;
+    MatrixXd inner = AiU * R_VAiU.householderQr().solve(AiU.transpose());
     theta_tilda = WtRinvy.array()/prior_prec.array();
     theta_tilda -= inner * WtRinvy;
   }
 
-  Eigen::VectorXd theta = theta_star + theta_tilda;
+  VectorXd theta = theta_star + theta_tilda;
 
   return theta;
 }
 
 // [[Rcpp::export]]
-Eigen::VectorXd sample_MME_single_diagK_c(
-    Eigen::Map<Eigen::VectorXd> y,
-    Eigen::Map<Eigen::MatrixXd> W,
-    Eigen::Map<Eigen::VectorXd> prior_mean,
-    Eigen::Map<Eigen::VectorXd> prior_prec,
+VectorXd sample_MME_single_diagK_c(
+    Map<VectorXd> y,
+    Map<MatrixXd> W,
+    Map<VectorXd> prior_mean,
+    Map<VectorXd> prior_prec,
     MSpMat chol_R,
     double tot_Eta_prec,
-    Eigen::Map<Eigen::VectorXd> randn_theta,
-    Eigen::Map<Eigen::VectorXd> randn_e
+    Map<VectorXd> randn_theta,
+    Map<VectorXd> randn_e
 ){
   return sample_MME_single_diagK(y,W,prior_mean,prior_prec,chol_R,tot_Eta_prec,randn_theta,randn_e);
 }
 
 // [[Rcpp::export()]]
-Eigen::MatrixXd sample_MME_fixedEffects_c(
-    Eigen::Map<Eigen::MatrixXd> Y,
-    Eigen::Map<Eigen::MatrixXd> W,
+MatrixXd sample_MME_fixedEffects_c(
+    Map<MatrixXd> Y,
+    Map<MatrixXd> W,
     Rcpp::List chol_Rs,
     Rcpp::IntegerVector h2s_index,
-    Eigen::Map<Eigen::VectorXd> tot_Eta_prec,
-    Eigen::Map<Eigen::MatrixXd> prior_mean,
-    Eigen::Map<Eigen::MatrixXd> prior_prec,
-    Eigen::Map<Eigen::MatrixXd> randn_theta,
-    Eigen::Map<Eigen::MatrixXd> randn_e,
+    Map<VectorXd> tot_Eta_prec,
+    Map<MatrixXd> prior_mean,
+    Map<MatrixXd> prior_prec,
+    Map<MatrixXd> randn_theta,
+    Map<MatrixXd> randn_e,
     int grainSize) {
 
   struct sampleColumn : public Worker {
-    Eigen::MatrixXd Y, W, prior_mean, prior_prec, randn_theta, randn_e;
+    MatrixXd Y, W, prior_mean, prior_prec, randn_theta, randn_e;
     const std::vector<SpMat> chol_R_list;
     RVector<int> h2s_index;
-    Eigen::VectorXd tot_Eta_prec;
-    Eigen::MatrixXd &coefs;
+    VectorXd tot_Eta_prec;
+    MatrixXd &coefs;
 
-    sampleColumn(Eigen::MatrixXd Y,
-                 Eigen::MatrixXd W,
-                 Eigen::MatrixXd prior_mean,
-                 Eigen::MatrixXd prior_prec,
+    sampleColumn(MatrixXd Y,
+                 MatrixXd W,
+                 MatrixXd prior_mean,
+                 MatrixXd prior_prec,
                  const std::vector<SpMat> chol_R_list,
                  const Rcpp::IntegerVector h2s_index,
-                 Eigen::VectorXd tot_Eta_prec,
-                 Eigen::MatrixXd randn_theta,
-                 Eigen::MatrixXd randn_e,
-                 Eigen::MatrixXd &coefs):
+                 VectorXd tot_Eta_prec,
+                 MatrixXd randn_theta,
+                 MatrixXd randn_e,
+                 MatrixXd &coefs):
       Y(Y), W(W), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
       chol_R_list(chol_R_list), h2s_index(h2s_index), tot_Eta_prec(tot_Eta_prec), coefs(coefs) {}
 
@@ -117,7 +115,7 @@ Eigen::MatrixXd sample_MME_fixedEffects_c(
     chol_R_list.push_back(Rcpp::as<MSpMat>(chol_Rs[i]));
   }
 
-  Eigen::MatrixXd coefs(b,p);
+  MatrixXd coefs(b,p);
 
   sampleColumn sampler(Y,W,prior_mean,prior_prec,chol_R_list,h2s_index,tot_Eta_prec,randn_theta,randn_e, coefs);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
@@ -130,75 +128,75 @@ Eigen::MatrixXd sample_MME_fixedEffects_c(
 // ------------ sample_MME_ZKZts -------------- //
 // -------------------------------------------- //
 
-Eigen::VectorXd sample_MME_single_diagR(
-    Eigen::VectorXd Y,
+VectorXd sample_MME_single_diagR(
+    VectorXd Y,
     SpMat W,
     SpMat chol_C,
     double pe,
     SpMat chol_K_inv,
     double tot_Eta_prec,
-    Eigen::VectorXd randn_theta,
-    Eigen::VectorXd randn_e
+    VectorXd randn_theta,
+    VectorXd randn_e
 ){
-  Eigen::VectorXd theta_star = chol_K_inv.triangularView<Eigen::Upper>().solve(randn_theta);
-  Eigen::VectorXd e_star = randn_e / sqrt(pe);
-  Eigen::MatrixXd W_theta_star = W * theta_star;
+  VectorXd theta_star = chol_K_inv.triangularView<Upper>().solve(randn_theta);
+  VectorXd e_star = randn_e / sqrt(pe);
+  MatrixXd W_theta_star = W * theta_star;
 
-  Eigen::VectorXd Y_resid = Y - W_theta_star - e_star;
-  Eigen::VectorXd WtRiy = W.transpose() * (Y_resid * pe);
+  VectorXd Y_resid = Y - W_theta_star - e_star;
+  VectorXd WtRiy = W.transpose() * (Y_resid * pe);
 
-  Eigen::VectorXd theta_tilda = chol_C.transpose().triangularView<Eigen::Upper>().solve(chol_C.triangularView<Eigen::Lower>().solve(WtRiy));
+  VectorXd theta_tilda = chol_C.transpose().triangularView<Upper>().solve(chol_C.triangularView<Lower>().solve(WtRiy));
 
-  Eigen::VectorXd theta = theta_tilda / tot_Eta_prec + theta_star;
+  VectorXd theta = theta_tilda / tot_Eta_prec + theta_star;
 
   return theta;
 }
 
 // [[Rcpp::export]]
-Eigen::VectorXd sample_MME_single_diagR_c(
-    Eigen::Map<Eigen::VectorXd> Y,
+VectorXd sample_MME_single_diagR_c(
+    Map<VectorXd> Y,
     MSpMat W,
     MSpMat chol_C,
     double pe,
     MSpMat chol_K_inv,
     double tot_Eta_prec,
-    Eigen::Map<Eigen::VectorXd> randn_theta,
-    Eigen::Map<Eigen::VectorXd> randn_e
+    Map<VectorXd> randn_theta,
+    Map<VectorXd> randn_e
 ){
   return sample_MME_single_diagR(Y,W,chol_C,pe,chol_K_inv,tot_Eta_prec,randn_theta,randn_e);
 }
 
 // [[Rcpp::export()]]
-Eigen::MatrixXd sample_MME_ZKZts_c(
-    Eigen::Map<Eigen::MatrixXd> Y,
+MatrixXd sample_MME_ZKZts_c(
+    Map<MatrixXd> Y,
     MSpMat W,
-    Eigen::Map<Eigen::VectorXd> tot_Eta_prec,
+    Map<VectorXd> tot_Eta_prec,
     Rcpp::List chol_Cs,
     Rcpp::List chol_K_invs,
-    Eigen::Map<Eigen::MatrixXd> h2s,
+    Map<MatrixXd> h2s,
     Rcpp::IntegerVector h2s_index,
-    Eigen::Map<Eigen::MatrixXd> randn_theta,
-    Eigen::Map<Eigen::MatrixXd> randn_e,
+    Map<MatrixXd> randn_theta,
+    Map<MatrixXd> randn_e,
     int grainSize) {
 
   struct sampleColumn : public Worker {
-    Eigen::MatrixXd Y;
+    MatrixXd Y;
     SpMat W;
     const std::vector<SpMat> chol_C_list,chol_K_inv_list;
-    Eigen::VectorXd pes,tot_Eta_prec;
+    VectorXd pes,tot_Eta_prec;
     RVector<int> h2s_index;
-    Eigen::MatrixXd randn_theta, randn_e;
-    Eigen::MatrixXd &coefs;
+    MatrixXd randn_theta, randn_e;
+    MatrixXd &coefs;
 
-    sampleColumn(Eigen::MatrixXd Y,
+    sampleColumn(MatrixXd Y,
                  SpMat W,
                  const std::vector<SpMat> chol_C_list,
                  const std::vector<SpMat> chol_K_inv_list,
-                 Eigen::VectorXd pes,
-                 Eigen::VectorXd tot_Eta_prec,
+                 VectorXd pes,
+                 VectorXd tot_Eta_prec,
                  Rcpp::IntegerVector h2s_index,
-                 Eigen::MatrixXd randn_theta, Eigen::MatrixXd randn_e,
-                 Eigen::MatrixXd &coefs):
+                 MatrixXd randn_theta, MatrixXd randn_e,
+                 MatrixXd &coefs):
       Y(Y), W(W),
       chol_C_list(chol_C_list), chol_K_inv_list(chol_K_inv_list),
       pes(pes), tot_Eta_prec(tot_Eta_prec),h2s_index(h2s_index),
@@ -224,9 +222,9 @@ Eigen::MatrixXd sample_MME_ZKZts_c(
     chol_K_inv_list.push_back(Rcpp::as<MSpMat>(chol_K_invs[i]));
   }
 
-  Eigen::MatrixXd coefs(b,p);
-  Eigen::VectorXd h2_e = 1.0 - h2s.colwise().sum().array();
-  Eigen::VectorXd pes = tot_Eta_prec.array() / h2_e.array();
+  MatrixXd coefs(b,p);
+  VectorXd h2_e = 1.0 - h2s.colwise().sum().array();
+  VectorXd pes = tot_Eta_prec.array() / h2_e.array();
 
   sampleColumn sampler(Y,W,chol_C_list,chol_K_inv_list,pes,tot_Eta_prec,h2s_index,randn_theta,randn_e,coefs);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
@@ -240,24 +238,24 @@ Eigen::MatrixXd sample_MME_ZKZts_c(
 // -------------- tot_prec_scores ------------- //
 // -------------------------------------------- //
 // [[Rcpp::export()]]
-Eigen::VectorXd tot_prec_scores(
-    Eigen::Map<Eigen::MatrixXd> Y,
+VectorXd tot_prec_scores(
+    Map<MatrixXd> Y,
     Rcpp::List chol_Sigmas,
     Rcpp::IntegerVector h2s_index,
     int grainSize)
 {
 
   struct sampleColumn : public Worker {
-    Eigen::MatrixXd Y;
+    MatrixXd Y;
     SpMat W;
     const std::vector<SpMat> chol_Sigma_list;
     RVector<int> h2s_index;
-    Eigen::VectorXd &scores;
+    VectorXd &scores;
 
-    sampleColumn(Eigen::MatrixXd Y,
+    sampleColumn(MatrixXd Y,
                  const std::vector<SpMat> chol_Sigma_list,
                  Rcpp::IntegerVector h2s_index,
-                 Eigen::VectorXd &scores):
+                 VectorXd &scores):
       Y(Y), chol_Sigma_list(chol_Sigma_list), h2s_index(h2s_index),
       scores(scores) {}
 
@@ -265,14 +263,14 @@ Eigen::VectorXd tot_prec_scores(
       for(std::size_t j = begin; j < end; j++){
         int h2_index = h2s_index[j] - 1;
         SpMat chol_Sigma = chol_Sigma_list[h2_index];
-        Eigen::VectorXd score = chol_Sigma.triangularView<Eigen::Lower>().solve(Y.col(j));
+        VectorXd score = chol_Sigma.triangularView<Lower>().solve(Y.col(j));
         scores[j] = score.dot(score);
       }
     }
   };
 
   int p = Y.cols();
-  Eigen::VectorXd scores(p);
+  VectorXd scores(p);
 
   std::vector<SpMat> chol_Sigma_list;
   for(int i = 0; i < max(h2s_index); i++){
@@ -291,29 +289,29 @@ Eigen::VectorXd tot_prec_scores(
 // -------------------------------------------- //
 
 // [[Rcpp::export()]]
-Eigen::VectorXd log_p_h2s(
-    Eigen::Map<Eigen::MatrixXd> Y,
-    Eigen::Map<Eigen::VectorXd> tot_Eta_prec,
+VectorXd log_p_h2s(
+    Map<MatrixXd> Y,
+    Map<VectorXd> tot_Eta_prec,
     Rcpp::List chol_Sigmas,
-    Eigen::Map<Eigen::VectorXd> log_det_Sigmas,
-    Eigen::Map<Eigen::VectorXd> discrete_priors,
+    Map<VectorXd> log_det_Sigmas,
+    Map<VectorXd> discrete_priors,
     int grainSize)
 {
 
   struct sampleColumn : public Worker {
-    Eigen::MatrixXd Y;
-    Eigen::VectorXd tot_Eta_prec;
+    MatrixXd Y;
+    VectorXd tot_Eta_prec;
     const std::vector<SpMat> chol_Sigma_list;
-    Eigen::VectorXd log_det_Sigmas;
-    Eigen::VectorXd discrete_priors;
-    Eigen::MatrixXd &log_ps;
+    VectorXd log_det_Sigmas;
+    VectorXd discrete_priors;
+    MatrixXd &log_ps;
 
-    sampleColumn(Eigen::MatrixXd Y,
-                 Eigen::VectorXd tot_Eta_prec,
+    sampleColumn(MatrixXd Y,
+                 VectorXd tot_Eta_prec,
                  const std::vector<SpMat> chol_Sigma_list,
-                 Eigen::VectorXd log_det_Sigmas,
-                 Eigen::VectorXd discrete_priors,
-                 Eigen::MatrixXd &log_ps):
+                 VectorXd log_det_Sigmas,
+                 VectorXd discrete_priors,
+                 MatrixXd &log_ps):
       Y(Y), tot_Eta_prec(tot_Eta_prec), chol_Sigma_list(chol_Sigma_list),
       log_det_Sigmas(log_det_Sigmas), discrete_priors(discrete_priors), log_ps(log_ps) {}
 
@@ -323,9 +321,9 @@ Eigen::VectorXd log_p_h2s(
       int n = Y.rows();
       for(std::size_t i = begin; i < end; i++){
         SpMat chol_Sigma = chol_Sigma_list[i];
-        Eigen::VectorXd scores2(p);
+        VectorXd scores2(p);
         for(int j = 0; j < p; j++){
-          Eigen::VectorXd x_std = chol_Sigma.triangularView<Eigen::Lower>().solve(Y.col(j));
+          VectorXd x_std = chol_Sigma.triangularView<Lower>().solve(Y.col(j));
           scores2[j] = tot_Eta_prec[j] * x_std.dot(x_std);
         }
         log_ps.row(i) = (-n/2.0 * log(2*M_PI) - 0.5 * (log_det_Sigmas[i] - n*tot_Eta_prec.array().log()) -
@@ -343,7 +341,7 @@ Eigen::VectorXd log_p_h2s(
     chol_Sigma_list.push_back(Rcpp::as<MSpMat>(chol_Sigmas[i]));
   }
 
-  Eigen::MatrixXd log_ps(b,p);
+  MatrixXd log_ps(b,p);
 
   sampleColumn sampler(Y,tot_Eta_prec,chol_Sigma_list,log_det_Sigmas,discrete_priors,log_ps);
   RcppParallel::parallelFor(0,b,sampler,grainSize);
@@ -352,19 +350,19 @@ Eigen::VectorXd log_p_h2s(
 
 // [[Rcpp::export()]]
 Rcpp::IntegerVector sample_h2s(
-    Eigen::Map<Eigen::ArrayXXd> log_ps,
-    Eigen::Map<Eigen::VectorXd> rs,
+    Map<ArrayXXd> log_ps,
+    Map<VectorXd> rs,
     int grainSize
 )
 {
 
   struct sampleColumn : public Worker {
-    Eigen::ArrayXXd log_ps;
-    Eigen::VectorXd rs;
+    ArrayXXd log_ps;
+    VectorXd rs;
     RVector<int> h2s_index;
 
-    sampleColumn(Eigen::ArrayXXd log_ps,
-                 Eigen::VectorXd rs,
+    sampleColumn(ArrayXXd log_ps,
+                 VectorXd rs,
                  Rcpp::IntegerVector h2s_index):
       log_ps(log_ps), rs(rs), h2s_index(h2s_index) {}
 
@@ -373,7 +371,7 @@ Rcpp::IntegerVector sample_h2s(
       for(std::size_t j = begin; j < end; j++){
         double max_col = log_ps.col(j).maxCoeff();
         double norm_factor = max_col + log((log_ps.col(j) - max_col).exp().sum());
-        Eigen::VectorXd ps_j = (log_ps.col(j) - norm_factor).exp();
+        VectorXd ps_j = (log_ps.col(j) - norm_factor).exp();
         h2s_index[j] = 1;
         double cumsum = 0;
         for(int i = 0; i < b; i++){
@@ -386,7 +384,7 @@ Rcpp::IntegerVector sample_h2s(
     }
   };
   int p = log_ps.cols();
-  // int b = log_ps.rows();
+
   Rcpp::IntegerVector h2s_index(p);
 
   sampleColumn sampler(log_ps,rs,h2s_index);
@@ -401,27 +399,27 @@ Rcpp::IntegerVector sample_h2s(
 // -------------------------------------------- //
 
 double log_prob_h2_c(
-    Eigen::VectorXd y,
+    VectorXd y,
     SpMat chol_Sigma,
     double log_det_Sigma,
     int n,
     double tot_Eta_prec,
     double discrete_prior
 ){
-  Eigen::VectorXd x_std = chol_Sigma.triangularView<Eigen::Lower>().solve(y);
+  VectorXd x_std = chol_Sigma.triangularView<Lower>().solve(y);
   double score2 = tot_Eta_prec * x_std.dot(x_std);
 
   double log_p = -n/2.0 * log(2*M_PI) - 0.5*(log_det_Sigma - n*log(tot_Eta_prec)) - 0.5 * score2 + log(discrete_prior);
   return log_p;
 }
 
-Eigen::VectorXd find_candidate_states(
-    Eigen::ArrayXXd h2s_matrix,
+VectorXd find_candidate_states(
+    ArrayXXd h2s_matrix,
     double step_size,
     int old_state
 ) {
-  Eigen::VectorXd dists = (h2s_matrix.colwise() - h2s_matrix.col(old_state)).abs().matrix().colwise().sum();
-  Eigen::VectorXd indices(dists.size());
+  VectorXd dists = (h2s_matrix.colwise() - h2s_matrix.col(old_state)).abs().matrix().colwise().sum();
+  VectorXd indices(dists.size());
   int count = 0;
   for(int i = 0; i < dists.size(); i++){
     if(dists[i] < step_size & dists[i] > 0) {
@@ -440,38 +438,38 @@ int randomInt(int max){
 
 // [[Rcpp::export()]]
 Rcpp::IntegerVector sample_h2s_discrete_MH_c(
-    Eigen::Map<Eigen::MatrixXd> Y,
-    Eigen::Map<Eigen::MatrixXd> h2s_matrix,
+    Map<MatrixXd> Y,
+    Map<MatrixXd> h2s_matrix,
     Rcpp::List chol_Sigmas,
-    Eigen::Map<Eigen::VectorXd> log_det_Sigmas,
-    Eigen::Map<Eigen::VectorXd> tot_Eta_prec,
-    Eigen::Map<Eigen::VectorXd> discrete_priors,
-    Eigen::Map<Eigen::VectorXd> r_draws,
+    Map<VectorXd> log_det_Sigmas,
+    Map<VectorXd> tot_Eta_prec,
+    Map<VectorXd> discrete_priors,
+    Map<VectorXd> r_draws,
     double step_size,
-    Rcpp::IntegerVector h2_index,    // Rcpp::NumericVector state_draws
+    Rcpp::IntegerVector h2_index,
     Rcpp::NumericVector state_draws,
     int grainSize
 ){
 
   struct sampleColumn : public Worker {
-    const Eigen::MatrixXd Y;
-    const Eigen::MatrixXd h2s_matrix;
+    const MatrixXd Y;
+    const MatrixXd h2s_matrix;
     const std::vector<SpMat> chol_Sigma_list;
-    const Eigen::VectorXd log_det_Sigmas;
-    const Eigen::VectorXd tot_Eta_prec;
-    const Eigen::VectorXd discrete_priors;
-    const Eigen::VectorXd r_draws;
+    const VectorXd log_det_Sigmas;
+    const VectorXd tot_Eta_prec;
+    const VectorXd discrete_priors;
+    const VectorXd r_draws;
     const double step_size;
     const RVector<int> h2_index;
     RVector<int> new_index;
 
-    sampleColumn(const Eigen::MatrixXd Y,
-                 const Eigen::MatrixXd h2s_matrix,
+    sampleColumn(const MatrixXd Y,
+                 const MatrixXd h2s_matrix,
                  const std::vector<SpMat> chol_Sigma_list,
-                 const Eigen::VectorXd log_det_Sigmas,
-                 const Eigen::VectorXd tot_Eta_prec,
-                 const Eigen::VectorXd discrete_priors,
-                 const Eigen::VectorXd r_draws,
+                 const VectorXd log_det_Sigmas,
+                 const VectorXd tot_Eta_prec,
+                 const VectorXd discrete_priors,
+                 const VectorXd r_draws,
                  const double step_size,
                  const Rcpp::IntegerVector h2_index,
                  Rcpp::IntegerVector new_index):
@@ -488,13 +486,13 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
         SpMat chol_Sigma_old = chol_Sigma_list[old_state];
         double old_log_p = log_prob_h2_c(Y.col(j),chol_Sigma_old,log_det_Sigmas[old_state],n,tot_Eta_prec[j],discrete_priors[old_state]);
 
-        Eigen::VectorXd candidate_new_states = find_candidate_states(h2s_matrix,step_size,old_state);
+        VectorXd candidate_new_states = find_candidate_states(h2s_matrix,step_size,old_state);
         int proposed_state = candidate_new_states[randomInt(candidate_new_states.size())];
 
         SpMat chol_Sigma_new = chol_Sigma_list[proposed_state];
         double new_log_p = log_prob_h2_c(Y.col(j),chol_Sigma_new,log_det_Sigmas[proposed_state],n,tot_Eta_prec[j],discrete_priors[proposed_state]);
 
-        Eigen::VectorXd candidate_states_from_new_state = find_candidate_states(h2s_matrix,step_size,proposed_state);
+        VectorXd candidate_states_from_new_state = find_candidate_states(h2s_matrix,step_size,proposed_state);
 
         double forward_prob = 1.0 / candidate_new_states.size();
         double back_prob = 1.0 / candidate_states_from_new_state.size();
@@ -510,7 +508,6 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
     }
   };
 
-  // int n = Y.rows();
   int p = Y.cols();
 
   std::vector<SpMat> chol_Sigma_list;
