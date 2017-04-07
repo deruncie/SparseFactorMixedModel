@@ -233,9 +233,8 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 
 	run_variables = c(run_variables,list(
 			Sigma_Choleskys          = Sigma_Choleskys,
-			randomEffect_C_Choleskys = randomEffect_C_Choleskys,
-			chol_Ki_mats             = chol_Ki_mats,
-			candidate_h2s            = candidate_h2s
+			randomEffect_C_Choleskys = randomEffect_C_Choleskys
+			# chol_Ki_mats             = chol_Ki_mats
     ))
 
     RNG = list(

@@ -25,7 +25,7 @@
 #' @param R_Perm either \code{NULL} if \eqn{P} is diagonal, or the \eqn{P} matrix.
 #' @param tot_Eta_prec the inverse of the total variance
 #'
-sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, tot_Eta_prec, prior_mean, prior_prec,ncores){
+sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys,h2s_index, tot_Eta_prec, prior_mean, prior_prec,ncores){
 	# using method described in MCMC Course notes
 	p = ncol(Y)
 	n = nrow(Y)
@@ -40,7 +40,7 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys, Sigma_Perm, h2s_index, t
 	return(res)
 }
 
-sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, chol_Ki_mats,ncores){
+sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, ncores){
 	# using method described in MCMC Course notes
 	Y = as.matrix(Y)
 	p = ncol(Y)
@@ -54,7 +54,7 @@ sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h
 	theta = sample_MME_ZKZts_c(Y,W,tot_Eta_prec,randomEffect_C_Choleskys,h2s,h2s_index,randn_theta,randn_e,1)
 }
 
-sample_tot_prec = function(Y, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys,Sigma_Perm, h2s_index,ncores){
+sample_tot_prec = function(Y, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys,h2s_index,ncores){
 	n = nrow(Y)
 	p = ncol(Y)
 
@@ -68,7 +68,6 @@ generate_candidate_states = function(h2s_matrix,step_size){
     which(h2_dist < step_size & h2_dist > 0)
   })
 }
-
 
 sample_h2s_discrete_MH = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_priors,h2s_matrix,h2_index,step_size,grainSize){
 	# while this works, it is much slower than doing the full scan over all traits, at least for multiple traits
@@ -91,7 +90,7 @@ sample_h2s_discrete_MH = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_prior
 	return(h2s_index)
 }
 
-sample_h2s_discrete = function(Y,tot_Eta_prec, Sigma_Choleskys,Sigma_Perm,discrete_priors,ncores){
+sample_h2s_discrete = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_priors,ncores){
 	n = nrow(Y)
 	p = ncol(Y)
 
