@@ -30,7 +30,7 @@ run_parameters = list(
     epsilon      = 1e-1,
     prop         = 1.00,
     k_init       = 20,
-    h2_divisions = 100,
+    h2_divisions = 10,
     burn         = 100,
     thin         = 2
     )
