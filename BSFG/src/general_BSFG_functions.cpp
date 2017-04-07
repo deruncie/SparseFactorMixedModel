@@ -29,8 +29,8 @@ VectorXd sample_MME_single_diagK(
   MatrixXd W_theta_star = W * theta_star;
   VectorXd y_resid = y - W_theta_star - e_star;
 
-  MatrixXd RinvSqW = chol_R.triangularView<Lower>().solve(W);
-  VectorXd WtRinvy = RinvSqW.transpose() * chol_R.triangularView<Lower>().solve(y_resid) * tot_Eta_prec;
+  MatrixXd RinvSqW = chol_R.transpose().triangularView<Lower>().solve(W);
+  VectorXd WtRinvy = RinvSqW.transpose() * chol_R.transpose().triangularView<Lower>().solve(y_resid) * tot_Eta_prec;
 
   VectorXd theta_tilda;
 
@@ -39,7 +39,7 @@ VectorXd sample_MME_single_diagK(
     C.diagonal() = C.diagonal() + prior_prec;
     theta_tilda = C.householderQr().solve(WtRinvy);
   } else{
-    MatrixXd R = chol_R * chol_R.transpose() / tot_Eta_prec;
+    MatrixXd R = chol_R.transpose() * chol_R / tot_Eta_prec;
     MatrixXd AiU = (W * prior_prec.cwiseInverse().asDiagonal()).transpose();
     MatrixXd R_VAiU = R + W * AiU;
     MatrixXd inner = AiU * R_VAiU.householderQr().solve(AiU.transpose());

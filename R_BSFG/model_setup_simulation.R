@@ -8,7 +8,7 @@ library(BSFG)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 1
-new_halfSib_simulation('Sim_FE_1', nSire=10,nRep=50,p=100, b=5, k=10, k_G=5, i_Va = 0.2, i_Ve = 0.2)
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, k=10, k_G=5, i_Va = 0.2, i_Ve = 0.2)
 set.seed(seed)
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
