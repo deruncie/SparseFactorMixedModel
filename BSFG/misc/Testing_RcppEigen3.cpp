@@ -13,6 +13,8 @@ using Eigen::Lower;
 typedef Eigen::MappedSparseMatrix<double> MSpMat;
 typedef Eigen::SparseMatrix<double> SpMat;
 
+using namespace Rcpp;
+
 
 // [[Rcpp::export]]
 MatrixXd chol_solve_mat1(MSpMat R, Map<MatrixXd> B) {
@@ -31,4 +33,13 @@ MatrixXd chol_solve_mat2(MSpMat R, Map<MatrixXd> B) {
     x.col(i) = R.triangularView<Upper>().solve(B.col(i));
   }
   return x;
+}
+
+// [[Rcpp::export]]
+int test(List a){
+  List a1 = as<List>(a[0]);
+  List a2 = as<List>(a[1]);
+  int A = Rcpp::as<int>(a1["A"]);
+  int B = Rcpp::as<int>(a2["B"]);
+  return A+B;
 }

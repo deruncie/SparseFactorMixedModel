@@ -69,7 +69,7 @@ VectorXd sample_MME_single_diagK_c(
 MatrixXd sample_MME_fixedEffects_c(
     Map<MatrixXd> Y,
     Map<MatrixXd> W,
-    Rcpp::List chol_Rs,
+    Rcpp::List Sigma_Choleskys,
     Rcpp::IntegerVector h2s_index,
     Map<VectorXd> tot_Eta_prec,
     Map<MatrixXd> prior_mean,
@@ -112,7 +112,8 @@ MatrixXd sample_MME_fixedEffects_c(
 
   std::vector<SpMat> chol_R_list;
   for(int i = 0; i < max(h2s_index); i++){
-    chol_R_list.push_back(Rcpp::as<MSpMat>(chol_Rs[i]));
+    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
+    chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
   }
 
   MatrixXd coefs(b,p);
@@ -128,6 +129,7 @@ MatrixXd sample_MME_fixedEffects_c(
 // ------------ sample_MME_ZKZts -------------- //
 // -------------------------------------------- //
 
+// [[Rcpp::export]]
 VectorXd sample_MME_single_diagR(
     VectorXd Y,
     SpMat W,
@@ -145,34 +147,33 @@ VectorXd sample_MME_single_diagR(
   VectorXd Y_resid = Y - W_theta_star - e_star;
   VectorXd WtRiy = W.transpose() * (Y_resid * pe);
 
-  VectorXd theta_tilda = chol_C.transpose().triangularView<Upper>().solve(chol_C.triangularView<Lower>().solve(WtRiy));
+  VectorXd theta_tilda = chol_C.triangularView<Upper>().solve(chol_C.transpose().triangularView<Lower>().solve(WtRiy));
 
   VectorXd theta = theta_tilda / tot_Eta_prec + theta_star;
 
   return theta;
 }
 
-// [[Rcpp::export]]
-VectorXd sample_MME_single_diagR_c(
-    Map<VectorXd> Y,
-    MSpMat W,
-    MSpMat chol_C,
-    double pe,
-    MSpMat chol_K_inv,
-    double tot_Eta_prec,
-    Map<VectorXd> randn_theta,
-    Map<VectorXd> randn_e
-){
-  return sample_MME_single_diagR(Y,W,chol_C,pe,chol_K_inv,tot_Eta_prec,randn_theta,randn_e);
-}
+// // [[Rcpp::export]]
+// VectorXd sample_MME_single_diagR_c(
+//     Map<VectorXd> Y,
+//     MSpMat W,
+//     MSpMat chol_C,
+//     double pe,
+//     MSpMat chol_K_inv,
+//     double tot_Eta_prec,
+//     Map<VectorXd> randn_theta,
+//     Map<VectorXd> randn_e
+// ){
+//   return sample_MME_single_diagR(Y,W,chol_C,pe,chol_K_inv,tot_Eta_prec,randn_theta,randn_e);
+// }
 
 // [[Rcpp::export()]]
 MatrixXd sample_MME_ZKZts_c(
     Map<MatrixXd> Y,
     MSpMat W,
     Map<VectorXd> tot_Eta_prec,
-    Rcpp::List chol_Cs,
-    Rcpp::List chol_K_invs,
+    Rcpp::List randomEffect_C_Choleskys,
     Map<MatrixXd> h2s,
     Rcpp::IntegerVector h2s_index,
     Map<MatrixXd> randn_theta,
@@ -218,8 +219,9 @@ MatrixXd sample_MME_ZKZts_c(
 
   std::vector<SpMat> chol_C_list,chol_K_inv_list;
   for(int i = 0; i < max(h2s_index); i++){
-    chol_C_list.push_back(Rcpp::as<MSpMat>(chol_Cs[i]));
-    chol_K_inv_list.push_back(Rcpp::as<MSpMat>(chol_K_invs[i]));
+    Rcpp::List randomEffect_C_Cholesky_i = Rcpp::as<Rcpp::List>(randomEffect_C_Choleskys[i]);
+    chol_C_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_C"]));
+    chol_K_inv_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_K_inv"]));
   }
 
   MatrixXd coefs(b,p);
@@ -232,15 +234,14 @@ MatrixXd sample_MME_ZKZts_c(
 }
 
 
-
-
 // -------------------------------------------- //
 // -------------- tot_prec_scores ------------- //
 // -------------------------------------------- //
+
 // [[Rcpp::export()]]
 VectorXd tot_prec_scores(
     Map<MatrixXd> Y,
-    Rcpp::List chol_Sigmas,
+    Rcpp::List Sigma_Choleskys,
     Rcpp::IntegerVector h2s_index,
     int grainSize)
 {
@@ -263,7 +264,7 @@ VectorXd tot_prec_scores(
       for(std::size_t j = begin; j < end; j++){
         int h2_index = h2s_index[j] - 1;
         SpMat chol_Sigma = chol_Sigma_list[h2_index];
-        VectorXd score = chol_Sigma.triangularView<Lower>().solve(Y.col(j));
+        VectorXd score = chol_Sigma.transpose().triangularView<Lower>().solve(Y.col(j));
         scores[j] = score.dot(score);
       }
     }
@@ -274,7 +275,8 @@ VectorXd tot_prec_scores(
 
   std::vector<SpMat> chol_Sigma_list;
   for(int i = 0; i < max(h2s_index); i++){
-    chol_Sigma_list.push_back(Rcpp::as<MSpMat>(chol_Sigmas[i]));
+    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
+    chol_Sigma_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
   }
 
   sampleColumn sampler(Y,chol_Sigma_list,h2s_index,scores);
@@ -282,18 +284,15 @@ VectorXd tot_prec_scores(
   return scores;
 }
 
-
-
 // -------------------------------------------- //
 // ---------------- sample h2s ---------------- //
 // -------------------------------------------- //
 
 // [[Rcpp::export()]]
-VectorXd log_p_h2s(
+MatrixXd log_p_h2s(
     Map<MatrixXd> Y,
     Map<VectorXd> tot_Eta_prec,
-    Rcpp::List chol_Sigmas,
-    Map<VectorXd> log_det_Sigmas,
+    Rcpp::List Sigma_Choleskys,
     Map<VectorXd> discrete_priors,
     int grainSize)
 {
@@ -316,14 +315,13 @@ VectorXd log_p_h2s(
       log_det_Sigmas(log_det_Sigmas), discrete_priors(discrete_priors), log_ps(log_ps) {}
 
     void operator()(std::size_t begin, std::size_t end) {
-      // int b = discrete_priors.size();
       int p = Y.cols();
       int n = Y.rows();
       for(std::size_t i = begin; i < end; i++){
         SpMat chol_Sigma = chol_Sigma_list[i];
         VectorXd scores2(p);
         for(int j = 0; j < p; j++){
-          VectorXd x_std = chol_Sigma.triangularView<Lower>().solve(Y.col(j));
+          VectorXd x_std = chol_Sigma.transpose().triangularView<Lower>().solve(Y.col(j));
           scores2[j] = tot_Eta_prec[j] * x_std.dot(x_std);
         }
         log_ps.row(i) = (-n/2.0 * log(2*M_PI) - 0.5 * (log_det_Sigmas[i] - n*tot_Eta_prec.array().log()) -
@@ -334,11 +332,13 @@ VectorXd log_p_h2s(
 
   int b = discrete_priors.size();
   int p = Y.cols();
-  // int n = Y.rows();
 
   std::vector<SpMat> chol_Sigma_list;
-  for(int i = 0; i < log_det_Sigmas.size(); i++){
-    chol_Sigma_list.push_back(Rcpp::as<MSpMat>(chol_Sigmas[i]));
+  VectorXd log_det_Sigmas(b);
+  for(int i = 0; i < b; i++){
+    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
+    chol_Sigma_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
+    log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
   }
 
   MatrixXd log_ps(b,p);
@@ -347,6 +347,7 @@ VectorXd log_p_h2s(
   RcppParallel::parallelFor(0,b,sampler,grainSize);
   return(log_ps);
 }
+
 
 // [[Rcpp::export()]]
 Rcpp::IntegerVector sample_h2s(
@@ -406,7 +407,7 @@ double log_prob_h2_c(
     double tot_Eta_prec,
     double discrete_prior
 ){
-  VectorXd x_std = chol_Sigma.triangularView<Lower>().solve(y);
+  VectorXd x_std = chol_Sigma.transpose().triangularView<Lower>().solve(y);
   double score2 = tot_Eta_prec * x_std.dot(x_std);
 
   double log_p = -n/2.0 * log(2*M_PI) - 0.5*(log_det_Sigma - n*log(tot_Eta_prec)) - 0.5 * score2 + log(discrete_prior);
@@ -440,14 +441,12 @@ int randomInt(int max){
 Rcpp::IntegerVector sample_h2s_discrete_MH_c(
     Map<MatrixXd> Y,
     Map<MatrixXd> h2s_matrix,
-    Rcpp::List chol_Sigmas,
-    Map<VectorXd> log_det_Sigmas,
+    Rcpp::List Sigma_Choleskys,
     Map<VectorXd> tot_Eta_prec,
     Map<VectorXd> discrete_priors,
     Map<VectorXd> r_draws,
     double step_size,
     Rcpp::IntegerVector h2_index,
-    Rcpp::NumericVector state_draws,
     int grainSize
 ){
 
@@ -509,10 +508,14 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
   };
 
   int p = Y.cols();
+  int b = discrete_priors.size();
 
   std::vector<SpMat> chol_Sigma_list;
-  for(int i = 0; i < log_det_Sigmas.size(); i++){
-    chol_Sigma_list.push_back(Rcpp::as<MSpMat>(chol_Sigmas[i]));
+  VectorXd log_det_Sigmas(b);
+  for(int i = 0; i < b; i++){
+    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
+    chol_Sigma_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
+    log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
   }
 
   Rcpp::IntegerVector new_index(p);
@@ -521,4 +524,3 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return new_index;
 }
-
