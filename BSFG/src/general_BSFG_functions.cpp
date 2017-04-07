@@ -81,7 +81,7 @@ MatrixXd sample_MME_fixedEffects_c(
 
   struct sampleColumn : public Worker {
     MatrixXd Y, W, prior_mean, prior_prec, randn_theta, randn_e;
-    const std::vector<SpMat> chol_R_list;
+    const std::vector<MSpMat> chol_R_list;
     RVector<int> h2s_index;
     VectorXd tot_Eta_prec;
     MatrixXd &coefs;
@@ -90,7 +90,7 @@ MatrixXd sample_MME_fixedEffects_c(
                  MatrixXd W,
                  MatrixXd prior_mean,
                  MatrixXd prior_prec,
-                 const std::vector<SpMat> chol_R_list,
+                 const std::vector<MSpMat> chol_R_list,
                  const Rcpp::IntegerVector h2s_index,
                  VectorXd tot_Eta_prec,
                  MatrixXd randn_theta,
@@ -111,7 +111,7 @@ MatrixXd sample_MME_fixedEffects_c(
   int b = randn_theta.rows();
   int p = randn_theta.cols();
 
-  std::vector<SpMat> chol_R_list;
+  std::vector<MSpMat> chol_R_list;
   for(int i = 0; i < max(h2s_index); i++){
     Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
     chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
@@ -184,7 +184,7 @@ MatrixXd sample_MME_ZKZts_c(
   struct sampleColumn : public Worker {
     MatrixXd Y;
     SpMat W;
-    const std::vector<SpMat> chol_C_list,chol_K_inv_list;
+    const std::vector<MSpMat> chol_C_list,chol_K_inv_list;
     VectorXd pes,tot_Eta_prec;
     RVector<int> h2s_index;
     MatrixXd randn_theta, randn_e;
@@ -192,8 +192,8 @@ MatrixXd sample_MME_ZKZts_c(
 
     sampleColumn(MatrixXd Y,
                  SpMat W,
-                 const std::vector<SpMat> chol_C_list,
-                 const std::vector<SpMat> chol_K_inv_list,
+                 const std::vector<MSpMat> chol_C_list,
+                 const std::vector<MSpMat> chol_K_inv_list,
                  VectorXd pes,
                  VectorXd tot_Eta_prec,
                  Rcpp::IntegerVector h2s_index,
@@ -218,7 +218,7 @@ MatrixXd sample_MME_ZKZts_c(
   int b = randn_theta.rows();
   int p = randn_theta.cols();
 
-  std::vector<SpMat> chol_C_list,chol_K_inv_list;
+  std::vector<MSpMat> chol_C_list,chol_K_inv_list;
   for(int i = 0; i < max(h2s_index); i++){
     Rcpp::List randomEffect_C_Cholesky_i = Rcpp::as<Rcpp::List>(randomEffect_C_Choleskys[i]);
     chol_C_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_C"]));
@@ -250,12 +250,12 @@ VectorXd tot_prec_scores(
   struct sampleColumn : public Worker {
     MatrixXd Y;
     SpMat W;
-    const std::vector<SpMat> chol_Sigma_list;
+    const std::vector<MSpMat> chol_Sigma_list;
     RVector<int> h2s_index;
     VectorXd &scores;
 
     sampleColumn(MatrixXd Y,
-                 const std::vector<SpMat> chol_Sigma_list,
+                 const std::vector<MSpMat> chol_Sigma_list,
                  Rcpp::IntegerVector h2s_index,
                  VectorXd &scores):
       Y(Y), chol_Sigma_list(chol_Sigma_list), h2s_index(h2s_index),
@@ -274,7 +274,7 @@ VectorXd tot_prec_scores(
   int p = Y.cols();
   VectorXd scores(p);
 
-  std::vector<SpMat> chol_Sigma_list;
+  std::vector<MSpMat> chol_Sigma_list;
   for(int i = 0; i < max(h2s_index); i++){
     Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
     chol_Sigma_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
@@ -301,14 +301,14 @@ MatrixXd log_p_h2s(
   struct sampleColumn : public Worker {
     MatrixXd Y;
     VectorXd tot_Eta_prec;
-    const std::vector<SpMat> chol_Sigma_list;
+    const std::vector<MSpMat> chol_Sigma_list;
     VectorXd log_det_Sigmas;
     VectorXd discrete_priors;
     MatrixXd &log_ps;
 
     sampleColumn(MatrixXd Y,
                  VectorXd tot_Eta_prec,
-                 const std::vector<SpMat> chol_Sigma_list,
+                 const std::vector<MSpMat> chol_Sigma_list,
                  VectorXd log_det_Sigmas,
                  VectorXd discrete_priors,
                  MatrixXd &log_ps):
@@ -334,7 +334,7 @@ MatrixXd log_p_h2s(
   int b = discrete_priors.size();
   int p = Y.cols();
 
-  std::vector<SpMat> chol_Sigma_list;
+  std::vector<MSpMat> chol_Sigma_list;
   VectorXd log_det_Sigmas(b);
   for(int i = 0; i < b; i++){
     Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
@@ -448,7 +448,7 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
   struct sampleColumn : public Worker {
     const MatrixXd Y;
     const MatrixXd h2s_matrix;
-    const std::vector<SpMat> chol_Sigma_list;
+    const std::vector<MSpMat> chol_Sigma_list;
     const VectorXd log_det_Sigmas;
     const VectorXd tot_Eta_prec;
     const VectorXd discrete_priors;
@@ -460,7 +460,7 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
 
     sampleColumn(const MatrixXd Y,
                  const MatrixXd h2s_matrix,
-                 const std::vector<SpMat> chol_Sigma_list,
+                 const std::vector<MSpMat> chol_Sigma_list,
                  const VectorXd log_det_Sigmas,
                  const VectorXd tot_Eta_prec,
                  const VectorXd discrete_priors,
@@ -506,7 +506,7 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
   int p = Y.cols();
   int b = discrete_priors.size();
 
-  std::vector<SpMat> chol_Sigma_list;
+  std::vector<MSpMat> chol_Sigma_list;
   VectorXd log_det_Sigmas(b);
   for(int i = 0; i < b; i++){
     Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
@@ -519,6 +519,108 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
   Rcpp::NumericVector state_draws = Rcpp::runif(p);
 
   sampleColumn sampler(Y,h2s_matrix,chol_Sigma_list,log_det_Sigmas,tot_Eta_prec,discrete_priors,r_draws,h2_index,state_draws,step_size,new_index);
+  RcppParallel::parallelFor(0,p,sampler,grainSize);
+  return new_index;
+}
+
+// [[Rcpp::export()]]
+Rcpp::IntegerVector sample_h2s_discrete_MH_c2(
+    Map<MatrixXd> Y,
+    Map<VectorXd> tot_Eta_prec,
+    Map<VectorXd> discrete_priors,
+    Rcpp::IntegerVector h2_index,
+    Map<MatrixXd> h2s_matrix,
+    Rcpp::List Sigma_Choleskys,
+    Map<VectorXd> r_draws,
+    Rcpp::List candidate_states,
+    int grainSize
+){
+
+  struct sampleColumn : public Worker {
+    const MatrixXd Y;
+    const MatrixXd h2s_matrix;
+    const std::vector<MSpMat> chol_Sigma_list;
+    const VectorXd log_det_Sigmas;
+    const VectorXd tot_Eta_prec;
+    const VectorXd discrete_priors;
+    const VectorXd r_draws;
+    const RVector<int> h2_index;
+    const RVector<double> state_draws;
+    const std::vector<Eigen::VectorXi> candidate_state_list;
+    RVector<int> new_index;
+
+    sampleColumn(const MatrixXd Y,
+                 const MatrixXd h2s_matrix,
+                 const std::vector<MSpMat> chol_Sigma_list,
+                 const VectorXd log_det_Sigmas,
+                 const VectorXd tot_Eta_prec,
+                 const VectorXd discrete_priors,
+                 const VectorXd r_draws,
+                 const Rcpp::IntegerVector h2_index,
+                 const Rcpp::NumericVector state_draws,
+                 const std::vector<Eigen::VectorXi> candidate_state_list,
+                 Rcpp::IntegerVector new_index):
+
+      Y(Y), h2s_matrix(h2s_matrix),
+      chol_Sigma_list(chol_Sigma_list), log_det_Sigmas(log_det_Sigmas),
+      tot_Eta_prec(tot_Eta_prec),  discrete_priors(discrete_priors),
+      r_draws(r_draws),h2_index(h2_index),state_draws(state_draws),candidate_state_list(candidate_state_list),new_index(new_index) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      int n = Y.rows();
+      for(std::size_t j = begin; j < end; j++){
+        int old_state = h2_index[j] - 1;
+        double old_log_p = log_prob_h2_c(Y.col(j),chol_Sigma_list[old_state],log_det_Sigmas[old_state],n,tot_Eta_prec[j],discrete_priors[old_state]);
+
+        Eigen::VectorXi candidate_new_states = candidate_state_list[old_state];
+        int r = state_draws[j] * (candidate_new_states.size());
+        int proposed_state = candidate_new_states[r];
+
+        double new_log_p = log_prob_h2_c(Y.col(j),chol_Sigma_list[proposed_state],log_det_Sigmas[proposed_state],n,tot_Eta_prec[j],discrete_priors[proposed_state]);
+
+        Eigen::VectorXi candidate_states_from_new_state = candidate_state_list[proposed_state];
+
+        double forward_prob = 1.0 / candidate_new_states.size();
+        double back_prob = 1.0 / candidate_states_from_new_state.size();
+
+        double log_MH_ratio = new_log_p - old_log_p + log(forward_prob) - log(back_prob);
+
+        if(log(r_draws[j]) < log_MH_ratio) {
+          new_index[j] = proposed_state;
+        } else {
+          new_index[j] = old_state;
+        }
+      }
+    }
+  };
+
+  int p = Y.cols();
+  int b = discrete_priors.size();
+
+  std::vector<MSpMat> chol_Sigma_list;
+  chol_Sigma_list.reserve(b);
+  VectorXd log_det_Sigmas(b);
+  std::vector<Eigen::VectorXi> candidate_state_list;
+  for(int i = 0; i < b; i++){
+    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
+
+    chol_Sigma_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
+    log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
+
+    Rcpp::IntegerVector candidate_states_i = Rcpp::as<Rcpp::IntegerVector>(candidate_states[i]);
+    int s = candidate_states_i.size();
+    Eigen::VectorXi candidate_states_i_vec(s);
+    for(int j = 0; j < s; j++){
+      candidate_states_i_vec[j] = candidate_states_i[j] - 1;
+    }
+    candidate_state_list.push_back(candidate_states_i_vec);
+
+  }
+
+  Rcpp::IntegerVector new_index(p);
+  Rcpp::NumericVector state_draws = Rcpp::runif(p);
+
+  sampleColumn sampler(Y,h2s_matrix,chol_Sigma_list,log_det_Sigmas,tot_Eta_prec,discrete_priors,r_draws,h2_index,state_draws,candidate_state_list,new_index);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return new_index;
 }

@@ -270,3 +270,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_h2s_discrete_MH_c2
+Rcpp::IntegerVector sample_h2s_discrete_MH_c2(Map<MatrixXd> Y, Map<VectorXd> tot_Eta_prec, Map<VectorXd> discrete_priors, Rcpp::IntegerVector h2_index, Map<MatrixXd> h2s_matrix, Rcpp::List Sigma_Choleskys, Map<VectorXd> r_draws, Rcpp::List candidate_states, int grainSize);
+RcppExport SEXP BSFG_sample_h2s_discrete_MH_c2(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP discrete_priorsSEXP, SEXP h2_indexSEXP, SEXP h2s_matrixSEXP, SEXP Sigma_CholeskysSEXP, SEXP r_drawsSEXP, SEXP candidate_statesSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type discrete_priors(discrete_priorsSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type h2_index(h2_indexSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s_matrix(h2s_matrixSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type Sigma_Choleskys(Sigma_CholeskysSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type r_draws(r_drawsSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type candidate_states(candidate_statesSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_h2s_discrete_MH_c2(Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, candidate_states, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}

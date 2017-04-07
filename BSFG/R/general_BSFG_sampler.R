@@ -49,8 +49,23 @@ sample_factor_model.general_BSFG = function(BSFG_state,ncores = detectCores(),..
 		Eta_tilde = Eta - XB - F %*% t(Lambda)
 		tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, Sigma_Perm, resid_h2_index,ncores)
 
-		resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
-		# resid_h2_index = sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores)
+		# big_Sigma_Choleskys = rep(Sigma_Choleskys,5)
+		# big_Resid_discrete_priors = rep(Resid_discrete_priors,5)
+		# big_candidate_states_h2 = rep(candidate_states_h2,5)
+		# recover()
+		# resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores)
+		resid_h2_index = sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores)
+		# resid_h2_index2b = sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, big_Sigma_Choleskys,big_Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores)
+		# resid_h2_index3 = sample_h2s_discrete_MH2(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,candidate_states_h2,ncores)
+		#
+		# microbenchmark(
+		#   sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, Sigma_Perm, Resid_discrete_priors,ncores),
+		#   sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores),
+		#   sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, big_Sigma_Choleskys,big_Resid_discrete_priors,h2s_matrix,resid_h2_index,step_size = 0.2,ncores),
+		#   sample_h2s_discrete_MH2(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,Resid_discrete_priors,h2s_matrix,resid_h2_index,candidate_states_h2,ncores),
+		#   sample_h2s_discrete_MH2(Eta_tilde,tot_Eta_prec, big_Sigma_Choleskys,big_Resid_discrete_priors,h2s_matrix,resid_h2_index,big_candidate_states_h2,ncores),
+		#   times=10
+		# )
 
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
 
