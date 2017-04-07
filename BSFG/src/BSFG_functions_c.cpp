@@ -1,8 +1,7 @@
 // [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::depends(RcppArmadillo)]]
-#include <RcppArmadillo.h>
-#include <RcppParallel.h>
-#include <iostream>
+#include "BSFG_types.h"
+// #include <iostream>
 using namespace Rcpp;
 using namespace RcppParallel;
 using namespace arma;

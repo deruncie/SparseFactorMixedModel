@@ -155,23 +155,23 @@ MatrixXd sample_MME_ZKZts_c(
     struct sampleColumn : public Worker {
       MatrixXd Y;
       SpMat W;
-      Rcpp::List chol_Cs,chol_K_invs;
+      const std::vector<SpMat> chol_C_list,chol_K_inv_list;
       VectorXd pes,tot_Eta_prec;
-      Rcpp::IntegerVector h2s_index;
+      RVector<int> h2s_index;
       MatrixXd randn_theta, randn_e;
       MatrixXd &coefs;
 
       sampleColumn(MatrixXd Y,
                    SpMat W,
-                   Rcpp::List chol_Cs,
-                   Rcpp::List chol_K_invs,
+                   const std::vector<SpMat> chol_C_list,
+                   const std::vector<SpMat> chol_K_inv_list,
                    VectorXd pes,
                    VectorXd tot_Eta_prec,
                    Rcpp::IntegerVector h2s_index,
                    MatrixXd randn_theta, MatrixXd randn_e,
                    MatrixXd &coefs):
         Y(Y), W(W),
-        chol_Cs(chol_Cs), chol_K_invs(chol_K_invs),
+        chol_C_list(chol_C_list), chol_K_inv_list(chol_K_inv_list),
         pes(pes), tot_Eta_prec(tot_Eta_prec),h2s_index(h2s_index),
         randn_theta(randn_theta), randn_e(randn_e),
         coefs(coefs) {}
@@ -179,8 +179,8 @@ MatrixXd sample_MME_ZKZts_c(
       void operator()(std::size_t begin, std::size_t end) {
         for(std::size_t j = begin; j < end; j++){
           int h2_index = h2s_index[j] - 1;
-          SpMat chol_C(Rcpp::as<MSpMat>(chol_Cs[h2_index]));
-          SpMat chol_K_inv(Rcpp::as<MSpMat>(chol_K_invs[h2_index]));
+          SpMat chol_C = chol_C_list[h2_index];
+          SpMat chol_K_inv = chol_K_inv_list[h2_index];
           chol_K_inv *= sqrt(tot_Eta_prec[j]);
           coefs.col(j) = sample_MME_single_diagR(Y.col(j), W, chol_C, pes[j],chol_K_inv, tot_Eta_prec[j], randn_theta.col(j),randn_e.col(j));
         }
@@ -189,11 +189,17 @@ MatrixXd sample_MME_ZKZts_c(
   int b = randn_theta.rows();
   int p = randn_theta.cols();
 
+  std::vector<SpMat> chol_C_list,chol_K_inv_list;
+  for(int i = 0; i < max(h2s_index); i++){
+    chol_C_list.push_back(Rcpp::as<MSpMat>(chol_Cs[i]));
+    chol_K_inv_list.push_back(Rcpp::as<MSpMat>(chol_K_invs[i]));
+  }
+
   MatrixXd coefs(b,p);
   VectorXd h2_e = 1.0 - h2s.colwise().sum().array();
   VectorXd pes = tot_Eta_prec.array() / h2_e.array();
 
-  sampleColumn sampler(Y,W,chol_Cs,chol_K_invs,pes,tot_Eta_prec,h2s_index,randn_theta,randn_e,coefs);
+  sampleColumn sampler(Y,W,chol_C_list,chol_K_inv_list,pes,tot_Eta_prec,h2s_index,randn_theta,randn_e,coefs);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return(coefs);
 }

@@ -119,23 +119,28 @@ MatrixXd sample_MME_fixedEffects_c(
 
   struct sampleColumn : public Worker {
     MatrixXd Y, W, prior_mean, prior_prec, randn_theta, randn_e;
-    Rcpp::List chol_Rs;
-    Rcpp::IntegerVector h2s_index;
+    const std::vector<SpMat> chol_R_list;
+    RVector<int> h2s_index;
     VectorXd tot_Eta_prec;
     MatrixXd &coefs;
 
-    sampleColumn(MatrixXd Y, MatrixXd W, MatrixXd prior_mean, MatrixXd prior_prec,
-                 Rcpp::List chol_Rs,
-                 Rcpp::IntegerVector h2s_index, VectorXd tot_Eta_prec,
-                 MatrixXd randn_theta, MatrixXd randn_e,
+    sampleColumn(MatrixXd Y,
+                 MatrixXd W,
+                 MatrixXd prior_mean,
+                 MatrixXd prior_prec,
+                 const std::vector<SpMat> chol_R_list,
+                 const Rcpp::IntegerVector h2s_index,
+                 VectorXd tot_Eta_prec,
+                 MatrixXd randn_theta,
+                 MatrixXd randn_e,
                  MatrixXd &coefs):
       Y(Y), W(W), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
-      chol_Rs(chol_Rs), h2s_index(h2s_index), tot_Eta_prec(tot_Eta_prec), coefs(coefs) {}
+      chol_R_list(chol_R_list), h2s_index(h2s_index), tot_Eta_prec(tot_Eta_prec), coefs(coefs) {}
 
     void operator()(std::size_t begin, std::size_t end) {
       for(std::size_t j = begin; j < end; j++){
         int h2_index = h2s_index[j] - 1;
-        SpMat chol_R(Rcpp::as<MSpMat>(chol_Rs[h2_index]));
+        SpMat chol_R = chol_R_list[h2_index];
         coefs.col(j) = sample_MME_single_diagK(Y.col(j), W, prior_mean.col(j), prior_prec.col(j), chol_R, tot_Eta_prec[j], randn_theta.col(j),randn_e.col(j));
       }
     }
@@ -144,9 +149,14 @@ MatrixXd sample_MME_fixedEffects_c(
   int b = randn_theta.rows();
   int p = randn_theta.cols();
 
+  std::vector<SpMat> chol_R_list;
+  for(int i = 0; i < max(h2s_index); i++){
+    chol_R_list.push_back(Rcpp::as<MSpMat>(chol_Rs[i]));
+  }
+
   MatrixXd coefs(b,p);
 
-  sampleColumn sampler(Y,W,prior_mean,prior_prec,chol_Rs,h2s_index,tot_Eta_prec,randn_theta,randn_e, coefs);
+  sampleColumn sampler(Y,W,prior_mean,prior_prec,chol_R_list,h2s_index,tot_Eta_prec,randn_theta,randn_e, coefs);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return(coefs);
 }
