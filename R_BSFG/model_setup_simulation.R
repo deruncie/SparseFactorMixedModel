@@ -20,8 +20,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = list(
-    # sampler = 'fast_BSFG',
-    sampler = 'general_BSFG',
+    sampler = 'fast_BSFG',
+    # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
     simulation   = T,
     scale_Y      = FALSE,
@@ -30,7 +30,7 @@ run_parameters = list(
     epsilon      = 1e-1,
     prop         = 1.00,
     k_init       = 20,
-    h2_divisions = 500,
+    h2_divisions = 20,
     h2_step_size = 0.2,
     burn         = 100,
     thin         = 2
@@ -56,9 +56,15 @@ print('Initializing')
 # setup = load_simulation_FE_data()
 load('../setup.RData')
 setup$data$Group = gl(3,1,length = nrow(setup$data))
+
+# to test non-PD K matrix:
+# X = matrix(sample(c(0,1),dim(setup$K)^2,replace=T),dim(setup$K)[1])
+# Xs = sweep(X,2,colMeans(X),'-')
+# K_new = tcrossprod(Xs)
+# rownames(K_new) = rownames(setup$K)
 # BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1+Fixed2 + Fixed3|Sire)+(Group|animal), #
-#                                   data,priors,run_parameters,A_mats = list(animal = A),
-#                                   setup = setup))
+                                  # data,priors=priors,run_parameters = run_parameters,K_mats = list(animal = K_new),
+                                  # setup = setup))
 # setup$Y[1:3] = NA
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
 BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #factor_model_fixed = ~1,
