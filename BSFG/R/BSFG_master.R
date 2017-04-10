@@ -374,10 +374,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
 	priors$tot_F_prec_shape    = with(priors$tot_F_var,nu - 1)
 	  # delta: column shrinkage of Lambda
-	# priors$delta_1_rate    = with(priors$delta_1,V * nu)
-	# priors$delta_1_shape   = with(priors$delta_1,nu - 1)
-	# priors$delta_2_rate    = with(priors$delta_2,V * nu)
-	# priors$delta_2_shape   = with(priors$delta_2,nu - 1)
 	priors$delta_1_rate    = priors$delta_1$rate
 	priors$delta_1_shape   = priors$delta_1$shape
 	priors$delta_2_rate    = priors$delta_2$rate
@@ -410,7 +406,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	Posterior = list(
 	  posteriorSample_params = unique(c(posteriorSample_params,data_model_state$posteriorSample_params)),
 	  posteriorMean_params = unique(c(posteriorMean_params,data_model_state$posteriorMean_params)),
-	  # per_trait_params = c('tot_Eta_prec','resid_h2','B'),
 	  total_samples = 0,
 	  folder = run_parameters$Posterior_folder,
 	  files = c()
