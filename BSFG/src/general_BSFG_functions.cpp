@@ -429,6 +429,12 @@ VectorXd find_candidate_states(
       count++;
     }
   }
+  if(count == 0) {  // return all indices as candidates
+    for(int i = 0; i < dists.size(); i++){
+      indices[count] = i;
+      count++;
+    }
+  }
   return indices.head(count);
 }
 
