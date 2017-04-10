@@ -165,8 +165,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
   if(verbose) print('Pre-calculating matrices')
 
 	#C
-	# recover()
-	ZtZ = crossprod(Z)
+	ZtZ = forceSymmetric(drop0(crossprod(Z),tol = 1e-14))
 	make_Chol_Ki = function(chol_Ki_mats,h2s){
 		do.call(bdiag,lapply(1:length(h2s),function(i) {
 			if(h2s[i] == 0) return(Diagonal(nrow(chol_Ki_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
@@ -189,7 +188,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 		Ki = crossprod(chol_K_inv)
 		C = ZtZ/(1-sum(h2s))
 		C = C + Ki
-		chol_Ci = as(chol(forceSymmetric(C)),'dgCMatrix')
+		chol_Ci = as(chol(Matrix(forceSymmetric(C),sparse=T)),'dgCMatrix')
 		chol_K_inv = as(chol_K_inv,'dgCMatrix')
 
 		return(list(chol_C = chol_Ci, chol_K_inv = chol_K_inv))
@@ -198,7 +197,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 	# Sigma
 	ZKZts = list()
 	for(i in 1:n_RE){
-		ZKZts[[i]] = forceSymmetric(Z_matrices[[i]] %*% K_mats[[i]] %*% t(Z_matrices[[i]]))
+		ZKZts[[i]] = forceSymmetric(drop0(Z_matrices[[i]] %*% K_mats[[i]] %*% t(Z_matrices[[i]]),tol = 1e-14))
 	}
 
 
@@ -212,12 +211,11 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 
 	# setup of symbolic Cholesky of Sigma
 	print('creating Sigma_Choleskys')
-	Sigma = make_Sigma(ZKZts,h2s_matrix[,2])
 
 	Sigma_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
 		if(i %% 100 == 0 && verbose) print(sprintf('Sigma_Choleskys %d of %d',i,ncol(h2s_matrix)))
-		Sigma = forceSymmetric(make_Sigma(ZKZts,h2s_matrix[,i]))
-		stopifnot(class(Sigma) == 'dsCMatrix')
+		Sigma = forceSymmetric(drop0(make_Sigma(ZKZts,h2s_matrix[,i]),tol = 1e-14))
+		if(!class(Sigma) == 'dsCMatrix') Sigma = Matrix(Sigma,sparse=T)
 		chol_Sigma = chol(Sigma)
 		log_det = 2*determinant(chol_Sigma,logarithm=T)$modulus
 		chol_Sigma = as(chol_Sigma,'dgCMatrix')
@@ -247,3 +245,4 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 
     return(BSFG_state)
 }
+
