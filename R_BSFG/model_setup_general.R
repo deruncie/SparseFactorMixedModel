@@ -1,6 +1,15 @@
+#library(git2r)
+#library(devtools)
+my_local_library = '/usr/local/lib/R/3.3/site-library/'
+BSFG_path = 'https://github.com/deruncie/SparseFactorMixedModel'
+withr::with_libpaths(my_local_library,install_git(BSFG_path,branch = 'develop',subdir = 'BSFG'))
+
+
 library(microbenchmark)
 library(MCMCpack)
 library(BSFG)
+
+setwd("~/Dropbox/UCD/Runcie/SparseFactorMixedModel/R_BSFG")
 
 # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # you can repeat the MCMC exactly
@@ -43,9 +52,14 @@ priors = list(
     h2_priors_resids   =   c(0,rep(1,99))*dbeta(seq(0,1,length=102),2,2)[2:101]
 )
 
+data <- readMat("Example_simulation/setup.mat")
+#pedigree <- load("Sim_1/pedigree.Robj")
+Y <- data$Y
+
 print('Initializing')
 
-BSFG_state = BSFG_init(Y, model=~1 + (1|Line),data,factor_model_fixed = NULL,priors=priors,run_parameters=run_parameters)#,K_mats = list(Line = setup$K))
+BSFG_state = BSFG_init(Y, model=~1 + (1|Line),data,factor_model_fixed = NULL,
+                       priors=priors,run_parameters=run_parameters)#,K_mats = list(Line = setup$K))
 
 # h2_divisions = run_parameters$h2_divisions
 # BSFG_state$priors$Resid_discrete_priors = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {

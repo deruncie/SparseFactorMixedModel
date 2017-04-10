@@ -53,7 +53,7 @@ print('Initializing')
 # setup = load_simulation_data()
 # setup = load_simulation_FE_data()
 load('../setup.RData')
-setup$data$Group = gl(3,1,length = nrow(setup$data))
+setup$data$Group = gl(3,1,length = nrow(setup$data)) #general factor levels, 3 levels, in the 
 # BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1+Fixed2 + Fixed3|Sire)+(Group|animal), #
 #                                   data,priors,run_parameters,A_mats = list(animal = A),
 #                                   setup = setup))
