@@ -15,6 +15,7 @@ LazyData: true
 Imports: 
   Rcpp (>= 0.12.9),
   RcppArmadillo,
+  RcppEigen,
   RcppParallel,
   Matrix,
   lme4,
@@ -27,8 +28,9 @@ Suggests:
   MCMCpack,
   splines
 LinkingTo: 
-  Rcpp,
+  Rcpp (>= 0.11.2), 
   RcppArmadillo,
+  RcppEigen (>= 0.3.2.2.0),
   RcppParallel
 SystemRequirements: GNU make
 RoxygenNote: 6.0.0

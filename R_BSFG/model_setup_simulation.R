@@ -20,8 +20,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = list(
-    sampler = 'fast_BSFG',
-    # sampler = 'general_BSFG',
+    # sampler = 'fast_BSFG',
+    sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
     simulation   = T,
     scale_Y      = FALSE,
@@ -30,11 +30,13 @@ run_parameters = list(
     epsilon      = 1e-1,
     prop         = 1.00,
     k_init       = 20,
-    h2_divisions = 10,
+    h2_divisions = 500,
+    h2_step_size = 0.2,
     burn         = 100,
     thin         = 2
     )
 
+h2_divisions = run_parameters$h2_divisions
 priors = list(
     # fixed_var = list(V = 5e5,   nu = 2.001),
     fixed_var = list(V = 1,     nu = 3),
@@ -45,8 +47,8 @@ priors = list(
     Lambda_df =   3,
     B_df =   3,
     B_F_df =   3,
-    h2_priors_factors   =   c(run_parameters$h2_divisions-1,rep(1,run_parameters$h2_divisions-1))/(2*(run_parameters$h2_divisions-1)),
-    h2_priors_resids   =   c(0,rep(1,99))*dbeta(seq(0,1,length=102),2,2)[2:101]
+    h2_priors_factors   =   c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1)),
+    h2_priors_resids   =   c(0,rep(1,h2_divisions-1))*dbeta(seq(0,1,length=h2_divisions+2),2,2)[2:(h2_divisions+1)]
 )
 
 print('Initializing')
@@ -65,14 +67,14 @@ BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|anima
 BSFG_state$current_state$F_h2
 
 h2_divisions = run_parameters$h2_divisions
-BSFG_state$priors$Resid_discrete_priors = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
+BSFG_state$priors$h2_priors_resids = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
     h2s = h2s_matrix[,x]
     pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
 }))
-BSFG_state$priors$Resid_discrete_priors = BSFG_state$priors$Resid_discrete_priors/sum(BSFG_state$priors$Resid_discrete_priors)
-BSFG_state$priors$F_discrete_priors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
+BSFG_state$priors$h2_priors_resids = BSFG_state$priors$h2_priors_resids/sum(BSFG_state$priors$h2_priors_resids)
+BSFG_state$priors$h2_priors_factors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
 
-# BSFG_state$priors$F_discrete_priors = with(BSFG_state$data_matrices, sapply(1:nrow(h2s_matrix),function(x) {
+# BSFG_state$priors$h2_priors_factors = with(BSFG_state$data_matrices, sapply(1:nrow(h2s_matrix),function(x) {
 #     h2s = h2s_matrix[x,]
 #     pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
 # }))

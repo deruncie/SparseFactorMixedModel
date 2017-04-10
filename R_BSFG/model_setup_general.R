@@ -24,8 +24,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = list(
-    # sampler = 'fast_BSFG',
-    sampler = 'general_BSFG',
+    sampler = 'fast_BSFG',
+    # sampler = 'general_BSFG',
     Posterior_folder = 'Posterior',
     save_Eta     = F,
     simulation   = FALSE,
@@ -36,10 +36,12 @@ run_parameters = list(
     prop         = 1.00,
     k_init       = 20,
     h2_divisions = 20,
+    h2_step_size = 0.2,
     burn         = 1000,
     thin         = 2
     )
 
+h2_divisions = run_parameters$h2_divisions
 priors = list(
     fixed_var = list(V = 5e5,   nu = 2.001),  # appropriate for only an intercept
     # fixed_var = list(V = 1,     nu = 3),  # if there are multiple fixed effects
@@ -48,8 +50,10 @@ priors = list(
     delta_1   = list(shape = 2.1,  rate = 1/20),
     delta_2   = list(shape = 3, rate = 1),
     Lambda_df =   3,
-    h2_priors_factors   =   c(run_parameters$h2_divisions-1,rep(1,run_parameters$h2_divisions-1))/(2*(run_parameters$h2_divisions-1)),
-    h2_priors_resids   =   c(0,rep(1,99))*dbeta(seq(0,1,length=102),2,2)[2:101]
+    B_df =   3,
+    B_F_df =   3,
+    h2_priors_factors   =   c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1)),
+    h2_priors_resids   =   c(0,rep(1,h2_divisions-1))*dbeta(seq(0,1,length=h2_divisions+2),2,2)[2:(h2_divisions+1)]
 )
 
 data <- readMat("Example_simulation/setup.mat")
@@ -58,16 +62,15 @@ Y <- data$Y
 
 print('Initializing')
 
-BSFG_state = BSFG_init(Y, model=~1 + (1|Line),data,factor_model_fixed = NULL,
-                       priors=priors,run_parameters=run_parameters)#,K_mats = list(Line = setup$K))
+BSFG_state = BSFG_init(Y, model=~1 + (1|Line),data,factor_model_fixed = NULL,priors=priors,run_parameters=run_parameters,K_mats = list(Line = K))
 
-# h2_divisions = run_parameters$h2_divisions
-# BSFG_state$priors$Resid_discrete_priors = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
-#     h2s = h2s_matrix[,x]
-#     pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
-# }))
-# BSFG_state$priors$Resid_discrete_priors = BSFG_state$priors$Resid_discrete_priors/sum(BSFG_state$priors$Resid_discrete_priors)
-# BSFG_state$priors$F_discrete_priors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
+h2_divisions = run_parameters$h2_divisions
+BSFG_state$priors$h2_priors_resids = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
+  h2s = h2s_matrix[,x]
+  pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
+}))
+BSFG_state$priors$h2_priors_resids = BSFG_state$priors$h2_priors_resids/sum(BSFG_state$priors$h2_priors_resids)
+BSFG_state$priors$h2_priors_factors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
 
 
 save(BSFG_state,file="BSFG_state.RData")
@@ -87,15 +90,15 @@ BSFG_state = clear_Posterior(BSFG_state)
 # burn in
 BSFG_state$run_parameters$simulation = FALSE
 n_samples = 100;
-for(i  in 1:20) {
-    print(sprintf('Run %d',i))
-    BSFG_state = sample_BSFG(BSFG_state,n_samples,1)
-    if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
-      BSFG_state = reorder_factors(BSFG_state)
-    }
-    BSFG_state = save_posterior_chunk(BSFG_state)
-    print(BSFG_state)
-    plot(BSFG_state,file = 'diagnostics_plots.pdf')
+for(i  in 1:70) {
+  print(sprintf('Run %d',i))
+  BSFG_state = sample_BSFG(BSFG_state,n_samples,ncores=1)
+  if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
+    BSFG_state = reorder_factors(BSFG_state)
+  }
+  BSFG_state = save_posterior_chunk(BSFG_state)
+  print(BSFG_state)
+  plot(BSFG_state)
 }
 
 # library(shinystan)
@@ -106,12 +109,12 @@ for(i  in 1:20) {
 # my_sso <- as.shinystan(samples)
 # my_sso <- launch_shinystan(my_sso)
 
-F_h2 = get_posteriorMean(BSFG_state,'F_h2')
-Eta = get_posteriorMean(BSFG_state,'Eta')
-Lambda = get_posteriorMean(BSFG_state,'Lambda')
-F = get_posteriorMean(BSFG_state,'F')
-F_a = get_posteriorMean(BSFG_state,'F_a')
-B = get_posteriorMean(BSFG_state,'B')
-tot_Eta_prec = get_posteriorMean(BSFG_state,'tot_Eta_prec')
-
-LLt2 = matrix(rowMeans(apply(BSFG_state$Posterior$Lambda[sample(1:dim(BSFG_state$Posterior$Lambda)[1],50),,],1,tcrossprod)),dim(BSFG_state$Posterior$Lambda)[2])
+# F_h2 = get_posteriorMean(BSFG_state,'F_h2')
+# Eta = get_posteriorMean(BSFG_state,'Eta')
+# Lambda = get_posteriorMean(BSFG_state,'Lambda')
+# F = get_posteriorMean(BSFG_state,'F')
+# F_a = get_posteriorMean(BSFG_state,'F_a')
+# B = get_posteriorMean(BSFG_state,'B')
+# tot_Eta_prec = get_posteriorMean(BSFG_state,'tot_Eta_prec')
+#
+# LLt2 = matrix(rowMeans(apply(BSFG_state$Posterior$Lambda[sample(1:dim(BSFG_state$Posterior$Lambda)[1],50),,],1,tcrossprod)),dim(BSFG_state$Posterior$Lambda)[2])
