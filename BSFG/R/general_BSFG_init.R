@@ -165,7 +165,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
   if(verbose) print('Pre-calculating matrices')
 
 	#C
-	ZtZ = forceSymmetric(drop0(crossprod(Z),tol = 1e-14))
+	ZtZ = forceSymmetric(drop0(crossprod(Z),tol = run_parameters$drop0_tol))
 	make_Chol_Ki = function(chol_Ki_mats,h2s){
 		do.call(bdiag,lapply(1:length(h2s),function(i) {
 			if(h2s[i] == 0) return(Diagonal(nrow(chol_Ki_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
@@ -196,7 +196,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 	# Sigma
 	ZKZts = list()
 	for(i in 1:n_RE){
-		ZKZts[[i]] = forceSymmetric(drop0(Z_matrices[[i]] %*% K_mats[[i]] %*% t(Z_matrices[[i]]),tol = 1e-14))
+		ZKZts[[i]] = forceSymmetric(drop0(Z_matrices[[i]] %*% K_mats[[i]] %*% t(Z_matrices[[i]]),tol = run_parameters$drop0_tol))
 	}
 
 
@@ -213,7 +213,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 
 	Sigma_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
 		if(i %% 100 == 0 && verbose) print(sprintf('Sigma_Choleskys %d of %d',i,ncol(h2s_matrix)))
-		Sigma = forceSymmetric(drop0(make_Sigma(ZKZts,h2s_matrix[,i]),tol = 1e-14))
+		Sigma = forceSymmetric(drop0(make_Sigma(ZKZts,h2s_matrix[,i]),tol = run_parameters$drop0_tol))
 		if(!class(Sigma) == 'dsCMatrix') Sigma = Matrix(Sigma,sparse=T)
 		chol_Sigma = chol(Sigma)
 		log_det = 2*determinant(chol_Sigma,logarithm=T)$modulus

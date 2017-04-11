@@ -2,9 +2,10 @@
 #'
 #' Function to create run_parameters list for initializing BSFG model
 #'
-#' @param sampler specify the sampler to use. fast_BSFG is much faster, but only allows one random
+#' @param sampler specify the sampler to use. fast_BSFG is often faster, but only allows one random
 #'   effect. If more are specified in \code{BSFG_init}, this is switched to general_BSFG.
-#' @param Posterior_folder folder to save posterior sample chunk files
+#' @param Posterior_folder path to folder to save posterior samples. Samples of each parameter
+#'     are saved in chuncks to limit memory requirements.
 #' @param simulation Is this a fit to simulated data? If so, a setup list will be expected providing
 #'   the true values
 #' @param scale_Y Should the Y values be centered and scaled? Recommend, except for simulated data.
@@ -21,6 +22,18 @@
 #'   \code{h2_divisions} is a scalar, the prior for each variance component has this number of divisions.
 #'   In the joint prior over all variance components, combinations of variance components with total variance != 1
 #'   are assigned a prior of zero and ignored.
+#' @param h2_step_size Either NULL, or a scaler in the range (0,1] giving specifying the range of h2 values for a Metropolis-Hastings
+#'   update step for each h2 parameter vector. If NULL, h2's will be sampled based on the marginal probability
+#'   over all possible h2 vectors. If a scalar, a Metropolis-Hastings update step will be used for each h2 vector.
+#'   The trail value will be selected uniformly from all possible h2 vectors within this Euclidean distance from the current vector.
+#' @param drop0_tol A scalar giving the a tolerance for the \code{drop0()} function that will be applied
+#'     to various symmetric (possibly) sparse matrices to try to fix numerical errors and increase sparsity.
+#' @param K_eigen_tol A scalar giving the minimum eigenvalue of a K matrix allowed. During pre-processing,
+#'     eigenvalues of each K matrix will be calculated using \code{svd(K)}. Only eigenvectors of K with corresponding eigenvalues
+#'     greater than this value will be kept. If smaller eigenvalues exist, the model will be transformed
+#'     to reduce the rank of K, by multiplying Z by the remaining eigenvectors of K. This transformation
+#'     is undone before posterior samples are recorded, so posterior samples of \code{U_F} and \code{U_R} are
+#'     untransformed.
 #' @param burn burnin length of the MCMC chain
 #' @param thin thinning rate of the MCMC chain
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
@@ -28,14 +41,15 @@
 BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder = 'Posterior',
                         simulation = c(F,T),scale_Y = c(T,F),
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
-                        k_init = 20, h2_divisions = 100,
+                        k_init = 20, h2_divisions = 100, h2_step_size = NULL,
+                        drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,
                         thin = 2) {
 
-  all_args = formals()
+  all_args = lapply(formals(),function(x) eval(x)[1])
   passed_args = as.list(match.call())[-1]
   all_args[names(passed_args)] = passed_args
-  return(passed_args)
+  return(all_args)
 }
 
 #' Initialize a BSFG model
@@ -108,7 +122,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'   parameters
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
 #'
-BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL, K_eigen_tol = 1e-10,
+BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
                      data_model = 'missing_data', data_model_parameters = NULL, X_resid = NULL, X_factor = NULL, cis_genotypes = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects'),
                      posteriorMean_params = c('U_R'),
@@ -173,7 +187,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	X = cbind(X, X_resid) # add in X_resid if provided.
 	b = ncol(X)
 
-    # for F
+  # for F
 	  # note we drop a column to force intercept to be zero
 	X_F = model.matrix(factor_model_fixed,data)[,-1,drop = FALSE]
 	X_F = cbind(X_F,X_factor)
@@ -220,6 +234,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	#  note: correlated random effects are not allowed. Will convert to un-correlated REs
 	RE_terms = mkReTrms(findbars(model),data,drop.unused.levels = FALSE)  # extracts terms and builds Zt matrices
 
+	# construct Z matrices for each Random Effect
 	Z_matrices = list()
 	RE_names = c()
 	RE_covs = c()
@@ -240,7 +255,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	names(Z_matrices) = RE_names
 
 	  # function to ensure that covariance matrices are sparse and symmetric
-	fix_K = function(x) forceSymmetric(drop0(x,tol = 1e-10))
+	fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
 
 	# construct K matrices for each random effect
 	    # if K is PSD, find K = USVt and set K* = S and Z* of ZU
@@ -252,7 +267,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  re_name = RE_names[i]
 	  if(re %in% names(svd_Ks)) {
 	    svd_K = svd_Ks[[re]]
-	    r_eff = sum(svd_K$d > K_eigen_tol)  # truncate eigenvalues at this value
+	    r_eff = sum(svd_K$d > run_parameters$K_eigen_tol)  # truncate eigenvalues at this value
 	    # if need to use reduced rank model, then use the svd of K in place of K and merge U into Z
 	    # otherwise, use original K, set U = Diagonal(1,r)
 	    if(r_eff < length(svd_K$d)) {
@@ -281,6 +296,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	# Fix Z_matrices based on PSD K's
 	Z = do.call(cbind,Z_matrices[RE_names])
 	Z = as(do.call(cbind,Z_matrices[RE_names]),'dgCMatrix')
+	# The following matrix is used to transform random effects back to the original space had we sampoled from the original (PSD) K.
 	if(length(RE_names) > 1) {
 	  U_svd = do.call(bdiag,RE_U_matrices[RE_names])
 	} else{
@@ -323,7 +339,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	h2_divisions = run_parameters$h2_divisions
 	if(length(h2_divisions) < n_RE){
 	  if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
-	  # h2_divisions = rep(ceiling(h2_divisions^(1/n_RE)),n_RE)  # evenly divide divisions among random effects
 	  h2_divisions = rep(h2_divisions,n_RE)
 	}
 	if(is.null(names(h2_divisions))) {
@@ -429,8 +444,8 @@ initialize_BSFG = function(BSFG_state,...){
 #' @param BSFG_state BSFG_state object of current chain
 #' @param n_samples Number of iterations to add to the chain (not number of posterior samples to draw.
 #'     This is determined by n_samples / thin)
-#' @param ncores Number of cores to use for computations. Only used in general_BSFG sampler.
-sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
+#' @param grainSize Minimum size of sub-problems for dividing among processes. Sent to RcppParallel
+sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
   run_parameters = BSFG_state$run_parameters
@@ -464,7 +479,7 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   start_time = Sys.time()
   for(i in start_i+(1:n_samples)){
     BSFG_state$current_state$nrun = i
-    BSFG_state$current_state = sample_factor_model(BSFG_state,ncores = ncores,...)
+    BSFG_state$current_state = sample_factor_model(BSFG_state,grainSize = grainSize,...)
 
     # -----Sample Lambda_prec ------------- #
     BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
