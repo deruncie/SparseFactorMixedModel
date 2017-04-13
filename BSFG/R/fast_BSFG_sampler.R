@@ -15,7 +15,6 @@ sample_factor_model.fast_BSFG = function(BSFG_state,grainSize,...) {
 
 	 # -----Sample Lambda and B ------------------ #
 		#conditioning on F, marginalizing over U_R
-
 		Design = as.matrix(cbind(X,F))
 		UtDesign = as.matrix(Ut %*% Design)
 		rows = b + k

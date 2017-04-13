@@ -55,7 +55,7 @@ VectorXd sample_coefs_single(
 }
 
 // [[Rcpp::export()]]
-MatrixXd sample_coefs_parallel_sparse_c_Eigen(
+MatrixXd sample_coefs_parallel_sparse_c(
     Map<MatrixXd> UtEta,
     Map<MatrixXd> UtW,
     Map<VectorXd> h2,
@@ -109,9 +109,9 @@ MatrixXd sample_coefs_parallel_sparse_c_Eigen(
 
 // [[Rcpp::export()]]
 MatrixXd sample_coefs_set_c(
-    Rcpp::List model_matrices,
-    Rcpp::List randn_draws,
-    Rcpp::List s_vectors,
+    List model_matrices,
+    List randn_draws,
+    List s_vectors,
     Map<VectorXd> h2s,
     Map<VectorXd> tot_Eta_prec,
     Map<MatrixXd> prior_mean,
