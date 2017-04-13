@@ -53,6 +53,7 @@ trace_plot_Lambda = function(Lambda, n_factors = 16, device = NULL){
     o = order(-abs(colMeans(Lambda[,,k])))
     traces = Lambda[,o[1:5],k]
     trace_plot(traces,main = sprintf('Factor %d lambdas',k))
+    abline(h=0)
   }
 }
 

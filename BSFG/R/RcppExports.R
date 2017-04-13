@@ -33,6 +33,14 @@ log_binom_c <- function(beta, X, y, N, mu, sigma2) {
     .Call('BSFG_log_binom_c', PACKAGE = 'BSFG', beta, X, y, N, mu, sigma2)
 }
 
+sample_coefs_parallel_sparse_c_2 <- function(UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize) {
+    .Call('BSFG_sample_coefs_parallel_sparse_c_2', PACKAGE = 'BSFG', UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
+}
+
+sample_coefs_set_c <- function(model_matrices, randn_draws, s_vectors, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize) {
+    .Call('BSFG_sample_coefs_set_c', PACKAGE = 'BSFG', model_matrices, randn_draws, s_vectors, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize)
+}
+
 sample_MME_single_diagK_c <- function(y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {
     .Call('BSFG_sample_MME_single_diagK_c', PACKAGE = 'BSFG', y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e)
 }

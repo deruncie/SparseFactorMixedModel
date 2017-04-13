@@ -52,11 +52,11 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, k, k_G, i_Va = 0.2, i_V
   B_F = matrix(rnorm((b-1)*k),nrow = (b-1),ncol=k)
   B = rbind(rnorm(p),matrix(0,(b-1),p))
 
-  U_F = K_chol %*% matrix(rnorm(n*k,0,sqrt(factor_h2s)),n,k,byrow=T)
+  U_F = t(K_chol) %*% matrix(rnorm(n*k,0,sqrt(factor_h2s)),n,k,byrow=T)
 
   F = X_F %*% B_F + Z %*% U_F + matrix(rnorm(n*k,0,sqrt(1-factor_h2s)),n,k,byrow=T)
 
-  U_R = K_chol %*% matrix(rnorm(n*p,0,sqrt(resid_h2/tot_Y_prec)),n,p,byrow=T)
+  U_R = t(K_chol) %*% matrix(rnorm(n*p,0,sqrt(resid_h2/tot_Y_prec)),n,p,byrow=T)
 
   Y = X %*% B + F %*% t(Lambda) + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
   Y = as.matrix(Y)

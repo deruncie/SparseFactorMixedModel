@@ -327,7 +327,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	n_RE = length(RE_names)
 
 	if(n_RE > 1 && run_parameters$sampler == 'fast_BSFG'){
-	  print(sprintf('%d random effects. Using \"general_BSFG\" sampler',length(RE_names)))
+	  cat(sprintf('%d random effects. Using \"general_BSFG\" sampler\n',length(RE_names)))
 	  run_parameters$sampler = 'general_BSFG'
 	}
 

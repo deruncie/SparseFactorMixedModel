@@ -67,7 +67,7 @@ sample_factor_model.fast_BSFG = function(BSFG_state,grainSize,...) {
 	# -----Sample Lambda and B_F ------------------ #
 		# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
 		if(b_F > 0){
-		  prior_mean = matrix(0,b_F,p)
+		  prior_mean = matrix(0,b_F,k)
 		  prior_prec = prec_B_F
 		  B_F = sample_coefs_parallel_sparse_c(as.matrix(Ut %*% F),as.matrix(Ut %*% X_F),F_h2, tot_F_prec,s, prior_mean,prior_prec,grainSize)
 		  XFBF = X_F %*% B_F

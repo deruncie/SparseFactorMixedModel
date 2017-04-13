@@ -22,6 +22,7 @@ setwd(folder)
 run_parameters = BSFG_control(
   sampler = 'fast_BSFG',
   # sampler = 'general_BSFG',
+  scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
   h2_step_size = NULL,

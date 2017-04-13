@@ -62,7 +62,7 @@ sample_factor_model.general_BSFG = function(BSFG_state,grainSize = 1,...) {
 		# -----Sample Lambda and B_F ------------------ #
 		# F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
 		if(b_F > 0){
-			prior_mean = matrix(0,b_F,p)
+			prior_mean = matrix(0,b_F,k)
 			prior_prec = prec_B_F
 			B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, F_h2_index, tot_F_prec, prior_mean, prior_prec,grainSize)
 			XFBF = X_F %*% B_F

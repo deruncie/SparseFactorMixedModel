@@ -108,9 +108,10 @@ voom_model = function(Y,data_model_parameters,BSFG_state = list()){
 #'
 #' @param Y a vector of observation. Pre-scaled and centered if desired.
 #' @param data_model_parameters a list including:
-#'     \code{observations}, a data.frame with columns: \code{ID}, and \code{covariate}, ordered by ID.
-#'     and the variables df, knots, degree and intercept.
-#'     Empty values will use the defaults for \code{bs()}.
+#'     1) \code{observations}, a data.frame including columns: \code{ID}, and \code{covariate}, ordered by ID.
+#'     2) the variables df, knots, degree and intercept. Empty values will use the defaults for \code{bs()}
+#'     3) \code{individual_model} formula for each individual of form \code{~SPLINE:factor} using keyword
+#'         \code{SPLINE} to denote b-spline factors. If not included, will use model \code{~SPLINE}
 bs_model = function(Y,data_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
@@ -122,19 +123,24 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       if(!exists('knots') || !is.numeric(knots)) knots = NULL
       if(!exists('degree') || !is.numeric(degree)) degree = 3
       if(!exists('intercept') || !is.numeric(intercept)) intercept = FALSE
+      if(!exists('individual_model')) individual_model = ~SPLINE
       covariate = observations$covariate
-      coefficients = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
+      global_b_spline = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
 
       model_matrices = tapply(1:nrow(observations),observations$ID,function(x) {
+        SPLINE = predict(global_b_spline,newx = observations$covariate[x])
         list(
-          X = coefficients[x,,drop=FALSE],
-          y = Y[x,,drop=FALSE]
+          X = eval(parse(text = sprintf('model.matrix(%s,observations[x,])',paste(as.character(individual_model),collapse='')))),
+          y = Y[x,,drop=FALSE],
+          position = x
         )
       })
     }
 
     n = length(model_matrices)
-    p = ncol(coefficients)
+    p = ncol(model_matrices[[1]]$X)
+    Eta_col_names = colnames(model_matrices[[1]]$X)
+    Eta_row_names = unique(observations$ID)
 
     if(length(current_state) == 0){
       Eta_mean = matrix(0,n,p)
@@ -142,33 +148,43 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       resid_Y_prec = matrix(1)  # only a single precision parameter for the data_model?
     } else{
       Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
-      resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+      resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
       if(!exists('resid_Y_prec')) resid_Y_prec = matrix(1)
     }
+    # Eta = do.call(cbind,parallel::mclapply(1:n,function(i) {
+    #   X = model_matrices[[i]]$X
+    #   y = model_matrices[[i]]$y
+    #   eta_i = sample_coefs_parallel_sparse_c_2(y,X,0,resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),rnorm(ncol(X)),rnorm(length(y)),1)
+    # },mc.cores = ncores))
+    randn_draws = lapply(1:n,function(i) {
+      list(
+        randn_theta = rnorm(ncol(model_matrices[[i]]$X)),
+        randn_e = rnorm(length(model_matrices[[i]]$y))
+      )
+    })
+    s_vectors = lapply(1:n,function(i) rep(1,nrow(model_matrices[[i]]$X)))
+    Eta = sample_coefs_set_c(model_matrices,randn_draws,s_vectors,rep(0,n),rep(resid_Y_prec,n),as.matrix(t(Eta_mean)),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
+    Eta = t(Eta)
+    colnames(Eta) = Eta_col_names
+    rownames(Eta) = Eta_row_names
 
     if(!exists('ncores')) ncores = 1
-    Eta = do.call(cbind,mclapply(1:n,function(i) {
-      X = model_matrices[[i]]$X
-      y = model_matrices[[i]]$y
-      eta_i = sample_coefs_parallel_sparse_c(y,X,matrix(0),resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),1)
-    },mc.cores = ncores))
-    Eta = t(Eta)
-
-    Y_fitted = do.call(c,mclapply(1:n,function(i) {
+    Y_fitted = do.call(c,parallel::mclapply(1:n,function(i) {
       y_fitted = model_matrices[[i]]$X %*% Eta[i,]
       if(is(y_fitted,'Matrix')) y_fitted = y_fitted@x
       y_fitted
     },mc.cores = ncores))
+    Y_fitted = Y_fitted[order(do.call(c,lapply(model_matrices,function(x) x$position)))]
 
     Y_tilde = Y - Y_fitted
 
     resid_Y_prec = matrix(rgamma(1,shape = resid_Y_prec_shape + 0.5*n*p, rate = resid_Y_prec_rate + 0.5*sum(Y_tilde^2)))
 
-    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, coefficients = coefficients))
+    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, global_b_spline = global_b_spline,Y_fitted=matrix(Y_fitted)))
   })
   return(list(state = data_model_state,
-              posteriorSample_params = c(),
-              posteriorMean_params = c('Eta','resid_Y_prec')
+              posteriorSample_params = c('Y_fitted','Eta'),
+              posteriorMean_params = c('resid_Y_prec')
   )
   )
 }

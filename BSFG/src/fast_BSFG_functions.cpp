@@ -1,35 +1,24 @@
 #include <math.h>
 #include <iostream>
-#include <RcppEigen.h>
-#include <RcppParallel.h>
+#include "BSFG_types.h"
 
 // [[Rcpp::depends(RcppEigen)]]
 using namespace Eigen;
 using namespace RcppParallel;
-using namespace Rcpp;
-
-using Eigen::Map;               	      // 'Eigen::Maps' rather than copies
-using Eigen::MatrixXd;                  // variable size matrix, double precision
-using Eigen::VectorXd;                  // variable size vector, double precision
-using Eigen::ArrayXXd;                  // variable size array, double precision
-using Eigen::Upper;
-using Eigen::Lower;
-typedef Eigen::MappedSparseMatrix<double> MSpMat;
-typedef Eigen::SparseMatrix<double> SpMat;
 
 
 VectorXd sample_coefs_single(
-                              VectorXd UtEta,
-                              MatrixXd UtW,
-                              VectorXd prior_mean,
-                              VectorXd prior_prec,
-                              double h2,
-                              double tot_Eta_prec,
-                              VectorXd randn_theta,
-                              VectorXd randn_e,
-                              VectorXd s,
-                              int b,
-                              int n
+    VectorXd UtEta,
+    MatrixXd UtW,
+    VectorXd prior_mean,
+    VectorXd prior_prec,
+    double h2,
+    double tot_Eta_prec,
+    VectorXd randn_theta,
+    VectorXd randn_e,
+    VectorXd s,
+    int b,
+    int n
 ) {
 
   VectorXd R_sq_diag = ((h2 * s.array() + (1-h2))/tot_Eta_prec).sqrt();
@@ -97,7 +86,7 @@ MatrixXd sample_coefs_parallel_sparse_c_2(
 
     void operator()(std::size_t begin, std::size_t end) {
       for(std::size_t j = begin; j < end; j++){
-          coefs.col(j) = sample_coefs_single(UtEta.col(j), UtW, prior_mean.col(j), prior_prec.col(j), h2(j), tot_Eta_prec(j), randn_theta.col(j),randn_e.col(j),s,b,n);
+        coefs.col(j) = sample_coefs_single(UtEta.col(j), UtW, prior_mean.col(j), prior_prec.col(j), h2(j), tot_Eta_prec(j), randn_theta.col(j),randn_e.col(j),s,b,n);
       }
     }
   };
@@ -117,9 +106,9 @@ MatrixXd sample_coefs_parallel_sparse_c_2(
 
 // [[Rcpp::export()]]
 MatrixXd sample_coefs_set_c(
-    List model_matrices,
-    List randn_draws,
-    List s_vectors,
+    Rcpp::List model_matrices,
+    Rcpp::List randn_draws,
+    Rcpp::List s_vectors,
     Map<VectorXd> h2s,
     Map<VectorXd> tot_Eta_prec,
     Map<MatrixXd> prior_mean,
@@ -159,7 +148,7 @@ MatrixXd sample_coefs_set_c(
         int n = randn_e_list[j].size();
         coefs.col(j) = sample_coefs_single(UtEta_list[j], UtW_list[j], prior_mean.col(j),
                   prior_prec.col(j), h2s(j), tot_Eta_prec(j), randn_theta_list[j],
-                  randn_e_list[j],s_list[j],b,n);
+                                                                              randn_e_list[j],s_list[j],b,n);
       }
     }
   };
