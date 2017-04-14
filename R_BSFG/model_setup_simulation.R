@@ -43,6 +43,7 @@ priors = list(
 
 print('Initializing')
 load('../setup.RData')
+
 setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 # to test non-PD K matrix:
@@ -50,6 +51,7 @@ setup$data$Group = gl(3,1,length = nrow(setup$data))
 # Xs = sweep(X,2,colMeans(X),'-')
 # K_new = tcrossprod(Xs)
 # rownames(K_new) = rownames(setup$K)
+
 # BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1+Fixed2 + Fixed3|Sire)+(Group|animal), #
                                   # data,priors=priors,run_parameters = run_parameters,K_mats = list(animal = K_new),
                                   # setup = setup))

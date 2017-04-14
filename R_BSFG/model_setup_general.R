@@ -1,6 +1,15 @@
+#library(git2r)
+#library(devtools)
+my_local_library = '/usr/local/lib/R/3.3/site-library/'
+BSFG_path = 'https://github.com/deruncie/SparseFactorMixedModel'
+withr::with_libpaths(my_local_library,install_git(BSFG_path,branch = 'develop',subdir = 'BSFG'))
+
+
 library(microbenchmark)
 library(MCMCpack)
 library(BSFG)
+
+setwd("~/Dropbox/UCD/Runcie/SparseFactorMixedModel/R_BSFG")
 
 # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # you can repeat the MCMC exactly
@@ -34,7 +43,6 @@ priors = list(
   B_df      = 3,
   B_F_df    = 3
 )
-
 
 print('Initializing')
 
