@@ -4,7 +4,7 @@
 \alias{plot.BSFG_state}
 \title{Make plots of current BSFG state}
 \usage{
-\method{plot}{BSFG_state}(BSFG_state, file = "diagnostics_plots.pdf")
+\method{plot}{BSFG_state}(BSFG_state, file = "diagnostics_polts.pdf")
 }
 \description{
 Make plots of current BSFG state

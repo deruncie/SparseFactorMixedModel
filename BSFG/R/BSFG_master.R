@@ -2,9 +2,10 @@
 #'
 #' Function to create run_parameters list for initializing BSFG model
 #'
-#' @param sampler specify the sampler to use. fast_BSFG is much faster, but only allows one random
+#' @param sampler specify the sampler to use. fast_BSFG is often faster, but only allows one random
 #'   effect. If more are specified in \code{BSFG_init}, this is switched to general_BSFG.
-#' @param Posterior_folder folder to save posterior sample chunk files
+#' @param Posterior_folder path to folder to save posterior samples. Samples of each parameter
+#'     are saved in chuncks to limit memory requirements.
 #' @param simulation Is this a fit to simulated data? If so, a setup list will be expected providing
 #'   the true values
 #' @param scale_Y Should the Y values be centered and scaled? Recommend, except for simulated data.
@@ -21,6 +22,18 @@
 #'   \code{h2_divisions} is a scalar, the prior for each variance component has this number of divisions.
 #'   In the joint prior over all variance components, combinations of variance components with total variance != 1
 #'   are assigned a prior of zero and ignored.
+#' @param h2_step_size Either NULL, or a scaler in the range (0,1] giving specifying the range of h2 values for a Metropolis-Hastings
+#'   update step for each h2 parameter vector. If NULL, h2's will be sampled based on the marginal probability
+#'   over all possible h2 vectors. If a scalar, a Metropolis-Hastings update step will be used for each h2 vector.
+#'   The trail value will be selected uniformly from all possible h2 vectors within this Euclidean distance from the current vector.
+#' @param drop0_tol A scalar giving the a tolerance for the \code{drop0()} function that will be applied
+#'     to various symmetric (possibly) sparse matrices to try to fix numerical errors and increase sparsity.
+#' @param K_eigen_tol A scalar giving the minimum eigenvalue of a K matrix allowed. During pre-processing,
+#'     eigenvalues of each K matrix will be calculated using \code{svd(K)}. Only eigenvectors of K with corresponding eigenvalues
+#'     greater than this value will be kept. If smaller eigenvalues exist, the model will be transformed
+#'     to reduce the rank of K, by multiplying Z by the remaining eigenvectors of K. This transformation
+#'     is undone before posterior samples are recorded, so posterior samples of \code{U_F} and \code{U_R} are
+#'     untransformed.
 #' @param burn burnin length of the MCMC chain
 #' @param thin thinning rate of the MCMC chain
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
@@ -28,14 +41,15 @@
 BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder = 'Posterior',
                         simulation = c(F,T),scale_Y = c(T,F),
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
-                        k_init = 20, h2_divisions = 100,
+                        k_init = 20, h2_divisions = 100, h2_step_size = NULL,
+                        drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,
                         thin = 2) {
 
-  all_args = formals()
+  all_args = lapply(formals(),function(x) eval(x)[1])
   passed_args = as.list(match.call())[-1]
   all_args[names(passed_args)] = passed_args
-  return(passed_args)
+  return(all_args)
 }
 
 #' Initialize a BSFG model
@@ -106,8 +120,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @return traitnames: vector of trait names (from colnames of Y)
 #' @return run_parameters, run_variables, data_matrices, priors, simulation: input data and
 #'   parameters
-#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}
-#'
+#' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
                      data_model = 'missing_data', data_model_parameters = NULL, X_resid = NULL, X_factor = NULL, cis_genotypes = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects'),
@@ -173,7 +186,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	X = cbind(X, X_resid) # add in X_resid if provided.
 	b = ncol(X)
 
-    # for F
+  # for F
 	  # note we drop a column to force intercept to be zero
 	X_F = model.matrix(factor_model_fixed,data)[,-1,drop = FALSE]
 	X_F = cbind(X_F,X_factor)
@@ -194,11 +207,18 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	RE_levels = list() # a list of levels for each of the random effects
 	if(is.null(K_mats)) K_mats = list()
 	for(re in names(K_mats)) {
+	  # check that K is a matrix, then convert to Matrix
+	  if(is.data.frame(K_mats[[re]])) K_mats[[re]] = as.matrix(K_mats[[re]])
+	  if(is.matrix(K_mats[[re]])) K_mats[[re]] = Matrix(K_mats[[re]],sparse=T)
 	  if(is.null(rownames(K_mats[[re]]))) stop(sprintf('K %s must have rownames',re))
 	  if(re %in% names(K_inv_mats)) stop(sprintf('Both K and Kinv provided for %s. Please provide only one for each random effect',re))
 	  RE_levels[[re]] = rownames(K_mats[[re]])
 	}
 	for(re in names(K_inv_mats)) {
+	  # check that K_inv is a matrix, then convert to Matrix
+	  if(is.data.frame(K_inv_mats[[re]])) K_inv_mats[[re]] = as.matrix(K_inv_mats[[re]])
+	  if(is.matrix(K_inv_mats[[re]])) K_inv_mats[[re]] = Matrix(K_inv_mats[[re]],sparse=T)
+
 	  if(is.null(rownames(K_inv_mats[[re]]))) stop(sprintf('K_inv %s must have rownames',re))
 	  RE_levels[[re]] = rownames(K_inv_mats[[re]])
 	}
@@ -213,6 +233,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	#  note: correlated random effects are not allowed. Will convert to un-correlated REs
 	RE_terms = mkReTrms(findbars(model),data,drop.unused.levels = FALSE)  # extracts terms and builds Zt matrices
 
+	# construct Z matrices for each Random Effect
 	Z_matrices = list()
 	RE_names = c()
 	RE_covs = c()
@@ -231,37 +252,56 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  Z_matrices = c(Z_matrices,Zs_term)
 	}
 	names(Z_matrices) = RE_names
-	Z = do.call(cbind,Z_matrices)
-
-	n_RE = length(RE_names)
-	r_RE = sapply(Z_matrices,function(x) ncol(x))
-
-	if(n_RE > 1 && run_parameters$sampler == 'fast_BSFG'){
-	  print(sprintf('%d random effects. Using \"general_BSFG\" sampler',length(RE_names)))
-	  run_parameters$sampler = 'general_BSFG'
-	}
 
 	  # function to ensure that covariance matrices are sparse and symmetric
-	fix_K = function(x) forceSymmetric(drop0(x,tol = 1e-10))
+	fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
 
-	  # construct K matrices for each random effect
+	# construct K matrices for each random effect
+	    # if K is PSD, find K = USVt and set K* = S and Z* of ZU
+	svd_Ks = lapply(K_mats,function(K) svd(K))
+	RE_U_matrices = list()
+
 	for(i in 1:length(RE_names)){
 	  re = RE_covs[i]
 	  re_name = RE_names[i]
-	  if(re %in% names(K_mats)) {
-	    K = K_mats[[re]]
+	  if(re %in% names(svd_Ks)) {
+	    svd_K = svd_Ks[[re]]
+	    r_eff = sum(svd_K$d > run_parameters$K_eigen_tol)  # truncate eigenvalues at this value
+	    # if need to use reduced rank model, then use the svd of K in place of K and merge U into Z
+	    # otherwise, use original K, set U = Diagonal(1,r)
+	    if(r_eff < length(svd_K$d)) {
+  	    K = Diagonal(r_eff,svd_K$d[1:r_eff])
+  	    U = Matrix(svd_K$u[,1:r_eff])
+	    } else{
+	      K = K_mats[[re]]
+	      U = Diagonal(nrow(K),1)
+	    }
 	  } else if(re %in% names(K_inv_mats)){
 	    K_mats[[re]] = solve(K_inv_mats[[re]])
 	    rownames(K_mats[[re]]) = rownames(K_inv_mats[[re]])
 	    K = K_mats[[re]]
+	    U = Diagonal(nrow(K),1)
 	  } else{
 	    K_mats[[re]] = Diagonal(ncol(Z_matrices[[re_name]]))
 	    rownames(K_mats[[re]]) = levels(data[[re]])
 	    K = K_mats[[re]]
+	    U = Diagonal(nrow(K),1)
 	  }
 	  K_mats[[re_name]] = fix_K(K)
+	  RE_U_matrices[[re_name]] = U
+	  Z_matrices[[re_name]] = Z_matrices[[re_name]] %*% U
 	}
 	K_mats = K_mats[RE_names]
+	# Fix Z_matrices based on PSD K's
+	Z = do.call(cbind,Z_matrices[RE_names])
+	Z = as(do.call(cbind,Z_matrices[RE_names]),'dgCMatrix')
+	# The following matrix is used to transform random effects back to the original space had we sampoled from the original (PSD) K.
+	if(length(RE_names) > 1) {
+	  U_svd = do.call(bdiag,RE_U_matrices[RE_names])
+	} else{
+	  U_svd = RE_U_matrices[[1]]
+	}
+	r_RE = sapply(Z_matrices,function(x) ncol(x))  # re-calculate
 
 	  # construct K_inverse matrices for each random effect
 	if(is.null(K_inv_mats)) K_inv_mats = list()
@@ -282,6 +322,15 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  # cholesky decompositions (L'L) of each K_inverse matrix
 	chol_Ki_mats = lapply(Ki_mats,chol)
 
+
+	n_RE = length(RE_names)
+
+	if(n_RE > 1 && run_parameters$sampler == 'fast_BSFG'){
+	  cat(sprintf('%d random effects. Using \"general_BSFG\" sampler\n',length(RE_names)))
+	  run_parameters$sampler = 'general_BSFG'
+	}
+
+
 	  # table of possible h2s for each random effect
 	  #   These are percentages of the total residual variance accounted for by each random effect
 	  #   Each column is a set of percentages, the sum of which must be less than 1 (so that Ve is > 0)
@@ -289,7 +338,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	h2_divisions = run_parameters$h2_divisions
 	if(length(h2_divisions) < n_RE){
 	  if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
-	  # h2_divisions = rep(ceiling(h2_divisions^(1/n_RE)),n_RE)  # evenly divide divisions among random effects
 	  h2_divisions = rep(h2_divisions,n_RE)
 	}
 	if(is.null(names(h2_divisions))) {
@@ -306,6 +354,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  X_F        = X_F,
 	  Z_matrices = Z_matrices,
 	  Z          = Z,
+	  U_svd      = U_svd,  # matrix necessary to back-transform U_F and U_R (U*U_F and U*U_R) to get original random effects
 	  h2s_matrix = h2s_matrix,
 	  cis_genotypes = cis_genotypes,
 	  cis_effects_index = cis_effects_index,
@@ -339,10 +388,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
 	priors$tot_F_prec_shape    = with(priors$tot_F_var,nu - 1)
 	  # delta: column shrinkage of Lambda
-	# priors$delta_1_rate    = with(priors$delta_1,V * nu)
-	# priors$delta_1_shape   = with(priors$delta_1,nu - 1)
-	# priors$delta_2_rate    = with(priors$delta_2,V * nu)
-	# priors$delta_2_shape   = with(priors$delta_2,nu - 1)
 	priors$delta_1_rate    = priors$delta_1$rate
 	priors$delta_1_shape   = priors$delta_1$shape
 	priors$delta_2_rate    = priors$delta_2$rate
@@ -375,12 +420,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	Posterior = list(
 	  posteriorSample_params = unique(c(posteriorSample_params,data_model_state$posteriorSample_params)),
 	  posteriorMean_params = unique(c(posteriorMean_params,data_model_state$posteriorMean_params)),
-	  # per_trait_params = c('tot_Eta_prec','resid_h2','B'),
 	  total_samples = 0,
 	  folder = run_parameters$Posterior_folder,
 	  files = c()
 	)
-	Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
+	Posterior = reset_Posterior(Posterior,BSFG_state)
 	BSFG_state$Posterior = Posterior
 
 
@@ -399,8 +443,8 @@ initialize_BSFG = function(BSFG_state,...){
 #' @param BSFG_state BSFG_state object of current chain
 #' @param n_samples Number of iterations to add to the chain (not number of posterior samples to draw.
 #'     This is determined by n_samples / thin)
-#' @param ncores Number of cores to use for computations. Only used in general_BSFG sampler.
-sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
+#' @param grainSize Minimum size of sub-problems for dividing among processes. Sent to RcppParallel
+sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
   run_parameters = BSFG_state$run_parameters
@@ -434,7 +478,7 @@ sample_BSFG = function(BSFG_state,n_samples,ncores = detectCores(),...) {
   start_time = Sys.time()
   for(i in start_i+(1:n_samples)){
     BSFG_state$current_state$nrun = i
-    BSFG_state$current_state = sample_factor_model(BSFG_state,ncores = ncores,...)
+    BSFG_state$current_state = sample_factor_model(BSFG_state,grainSize = grainSize,...)
 
     # -----Sample Lambda_prec ------------- #
     BSFG_state$current_state = sample_Lambda_prec(BSFG_state)

@@ -169,6 +169,9 @@ save_posterior_sample = function(BSFG_state) {
   Posterior$sp_num = sp_num
 
 	current_state = within(current_state,{
+	  # re-transform random effects using U_svd
+	  U_R = as.matrix(BSFG_state$data_matrices$U_svd %*% U_R)
+	  U_F = as.matrix(BSFG_state$data_matrices$U_svd %*% U_F)
 		# transform variables so that the variance of each column of F is 1.
 		F_var = 1/tot_F_prec
 		U_F = sweep(U_F,2,sqrt(F_var),'/')
@@ -191,17 +194,19 @@ save_posterior_sample = function(BSFG_state) {
 	}
 
 	for(param in Posterior$posteriorMean_params){
-	  # if(total_samples <= 1) {
-	  #   Posterior[[param]] = current_state[[param]]
-	  # } else {
 	  Posterior[[param]] = (Posterior[[param]]*(total_samples - 1) + current_state[[param]])/total_samples
-	  # }
 	}
 
 	return(Posterior)
 }
 
-reset_Posterior = function(Posterior,current_state){
+reset_Posterior = function(Posterior,BSFG_state){
+  current_state = BSFG_state$current_state
+
+  # re-transform random effects using U_svd
+  current_state$U_F = BSFG_state$data_matrices$U_svd %*% current_state$U_F
+  current_state$U_R = BSFG_state$data_matrices$U_svd %*% current_state$U_R
+
   for(param in Posterior$posteriorSample_params){
     Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
     dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
@@ -236,7 +241,7 @@ clear_Posterior = function(BSFG_state) {
 	run_parameters$burn = run_parameters$burn + run_parameters$thin*Posterior$total_samples
 
 	Posterior$total_samples = 0
-  Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
+  Posterior = reset_Posterior(Posterior,BSFG_state)
 
   if(length(list.files(path = Posterior$folder))>0) system('rm Posterior/*')
   Posterior$files = c()
@@ -267,7 +272,7 @@ save_posterior_chunk = function(BSFG_state){
     if(dim(samples)[1] > 0) save(samples,file = file_name)
   })
   Posterior$files = unique(c(Posterior$files,file_suffix))
-  Posterior = reset_Posterior(Posterior,BSFG_state$current_state)
+  Posterior = reset_Posterior(Posterior,BSFG_state)
   BSFG_state$Posterior = Posterior
   save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
   return(BSFG_state)
@@ -333,6 +338,7 @@ reload_Posterior = function(BSFG_state){
   Posterior = BSFG_state$Posterior
   for(param in c(Posterior$posteriorSample_params,Posterior$posteriorMean_params)){
     Posterior[[param]] = load_posterior_param(BSFG_state,param)
+    dimnames(Posterior[[param]]) = dimnames(BSFG_state$Posterior[[param]])
   }
   Posterior
 }

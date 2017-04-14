@@ -14,36 +14,25 @@ setwd(folder)
 
 
 # initialize priors
-run_parameters = list(
-    # sampler = 'fast_BSFG',
-    sampler = 'general_BSFG',
-    Posterior_folder = 'Posterior',
-    simulation   = T,
-    scale_Y      = FALSE,
-    b0           = 1,
-    b1           = 0.0005,
-    epsilon      = 1e-1,
-    prop         = 1.00,
-    k_init       = 20,
-    h2_divisions = 10,
-    h2_step_size = 0.2,
-    burn         = 100,
-    thin         = 2
-    )
+run_parameters = BSFG_control(
+  sampler = 'fast_BSFG',
+  # sampler = 'general_BSFG',
+  simulation = TRUE,
+  h2_divisions = 20,
+  h2_step_size = NULL,
+  burn = 100
+)
 
-h2_divisions = run_parameters$h2_divisions
 priors = list(
-    # fixed_var = list(V = 5e5,   nu = 2.001),
-    fixed_var = list(V = 1,     nu = 3),
-    tot_Y_var = list(V = 0.5,   nu = 3),
-    tot_F_var = list(V = 18/20, nu = 20),
-    delta_1   = list(shape = 2.1,  rate = 1/20),
-    delta_2   = list(shape = 3, rate = 1),
-    Lambda_df =   3,
-    B_df =   3,
-    B_F_df =   3,
-    h2_priors_factors   =   c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1)),
-    h2_priors_resids   =   c(0,rep(1,h2_divisions-1))*dbeta(seq(0,1,length=h2_divisions+2),2,2)[2:(h2_divisions+1)]
+  # fixed_var = list(V = 5e5,   nu = 2.001),
+  fixed_var = list(V = 1,     nu = 3),
+  tot_Y_var = list(V = 0.5,   nu = 3),
+  tot_F_var = list(V = 18/20, nu = 20),
+  delta_1   = list(shape = 2.1,  rate = 1/20),
+  delta_2   = list(shape = 3, rate = 1),
+  Lambda_df = 3,
+  B_df      = 3,
+  B_F_df    = 3
 )
 
 print('Initializing')
