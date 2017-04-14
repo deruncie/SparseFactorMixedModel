@@ -5,17 +5,19 @@
 \title{Set BSFG run parameters}
 \usage{
 BSFG_control(sampler = c("fast_BSFG", "general_BSFG"),
-  Posterior_folder = "Posterior", simulation = c(F, T), scale_Y = c(T, F),
-  b0 = 1, b1 = 5e-04, epsilon = 0.1, prop = 1, k_init = 20,
-  h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
-  K_eigen_tol = 1e-10, burn = 100, thin = 2)
+  Posterior_folder = "Posterior", fixed_factors = c(T, F),
+  simulation = c(F, T), scale_Y = c(T, F), b0 = 1, b1 = 5e-04,
+  epsilon = 0.1, prop = 1, k_init = 20, h2_divisions = 100,
+  burn = 100, thin = 2)
 }
 \arguments{
-\item{sampler}{specify the sampler to use. fast_BSFG is often faster, but only allows one random
+\item{sampler}{specify the sampler to use. fast_BSFG is much faster, but only allows one random
 effect. If more are specified in \code{BSFG_init}, this is switched to general_BSFG.}
 
-\item{Posterior_folder}{path to folder to save posterior samples. Samples of each parameter
-are saved in chuncks to limit memory requirements.}
+\item{Posterior_folder}{folder to save posterior sample chunk files}
+
+\item{fixed_factors}{should the fixed effect model be applied to factors as well as the factor
+residuals? If so, the first column of the design matrix is dropped.}
 
 \item{simulation}{Is this a fit to simulated data? If so, a setup list will be expected providing
 the true values}
@@ -38,21 +40,6 @@ with \code{h2_divisions} equally spaced values is constructred for each variance
 \code{h2_divisions} is a scalar, the prior for each variance component has this number of divisions.
 In the joint prior over all variance components, combinations of variance components with total variance != 1
 are assigned a prior of zero and ignored.}
-
-\item{h2_step_size}{Either NULL, or a scaler in the range (0,1] giving specifying the range of h2 values for a Metropolis-Hastings
-update step for each h2 parameter vector. If NULL, h2's will be sampled based on the marginal probability
-over all possible h2 vectors. If a scalar, a Metropolis-Hastings update step will be used for each h2 vector.
-The trail value will be selected uniformly from all possible h2 vectors within this Euclidean distance from the current vector.}
-
-\item{drop0_tol}{A scalar giving the a tolerance for the \code{drop0()} function that will be applied
-to various symmetric (possibly) sparse matrices to try to fix numerical errors and increase sparsity.}
-
-\item{K_eigen_tol}{A scalar giving the minimum eigenvalue of a K matrix allowed. During pre-processing,
-eigenvalues of each K matrix will be calculated using \code{svd(K)}. Only eigenvectors of K with corresponding eigenvalues
-greater than this value will be kept. If smaller eigenvalues exist, the model will be transformed
-to reduce the rank of K, by multiplying Z by the remaining eigenvectors of K. This transformation
-is undone before posterior samples are recorded, so posterior samples of \code{U_F} and \code{U_R} are
-untransformed.}
 
 \item{burn}{burnin length of the MCMC chain}
 

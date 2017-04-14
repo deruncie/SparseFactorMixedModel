@@ -4,7 +4,7 @@
 \alias{get_posteriorMean}
 \title{Calculates posterior means of specific parameters of a BSFG model}
 \usage{
-get_posteriorMean(BSFG_state, parameter = c("Lambda", "F", "U_F", "F_h2", "B",
+get_posteriorMean(BSFG_state, parameter = c("Lambda", "F", "F_a", "F_h2", "B",
   "B_F"), samples = NULL)
 }
 \arguments{

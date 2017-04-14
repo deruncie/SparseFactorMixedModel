@@ -4,7 +4,7 @@
 \alias{sample_BSFG}
 \title{Run BSFG Gibbs sampler}
 \usage{
-sample_BSFG(BSFG_state, n_samples, grainSize = 1, ...)
+sample_BSFG(BSFG_state, n_samples, ncores = detectCores(), ...)
 }
 \arguments{
 \item{BSFG_state}{BSFG_state object of current chain}
@@ -12,7 +12,7 @@ sample_BSFG(BSFG_state, n_samples, grainSize = 1, ...)
 \item{n_samples}{Number of iterations to add to the chain (not number of posterior samples to draw.
 This is determined by n_samples / thin)}
 
-\item{grainSize}{Minimum size of sub-problems for dividing among processes. Sent to RcppParallel}
+\item{ncores}{Number of cores to use for computations. Only used in general_BSFG sampler.}
 }
 \description{
 Run MCMC chain for a specified number of iterations

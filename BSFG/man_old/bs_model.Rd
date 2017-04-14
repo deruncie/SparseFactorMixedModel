@@ -10,10 +10,9 @@ bs_model(Y, data_model_parameters, BSFG_state = list())
 \item{Y}{a vector of observation. Pre-scaled and centered if desired.}
 
 \item{data_model_parameters}{a list including:
-1) \code{observations}, a data.frame including columns: \code{ID}, and \code{covariate}, ordered by ID.
-2) the variables df, knots, degree and intercept. Empty values will use the defaults for \code{bs()}
-3) \code{individual_model} formula for each individual of form \code{~SPLINE:factor} using keyword
-    \code{SPLINE} to denote b-spline factors. If not included, will use model \code{~SPLINE}}
+\code{observations}, a data.frame with columns: \code{ID} and \code{covariate}, ordered by ID.
+and the variables df, knots, degree and intercept.
+Empty values will use the defaults for \code{bs()}.}
 }
 \description{
 Eta is a matrix of individual-level parmaters for a B-spline with
