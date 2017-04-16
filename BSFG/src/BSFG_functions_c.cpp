@@ -255,39 +255,37 @@ List GSVD_2_c(mat K, mat B){
 
 // [[Rcpp::export()]]
 rowvec sample_delta_c(
-					vec delta,
-					vec tauh,
-					mat Lambda_prec,
-					double delta_1_shape,
-					double delta_1_rate,
-					double delta_2_shape,
-					double delta_2_rate,
-					mat Lambda2,
-					int times = 1
-					) {
-	int k = tauh.n_elem;
-	mat scores_mat = Lambda_prec % Lambda2;
-	int p = Lambda2.n_rows;
-	rowvec scores = sum(scores_mat,0);
+    vec delta,
+    vec tauh,
+    mat Lambda_prec,
+    double delta_1_shape,
+    double delta_1_rate,
+    double delta_2_shape,
+    double delta_2_rate,
+    mat randg_draws,  // all done with rate = 1;
+    mat Lambda2
+) {
+  int times = randg_draws.n_rows;
+  int k = tauh.n_elem;
+  mat scores_mat = Lambda_prec % Lambda2;
+  rowvec scores = sum(scores_mat,0);
 
-	double shape, rate;
-	vec delta_h;
-	for(int i = 0; i < times; i++){
-		shape = delta_1_shape + 0.5 * p * k;
-		rate = delta_1_rate + 0.5 * (1/delta(0)) * dot(tauh,scores);
-		delta_h = randg(1, distr_param(shape, 1/rate));
-		delta(0) = delta_h(0);
-		tauh = cumprod(delta);
+  double rate;
+  vec delta_h;
+  for(int i = 0; i < times; i++){
+    rate = delta_1_rate + 0.5 * (1/delta(0)) * dot(tauh,scores);
+    delta_h = randg_draws(i,1) / rate;
+    delta(0) = delta_h(0);
+    tauh = cumprod(delta);
 
-		for(int h = 1; h < k-1; h++) {
-			shape = delta_2_shape + 0.5*p*(k-h);
-			rate = delta_2_rate + 0.5*(1/delta(h))*dot(tauh.subvec(h, k-1),scores.subvec(h,k-1));
-			delta_h = randg(1, distr_param(shape, 1/rate));
-			delta(h) = delta_h(0);
-			tauh = cumprod(delta);
-		}
-	}
-	return(delta.t());
+    for(int h = 1; h < k-1; h++) {
+      rate = delta_2_rate + 0.5*(1/delta(h))*dot(tauh.subvec(h, k-1),scores.subvec(h,k-1));
+      delta_h = randg_draws(i,h) / rate;
+      delta(h) = delta_h(0);
+      tauh = cumprod(delta);
+    }
+  }
+  return(delta.t());
 }
 
 // [[Rcpp::export()]]

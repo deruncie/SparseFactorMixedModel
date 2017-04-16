@@ -151,11 +151,12 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
       if(!exists('resid_Y_prec')) resid_Y_prec = matrix(1)
     }
-    # Eta = do.call(cbind,parallel::mclapply(1:n,function(i) {
+    # Eta2 = do.call(cbind,parallel::mclapply(1:n,function(i) {
     #   X = model_matrices[[i]]$X
     #   y = model_matrices[[i]]$y
-    #   eta_i = sample_coefs_parallel_sparse_c_2(y,X,0,resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),rnorm(ncol(X)),rnorm(length(y)),1)
+    #   eta_i = sample_coefs_parallel_sparse_c_Eigen(y,X,0,resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),rnorm(ncol(X)),rnorm(length(y)),1)
     # },mc.cores = ncores))
+    # recover()
     randn_draws = lapply(1:n,function(i) {
       list(
         randn_theta = rnorm(ncol(model_matrices[[i]]$X)),

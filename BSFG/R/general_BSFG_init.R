@@ -218,7 +218,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 		chol_Sigma = chol(Sigma)
 		log_det = 2*determinant(chol_Sigma,logarithm=T)$modulus
 		chol_Sigma = as(chol_Sigma,'dgCMatrix')
-		list(log_det = log_det,chol_Sigma=chol_Sigma,Sigma = Sigma)
+		list(log_det = log_det,chol_Sigma=chol_Sigma)#,Sigma = Sigma)
 	},mc.cores = ncores)
 
 # ----------------------------- #

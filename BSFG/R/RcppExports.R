@@ -25,8 +25,8 @@ GSVD_2_c <- function(K, B) {
     .Call('BSFG_GSVD_2_c', PACKAGE = 'BSFG', K, B)
 }
 
-sample_delta_c <- function(delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, Lambda2, times = 1L) {
-    .Call('BSFG_sample_delta_c', PACKAGE = 'BSFG', delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, Lambda2, times)
+sample_delta_c <- function(delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, randg_draws, Lambda2) {
+    .Call('BSFG_sample_delta_c', PACKAGE = 'BSFG', delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, randg_draws, Lambda2)
 }
 
 log_binom_c <- function(beta, X, y, N, mu, sigma2) {

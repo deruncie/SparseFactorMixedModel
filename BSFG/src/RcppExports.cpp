@@ -100,8 +100,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_delta_c
-rowvec sample_delta_c(vec delta, vec tauh, mat Lambda_prec, double delta_1_shape, double delta_1_rate, double delta_2_shape, double delta_2_rate, mat Lambda2, int times);
-RcppExport SEXP BSFG_sample_delta_c(SEXP deltaSEXP, SEXP tauhSEXP, SEXP Lambda_precSEXP, SEXP delta_1_shapeSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_shapeSEXP, SEXP delta_2_rateSEXP, SEXP Lambda2SEXP, SEXP timesSEXP) {
+rowvec sample_delta_c(vec delta, vec tauh, mat Lambda_prec, double delta_1_shape, double delta_1_rate, double delta_2_shape, double delta_2_rate, mat randg_draws, mat Lambda2);
+RcppExport SEXP BSFG_sample_delta_c(SEXP deltaSEXP, SEXP tauhSEXP, SEXP Lambda_precSEXP, SEXP delta_1_shapeSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_shapeSEXP, SEXP delta_2_rateSEXP, SEXP randg_drawsSEXP, SEXP Lambda2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -112,9 +112,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type delta_1_rate(delta_1_rateSEXP);
     Rcpp::traits::input_parameter< double >::type delta_2_shape(delta_2_shapeSEXP);
     Rcpp::traits::input_parameter< double >::type delta_2_rate(delta_2_rateSEXP);
+    Rcpp::traits::input_parameter< mat >::type randg_draws(randg_drawsSEXP);
     Rcpp::traits::input_parameter< mat >::type Lambda2(Lambda2SEXP);
-    Rcpp::traits::input_parameter< int >::type times(timesSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_delta_c(delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, Lambda2, times));
+    rcpp_result_gen = Rcpp::wrap(sample_delta_c(delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, randg_draws, Lambda2));
     return rcpp_result_gen;
 END_RCPP
 }
