@@ -164,74 +164,27 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 # ------------------------------------ #
   if(verbose) print('Pre-calculating matrices')
 
-	#C
+  # setup of symbolic Cholesky of C
+  print('creating randomEffects_C')
 	ZtZ = forceSymmetric(drop0(crossprod(Z),tol = run_parameters$drop0_tol))
-	make_Chol_Ki = function(chol_Ki_mats,h2s){
-		do.call(bdiag,lapply(1:length(h2s),function(i) {
-			if(h2s[i] == 0) return(Diagonal(nrow(chol_Ki_mats[[i]]),Inf))  # if h2==0, then we want a Diagonal matrix with Inf diagonal.
-			chol_Ki = chol_Ki_mats[[i]]
-			chol_Ki@x = chol_Ki@x / sqrt(h2s[i])
-			chol_Ki
-		}))
-	}
-
-	# setup of symbolic Cholesky of C
-	print('creating randomEffects_C')
-
-	Ki = forceSymmetric(crossprod(make_Chol_Ki(chol_Ki_mats,rep(1,n_RE)/(n_RE+1))))
-
-	# recover()
-	randomEffect_C_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
-		if(i %% 100 == 0 && verbose) print(sprintf('randomEffects_C %d of %d',i,ncol(h2s_matrix)))
-		h2s = h2s_matrix[,i]
-		chol_K_inv = make_Chol_Ki(chol_Ki_mats,h2s)
-		Ki = crossprod(chol_K_inv)
-		C = ZtZ/(1-sum(h2s))
-		C = C + Ki
-		chol_Ci = as(drop0(chol(Matrix(forceSymmetric(C),sparse=T)),tol = run_parameters$drop0_tol),'dgCMatrix')
-		chol_K_inv = as(chol_K_inv,'dgCMatrix')
-
-		return(list(chol_C = chol_Ci, chol_K_inv = chol_K_inv))
-	},mc.cores = ncores)
-
-	# a = make_Chol_K_R(lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s)
-	# b = make_chol_C_R(lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s,as(ZtZ,'dgCMatrix'))
-	# make_randomEffect_C_Choleskys(lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix,as(ZtZ,'dgCMatrix'))
-
-	a = new(randomEffect_C_Cholesky_database,lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix,as(ZtZ,'dgCMatrix'))
-	a3 = new(randomEffect_C_Cholesky_database,lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix,as(ZtZ,'dgCMatrix'),1)
-	# image(a$get_chol_Ci(100))
-	image(a2$get_chol_Ci(100))
-	image(a3$get_chol_Ci(100))
-	image(randomEffect_C_Choleskys[[100]]$chol_C)
-
+	randomEffect_C_Choleskys_c = new(randomEffect_C_Cholesky_database,lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix,as(ZtZ,'dgCMatrix'),run_parameters$drop0_tol,1)
+	randomEffect_C_Choleskys = lapply(1:ncol(h2s_matrix),function(i) {
+	  list(chol_C = randomEffect_C_Choleskys_c$get_chol_Ci(i),
+	       chol_K_inv = randomEffect_C_Choleskys_c$get_chol_K_inv_i(i)
+	  )
+	})
 	# Sigma
+	print('creating Sigma_Choleskys')
 	ZKZts = list()
 	for(i in 1:n_RE){
 		ZKZts[[i]] = forceSymmetric(drop0(Z_matrices[[i]] %*% K_mats[[i]] %*% t(Z_matrices[[i]]),tol = run_parameters$drop0_tol))
 	}
+	Sigma_Choleskys_c = new(Sigma_Cholesky_database,lapply(ZKZts,function(x) as(x,'dgCMatrix')),h2s_matrix,run_parameters$drop0_tol,1)
+	Sigma_Choleskys = lapply(1:ncol(h2s_matrix),function(i) {
+	  list(log_det = Sigma_Choleskys_c$get_log_det(i),
+	       chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
+	})
 
-
-	make_Sigma = function(ZKZts,h2s){
-		R = 0
-		for(i in 1:length(h2s)){
-			R = R + h2s[i]*ZKZts[[i]]
-		}
-		forceSymmetric(R + (1-sum(h2s)) * Diagonal(nrow(R)))
-	}
-
-	# setup of symbolic Cholesky of Sigma
-	print('creating Sigma_Choleskys')
-
-	Sigma_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
-		if(i %% 100 == 0 && verbose) print(sprintf('Sigma_Choleskys %d of %d',i,ncol(h2s_matrix)))
-		Sigma = forceSymmetric(drop0(make_Sigma(ZKZts,h2s_matrix[,i]),tol = run_parameters$drop0_tol))
-		if(!class(Sigma) == 'dsCMatrix') Sigma = Matrix(Sigma,sparse=T)
-		chol_Sigma = chol(Sigma)
-		log_det = 2*determinant(chol_Sigma,logarithm=T)$modulus
-		chol_Sigma = as(chol_Sigma,'dgCMatrix')
-		list(log_det = log_det,chol_Sigma=chol_Sigma)#,Sigma = Sigma)
-	},mc.cores = ncores)
 
 # ----------------------------- #
 # ----Save run parameters------ #
@@ -241,9 +194,8 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 	candidate_h2s = generate_candidate_states(h2s_matrix,step_size = 0.2)
 
 	run_variables = c(run_variables,list(
-			Sigma_Choleskys          = Sigma_Choleskys,
-			randomEffect_C_Choleskys = randomEffect_C_Choleskys
-			# chol_Ki_mats             = chol_Ki_mats
+	  Sigma_Choleskys          = Sigma_Choleskys,
+	  randomEffect_C_Choleskys = randomEffect_C_Choleskys
     ))
 
     RNG = list(

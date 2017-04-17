@@ -15,3 +15,7 @@ using arma::mat;
 using arma::vec;
 using arma::sp_mat;
 using arma::rowvec;
+
+using namespace Rcpp;
+using namespace Eigen;
+
