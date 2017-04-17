@@ -123,61 +123,6 @@ MatrixXd sample_MME_fixedEffects_c(
   return(coefs);
 }
 
-
-// // [[Rcpp::export()]]
-// MatrixXd sample_MME_fixedEffects_c2(
-//     Map<MatrixXd> Y,
-//     Map<MatrixXd> W,
-//     const Sigma_Cholesky_database &Sigma_Choleskys,
-//     Rcpp::IntegerVector h2s_index,
-//     Map<VectorXd> tot_Eta_prec,
-//     Map<MatrixXd> prior_mean,
-//     Map<MatrixXd> prior_prec,
-//     Map<MatrixXd> randn_theta,
-//     Map<MatrixXd> randn_e,
-//     int grainSize) {
-//
-//   // struct sampleColumn : public Worker {
-//   //   MatrixXd Y, W, prior_mean, prior_prec, randn_theta, randn_e;
-//   //   Sigma_Cholesky_database Sigma_Choleskys;
-//   //   RVector<int> h2s_index;
-//   //   VectorXd tot_Eta_prec;
-//   //   MatrixXd &coefs;
-//   //
-//   //   sampleColumn(MatrixXd Y,
-//   //                MatrixXd W,
-//   //                MatrixXd prior_mean,
-//   //                MatrixXd prior_prec,
-//   //                const Sigma_Cholesky_database Sigma_Choleskys,
-//   //                const Rcpp::IntegerVector h2s_index,
-//   //                VectorXd tot_Eta_prec,
-//   //                MatrixXd randn_theta,
-//   //                MatrixXd randn_e,
-//   //                MatrixXd &coefs):
-//   //     Y(Y), W(W), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
-//   //     Sigma_Choleskys(Sigma_Choleskys), h2s_index(h2s_index), tot_Eta_prec(tot_Eta_prec), coefs(coefs) {}
-//   //
-//   //   void operator()(std::size_t begin, std::size_t end) {
-//   //     for(std::size_t j = begin; j < end; j++){
-//   //       int h2_index = h2s_index[j] - 1;
-//   //       SpMat chol_R = Sigma_Choleskys.get_chol_Sigma(h2_index);
-//   //       coefs.col(j) = sample_MME_single_diagK(Y.col(j), W, prior_mean.col(j), prior_prec.col(j), chol_R, tot_Eta_prec[j], randn_theta.col(j),randn_e.col(j));
-//   //     }
-//   //   }
-//   // };
-//
-//   int b = randn_theta.rows();
-//   int p = randn_theta.cols();
-//
-//   MatrixXd coefs(b,p);
-//
-//   // sampleColumn sampler(Y,W,prior_mean,prior_prec,Sigma_Choleskys,h2s_index,tot_Eta_prec,randn_theta,randn_e, coefs);
-//   // RcppParallel::parallelFor(0,p,sampler,grainSize);
-//   return(coefs);
-// }
-
-
-
 // -------------------------------------------- //
 // ------------ sample_MME_ZKZts -------------- //
 // -------------------------------------------- //
@@ -285,71 +230,6 @@ MatrixXd sample_MME_ZKZts_c(
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return(coefs);
 }
-
-// // [[Rcpp::export()]]
-// MatrixXd sample_MME_ZKZts_c2(
-//     Map<MatrixXd> Y,
-//     MSpMat W,
-//     Map<VectorXd> tot_Eta_prec,
-//     randomEffect_C_Cholesky_database randomEffect_C_Choleskys,
-//     Map<MatrixXd> h2s,
-//     Rcpp::IntegerVector h2s_index,
-//     Map<MatrixXd> randn_theta,
-//     Map<MatrixXd> randn_e,
-//     int grainSize) {
-//
-//   struct sampleColumn : public Worker {
-//     MatrixXd Y;
-//     SpMat W;
-//     const randomEffect_C_Cholesky_database randomEffect_C_Choleskys;
-//     VectorXd pes,tot_Eta_prec;
-//     RVector<int> h2s_index;
-//     MatrixXd randn_theta, randn_e;
-//     MatrixXd &coefs;
-//
-//     sampleColumn(MatrixXd Y,
-//                  SpMat W,
-//                  const randomEffect_C_Cholesky_database randomEffect_C_Choleskys,
-//                  VectorXd pes,
-//                  VectorXd tot_Eta_prec,
-//                  Rcpp::IntegerVector h2s_index,
-//                  MatrixXd randn_theta, MatrixXd randn_e,
-//                  MatrixXd &coefs):
-//       Y(Y), W(W),
-//       randomEffect_C_Choleskys(randomEffect_C_Choleskys),
-//       pes(pes), tot_Eta_prec(tot_Eta_prec),h2s_index(h2s_index),
-//       randn_theta(randn_theta), randn_e(randn_e),
-//       coefs(coefs) {}
-//
-//     void operator()(std::size_t begin, std::size_t end) {
-//       for(std::size_t j = begin; j < end; j++){
-//         int h2_index = h2s_index[j] - 1;
-//         SpMat chol_C = randomEffect_C_Choleskys.get_chol_Ci(h2_index);
-//         SpMat chol_K_inv = randomEffect_C_Choleskys.get_chol_K_inv_i(h2_index);
-//         chol_K_inv *= sqrt(tot_Eta_prec[j]);
-//         coefs.col(j) = sample_MME_single_diagR(Y.col(j), W, chol_C, pes[j],chol_K_inv, tot_Eta_prec[j], randn_theta.col(j),randn_e.col(j));
-//       }
-//     }
-//   };
-//   int b = randn_theta.rows();
-//   int p = randn_theta.cols();
-//
-//   // std::vector<MSpMat> chol_C_list,chol_K_inv_list;
-//   // for(int i = 0; i < max(h2s_index); i++){
-//   //   Rcpp::List randomEffect_C_Cholesky_i = Rcpp::as<Rcpp::List>(randomEffect_C_Choleskys[i]);
-//   //   chol_C_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_C"]));
-//   //   chol_K_inv_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_K_inv"]));
-//   // }
-//
-//   MatrixXd coefs(b,p);
-//   VectorXd h2_e = 1.0 - h2s.colwise().sum().array();
-//   VectorXd pes = tot_Eta_prec.array() / h2_e.array();
-//
-//   sampleColumn sampler(Y,W,randomEffect_C_Choleskys,pes,tot_Eta_prec,h2s_index,randn_theta,randn_e,coefs);
-//   RcppParallel::parallelFor(0,p,sampler,grainSize);
-//   return(coefs);
-// }
-
 
 // -------------------------------------------- //
 // -------------- tot_prec_scores ------------- //
