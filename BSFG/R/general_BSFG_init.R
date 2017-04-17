@@ -198,6 +198,13 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 	# b = make_chol_C_R(lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s,as(ZtZ,'dgCMatrix'))
 	# make_randomEffect_C_Choleskys(lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix,as(ZtZ,'dgCMatrix'))
 
+	a = new(randomEffect_C_Cholesky_database,lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix,as(ZtZ,'dgCMatrix'))
+	a3 = new(randomEffect_C_Cholesky_database,lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix,as(ZtZ,'dgCMatrix'),1)
+	# image(a$get_chol_Ci(100))
+	image(a2$get_chol_Ci(100))
+	image(a3$get_chol_Ci(100))
+	image(randomEffect_C_Choleskys[[100]]$chol_C)
+
 	# Sigma
 	ZKZts = list()
 	for(i in 1:n_RE){
