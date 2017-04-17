@@ -1,4 +1,5 @@
 exportPattern("^[[:alpha:]]+")
+import(Rcpp)
 importFrom(Rcpp, evalCpp)
 importFrom(RcppParallel, RcppParallelLibs)
 import(Matrix)

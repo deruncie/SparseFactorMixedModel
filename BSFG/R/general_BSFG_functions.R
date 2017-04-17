@@ -34,8 +34,7 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys,h2s_index, tot_Eta_prec, 
 	# pre-sample z-scores because draws from parallel processes not consecutive
 	randn_theta = matrix(rnorm(b*p),ncol = p)
 	randn_e = matrix(rnorm(n*p),ncol = p)
-
-	res = sample_MME_fixedEffects_c(Y,W,Sigma_Choleskys,h2s_index,tot_Eta_prec,prior_mean,prior_prec,randn_theta,randn_e,1)
+  res = sample_MME_fixedEffects_c(Y,W,Sigma_Choleskys,h2s_index,tot_Eta_prec,prior_mean,prior_prec,randn_theta,randn_e,1)
 
 	return(res)
 }
