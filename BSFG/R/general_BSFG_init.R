@@ -180,6 +180,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 
 	Ki = forceSymmetric(crossprod(make_Chol_Ki(chol_Ki_mats,rep(1,n_RE)/(n_RE+1))))
 
+	# recover()
 	randomEffect_C_Choleskys = mclapply(1:ncol(h2s_matrix),function(i) {
 		if(i %% 100 == 0 && verbose) print(sprintf('randomEffects_C %d of %d',i,ncol(h2s_matrix)))
 		h2s = h2s_matrix[,i]
@@ -187,11 +188,15 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 		Ki = crossprod(chol_K_inv)
 		C = ZtZ/(1-sum(h2s))
 		C = C + Ki
-		chol_Ci = as(chol(Matrix(forceSymmetric(C),sparse=T)),'dgCMatrix')
+		chol_Ci = as(drop0(chol(Matrix(forceSymmetric(C),sparse=T)),tol = run_parameters$drop0_tol),'dgCMatrix')
 		chol_K_inv = as(chol_K_inv,'dgCMatrix')
 
 		return(list(chol_C = chol_Ci, chol_K_inv = chol_K_inv))
 	},mc.cores = ncores)
+
+	# a = make_Chol_K_R(lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s)
+	# b = make_chol_C_R(lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s,as(ZtZ,'dgCMatrix'))
+	# make_randomEffect_C_Choleskys(lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix,as(ZtZ,'dgCMatrix'))
 
 	# Sigma
 	ZKZts = list()
