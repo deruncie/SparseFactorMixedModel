@@ -338,7 +338,7 @@ reload_Posterior = function(BSFG_state){
   Posterior = BSFG_state$Posterior
   for(param in c(Posterior$posteriorSample_params,Posterior$posteriorMean_params)){
     Posterior[[param]] = load_posterior_param(BSFG_state,param)
-    dimnames(Posterior[[param]]) = dimnames(BSFG_state$Posterior[[param]])
+    try(dimnames(Posterior[[param]]) <- dimnames(BSFG_state$Posterior[[param]]),silent=T)
   }
   Posterior
 }

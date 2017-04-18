@@ -174,7 +174,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 	  )
 	})
 	# Sigma
-	print('creating Sigma_Choleskys')
+	if(verbose) print('creating Sigma_Choleskys')
 	ZKZts = list()
 	for(i in 1:n_RE){
 		ZKZts[[i]] = forceSymmetric(drop0(Z_matrices[[i]] %*% K_mats[[i]] %*% t(Z_matrices[[i]]),tol = run_parameters$drop0_tol))
@@ -184,6 +184,8 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 	  list(log_det = Sigma_Choleskys_c$get_log_det(i),
 	       chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
 	})
+
+	if(verbose) print('done')
 
 
 # ----------------------------- #
