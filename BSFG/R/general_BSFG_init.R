@@ -116,11 +116,15 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 
     if(b > 0) {
       tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
-      tau_B_F = tau_B[1,-1,drop=FALSE]
     } else{
       tau_B = matrix(0,ncol=0,nrow=1)
-      tau_B_F = tau_B
     }
+    if(b_F > 0) {
+      tau_B_F = matrix(rgamma(b_F,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate),nrow=1)
+    } else{
+      tau_B_F = matrix(0,ncol=0,nrow=1)
+    }
+
     prec_B = matrix(tau_B,nrow = b, ncol = p)
     prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
 
