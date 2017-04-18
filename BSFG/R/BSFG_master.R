@@ -478,7 +478,12 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
   start_time = Sys.time()
   for(i in start_i+(1:n_samples)){
     BSFG_state$current_state$nrun = i
-    BSFG_state$current_state = sample_factor_model(BSFG_state,grainSize = grainSize,...)
+
+    # ----- Sample Lambda ---------------- #
+    BSFG_state$current_state = sample_Lambda_B(BSFG_state,grainSize = grainSize,...)
+
+    # ----- Sample other factor model parameters  ---------------- #
+    BSFG_state$current_state = sample_latent_traits(BSFG_state,grainSize = grainSize,...)
 
     # -----Sample Lambda_prec ------------- #
     BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
@@ -516,8 +521,12 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
   return(BSFG_state)
 }
 
-sample_factor_model = function(BSFG_state,...){
-  UseMethod("sample_factor_model",BSFG_state)
+sample_Lambda_B = function(BSFG_state,...){
+  UseMethod("sample_Lambda_B",BSFG_state)
+}
+
+sample_latent_traits = function(BSFG_state,...){
+  UseMethod("sample_latent_traits",BSFG_state)
 }
 
 sample_Lambda_prec = function(BSFG_state) {
