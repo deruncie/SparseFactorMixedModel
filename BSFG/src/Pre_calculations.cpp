@@ -170,7 +170,7 @@ Sigma_Cholesky_database::Sigma_Cholesky_database(List ZtZs_list, MatrixXd h2s_ma
         VectorXd h2s = h2s_matrix.col(j);
 
         SpMat Sigma = make_Sigma(ZKZts, h2s,tol);
-        Eigen::SimplicialLLT<SpMat> chol_Sigma(Sigma);
+        Eigen::LLT<MatrixXd> chol_Sigma(Sigma);
         MatrixXd chol_SigmaU = chol_Sigma.matrixU();
         Sigma_Cholesky_list_parallel[j].chol_Sigma = chol_SigmaU.sparseView(0,tol);
         Sigma_Cholesky_list_parallel[j].log_det = 2*chol_SigmaU.diagonal().array().log().sum();
