@@ -11,7 +11,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, V
   K = forceSymmetric(solve(Kinv))
   rownames(K) = rownames(Kinv)
   K = K[children,children]
-  K[K>0 & K<1] = 0.5
+  # K[K>0 & K<1] = 0.5
 
   K_chol = chol(K)
 
