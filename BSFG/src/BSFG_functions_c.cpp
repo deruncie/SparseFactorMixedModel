@@ -271,17 +271,17 @@ rowvec sample_delta_c(
   rowvec scores = sum(scores_mat,0);
 
   double rate;
-  vec delta_h;
+  // vec delta_h;
   for(int i = 0; i < times; i++){
     rate = delta_1_rate + 0.5 * (1/delta(0)) * dot(tauh,scores);
-    delta_h = randg_draws(i,1) / rate;
-    delta(0) = delta_h(0);
+    // delta_h =
+    delta(0) = randg_draws(i,0) / rate;
     tauh = cumprod(delta);
 
     for(int h = 1; h < k-1; h++) {
       rate = delta_2_rate + 0.5*(1/delta(h))*dot(tauh.subvec(h, k-1),scores.subvec(h,k-1));
-      delta_h = randg_draws(i,h) / rate;
-      delta(h) = delta_h(0);
+      // delta_h =
+      delta(h) = randg_draws(i,h) / rate;
       tauh = cumprod(delta);
     }
   }
