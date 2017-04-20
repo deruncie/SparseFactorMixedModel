@@ -40,7 +40,7 @@ missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
         Eta_mean = matrix(0,n,p)
         resids = matrix(rnorm(n*p),n,p)
       } else{
-        Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
+        Eta_mean = XB + F %*% t(Lambda) + Z %*% U_R
         resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
         resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
       }

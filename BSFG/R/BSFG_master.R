@@ -540,6 +540,9 @@ sample_Lambda_prec = function(BSFG_state) {
 		Lambda2 = Lambda^2
 		Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
+		# # trait one is special?
+		# Lambda_prec[1,] = 1e-10
+
 	 # # -----Sample delta, update tauh------ #
 		shapes = c(delta_1_shape + 0.5*p*k,
 		           delta_2_shape + 0.5*p*((k-1):1))

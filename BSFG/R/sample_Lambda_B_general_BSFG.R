@@ -28,15 +28,27 @@ sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     } else{
       for(j in 1:p){
         cis_X_j = cis_genotypes[[j]]
-        Design_j = cbind(Design,cis_X_j)
-        prior_mean_j = rbind(prior_mean[,j,drop=FALSE],0)
-        prior_prec_j = rbind(prior_prec[,j,drop=FALSE],1e-10)
-        coefs_j = sample_MME_fixedEffects(Eta[,j,drop=FALSE],Design_j,Sigma_Choleskys,  resid_h2_index[j], tot_Eta_prec[,j,drop=FALSE], prior_mean_j, prior_prec_j,grainSize)
-        if(b > 0){
-          B[,j] = coefs_j[1:b]
+        if(var(cis_X_j) > 0) {   # Temporary fix
+          Design_j = cbind(Design,cis_X_j)
+          prior_mean_j = rbind(prior_mean[,j,drop=FALSE],0)
+          prior_prec_j = rbind(prior_prec[,j,drop=FALSE],1e-10)
+          coefs_j = sample_MME_fixedEffects(Eta[,j,drop=FALSE],Design_j,Sigma_Choleskys,  resid_h2_index[j], tot_Eta_prec[,j,drop=FALSE], prior_mean_j, prior_prec_j,grainSize)
+          if(b > 0){
+            B[,j] = coefs_j[1:b]
+          }
+          Lambda[j,] = coefs_j[b+1:k]
+          cis_effects[,cis_effects_index[j]] = coefs_j[-c(1:(b+k))]
+        } else{
+          Design_j = Design
+          prior_mean_j = prior_mean[,j,drop=FALSE]
+          prior_prec_j = prior_prec[,j,drop=FALSE]
+          coefs_j = sample_MME_fixedEffects(Eta[,j,drop=FALSE],Design_j,Sigma_Choleskys,  resid_h2_index[j], tot_Eta_prec[,j,drop=FALSE], prior_mean_j, prior_prec_j,grainSize)
+          if(b > 0){
+            B[,j] = coefs_j[1:b]
+          }
+          Lambda[j,] = coefs_j[b+1:k]
+          cis_effects[,cis_effects_index[j]] = 0
         }
-        Lambda[j,] = coefs_j[b+1:k]
-        cis_effects[,cis_effects_index[j]] = coefs_j[-c(1:(b+k))]
       }
     }
   }))

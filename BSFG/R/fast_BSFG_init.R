@@ -1,6 +1,7 @@
 initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = NULL,verbose=T,...){
 
     Y          = BSFG_state$data_matrices$Y
+    X          = BSFG_state$data_matrices$X
     X_F        = BSFG_state$data_matrices$X_F
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
@@ -130,6 +131,8 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     # cis effects
     cis_effects = matrix(rnorm(length(cis_effects_index),0,1),nrow=1)
 
+    XB = X %*% B
+
 # ----------------------- #
 # ---Save initial values- #
 # ----------------------- #
@@ -151,6 +154,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
             U_R            = U_R,
             B              = B,
             B_F            = B_F,
+            XB             = XB,
             tau_B          = tau_B,
             tau_B_F        = tau_B_F,
             prec_B         = prec_B,
