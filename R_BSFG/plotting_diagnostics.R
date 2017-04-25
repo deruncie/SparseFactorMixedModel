@@ -139,7 +139,7 @@ draw_simulation_diagnostics = function(sp_num,run_parameters,run_variables,Poste
     }
 }
 
-draw_results_diagnostics = function(sp_num,params,run_variables,Lambda, F_h2, Posterior,E_a_prec,resid_Y_prec,traitnames){
+draw_results_diagnostics = function(sp_num,paras,run_variables,Lambda, F_h2, Posterior,E_a_prec,resid_Y_prec,traitnames){
     # devices = dev.list()
     # while(length(devices) < 7){
     #     if(.Platform$OS.type != "windows") {
@@ -338,10 +338,33 @@ plot_diagnostics = function(BSFG_state){
   sp_num = ncol(BSFG_state$Posterior$Lambda)    
     draw_results_diagnostics(sp_num,params,run_variables,Lambda, F_h2, Posterior,E_a_prec,resid_Y_prec,traitnames)
     
-  # }
 }
 # load("BSFG_state.RData")
 # plot_diagnostics(BSFG_state)
+
+plot_diagnostics_comb = function(BSFG_state){
+  burn           = BSFG_state$run_parameters$burn
+  thin           = BSFG_state$run_parameters$thin
+  start_i        = BSFG_state$current_state$nrun
+  params         = BSFG_state$params
+  run_variables  = BSFG_state$run_variables
+  Lambda         = BSFG_state$current_state$Lambda
+  F_h2           = BSFG_state$current_state$F_h2[[pop]]
+  Posterior      = BSFG_state$Posterior
+  E_a_prec       = BSFG_state$current_state$E_a_prec[[pop]]
+  resid_Y_prec   = BSFG_state$current_state$resid_Y_prec[[pop]]
+  traitnames     = BSFG_state$traitnames
+  draw_iter      = BSFG_state$run_parameters$draw_iter
+  #   for(i in start_i+(1:n_samples)){
+  #   if( (i-burn) %% thin == 0 && i > burn) {
+  #       sp_num = (i-burn)/thin    
+  #   }
+  #     if(i %% draw_iter  == 0) {
+  sp_num = ncol(BSFG_state$Posterior$Lambda)    
+  draw_results_diagnostics(sp_num,params,run_variables,Lambda, F_h2, Posterior,E_a_prec,resid_Y_prec,traitnames)
+  
+}
+
 
 ComparingGMatrix_plot = function(target){
   #load data from the original population

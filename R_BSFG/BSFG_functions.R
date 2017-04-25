@@ -630,6 +630,54 @@ G_Matrix_Comp = function(BSFG_state){
   return(GMatrix)
 }
 
+G_Matrix_comb_Comp = function(BSFG_state){
+  Posterior      = BSFG_state$Posterior
+  traitnames     = BSFG_state$traitnames
+  run_variables  = BSFG_state$run_variables
+  sp_num = ncol(Posterior$Lambda) 
+  #n = run_variables$n
+  k = 10
+  p = run_variables$p
+  n = nrow(Posterior$F_a)/k
+  k1 = nrow(Posterior$F_a)/n;
+  k2 = nrow(Posterior$Lambda)/p;
+  if (k2 >= k1){
+    k = k1
+  }else{
+    k=k2
+  }
+  h2s = Posterior$F_h2[,1:sp_num]
+  #G_Lambdas = array(0,dim = dim(Posterior$Lambda))
+  #Lambda_est = matrix(0,p,k)
+  G_est = E_est = matrix(0,p,p)
+  #traces_G = matrix(,p*(p+1)/2,sp_num)
+  #traces_G_cor = matrix(,p*(p+1)/2,sp_num)
+  #traces_E = matrix(,p*(p+1)/2,sp_num)
+  GMatrix = NULL
+  for(j in 1:sp_num) {
+    Lj = matrix(Posterior$Lambda[,j],p,k)
+    h2j = Posterior$F_h2[,j]
+    G_Lj = Lj %*%  diag(sqrt(h2j))
+    #G_Lambdas[,j] = c(G_Lj)
+    Gj = G_Lj %*%  t(G_Lj) + diag(1/Posterior$E_a_prec[,j])
+    rownames(Gj) = traitnames
+    #posterior mean
+    GMatrix[[j]] = Gj
+    G_est = G_est + Gj/sp_num
+    #library(gdata)
+    #traces_G[,j] = lowerTriangle(Gj,diag = TRUE)
+    #traces_G_cor[,j] = lowerTriangle(CovToCor(Gj),diag = TRUE)
+    
+    #E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag(1/Posterior$resid_Y_prec[,j])
+    #E_est = E_est + E_Lj/sp_num;
+    #posterior mean for lambda
+    #Lambda_est = Lambda_est + matrix(Posterior$Lambda[,j],p,k)/sp_num;
+    #traces_E[,j] = lowerTriangle(E_Lj,diag = TRUE)
+  }
+  #G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
+  return(G_est)
+}
+
 G_Traces_Comp = function(BSFG_state){
   Posterior      = BSFG_state$Posterior
   traitnames     = BSFG_state$traitnames
