@@ -498,7 +498,9 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
     BSFG_state$current_state[names(data_model_state)] = data_model_state
 
     # -- adapt number of factors to samples ---#
-    BSFG_state$current_state = update_k(BSFG_state)
+    if(i > 200 && runif(1) < with(BSFG_state$run_parameters,1/exp(b0 + b1*i))){  # adapt with decreasing probability per iteration
+      BSFG_state$current_state = update_k(BSFG_state)
+    }
 
     # -- save sampled values (after thinning) -- #
     if( (i-burn) %% thin == 0 && i > burn) {
@@ -564,14 +566,21 @@ sample_prec_B = function(BSFG_state){
 
   current_state = with(c(priors,run_variables),within(current_state,{
     if(b > 1) {
-      if(b_F > 0){
-        B2 = cbind(B[-1,],B_F)^2
+      if(b_F == b-1) {  # assume that X_F == X, want same tau for both
+        B2 = cbind(B[-1,,drop=FALSE],B_F)^2
       } else{
         B2 = B[-1,,drop=FALSE]^2
       }
       tau_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
-      tau_B_F[1,] = tau_B[1,-1]
       prec_B = matrix(tau_B,nrow = b, ncol = p)
+    }
+    if(b_F > 1){
+      if(b_F == (b-1)) {
+        tau_B_F[1,] = tau_B[1,-1]
+      } else{
+        B_F2 = B_F^2
+        tau_B_F[1,] = rgamma(b_F, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2)/2)
+      }
       prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
     }
   }))
@@ -591,7 +600,7 @@ sample_prec_B_ARD = function(BSFG_state){
     }
     if(b_F > 0) {
       B_F2 = B_F^2
-      tau_B_F[1,] = rgamma(b_F > 0, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2 * prec_B_F/c(tau_B_F))/2)
+      tau_B_F[1,] = rgamma(b_F, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2 * prec_B_F/c(tau_B_F))/2)
       prec_B_F[] = matrix(rgamma(b_F*k,shape = (B_F_df + 1)/2,rate = (B_F_df + B_F2*c(tau_B_F))/2),nr = b_F,nc = k)
       prec_B_F[] = prec_B_F*c(tau_B_F)
     }

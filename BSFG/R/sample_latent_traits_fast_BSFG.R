@@ -28,7 +28,8 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		#conditioning on W, B, F, Lambda, marginalizing over U_R
 		Eta_tilde = Eta - XB - F %*% t(Lambda)
 		UtEta_tilde = as.matrix(Ut %*% Eta_tilde)
-		tot_Eta_prec[] = sample_tot_prec_sparse_c(UtEta_tilde,resid_h2,s,tot_Eta_prec_shape,tot_Eta_prec_rate)
+		randg_draws = rgamma(p,shape = tot_Eta_prec_shape + n/2,rate = 1)
+		tot_Eta_prec[] = sample_tot_prec_sparse_c(UtEta_tilde,resid_h2,s,tot_Eta_prec_rate,randg_draws)
 
 		resid_h2_index = sample_h2s_discrete_given_p_sparse_c(UtEta_tilde,h2_divisions,h2_priors_resids,tot_Eta_prec,s)
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
@@ -38,11 +39,27 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
 
 	# -----Sample Lambda and B_F ------------------ #
+		# tot_F_prec[] = 1
 		# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
 		if(b_F > 0){
 		  prior_mean = matrix(0,b_F,k)
-		  prior_prec = prec_B_F
-		  B_F = sample_coefs_parallel_sparse_c(as.matrix(Ut %*% F),as.matrix(Ut %*% X_F),F_h2, tot_F_prec,s, prior_mean,prior_prec,grainSize)
+		  prior_prec = sweep(prec_B_F,2,tot_F_prec,'*')  # prior for B_F includes tot_F_prec
+		  if(b_F > 100){
+		    n_sets = ceiling(b_F/100)
+		    sets = gl(n_sets,b_F/n_sets)
+		    for(set in unique(sets)){
+		      index = sets==set
+		      F_tilde = F - X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE]
+		      B_F[index,] = sample_coefs_parallel_sparse_c(as.matrix(Ut %*% F_tilde),
+		                                                   as.matrix(Ut %*% X_F[,index]),
+		                                                   F_h2, tot_F_prec,s,
+		                                                   prior_mean[index,],
+		                                                   prior_prec[index,],
+		                                                   grainSize)
+		    }
+		  } else{
+		    B_F = sample_coefs_parallel_sparse_c(as.matrix(Ut %*% F),as.matrix(Ut %*% X_F),F_h2, tot_F_prec,s, prior_mean,prior_prec,grainSize)
+		  }
 		  XFBF = X_F %*% B_F
 		  if(class(XFBF) == 'Matrix') XFBF = as.matrix(XFBF)
 		  F_tilde = F - XFBF # not sparse.
@@ -53,7 +70,18 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 	 # -----Sample F_h2 and tot_F_prec, U_F -------------------- #
 		#conditioning on F, U_F
 		UtF_tilde = as.matrix(Ut %*% F_tilde)
-		tot_F_prec[] = sample_tot_prec_sparse_c(UtF_tilde,F_h2,s,tot_F_prec_shape,tot_F_prec_rate)
+
+		if(nrun > 0) {
+  		if(b_F == 0) {
+    		randg_draws = rgamma(k,shape = tot_F_prec_shape + n/2,rate = 1)
+    		tot_F_prec[] = sample_tot_prec_sparse_c(UtF_tilde,F_h2,s,tot_F_prec_rate,randg_draws)
+  		} else{
+  		  randg_draws = rgamma(k,shape = tot_F_prec_shape + n/2 + b_F/2,rate = 1)
+  		  tot_F_prec[] = sample_tot_prec_sparse_withX_c(UtF_tilde,B_F,F_h2,s,prec_B_F,tot_F_prec_rate,randg_draws)
+  		}
+		} else{
+		  tot_F_prec[] = 1
+		}
 
 		F_h2_index = sample_h2s_discrete_given_p_sparse_c(UtF_tilde,h2_divisions,h2_priors_factors,tot_F_prec,s)
 		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
@@ -69,7 +97,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		  prior_mean = prior_mean + XFBF
 		}
 		F[] = sample_factors_scores_sparse_c( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec )
-
+		# tot_F_prec[] = temp
   }))
 	current_state = current_state[current_state_names]
 

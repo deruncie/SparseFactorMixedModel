@@ -51,54 +51,52 @@ update_k = function( BSFG_state) {
 		p = nrow(Lambda)
 		b_F = ncol(X_F)
 
-		prob = 1/exp(b0 + b1*i)                # probability of adapting
-		uu = runif(1)
-		lind = colMeans(abs(Lambda) < epsilon)    # proportion of elements in each column less than eps in magnitude
+		# to determine if Lambda is kept, first remove tot_F_prec
+		Lambda_star = sweep(Lambda,2,sqrt(1/tot_F_prec),'*')
+		lind = colMeans(abs(Lambda_star) < epsilon)    # proportion of elements in each column less than eps in magnitude
 		vec = lind >= prop
 		num = sum(vec)       # number of redundant columns
 
-		if(uu < prob && i>200){
-			if(i > 20 && num == 0 && all(lind < 0.995) && k < 2*p) { #add a column
-				k             = k+1
-				Lambda_prec   = cbind(Lambda_prec,rgamma(p,shape = Lambda_df/2, rate = Lambda_df/2))
-				delta         = cbind(delta,rgamma(1,shape = delta_2_shape,rate = delta_2_rate))
-				tauh          = matrix(cumprod(delta),nrow = 1)
-				Plam          = sweep(Lambda_prec,2,tauh,'*')
-				Lambda        = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
-				F_h2_index    = c(F_h2_index,sample(1:ncol(h2s_matrix),1))
-				F_h2          = h2s_matrix[,F_h2_index,drop=FALSE]
-				tot_F_prec    = cbind(tot_F_prec,1)
-				U_F           = cbind(U_F,rnorm(r,0,sqrt(sum(F_h2[,k]))))
-				B_F           = cbind(B_F,rnorm(b_F,0,1))
-				prec_B_F      = cbind(prec_B_F,c(tau_B_F))
-				F             = cbind(F,rnorm(n,X_F %*% B_F[,k] + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
-			} else if(num > 0) { # drop redundant columns
-				nonred = which(vec == 0) # non-redundant loadings columns
-				while(length(nonred) < 2) {
-					nonred = c(nonred,which(vec != 0)[1])
-					vec[nonred[length(nonred)]] = 0
-				}
-				k = length(nonred)
-				Lambda = Lambda[,nonred,drop=FALSE]
-				Lambda_prec = Lambda_prec[,nonred,drop=FALSE]
-				F = F[,nonred,drop=FALSE]
-				for(red in which(vec == 1)){
-					if(red == length(vec)) next
-					# combine deltas so that the shrinkage of kept columns doesnt
-					# decrease after dropping redundant columns
-					delta[red+1] = delta[red+1]*delta[red]
-				}
-				if(is.null(dim(delta))) recover()
-				delta = delta[,nonred,drop=FALSE]
-				tauh = matrix(cumprod(delta),nrow=1)
-				Plam = sweep(Lambda_prec,2,tauh,'*')
-				F_h2 = F_h2[,nonred,drop=FALSE]
-				F_h2_index = F_h2_index[nonred]
-				tot_F_prec = tot_F_prec[,nonred,drop=FALSE]
-				U_F = U_F[,nonred,drop=FALSE]
-				B_F = B_F[,nonred,drop=FALSE]
-				prec_B_F = prec_B_F[,nonred,drop=FALSE]
+		if(num == 0 && all(lind < 0.995) && k < 2*p) { #add a column
+			k             = k+1
+			Lambda_prec   = cbind(Lambda_prec,rgamma(p,shape = Lambda_df/2, rate = Lambda_df/2))
+			delta         = cbind(delta,rgamma(1,shape = delta_2_shape,rate = delta_2_rate))
+			tauh          = matrix(cumprod(delta),nrow = 1)
+			Plam          = sweep(Lambda_prec,2,tauh,'*')
+			Lambda        = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
+			F_h2_index    = c(F_h2_index,sample(1:ncol(h2s_matrix),1))
+			F_h2          = h2s_matrix[,F_h2_index,drop=FALSE]
+			tot_F_prec    = cbind(tot_F_prec,1)
+			U_F           = cbind(U_F,rnorm(r,0,sqrt(sum(F_h2[,k]))))
+			B_F           = cbind(B_F,0*rnorm(b_F,0,1))
+			prec_B_F      = cbind(prec_B_F,c(tau_B_F))
+			F             = cbind(F,rnorm(n,X_F %*% B_F[,k] + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
+		} else if(num > 0) { # drop redundant columns
+			nonred = which(vec == 0) # non-redundant loadings columns
+			while(length(nonred) < 2) {
+				nonred = c(nonred,which(vec != 0)[1])
+				vec[nonred[length(nonred)]] = 0
 			}
+			k = length(nonred)
+			Lambda = Lambda[,nonred,drop=FALSE]
+			Lambda_prec = Lambda_prec[,nonred,drop=FALSE]
+			F = F[,nonred,drop=FALSE]
+			for(red in which(vec == 1)){
+				if(red == length(vec)) next
+				# combine deltas so that the shrinkage of kept columns doesnt
+				# decrease after dropping redundant columns
+				delta[red+1] = delta[red+1]*delta[red]
+			}
+			if(is.null(dim(delta))) recover()
+			delta = delta[,nonred,drop=FALSE]
+			tauh = matrix(cumprod(delta),nrow=1)
+			Plam = sweep(Lambda_prec,2,tauh,'*')
+			F_h2 = F_h2[,nonred,drop=FALSE]
+			F_h2_index = F_h2_index[nonred]
+			tot_F_prec = tot_F_prec[,nonred,drop=FALSE]
+			U_F = U_F[,nonred,drop=FALSE]
+			B_F = B_F[,nonred,drop=FALSE]
+			prec_B_F = prec_B_F[,nonred,drop=FALSE]
 		}
 	}))
 	current_state = current_state[current_state_members]
@@ -175,6 +173,7 @@ save_posterior_sample = function(BSFG_state) {
 		# transform variables so that the variance of each column of F is 1.
 		F_var = 1/tot_F_prec
 		U_F = sweep(U_F,2,sqrt(F_var),'/')
+		B_F = sweep(B_F,2,sqrt(F_var),'/')
 		F = sweep(F,2,sqrt(F_var),'/')
 		Lambda = sweep(Lambda,2,sqrt(F_var),'*')
 	})

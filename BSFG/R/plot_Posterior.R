@@ -261,8 +261,10 @@ plot_diagnostics_simulation = function(BSFG_state){
 #' @param BSFG_state a BSFG_state object
 plot_diagnostics = function(BSFG_state){
   if(BSFG_state$Posterior$total_samples > 0) {
-    trace_plot_h2s(load_posterior_param(BSFG_state,'F_h2'))
-    trace_plot_Lambda(load_posterior_param(BSFG_state,'Lambda'))
+    BSFG_state$Posterior$F_h2 = load_posterior_param(BSFG_state,'F_h2')
+    trace_plot_h2s(BSFG_state)
+    BSFG_state$Posterior$F_h2 = load_posterior_param(BSFG_state,'Lambda')
+    trace_plot_Lambda(BSFG_state)
   }
 }
 

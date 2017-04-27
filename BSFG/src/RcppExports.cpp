@@ -26,18 +26,53 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_coefs_parallel_sparse_c2
+mat sample_coefs_parallel_sparse_c2(mat UtEta, mat UtW, vec h2, vec tot_Eta_prec, vec s, mat prior_mean, mat prior_prec, int grainSize);
+RcppExport SEXP BSFG_sample_coefs_parallel_sparse_c2(SEXP UtEtaSEXP, SEXP UtWSEXP, SEXP h2SEXP, SEXP tot_Eta_precSEXP, SEXP sSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< mat >::type UtEta(UtEtaSEXP);
+    Rcpp::traits::input_parameter< mat >::type UtW(UtWSEXP);
+    Rcpp::traits::input_parameter< vec >::type h2(h2SEXP);
+    Rcpp::traits::input_parameter< vec >::type tot_Eta_prec(tot_Eta_precSEXP);
+    Rcpp::traits::input_parameter< vec >::type s(sSEXP);
+    Rcpp::traits::input_parameter< mat >::type prior_mean(prior_meanSEXP);
+    Rcpp::traits::input_parameter< mat >::type prior_prec(prior_precSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_coefs_parallel_sparse_c2(UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_tot_prec_sparse_c
-rowvec sample_tot_prec_sparse_c(mat UtEta, vec h2, vec s, double tot_Eta_prec_shape, double tot_Eta_prec_rate);
-RcppExport SEXP BSFG_sample_tot_prec_sparse_c(SEXP UtEtaSEXP, SEXP h2SEXP, SEXP sSEXP, SEXP tot_Eta_prec_shapeSEXP, SEXP tot_Eta_prec_rateSEXP) {
+rowvec sample_tot_prec_sparse_c(mat UtEta, vec h2, vec s, double tot_Eta_prec_rate, vec randg_draws);
+RcppExport SEXP BSFG_sample_tot_prec_sparse_c(SEXP UtEtaSEXP, SEXP h2SEXP, SEXP sSEXP, SEXP tot_Eta_prec_rateSEXP, SEXP randg_drawsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< mat >::type UtEta(UtEtaSEXP);
     Rcpp::traits::input_parameter< vec >::type h2(h2SEXP);
     Rcpp::traits::input_parameter< vec >::type s(sSEXP);
-    Rcpp::traits::input_parameter< double >::type tot_Eta_prec_shape(tot_Eta_prec_shapeSEXP);
     Rcpp::traits::input_parameter< double >::type tot_Eta_prec_rate(tot_Eta_prec_rateSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_tot_prec_sparse_c(UtEta, h2, s, tot_Eta_prec_shape, tot_Eta_prec_rate));
+    Rcpp::traits::input_parameter< vec >::type randg_draws(randg_drawsSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_tot_prec_sparse_c(UtEta, h2, s, tot_Eta_prec_rate, randg_draws));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_tot_prec_sparse_withX_c
+rowvec sample_tot_prec_sparse_withX_c(mat UtEta, mat B_F, vec h2, vec s, mat prec_B_F, double tot_Eta_prec_rate, vec randg_draws);
+RcppExport SEXP BSFG_sample_tot_prec_sparse_withX_c(SEXP UtEtaSEXP, SEXP B_FSEXP, SEXP h2SEXP, SEXP sSEXP, SEXP prec_B_FSEXP, SEXP tot_Eta_prec_rateSEXP, SEXP randg_drawsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< mat >::type UtEta(UtEtaSEXP);
+    Rcpp::traits::input_parameter< mat >::type B_F(B_FSEXP);
+    Rcpp::traits::input_parameter< vec >::type h2(h2SEXP);
+    Rcpp::traits::input_parameter< vec >::type s(sSEXP);
+    Rcpp::traits::input_parameter< mat >::type prec_B_F(prec_B_FSEXP);
+    Rcpp::traits::input_parameter< double >::type tot_Eta_prec_rate(tot_Eta_prec_rateSEXP);
+    Rcpp::traits::input_parameter< vec >::type randg_draws(randg_drawsSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_tot_prec_sparse_withX_c(UtEta, B_F, h2, s, prec_B_F, tot_Eta_prec_rate, randg_draws));
     return rcpp_result_gen;
 END_RCPP
 }

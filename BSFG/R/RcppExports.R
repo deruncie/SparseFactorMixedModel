@@ -5,8 +5,16 @@ sample_coefs_parallel_sparse_c <- function(UtEta, UtW, h2, tot_Eta_prec, s, prio
     .Call('BSFG_sample_coefs_parallel_sparse_c', PACKAGE = 'BSFG', UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, grainSize)
 }
 
-sample_tot_prec_sparse_c <- function(UtEta, h2, s, tot_Eta_prec_shape, tot_Eta_prec_rate) {
-    .Call('BSFG_sample_tot_prec_sparse_c', PACKAGE = 'BSFG', UtEta, h2, s, tot_Eta_prec_shape, tot_Eta_prec_rate)
+sample_coefs_parallel_sparse_c2 <- function(UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, grainSize) {
+    .Call('BSFG_sample_coefs_parallel_sparse_c2', PACKAGE = 'BSFG', UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, grainSize)
+}
+
+sample_tot_prec_sparse_c <- function(UtEta, h2, s, tot_Eta_prec_rate, randg_draws) {
+    .Call('BSFG_sample_tot_prec_sparse_c', PACKAGE = 'BSFG', UtEta, h2, s, tot_Eta_prec_rate, randg_draws)
+}
+
+sample_tot_prec_sparse_withX_c <- function(UtEta, B_F, h2, s, prec_B_F, tot_Eta_prec_rate, randg_draws) {
+    .Call('BSFG_sample_tot_prec_sparse_withX_c', PACKAGE = 'BSFG', UtEta, B_F, h2, s, prec_B_F, tot_Eta_prec_rate, randg_draws)
 }
 
 sample_h2s_discrete_given_p_sparse_c <- function(UtEta, h2_divisions, h2_priors, Tot_prec, s) {

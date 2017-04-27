@@ -4,11 +4,15 @@ library(BSFG)
 
 # set the directory to the location of the setup.RData or setup.mat file
 
-setwd("~/Box Sync/DER_projects/BSFG/R_BSFG/Sim_FE3_1")
+# setwd("~/Box Sync/DER_projects/BSFG/R_BSFG/Sim_FE3_1")
+seed = 1
+set.seed(seed)
+new_halfSib_simulation_eQTL('Sim_eQTL_1', nSire=50,nRep=10,p=100, b=1, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2,V_cis = 1,nSNP = 1000,bSNP = 1)
+
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
-rep = "2"
-folder = sprintf('R_rep_%s',rep)
+rep = "1"
+folder = sprintf('R_eQTL_rep_%s',rep)
 try(dir.create(folder))
 setwd(folder)
 
@@ -17,15 +21,17 @@ setwd(folder)
 run_parameters = BSFG_control(
   sampler = 'fast_BSFG',
   # sampler = 'general_BSFG',
+  scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
   h2_step_size = NULL,
-  burn = 100
+  burn = 00,
+  k_init = 10
 )
 
 priors = list(
   # fixed_var = list(V = 5e5,   nu = 2.001),
-  fixed_var = list(V = 1,     nu = 3),
+  fixed_var = list(V = 1/1000,     nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 3),
   tot_F_var = list(V = 18/20, nu = 20),
   delta_1   = list(shape = 2.1,  rate = 1/20),
@@ -38,13 +44,15 @@ priors = list(
 print('Initializing')
 # setup = load_simulation_data()
 # setup = load_simulation_FE_data()
-load('../Sim_data.RData')
-sim_data$data = with(sim_data,data.frame(TRT = X[,'TRT'],Line = colnames(Z1)[apply(Z1,1,function(x) which(x==1))]))
-sim_data$B = rbind(sim_data$mu,sim_data$B)
-BSFG_state = with(sim_data,BSFG_init(Y, model=~TRT+(1|Line), data, #factor_model_fixed = ~1,
+load('../setup_Sim_eQTL_1.RData')
+# sim_data$data = with(sim_data,data.frame(TRT = X[,'TRT'],Line = colnames(Z1)[apply(Z1,1,function(x) which(x==1))]))
+# sim_data$B = rbind(sim_data$mu,sim_data$B)
+BSFG_state = with(setup,BSFG_init(Y, model=~1+(1|animal), data, #factor_model_fixed = ~1,
+                                  X_factor = X_SNP,
                                   priors=priors,run_parameters=run_parameters,
-                                  cis_genotypes = lapply(1:ncol(cisGenotypes),function(x) matrix(cisGenotypes[,x],ncol=1)),
-                                  setup = sim_data))
+                                  cis_genotypes = lapply(1:ncol(X_cis),function(x) matrix(X_cis[,x],ncol=1)),
+                                  K_mats = list(animal = K),
+                                  setup = setup))
 BSFG_state$current_state$F_h2
 
 h2_divisions = run_parameters$h2_divisions
@@ -73,15 +81,14 @@ BSFG_state = clear_Posterior(BSFG_state)
 # Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
 # burn in
 
-n_samples = 100;
-for(i  in 1:70) {
-    print(sprintf('Run %d',i))
-    # microbenchmark(
-    #     BSFG_sampler(BSFG_state,2,detectCores()),
-    #     BSFG_sampler(BSFG_state,2,1),
-    #     times = 10
-    #     )
-    BSFG_state = sample_BSFG(BSFG_state,n_samples,ncores=1)
+n_samples = 200
+for(i  in 1:100) {
+  if(i < 10 || (i-1) %% 20 == 0) {
+    BSFG_state = reorder_factors(BSFG_state)
+    BSFG_state = clear_Posterior(BSFG_state)
+  }
+  print(sprintf('Run %d',i))
+  BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
     }
@@ -89,6 +96,56 @@ for(i  in 1:70) {
     print(BSFG_state)
     plot(BSFG_state)
 }
+BSFG_state$Posterior = reload_Posterior(BSFG_state)
+
+trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
+trace_plot(BSFG_state$Posterior$delta[,1,2:4])
+trace_plot(BSFG_state$Posterior$B_F[,,1])
+trace_plot(BSFG_state$Posterior$B_F[,1:3,2])
+trace_plot(BSFG_state$Posterior$B_F[,,3])
+trace_plot_h2s(BSFG_state$Posterior$F_h2)
+trace_plot_Lambda(BSFG_state$Posterior$Lambda[1:100,,],n_factors = 10)
+trace_plot(BSFG_state$Posterior$tau_B_F[1:100,1,1:10])
+
+with(BSFG_state$Posterior,sapply(1:total_samples,function(i) colSums(1/prec_B_F[i,,])))
+trace_plot(t(with(BSFG_state$Posterior,sapply(1:total_samples,function(i) colMeans(F[i,,]^2))))[,1:6])
+
+plot(with(BSFG_state$Posterior,sapply(1:total_samples,function(i) colMeans(F[i,,]^2)))[1,],BSFG_state$Posterior$tot_F_prec[,1,1])
+
+plot(BSFG_state$Posterior$tot_F_prec[,1,1],BSFG_state$Posterior$delta[,1,1])
+plot(BSFG_state$Posterior$tot_F_prec[,1,3],BSFG_state$Posterior$B_F[,1,3])
+
+posterior_plot(BSFG_state$Posterior$B_F[,,1])
+posterior_plot(BSFG_state$Posterior$B_F[,,3])
+
+order(BSFG_state$current_state$Lambda[,1])
+
+
+
+
+
+posterior_plot = function(X,xlab='',ylab='',colorSig = T,ylim = NULL) {
+  X = mcmc(X)
+  Xdata = data.frame(ID = 1:ncol(X),Mean = colMeans(X),Median = apply(X,2,median))
+  Xi = HPDinterval(X,prob = 0.95)
+  Xdata$low_95 = Xi[,1]
+  Xdata$high_95 = Xi[,2]
+  Xi = HPDinterval(X,prob = 0.8)
+  Xdata$low_80 = Xi[,1]
+  Xdata$high_80 = Xi[,2]
+  Xdata$color = sign(Xdata$low_95) == sign(Xdata$high_95)
+  if(!colorSig) Xdata$color = 1
+  if(is.null(ylim)) ylim = range(Xdata[,-1])
+
+  p = ggplot(Xdata,aes(x=ID)) + geom_hline(yintercept = 0) +
+    xlab(xlab) + ylab(ylab) + ylim(ylim)+
+    geom_segment(aes(xend = ID,y = low_95,yend=high_95,color=color),size=.5) +
+    geom_segment(aes(xend = ID,y = low_80,yend=high_80,color = color),size = .9) +
+    geom_point(aes(y=Median,color = color)) +
+    theme(legend.position = 'none')
+  p
+}
+
 
 library(shinystan)
 library(MCMCpack)
