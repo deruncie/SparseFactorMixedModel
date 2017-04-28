@@ -5,24 +5,12 @@ sample_coefs_parallel_sparse_c <- function(UtEta, UtW, h2, tot_Eta_prec, s, prio
     .Call('BSFG_sample_coefs_parallel_sparse_c', PACKAGE = 'BSFG', UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, grainSize)
 }
 
-sample_coefs_parallel_sparse_c2 <- function(UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, grainSize) {
-    .Call('BSFG_sample_coefs_parallel_sparse_c2', PACKAGE = 'BSFG', UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, grainSize)
-}
-
 sample_tot_prec_sparse_c <- function(UtEta, h2, s, tot_Eta_prec_rate, randg_draws) {
     .Call('BSFG_sample_tot_prec_sparse_c', PACKAGE = 'BSFG', UtEta, h2, s, tot_Eta_prec_rate, randg_draws)
 }
 
 sample_tot_prec_sparse_withX_c <- function(UtEta, B_F, h2, s, prec_B_F, tot_Eta_prec_rate, randg_draws) {
     .Call('BSFG_sample_tot_prec_sparse_withX_c', PACKAGE = 'BSFG', UtEta, B_F, h2, s, prec_B_F, tot_Eta_prec_rate, randg_draws)
-}
-
-sample_h2s_discrete_given_p_sparse_c <- function(UtEta, h2_divisions, h2_priors, Tot_prec, s) {
-    .Call('BSFG_sample_h2s_discrete_given_p_sparse_c', PACKAGE = 'BSFG', UtEta, h2_divisions, h2_priors, Tot_prec, s)
-}
-
-sample_randomEffects_parallel_sparse_c <- function(Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize) {
-    .Call('BSFG_sample_randomEffects_parallel_sparse_c', PACKAGE = 'BSFG', Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize)
 }
 
 sample_factors_scores_sparse_c <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec) {
@@ -41,16 +29,20 @@ log_binom_c <- function(beta, X, y, N, mu, sigma2) {
     .Call('BSFG_log_binom_c', PACKAGE = 'BSFG', beta, X, y, N, mu, sigma2)
 }
 
-sample_coefs_parallel_sparse_c_Eigen <- function(UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize) {
-    .Call('BSFG_sample_coefs_parallel_sparse_c_Eigen', PACKAGE = 'BSFG', UtEta, UtW, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
-}
-
-sample_coefs_set_c <- function(model_matrices, randn_draws, s_vectors, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize) {
-    .Call('BSFG_sample_coefs_set_c', PACKAGE = 'BSFG', model_matrices, randn_draws, s_vectors, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize)
+sample_coefs_parallel_sparse_c_Eigen <- function(Ut, Eta, W, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize) {
+    .Call('BSFG_sample_coefs_parallel_sparse_c_Eigen', PACKAGE = 'BSFG', Ut, Eta, W, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
 }
 
 tot_prec_scores_c <- function(UtEta, h2, s) {
     .Call('BSFG_tot_prec_scores_c', PACKAGE = 'BSFG', UtEta, h2, s)
+}
+
+log_p_h2s_fast <- function(UtEta, tot_Eta_prec, discrete_priors, s, grainSize) {
+    .Call('BSFG_log_p_h2s_fast', PACKAGE = 'BSFG', UtEta, tot_Eta_prec, discrete_priors, s, grainSize)
+}
+
+sample_randomEffects_parallel_sparse_c <- function(Eta, Z, tot_prec, h2, invert_aZZt_Kinv, randn_draws, grainSize) {
+    .Call('BSFG_sample_randomEffects_parallel_sparse_c', PACKAGE = 'BSFG', Eta, Z, tot_prec, h2, invert_aZZt_Kinv, randn_draws, grainSize)
 }
 
 sample_MME_single_diagK_c <- function(y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {

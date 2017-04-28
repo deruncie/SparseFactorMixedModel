@@ -147,101 +147,101 @@ rowvec sample_tot_prec_sparse_withX_c(
   return(tot_Eta_prec.t());
 }
 
+// // [[Rcpp::export()]]
+// rowvec sample_h2s_discrete_given_p_sparse_c (mat UtEta,
+//                                              int h2_divisions,
+//                                              vec h2_priors,
+//                                              vec Tot_prec,
+//                                              vec s
+// ){
+//
+//   int p = UtEta.n_cols;
+//   int n = UtEta.n_rows;
+//   vec h2_index = zeros(p);
+//
+//   mat log_ps = zeros(p,h2_divisions);
+//   mat std_scores_b = sweep_times(UtEta.t(),1,sqrt(Tot_prec));
+//   mat std_scores_b2 = std_scores_b % std_scores_b;
+//
+//   vec s2s;
+//   mat scores_2;
+//   for(double i =0; i < h2_divisions; i+=1){
+//     double h2 = (i)/(h2_divisions);
+//     s2s = h2*s + (1-h2);
+//     scores_2 = -sweep_times(std_scores_b2,2,0.5/s2s);
+//     double det = -n/2 * log(2.0*M_PI) - 0.5*sum(log(s2s));
+//     log_ps.col(i) = sum(scores_2,1) + det + log(h2_priors(i));
+//   }
+//   for(int j =0; j < p; j++){
+//     double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
+//     mat ps_j = exp(log_ps.row(j) - norm_factor);
+//     log_ps.row(j) = ps_j;
+//     vec r = randu(1);
+//     uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
+//     h2_index(j) = selected.n_elem;
+//   }
+//
+//   return(h2_index.t() + 1);
+// }
 
-// [[Rcpp::export()]]
-rowvec sample_h2s_discrete_given_p_sparse_c (mat UtEta,
-            				int h2_divisions,
-            				vec h2_priors,
-            				vec Tot_prec,
-            				vec s
-              ){
-
-	int p = UtEta.n_cols;
-	int n = UtEta.n_rows;
-	vec h2_index = zeros(p);
-
-	mat log_ps = zeros(p,h2_divisions);
-	mat std_scores_b = sweep_times(UtEta.t(),1,sqrt(Tot_prec));
-
-	vec s2s;
-	mat scores_2;
-	for(double i =0; i < h2_divisions; i+=1){
-		double h2 = (i)/(h2_divisions);
-		s2s = h2*s + (1-h2);
-		scores_2 = -sweep_times(std_scores_b % std_scores_b,2,0.5/s2s);
-		double det = -n/2 * log(2.0*M_PI) - 0.5*sum(log(s2s));
-		log_ps.col(i) = sum(scores_2,1) + det + log(h2_priors(i));
-	}
-	for(int j =0; j < p; j++){
-		double norm_factor = max(log_ps.row(j))+log(sum(exp(log_ps.row(j)-max(log_ps.row(j)))));
-		mat ps_j = exp(log_ps.row(j) - norm_factor);
-		log_ps.row(j) = ps_j;
-		vec r = randu(1);
-		uvec selected = find(repmat(r,1,h2_divisions)>cumsum(ps_j,1));
-		h2_index(j) = selected.n_elem;
-	}
-
-	return(h2_index.t() + 1);
-}
-
-// [[Rcpp::export()]]
-mat sample_randomEffects_parallel_sparse_c (mat Eta,
-				sp_mat Z,
-				vec tot_prec,
-				vec h2,
-				List invert_aZZt_Kinv,
-				int grainSize ) {
-	//samples genetic effects on factors (F_a) conditional on the factor scores F:
-	// F_i = F_{a_i} + E_i, E_i~N(0,s2*(1-h2)*I) for each latent trait i
-	// U_i = zeros(r,1) if h2_i = 0
-	// it is assumed that s2 = 1 because this scaling factor is absorbed in
-	// Lambda
-	// invert_aZZt_Kinv has parameters to diagonalize a*Z*Z' + b*K for fast
-	// inversion:
-
-	vec a_prec = tot_prec / h2;
-	vec e_prec = tot_prec / (1-h2);
-
-	sp_mat U = as<sp_mat>(invert_aZZt_Kinv["U"]);
-	vec s1 = as<vec>(invert_aZZt_Kinv["s1"]);
-	vec s2 = as<vec>(invert_aZZt_Kinv["s2"]);
-
-	int p = Eta.n_cols;
-	int r = Z.n_cols;
-	mat b = U.t() * Z.t() * sweep_times(Eta,2,e_prec);
-
-	mat z = randn(r,p);
-	// Environment stats("package:stats");
-	// Function rnorm = stats["rnorm"];
-	// vec z_v = as<vec>(rnorm(r*k));
-	// mat z = reshape(z_v,r,k);
-
-	mat effects = zeros(r,p);
-
-	struct sampleColumn : public Worker {
-		vec s1, s2, a_prec, e_prec;
-		sp_mat U;
-		mat b, z;
-		mat &effects;
-
-		sampleColumn(vec s1, vec s2, vec a_prec, vec e_prec, sp_mat U, mat b, mat z, mat &effects)
-			: s1(s1), s2(s2), a_prec(a_prec), e_prec(e_prec), U(U), b(b), z(z), effects(effects) {}
-
-      void operator()(std::size_t begin, std::size_t end) {
-  			vec d, mlam;
-  			for(std::size_t j = begin; j < end; j++){
-  				vec d = s2*a_prec(j) + s1*e_prec(j);
-  				vec mlam = b.col(j) / d;
-  				effects.col(j) = U * (mlam + z.col(j)/sqrt(d));
-  			}
-	  	}
-	};
-
-	sampleColumn sampler(s1, s2, a_prec, e_prec, U, b, z, effects);
-	RcppParallel::parallelFor(0,p,sampler,grainSize);
-
-	return(effects);
-}
+// // [[Rcpp::export()]]
+// mat sample_randomEffects_parallel_sparse_c (mat Eta,
+// 				sp_mat Z,
+// 				vec tot_prec,
+// 				vec h2,
+// 				List invert_aZZt_Kinv,
+// 				int grainSize ) {
+// 	//samples genetic effects on factors (F_a) conditional on the factor scores F:
+// 	// F_i = F_{a_i} + E_i, E_i~N(0,s2*(1-h2)*I) for each latent trait i
+// 	// U_i = zeros(r,1) if h2_i = 0
+// 	// it is assumed that s2 = 1 because this scaling factor is absorbed in
+// 	// Lambda
+// 	// invert_aZZt_Kinv has parameters to diagonalize a*Z*Z' + b*K for fast
+// 	// inversion:
+//
+// 	vec a_prec = tot_prec / h2;
+// 	vec e_prec = tot_prec / (1-h2);
+//
+// 	sp_mat U = as<sp_mat>(invert_aZZt_Kinv["U"]);
+// 	vec s1 = as<vec>(invert_aZZt_Kinv["s1"]);
+// 	vec s2 = as<vec>(invert_aZZt_Kinv["s2"]);
+//
+// 	int p = Eta.n_cols;
+// 	int r = Z.n_cols;
+// 	mat b = U.t() * Z.t() * sweep_times(Eta,2,e_prec);
+//
+// 	mat z = randn(r,p);
+// 	// Environment stats("package:stats");
+// 	// Function rnorm = stats["rnorm"];
+// 	// vec z_v = as<vec>(rnorm(r*k));
+// 	// mat z = reshape(z_v,r,k);
+//
+// 	mat effects = zeros(r,p);
+//
+// 	struct sampleColumn : public Worker {
+// 		vec s1, s2, a_prec, e_prec;
+// 		sp_mat U;
+// 		mat b, z;
+// 		mat &effects;
+//
+// 		sampleColumn(vec s1, vec s2, vec a_prec, vec e_prec, sp_mat U, mat b, mat z, mat &effects)
+// 			: s1(s1), s2(s2), a_prec(a_prec), e_prec(e_prec), U(U), b(b), z(z), effects(effects) {}
+//
+//       void operator()(std::size_t begin, std::size_t end) {
+//   			vec d, mlam;
+//   			for(std::size_t j = begin; j < end; j++){
+//   				vec d = s2*a_prec(j) + s1*e_prec(j);
+//   				vec mlam = b.col(j) / d;
+//   				effects.col(j) = U * (mlam + z.col(j)/sqrt(d));
+//   			}
+// 	  	}
+// 	};
+//
+// 	sampleColumn sampler(s1, s2, a_prec, e_prec, U, b, z, effects);
+// 	RcppParallel::parallelFor(0,p,sampler,grainSize);
+//
+// 	return(effects);
+// }
 
 
 // [[Rcpp::export()]]
