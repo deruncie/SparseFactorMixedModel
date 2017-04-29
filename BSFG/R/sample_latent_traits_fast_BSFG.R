@@ -41,6 +41,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 	# -----Sample Lambda and B_F ------------------ #
 		# tot_F_prec[] = 1
 		# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
+
 		if(b_F > 0){
 		  prior_mean = matrix(0,b_F,k)
 		  prior_prec = sweep(prec_B_F,2,tot_F_prec,'*')  # prior for B_F includes tot_F_prec
@@ -97,8 +98,8 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		F_h2_index = sample_h2s_discrete_fast(UtF_tilde, tot_F_prec, h2_priors_factors,s,grainSize)
 		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    randn = matrix(rnorm(ncol(Z)*k),ncol(Z))
-    U_F[] = sample_randomEffects_parallel_sparse_c_Eigen(F_tilde, Z, tot_F_prec, F_h2, invert_aZZt_Kinv, randn,grainSize)
+	    randn = matrix(rnorm(ncol(Z)*k),ncol(Z))
+	    U_F[] = sample_randomEffects_parallel_sparse_c_Eigen(F_tilde, Z, tot_F_prec, F_h2, invert_aZZt_Kinv, randn,grainSize)
 
 	 # -----Sample F----------------------- #
 		#conditioning on B, U_F,U_R,W,Lambda, F_h2
