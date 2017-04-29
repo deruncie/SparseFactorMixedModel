@@ -52,13 +52,15 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		    sets = gl(n_sets,b_F/n_sets)
 		    for(set in unique(sets)){
 		      index = sets==set
-		      F_tilde = F - X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE]
-		      B_F[index,] = sample_coefs_parallel_sparse_c(as.matrix(Ut %*% F_tilde),
-		                                                   as.matrix(Ut %*% X_F[,index]),
-		                                                   F_h2, tot_F_prec,s,
-		                                                   prior_mean[index,],
-		                                                   prior_prec[index,],
-		                                                   grainSize)
+		      X_F_set = X_F[,!index,drop=FALSE]
+		      F_tilde = F - X_F_set %*% B_F[!index,,drop=FALSE]
+		      randn_theta = matrix(rnorm(ncol(X_F_set)*k),ncol(X_F_set))
+		      randn_e = matrix(rnorm(n*k),n)
+		      B_F[index,] = sample_coefs_parallel_sparse_c_Eigen(Ut, F_tilde, X_F_set,
+		                                                         F_h2, tot_F_prec,s,
+		                                                         prior_mean[index,],
+		                                                         prior_prec[index,],
+		                                                         randn_theta,randn_e,grainSize)
 		    }
 #
 # 		    set_sample = function(index){
@@ -140,7 +142,9 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		if(b_F > 0) {
 		  prior_mean = prior_mean + XFBF
 		}
-		F[] = sample_factors_scores_sparse_c( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec )
+		randn_draws = matrix(rnorm(n*k),n)
+		F[] = sample_factors_scores_sparse_c(Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec,randn_draws)
+
 		# tot_F_prec[] = temp
   }))
 	current_state = current_state[current_state_names]

@@ -7,7 +7,7 @@ library(BSFG)
 # setwd("~/Box Sync/DER_projects/BSFG/R_BSFG/Sim_FE3_1")
 seed = 1
 set.seed(seed)
-new_halfSib_simulation_eQTL('Sim_eQTL_1', nSire=50,nRep=10,p=100, b=1, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2,V_cis = 1,nSNP = 1000,bSNP = 1)
+new_halfSib_simulation_eQTL('Sim_eQTL_1', nSire=50,nRep=10,p=100, b=1, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2,V_cis = 1,nSNP = 10,bSNP = 1)
 
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)

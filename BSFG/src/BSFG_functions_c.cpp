@@ -19,106 +19,106 @@ mat sweep_times(mat x, int MARGIN, vec STATS){
   return(x);
 }
 
-// [[Rcpp::export()]]
-mat sample_coefs_parallel_sparse_c(
-    mat UtEta,
-    mat UtW,
-    vec h2,
-    vec tot_Eta_prec,
-    vec s,
-    mat prior_mean,
-    mat prior_prec,
-    int grainSize) {
+// // [[Rcpp::export()]]
+// mat sample_coefs_parallel_sparse_c(
+//     mat UtEta,
+//     mat UtW,
+//     vec h2,
+//     vec tot_Eta_prec,
+//     vec s,
+//     mat prior_mean,
+//     mat prior_prec,
+//     int grainSize) {
+//
+//   // Sample regression coefficients
+//   // columns of matrices are independent
+//   // each column conditional posterior is a MVN due to conjugacy
+//
+//
+//   struct sampleColumn : public Worker {
+//     mat UtW, UtEta, prior_mean, prior_prec, randn_theta, randn_e;
+//     vec h2, tot_Eta_prec, s;
+//     int b,n;
+//     mat &coefs;
+//
+//     sampleColumn(mat UtW, mat UtEta, mat prior_mean, mat prior_prec, vec h2, vec tot_Eta_prec,
+//                  mat randn_theta, mat randn_e,
+//                  vec s, int b, int n,
+//                  mat &coefs) :
+//       UtW(UtW), UtEta(UtEta), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
+//       h2(h2), tot_Eta_prec(tot_Eta_prec),
+//       s(s), b(b), n(n),
+//       coefs(coefs) {}
+//
+//     void operator()(std::size_t begin, std::size_t end) {
+//       mat RinvSqUtW, WtURinvy;
+//       vec R_sq_diag, theta_star, e_star, UtW_theta_star, eta_resid, theta_tilda;
+//       for(std::size_t j = begin; j < end; j++){
+//         R_sq_diag = sqrt((h2(j) * s + (1-h2(j)))/tot_Eta_prec(j));
+//         theta_star = randn_theta.col(j)/sqrt(prior_prec.col(j)) + prior_mean.col(j);
+//         e_star = randn_e.col(j) % R_sq_diag;
+//         UtW_theta_star = UtW * theta_star;
+//         eta_resid = UtEta.col(j) - UtW_theta_star - e_star;
+//         RinvSqUtW = sweep_times(UtW,1,1.0/R_sq_diag);
+//         WtURinvy = RinvSqUtW.t() * (eta_resid/R_sq_diag);
+//
+//         if(b < n) {
+//           mat C = RinvSqUtW.t() * RinvSqUtW ;
+//           for(int i = 0; i < b; i++) {
+//             C(i,i) += prior_prec(i,j);
+//           }
+//           theta_tilda = solve(C,WtURinvy);
+//         } else{
+//           mat VAi = sweep_times(UtW,2,1.0/prior_prec.col(j)); // using Binomial Inverse Theorem if b > n
+//           mat inner = VAi*UtW.t();
+//           for(int i = 0; i < n; i++) {
+//             inner(i,i) += (h2(j) * s(i) + (1-h2(j))) / tot_Eta_prec(j);
+//           }
+//           vec VAiWtURinvy = VAi * WtURinvy;
+//           vec outerWtURinvy = VAi.t() * solve(inner,VAiWtURinvy);
+//           theta_tilda = WtURinvy / prior_prec.col(j) - outerWtURinvy;
+//         }
+//
+//         coefs.col(j) = theta_tilda + theta_star;
+//       }
+//     }
+//   };
+//
+//   int p = tot_Eta_prec.n_elem;
+//   int b = UtW.n_cols;
+//   int n = UtW.n_rows;
+//
+//   mat randn_theta = randn(b,p);
+//   mat randn_e = randn(n,p);
+//   mat coefs = zeros(b,p);
+//
+//   sampleColumn sampler(UtW, UtEta, prior_mean, prior_prec, h2, tot_Eta_prec, randn_theta,randn_e, s, b, n, coefs);
+//   RcppParallel::parallelFor(0,p,sampler,grainSize);
+//
+//   return(coefs);
+// }
 
-  // Sample regression coefficients
-  // columns of matrices are independent
-  // each column conditional posterior is a MVN due to conjugacy
-
-
-  struct sampleColumn : public Worker {
-    mat UtW, UtEta, prior_mean, prior_prec, randn_theta, randn_e;
-    vec h2, tot_Eta_prec, s;
-    int b,n;
-    mat &coefs;
-
-    sampleColumn(mat UtW, mat UtEta, mat prior_mean, mat prior_prec, vec h2, vec tot_Eta_prec,
-                 mat randn_theta, mat randn_e,
-                 vec s, int b, int n,
-                 mat &coefs) :
-      UtW(UtW), UtEta(UtEta), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
-      h2(h2), tot_Eta_prec(tot_Eta_prec),
-      s(s), b(b), n(n),
-      coefs(coefs) {}
-
-    void operator()(std::size_t begin, std::size_t end) {
-      mat RinvSqUtW, WtURinvy;
-      vec R_sq_diag, theta_star, e_star, UtW_theta_star, eta_resid, theta_tilda;
-      for(std::size_t j = begin; j < end; j++){
-        R_sq_diag = sqrt((h2(j) * s + (1-h2(j)))/tot_Eta_prec(j));
-        theta_star = randn_theta.col(j)/sqrt(prior_prec.col(j)) + prior_mean.col(j);
-        e_star = randn_e.col(j) % R_sq_diag;
-        UtW_theta_star = UtW * theta_star;
-        eta_resid = UtEta.col(j) - UtW_theta_star - e_star;
-        RinvSqUtW = sweep_times(UtW,1,1.0/R_sq_diag);
-        WtURinvy = RinvSqUtW.t() * (eta_resid/R_sq_diag);
-
-        if(b < n) {
-          mat C = RinvSqUtW.t() * RinvSqUtW ;
-          for(int i = 0; i < b; i++) {
-            C(i,i) += prior_prec(i,j);
-          }
-          theta_tilda = solve(C,WtURinvy);
-        } else{
-          mat VAi = sweep_times(UtW,2,1.0/prior_prec.col(j)); // using Binomial Inverse Theorem if b > n
-          mat inner = VAi*UtW.t();
-          for(int i = 0; i < n; i++) {
-            inner(i,i) += (h2(j) * s(i) + (1-h2(j))) / tot_Eta_prec(j);
-          }
-          vec VAiWtURinvy = VAi * WtURinvy;
-          vec outerWtURinvy = VAi.t() * solve(inner,VAiWtURinvy);
-          theta_tilda = WtURinvy / prior_prec.col(j) - outerWtURinvy;
-        }
-
-        coefs.col(j) = theta_tilda + theta_star;
-      }
-    }
-  };
-
-  int p = tot_Eta_prec.n_elem;
-  int b = UtW.n_cols;
-  int n = UtW.n_rows;
-
-  mat randn_theta = randn(b,p);
-  mat randn_e = randn(n,p);
-  mat coefs = zeros(b,p);
-
-  sampleColumn sampler(UtW, UtEta, prior_mean, prior_prec, h2, tot_Eta_prec, randn_theta,randn_e, s, b, n, coefs);
-  RcppParallel::parallelFor(0,p,sampler,grainSize);
-
-  return(coefs);
-}
-
-// [[Rcpp::export()]]
-rowvec sample_tot_prec_sparse_c(mat UtEta,
-                                 vec h2,
-                                 vec s,
-                                 double tot_Eta_prec_rate,
-                                 vec randg_draws
-) {
-
-  // int n = UtEta.n_rows;
-  int p = UtEta.n_cols;
-
-  vec tot_Eta_prec = zeros(p);
-
-  for(int i = 0; i < p; i++){
-    vec Sigma_sqrt = sqrt(h2(i) * s + (1.0 - h2(i)));
-    vec SiUtEta_i = UtEta.col(i) / Sigma_sqrt;
-    double rate = tot_Eta_prec_rate + 0.5 * dot(SiUtEta_i,SiUtEta_i);
-    tot_Eta_prec(i) = randg_draws(i) / rate;
-  }
-  return(tot_Eta_prec.t());
-}
+// // [[Rcpp::export()]]
+// rowvec sample_tot_prec_sparse_c(mat UtEta,
+//                                  vec h2,
+//                                  vec s,
+//                                  double tot_Eta_prec_rate,
+//                                  vec randg_draws
+// ) {
+//
+//   // int n = UtEta.n_rows;
+//   int p = UtEta.n_cols;
+//
+//   vec tot_Eta_prec = zeros(p);
+//
+//   for(int i = 0; i < p; i++){
+//     vec Sigma_sqrt = sqrt(h2(i) * s + (1.0 - h2(i)));
+//     vec SiUtEta_i = UtEta.col(i) / Sigma_sqrt;
+//     double rate = tot_Eta_prec_rate + 0.5 * dot(SiUtEta_i,SiUtEta_i);
+//     tot_Eta_prec(i) = randg_draws(i) / rate;
+//   }
+//   return(tot_Eta_prec.t());
+// }
 
 
 // [[Rcpp::export()]]
@@ -244,27 +244,27 @@ rowvec sample_tot_prec_sparse_withX_c(
 // }
 
 
-// [[Rcpp::export()]]
-mat sample_factors_scores_sparse_c(mat Eta_tilde,
-                                         mat prior_mean,
-                                         mat Lambda,
-                                         vec resid_Eta_prec,
-                                         vec F_e_prec
-) {
-  //Sample factor scores given factor loadings (F_a), factor residual variances (F_e_prec) and
-  //phenotype residuals
-  mat Lmsg = sweep_times(Lambda,1,resid_Eta_prec);
-  mat R = chol(Lambda.t() * Lmsg + diagmat(F_e_prec));
-  mat Rt = R.t();
-
-  mat Meta = solve(Rt,trans(Eta_tilde * Lmsg + sweep_times(prior_mean,2,F_e_prec)));
-
-  mat Zlams = randn(Meta.n_rows,Meta.n_cols);
-
-  mat F = trans(solve(R,Meta + Zlams));
-
-  return(F);
-}
+// // [[Rcpp::export()]]
+// mat sample_factors_scores_sparse_c(mat Eta_tilde,
+//                                          mat prior_mean,
+//                                          mat Lambda,
+//                                          vec resid_Eta_prec,
+//                                          vec F_e_prec
+// ) {
+//   //Sample factor scores given factor loadings (F_a), factor residual variances (F_e_prec) and
+//   //phenotype residuals
+//   mat Lmsg = sweep_times(Lambda,1,resid_Eta_prec);
+//   mat R = chol(Lambda.t() * Lmsg + diagmat(F_e_prec));
+//   mat Rt = R.t();
+//
+//   mat Meta = solve(Rt,trans(Eta_tilde * Lmsg + sweep_times(prior_mean,2,F_e_prec)));
+//
+//   mat Zlams = randn(Meta.n_rows,Meta.n_cols);
+//
+//   mat F = trans(solve(R,Meta + Zlams));
+//
+//   return(F);
+// }
 
 // [[Rcpp::export()]]
 List GSVD_2_c(mat K, mat B){
@@ -282,53 +282,53 @@ List GSVD_2_c(mat K, mat B){
 	return(List::create(_["U"]=U,_["V"]=V,_["X"]=X,_["C"]=C,_["S"]=S));
 }
 
-// [[Rcpp::export()]]
-rowvec sample_delta_c(
-    vec delta,
-    vec tauh,
-    mat Lambda_prec,
-    double delta_1_shape,
-    double delta_1_rate,
-    double delta_2_shape,
-    double delta_2_rate,
-    mat randg_draws,  // all done with rate = 1;
-    mat Lambda2
-) {
-  int times = randg_draws.n_rows;
-  int k = tauh.n_elem;
-  mat scores_mat = Lambda_prec % Lambda2;
-  rowvec scores = sum(scores_mat,0);
+// // [[Rcpp::export()]]
+// rowvec sample_delta_c_old(
+//     vec delta,
+//     vec tauh,
+//     mat Lambda_prec,
+//     double delta_1_shape,
+//     double delta_1_rate,
+//     double delta_2_shape,
+//     double delta_2_rate,
+//     mat randg_draws,  // all done with rate = 1;
+//     mat Lambda2
+// ) {
+//   int times = randg_draws.n_rows;
+//   int k = tauh.n_elem;
+//   mat scores_mat = Lambda_prec % Lambda2;
+//   rowvec scores = sum(scores_mat,0);
+//
+//   double rate;
+//   // vec delta_h;
+//   for(int i = 0; i < times; i++){
+//     rate = delta_1_rate + 0.5 * (1/delta(0)) * dot(tauh,scores);
+//     delta(0) = randg_draws(i,0) / rate;
+//     tauh = cumprod(delta);
+//
+//     for(int h = 1; h < k-1; h++) {
+//       rate = delta_2_rate + 0.5*(1/delta(h))*dot(tauh.subvec(h, k-1),scores.subvec(h,k-1));
+//       delta(h) = randg_draws(i,h) / rate;
+//       tauh = cumprod(delta);
+//     }
+//   }
+//   return(delta.t());
+// }
 
-  double rate;
-  // vec delta_h;
-  for(int i = 0; i < times; i++){
-    rate = delta_1_rate + 0.5 * (1/delta(0)) * dot(tauh,scores);
-    delta(0) = randg_draws(i,0) / rate;
-    tauh = cumprod(delta);
-
-    for(int h = 1; h < k-1; h++) {
-      rate = delta_2_rate + 0.5*(1/delta(h))*dot(tauh.subvec(h, k-1),scores.subvec(h,k-1));
-      delta(h) = randg_draws(i,h) / rate;
-      tauh = cumprod(delta);
-    }
-  }
-  return(delta.t());
-}
-
-// [[Rcpp::export()]]
-double log_binom_c(
-                      vec beta,
-                      mat X,
-                      vec y,
-                      vec N,
-                      vec mu,
-                      vec sigma2
-) {
-  vec Xbeta = X * beta;
-  vec e_Xbeta = exp(Xbeta);
-  vec p = e_Xbeta / (1.0 + e_Xbeta);
-  double ll = sum(y%log(p) + (N-y) % log(1.0-p)) - sum((beta - mu) % (beta - mu) / (2*sigma2));
-  return ll;
-}
+// // [[Rcpp::export()]]
+// double log_binom_c(
+//                       vec beta,
+//                       mat X,
+//                       vec y,
+//                       vec N,
+//                       vec mu,
+//                       vec sigma2
+// ) {
+//   vec Xbeta = X * beta;
+//   vec e_Xbeta = exp(Xbeta);
+//   vec p = e_Xbeta / (1.0 + e_Xbeta);
+//   double ll = sum(y%log(p) + (N-y) % log(1.0-p)) - sum((beta - mu) % (beta - mu) / (2*sigma2));
+//   return ll;
+// }
 
 
