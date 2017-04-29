@@ -23,8 +23,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = BSFG_control(
-  # sampler = 'fast_BSFG',
-  sampler = 'general_BSFG',
+  sampler = 'fast_BSFG',
+  # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = FALSE,
   h2_divisions = 20,

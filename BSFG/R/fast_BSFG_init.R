@@ -192,16 +192,32 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     # inv(a*Z  '*Z   + b*Kinv) = U*diag(1./(a.*s1+b.*s2))*U'
     #similar to fixed effects + random effects 1 above, but no fixed effects.
 
+    chol_Kinv = chol(solve(K))
     ZtZ = crossprod(Z)
     svd_ZZt = svd(ZtZ)
     ZZt_sqrt = t(sweep(svd_ZZt$u,2,sqrt(svd_ZZt$d),'*'))
-    result = GSVD_2_c(ZZt_sqrt,as.matrix(chol_Kinv))
+
+    GSVD_R = function(K,B){
+      K_invB = t(solve(t(B),t(K)))
+      svd_K_invB = svd(K_invB)
+      d = svd_K_invB$d
+      U = svd_K_invB$u
+      V = svd_K_invB$v
+      norm_factor = sqrt(1+d^2)
+      c = d/norm_factor
+      s = 1/norm_factor
+      X = sweep(t(B) %*% V,2,norm_factor,'*')
+
+      return(list(U=svd_K_invB$u, V = svd_K_invB$v,
+                      X = X,c=c,s=s))
+    }
+    result = GSVD_R(ZZt_sqrt,as.matrix(chol_Kinv))
 
     invert_aZZt_Kinv = list(
         U = drop0(Matrix(t(solve(result$X)),sparse=T),tol = run_parameters$drop0_tol),
         # U = t(solve(result$X)),
-			s1 = diag(result$C)^2,
-			s2 = diag(result$S)^2
+			s1 = result$c^2,
+			s2 = result$s^2
 		)
 
 
