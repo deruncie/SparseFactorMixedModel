@@ -1,4 +1,3 @@
-#include <RcppArmadillo.h>
 #include <RcppEigen.h>
 #include <RcppParallel.h>
 
@@ -10,11 +9,6 @@ using Eigen::Upper;
 using Eigen::Lower;
 typedef Eigen::MappedSparseMatrix<double> MSpMat;
 typedef Eigen::SparseMatrix<double> SpMat;
-
-using arma::mat;
-using arma::vec;
-using arma::sp_mat;
-using arma::rowvec;
 
 using namespace Rcpp;
 using namespace Eigen;

@@ -550,7 +550,6 @@ sample_Lambda_prec = function(BSFG_state) {
 		           delta_2_shape + 0.5*p*((k-1):1))
 		times = 100
 		randg_draws = matrix(rgamma(times*k,shape = shapes,rate = 1),nr=times,byrow=T)
-		# delta[] = sample_delta_c( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,randg_draws,Lambda2)
 		delta[] = sample_delta_c_Eigen( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,randg_draws,Lambda2)
 		tauh[]  = matrix(cumprod(delta),nrow=1)
 
