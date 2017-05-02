@@ -36,6 +36,7 @@
 #'     untransformed.
 #' @param burn burnin length of the MCMC chain
 #' @param thin thinning rate of the MCMC chain
+#' @param delta_iteractions_factor Number of times to iterate through sample_delta per iteration of the other parameters
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 #'
 BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder = 'Posterior',
@@ -43,8 +44,9 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100, h2_step_size = NULL,
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
-                        burn = 100,
-                        thin = 2) {
+                        burn = 100,thin = 2,
+                        delta_iteractions_factor = 100
+                        ) {
 
   all_args = lapply(formals(),function(x) eval(x)[1])
   passed_args = as.list(match.call())[-1]
@@ -76,8 +78,8 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @param data data.frame with n rows containing columns corresponding to the fixed and random
 #'   effects
 #' @param factor_model_fixed Fixed effect model formula specific to the latent factors. Optional. If NULL,
-#'     the fixed effects for the latent factors will be the same as for Eta, except that the intercept
-#'     will be removed. If a formula is provided (no random effects allowed), the model will be applied to
+#'     the fixed effects for the latent factors will be the same as for Eta, except that the columns will be centered.
+#'     If a formula is provided (no random effects allowed), the model will be applied to
 #'     each factor, again with the intercept dropped (or set to zero). Note: Random effects in \code{model}
 #'     are applied to both Eta and F.
 #' @param priors list providing hyperparameters for the model priors. This must include: for \code{fixed_var},
@@ -104,7 +106,8 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @param X_resid a design matrix. Alternative method for specifying fixed effects for \code{model}.
 #'     Care must be taken with the intercept if both a fixed effect model is specified for in both
 #'     \code{model} and \code{X_resid}.
-#' @param X_factor a design matrix. Alternative method for specifying \code{factor_model_fixed}
+#' @param X_factor a design matrix. Alternative method for specifying \code{factor_model_fixed}.
+#'     Columns will be centered. Zero-variance columns will be assigned infinite precision.
 #' @param cis_genotypes a list of design matrices of length \code{p} (ie number of columns of \code{Eta})
 #'     This is used to specify trait-specific fixed effects, such a cis-genotypes
 #' @param posteriorSample_params A character vector giving names of parameters to save all posterior samples
@@ -166,7 +169,12 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	traitnames = colnames(Y)
 
 	# if factor_model_fixed not specified, use fixed effects from model for both
-	if(is.null(factor_model_fixed)) factor_model_fixed = nobars(model)
+	if(is.null(factor_model_fixed)) {
+	  factor_model_fixed = nobars(model)
+	  same_fixed_model = TRUE  # keep track if the factors and residuals have same fixed effects
+	} else{
+	  same_fixed_model = FALSE
+	}
 
 	# check that there are no random effects specifed in factor_model_fixed
 	if(length(findbars(factor_model_fixed))) stop('Do not specify random effects in `factor_model_fixed`. Random effects for factors taken from `model`')
@@ -183,14 +191,27 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	# build X from fixed model
 	  # for Eta
 	X = model.matrix(nobars(model),data)
-	X = cbind(X, X_resid) # add in X_resid if provided.
+	if(all(X[,1] == 1)) {
+	  resid_intercept = TRUE   # is there an intercept? If so, don't penalize coefficient.
+	} else{
+	  resid_intercept = FALSE
+	}
+	if(!is.null(X_resid)){
+	  X = cbind(X, X_resid) # add in X_resid if provided.
+	  same_fixed_model = FALSE
+	}
 	b = ncol(X)
 
   # for F
-	  # note we drop a column to force intercept to be zero
-	X_F = model.matrix(factor_model_fixed,data)[,-1,drop = FALSE]
-	X_F = cbind(X_F,X_factor)
+	  # note columns are centered, potentially resulting in zero-variance columns
+	X_F = model.matrix(factor_model_fixed,data)
+	if(!is.null(X_factor)){
+	  X_F = cbind(X_F,X_factor)
+	  same_fixed_model = FALSE
+	}
+	X_F = sweep(X_F,2,colMeans(X_F),'-') #
 	b_F = ncol(X_F)
+	X_F_zero_variance = apply(X_F,2,var) == 0
 
 	# -------- cis genotypes ---------- #
 	if(is.null(cis_genotypes)){
@@ -357,7 +378,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  U_svd      = U_svd,  # matrix necessary to back-transform U_F and U_R (U*U_F and U*U_R) to get original random effects
 	  h2s_matrix = h2s_matrix,
 	  cis_genotypes = cis_genotypes,
-	  cis_effects_index = cis_effects_index,
 	  data       = data
 	)
 
@@ -368,7 +388,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  b      = b,
 	  b_F    = b_F,
 	  Mean_Y = Mean_Y,
-	  VY     = VY
+	  VY     = VY,
+	  resid_intercept = resid_intercept,
+	  same_fixed_model = same_fixed_model,
+	  X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
+	  cis_effects_index = cis_effects_index
 	)
 
 	run_parameters$data_model = data_model
@@ -498,7 +522,7 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
     BSFG_state$current_state[names(data_model_state)] = data_model_state
 
     # -- adapt number of factors to samples ---#
-    if(i > 200 && runif(1) < with(BSFG_state$run_parameters,1/exp(b0 + b1*i))){  # adapt with decreasing probability per iteration
+    if(i > 200 && i < burn && runif(1) < with(BSFG_state$run_parameters,1/exp(b0 + b1*i))){  # adapt with decreasing probability per iteration
       BSFG_state$current_state = update_k(BSFG_state)
     }
 
@@ -538,7 +562,7 @@ sample_Lambda_prec = function(BSFG_state) {
   run_variables  = BSFG_state$run_variables
   current_state  = BSFG_state$current_state
 
-  current_state = with(c(priors,run_variables),within(current_state,{
+  current_state = with(c(priors,run_variables,run_parameters),within(current_state,{
 		Lambda2 = Lambda^2
 		Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
@@ -548,7 +572,7 @@ sample_Lambda_prec = function(BSFG_state) {
 	 # # -----Sample delta, update tauh------ #
 		shapes = c(delta_1_shape + 0.5*p*k,
 		           delta_2_shape + 0.5*p*((k-1):1))
-		times = 100
+		times = delta_iteractions_factor
 		randg_draws = matrix(rgamma(times*k,shape = shapes,rate = 1),nr=times,byrow=T)
 		delta[] = sample_delta_c_Eigen( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,randg_draws,Lambda2)
 		tauh[]  = matrix(cumprod(delta),nrow=1)
@@ -565,22 +589,26 @@ sample_prec_B = function(BSFG_state){
   current_state  = BSFG_state$current_state
 
   current_state = with(c(priors,run_variables),within(current_state,{
-    if(b > 1) {
-      if(b_F == b-1) {  # assume that X_F == X, want same tau for both
-        B2 = cbind(B[-1,,drop=FALSE],B_F)^2
+    if(b > 0) {
+      if(same_fixed_model) {  # want same tau for both
+        B2 = cbind(B,B_F)^2  # tauh
       } else{
-        B2 = B[-1,,drop=FALSE]^2
+        B2 = B^2
       }
-      tau_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
+      tau_B[1,] = rgamma(b, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
+      if(resid_intercept){
+        tau_B[1,1] = 1e-10
+      }
       prec_B = matrix(tau_B,nrow = b, ncol = p)
     }
-    if(b_F > 1){
-      if(b_F == (b-1)) {
-        tau_B_F[1,] = tau_B[1,-1]
+    if(b_F > 0){
+      if(same_fixed_model) {
+        tau_B_F[1,] = tau_B[1,]
       } else{
         B_F2 = B_F^2
         tau_B_F[1,] = rgamma(b_F, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2)/2)
       }
+      tau_B_F[1,X_F_zero_variance] = 1e10
       prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
     }
   }))
@@ -592,17 +620,23 @@ sample_prec_B_ARD = function(BSFG_state){
   run_variables  = BSFG_state$run_variables
   current_state  = BSFG_state$current_state
   current_state = with(c(priors,run_variables),within(current_state,{
-    if(b > 1) {
+    if(b > 0) {
       B2 = B^2
-      tau_B[1,-1] = rgamma(b-1, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums((B2 * prec_B/c(tau_B))[-1,,drop=FALSE])/2)
-      prec_B[-1,] = matrix(rgamma((b-1)*p,shape = (B_df + 1)/2,rate = (B_df + B2[-1,,drop=FALSE]*tau_B[-1])/2),nr = (b-1),nc = p)
-      prec_B[-1,] = prec_B[-1,]*tau_B[-1]
+      tau_B[1,-1] = rgamma(b, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums((B2 * prec_B/c(tau_B)))/2)
+      prec_B[] = matrix(rgamma(b*p,shape = (B_df + 1)/2,rate = (B_df + B2*c(tau_B))/2),nr = b,nc = p)
+      prec_B[] = prec_B*c(tau_B)
+      if(resid_intercept){
+        tau_B[1,1] = 1e-10
+        prec_B[,1] = 1e-10
+      }
     }
     if(b_F > 0) {
       B_F2 = B_F^2
       tau_B_F[1,] = rgamma(b_F, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2 * prec_B_F/c(tau_B_F))/2)
       prec_B_F[] = matrix(rgamma(b_F*k,shape = (B_F_df + 1)/2,rate = (B_F_df + B_F2*c(tau_B_F))/2),nr = b_F,nc = k)
       prec_B_F[] = prec_B_F*c(tau_B_F)
+      tau_B_F[1,X_F_zero_variance] = 1e10
+      prec_B_F[X_F_zero_variance,] = 1e10
     }
   }))
   return(current_state)

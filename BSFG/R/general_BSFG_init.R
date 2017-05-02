@@ -7,7 +7,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     Z_matrices = BSFG_state$data_matrices$Z_matrices
     Z          = BSFG_state$data_matrices$Z
     h2s_matrix = BSFG_state$data_matrices$h2s_matrix
-    cis_effects_index = BSFG_state$data_matrices$cis_effects_index
+    cis_effects_index = BSFG_state$run_variables$cis_effects_index
 
     RE_names   = rownames(h2s_matrix)
     n_RE       = length(RE_names)

@@ -1,5 +1,4 @@
 #include "BSFG_types.h"
-// #include "Pre_calculations.h"
 
 using namespace Rcpp;
 using namespace Eigen;
@@ -182,11 +181,6 @@ Sigma_Cholesky_database::Sigma_Cholesky_database(List ZtZs_list, MatrixXd h2s_ma
 
   calc_matrices calculator(ZKZts,h2s_matrix,tol,Sigma_Cholesky_list);
   RcppParallel::parallelFor(0,n,calculator,grainSize);
-
-  // Rcpp::List Sigma_Cholesky;
-  // for(int i = 0; i < n; i++){
-  //   Sigma_Cholesky[i] = Rcpp::List.create
-  // }
 }
 
 

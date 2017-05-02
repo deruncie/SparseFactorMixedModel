@@ -84,6 +84,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 200
 for(i  in 1:100) {
   if(i < 10 || (i-1) %% 20 == 0) {
+    BSFG_state$current_state = update_k(BSFG_state)
     BSFG_state = reorder_factors(BSFG_state)
     BSFG_state = clear_Posterior(BSFG_state)
   }
