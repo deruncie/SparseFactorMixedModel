@@ -197,6 +197,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  resid_intercept = FALSE
 	}
 	if(!is.null(X_resid)){
+	  if(is.data.frame(X_resid)) X_resid = as.matrix(X_resid)
 	  X = cbind(X, X_resid) # add in X_resid if provided.
 	  same_fixed_model = FALSE
 	}
@@ -206,6 +207,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  # note columns are centered, potentially resulting in zero-variance columns
 	X_F = model.matrix(factor_model_fixed,data)
 	if(!is.null(X_factor)){
+	  if(is.data.frame(X_factor)) X_factor = as.matrix(X_factor)
 	  X_F = cbind(X_F,X_factor)
 	  same_fixed_model = FALSE
 	}
