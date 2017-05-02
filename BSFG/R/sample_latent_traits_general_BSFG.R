@@ -71,7 +71,8 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     if(b_F > 0) {
       prior_mean = prior_mean + XFBF
     }
-    F[] = sample_factors_scores_sparse_c( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec )
+    randn = matrix(rnorm(n*k),n)
+    F[] = sample_factors_scores_sparse_c_Eigen( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec,randn )
 
   }))
   current_state = current_state[current_state_names]
