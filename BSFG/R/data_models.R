@@ -119,6 +119,9 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
   data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
 
     if(!exists('model_matrices')){
+      if(!'ID' %in% colnames(data)) stop('ID column required in data')
+      if(!length(unique(data$ID)) == nrow(data)) stop('duplicate IDs in data')
+
       if(!exists('df') || !is.numeric(df)) df = NULL
       if(!exists('knots') || !is.numeric(knots)) knots = NULL
       if(!exists('degree') || !is.numeric(degree)) degree = 3
@@ -127,7 +130,8 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       covariate = observations$covariate
       global_b_spline = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
 
-      model_matrices = tapply(1:nrow(observations),observations$ID,function(x) {
+      model_matrices = lapply(data$ID,function(id) {
+        x = which(observations$ID == id)
         SPLINE = predict(global_b_spline,newx = observations$covariate[x])
         list(
           X = eval(parse(text = sprintf('model.matrix(%s,observations[x,])',paste(as.character(individual_model),collapse='')))),
@@ -135,12 +139,13 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
           position = x
         )
       })
+      names(model_matrices) = data$ID
     }
 
     n = length(model_matrices)
     p = ncol(model_matrices[[1]]$X)
     Eta_col_names = colnames(model_matrices[[1]]$X)
-    Eta_row_names = unique(observations$ID)
+    Eta_row_names = data$ID
 
     if(length(current_state) == 0){
       Eta_mean = matrix(0,n,p)
@@ -151,12 +156,7 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
       if(!exists('resid_Y_prec')) resid_Y_prec = matrix(1)
     }
-    # Eta2 = do.call(cbind,parallel::mclapply(1:n,function(i) {
-    #   X = model_matrices[[i]]$X
-    #   y = model_matrices[[i]]$y
-    #   eta_i = sample_coefs_parallel_sparse_c_Eigen(y,X,0,resid_Y_prec,rep(1,nrow(X)),matrix(Eta_mean[i,]),t(resid_Eta_prec),rnorm(ncol(X)),rnorm(length(y)),1)
-    # },mc.cores = ncores))
-    # recover()
+
     randn_draws = lapply(1:n,function(i) {
       list(
         randn_theta = rnorm(ncol(model_matrices[[i]]$X)),

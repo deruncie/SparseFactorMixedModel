@@ -163,7 +163,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  data_model = voom_model()
 	  data_model_parameters$Y_std = Y * data_model_parameters$prec_Y
 	}
-	data_model_state = data_model(Y,data_model_parameters)
+	data_model_state = data_model(Y,data_model_parameters,list(data_matrices = list(data = data)))
 	Eta = data_model_state$state$Eta
 	p = ncol(Eta)
 	traitnames = colnames(Y)
@@ -622,7 +622,7 @@ sample_prec_B_ARD = function(BSFG_state){
   current_state = with(c(priors,run_variables),within(current_state,{
     if(b > 0) {
       B2 = B^2
-      tau_B[1,-1] = rgamma(b, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums((B2 * prec_B/c(tau_B)))/2)
+      tau_B[1,] = rgamma(b, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums((B2 * prec_B/c(tau_B)))/2)
       prec_B[] = matrix(rgamma(b*p,shape = (B_df + 1)/2,rate = (B_df + B2*c(tau_B))/2),nr = b,nc = p)
       prec_B[] = prec_B*c(tau_B)
       if(resid_intercept){
