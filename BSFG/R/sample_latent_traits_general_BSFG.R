@@ -24,6 +24,7 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     Eta_tilde = Eta - XB - F %*% t(Lambda)
     tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, resid_h2_index,grainSize)
 
+    if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
     if(is.null(h2_step_size)) {
       resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, h2_priors_resids,grainSize)
     } else{
@@ -53,6 +54,7 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
 
     tot_F_prec[] = sample_tot_prec(F_tilde, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, F_h2_index,grainSize)
 
+    if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
     if(is.null(h2_step_size)) {
       F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys,h2_priors_factors,grainSize)
     } else{

@@ -411,12 +411,13 @@ double log_prob_h2_c(
   return log_p;
 }
 
+// [[Rcpp::export()]]
 VectorXd find_candidate_states(
-    ArrayXXd h2s_matrix,
+    MatrixXd h2s_matrix,
     double step_size,
     int old_state
 ) {
-  VectorXd dists = (h2s_matrix.colwise() - h2s_matrix.col(old_state)).abs().matrix().colwise().sum();
+  VectorXd dists = (h2s_matrix.colwise() - h2s_matrix.col(old_state)).cwiseAbs().colwise().sum();
   VectorXd indices(dists.size());
   int count = 0;
   for(int i = 0; i < dists.size(); i++){
@@ -435,14 +436,15 @@ VectorXd find_candidate_states(
 }
 
 // [[Rcpp::export()]]
-Rcpp::IntegerVector sample_h2s_discrete_MH_c(
+VectorXi sample_h2s_discrete_MH_c(
     Map<MatrixXd> Y,
     Map<VectorXd> tot_Eta_prec,
     Map<VectorXd> discrete_priors,
-    Rcpp::IntegerVector h2_index,
+    VectorXi h2_index,
     Map<MatrixXd> h2s_matrix,
     Rcpp::List Sigma_Choleskys,
     Map<VectorXd> r_draws,
+    Map<VectorXd> state_draws,
     double step_size,
     int grainSize
 ){
@@ -455,10 +457,10 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
     const VectorXd tot_Eta_prec;
     const VectorXd discrete_priors;
     const VectorXd r_draws;
-    const RVector<int> h2_index;
-    const RVector<double> state_draws;
+    const VectorXd state_draws;
+    const VectorXi h2_index;
     const double step_size;
-    RVector<int> new_index;
+    VectorXi &new_index;
 
     sampleColumn(const MatrixXd Y,
                  const MatrixXd h2s_matrix,
@@ -467,15 +469,15 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
                  const VectorXd tot_Eta_prec,
                  const VectorXd discrete_priors,
                  const VectorXd r_draws,
-                 const Rcpp::IntegerVector h2_index,
-                 const Rcpp::NumericVector state_draws,
+                 const VectorXd state_draws,
+                 const VectorXi h2_index,
                  const double step_size,
-                 Rcpp::IntegerVector new_index):
+                 VectorXi &new_index):
 
       Y(Y), h2s_matrix(h2s_matrix),
       chol_Sigma_list(chol_Sigma_list), log_det_Sigmas(log_det_Sigmas),
       tot_Eta_prec(tot_Eta_prec),  discrete_priors(discrete_priors),
-      r_draws(r_draws),h2_index(h2_index),state_draws(state_draws),step_size(step_size),new_index(new_index) {}
+      r_draws(r_draws),state_draws(state_draws),h2_index(h2_index),step_size(step_size),new_index(new_index) {}
 
     void operator()(std::size_t begin, std::size_t end) {
       int n = Y.rows();
@@ -517,10 +519,9 @@ Rcpp::IntegerVector sample_h2s_discrete_MH_c(
     log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
   }
 
-  Rcpp::IntegerVector new_index(p);
-  Rcpp::NumericVector state_draws = Rcpp::runif(p);
+  VectorXi new_index(p);
 
-  sampleColumn sampler(Y,h2s_matrix,chol_Sigma_list,log_det_Sigmas,tot_Eta_prec,discrete_priors,r_draws,h2_index,state_draws,step_size,new_index);
+  sampleColumn sampler(Y,h2s_matrix,chol_Sigma_list,log_det_Sigmas,tot_Eta_prec,discrete_priors,r_draws,state_draws,h2_index,step_size,new_index);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return new_index;
 }

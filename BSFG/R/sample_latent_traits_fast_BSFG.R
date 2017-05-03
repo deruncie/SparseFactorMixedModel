@@ -30,6 +30,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		scores = tot_prec_scores_c(UtEta_tilde,resid_h2,s)
 		tot_Eta_prec[] = rgamma(p,shape = tot_Eta_prec_shape + n/2,rate = tot_Eta_prec_rate + 0.5*scores)
 
+		if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
 		resid_h2_index = sample_h2s_discrete_fast(UtEta_tilde, tot_Eta_prec, h2_priors_resids,s,grainSize)
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
 
@@ -95,11 +96,12 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		  tot_F_prec[] = 1
 		}
 
+		if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
 		F_h2_index = sample_h2s_discrete_fast(UtF_tilde, tot_F_prec, h2_priors_factors,s,grainSize)
 		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-	    randn = matrix(rnorm(ncol(Z)*k),ncol(Z))
-	    U_F[] = sample_randomEffects_parallel_sparse_c_Eigen(F_tilde, Z, tot_F_prec, F_h2, invert_aZZt_Kinv, randn,grainSize)
+    randn = matrix(rnorm(ncol(Z)*k),ncol(Z))
+    U_F[] = sample_randomEffects_parallel_sparse_c_Eigen(F_tilde, Z, tot_F_prec, F_h2, invert_aZZt_Kinv, randn,grainSize)
 
 	 # -----Sample F----------------------- #
 		#conditioning on B, U_F,U_R,W,Lambda, F_h2

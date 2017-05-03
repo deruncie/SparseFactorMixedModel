@@ -79,8 +79,9 @@ sample_h2s_discrete_MH = function(Y,tot_Eta_prec, Sigma_Choleskys,discrete_prior
 
 	# sample runif(p,0,1) before because parallel RNGs aren't consecutive.
 	r_draws = runif(p)
+	state_draws = runif(p)
 
-	h2s_index = sample_h2s_discrete_MH_c(Y,tot_Eta_prec,discrete_priors,h2_index,h2s_matrix,Sigma_Choleskys,r_draws,step_size,grainSize)+1
+	h2s_index = sample_h2s_discrete_MH_c(Y,tot_Eta_prec,discrete_priors,h2_index,h2s_matrix,Sigma_Choleskys,r_draws,state_draws,step_size,grainSize)+1
 
 		return(h2s_index)
 }

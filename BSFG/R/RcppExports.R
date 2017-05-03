@@ -61,7 +61,11 @@ sample_h2s <- function(log_ps, rs, grainSize) {
     .Call('BSFG_sample_h2s', PACKAGE = 'BSFG', log_ps, rs, grainSize)
 }
 
-sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, step_size, grainSize) {
-    .Call('BSFG_sample_h2s_discrete_MH_c', PACKAGE = 'BSFG', Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, step_size, grainSize)
+find_candidate_states <- function(h2s_matrix, step_size, old_state) {
+    .Call('BSFG_find_candidate_states', PACKAGE = 'BSFG', h2s_matrix, step_size, old_state)
+}
+
+sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, state_draws, step_size, grainSize) {
+    .Call('BSFG_sample_h2s_discrete_MH_c', PACKAGE = 'BSFG', Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, state_draws, step_size, grainSize)
 }
 

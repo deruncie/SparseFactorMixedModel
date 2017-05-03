@@ -66,8 +66,10 @@ BSFG_state$priors$h2_priors_resids = with(BSFG_state$data_matrices, sapply(1:nco
     pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
 }))
 BSFG_state$priors$h2_priors_resids = BSFG_state$priors$h2_priors_resids/sum(BSFG_state$priors$h2_priors_resids)
-BSFG_state$priors$h2_priors_factors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
+BSFG_state$priors$h2_priors_factors = BSFG_state$priors$h2_priors_resids
 
+# h2_divisions = ncol(BSFG_state$data_matrices$h2s_matrix)
+# BSFG_state$priors$h2_priors_factors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
 # BSFG_state$priors$h2_priors_factors = with(BSFG_state$data_matrices, sapply(1:nrow(h2s_matrix),function(x) {
 #     h2s = h2s_matrix[x,]
 #     pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
