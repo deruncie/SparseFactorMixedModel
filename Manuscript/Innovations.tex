@@ -275,10 +275,13 @@ Expanding this out, we have:
 
 \noindent with the brackets highlighting the fact that there are really two parallel models for the fixed effects. In the case that $\B{X} = \B{X}_F$, either $\B{B}$ or $\B{B}_F\B{\Lambda}^T$ could account for the relationship between $\B{X}$ and $\B{H}$. $\B{B}$ has $b \times p$ parameters and $\B{B}_F\B{\Lambda}^T$ has $b \times k + k \times p$ parameters. When $b > k$, the factors provide a potentially more parsimonious model for these fixed effects, under the assumption that these effects may be correlated. When $b < k$, $\B{B}$ has fewer parameters. However, the $k \times p$ parameters of $\B{\Lambda}^T$ are also shared by the ``genetic`` model: $\B{E}^*_F\B{\Lambda}^T$, so they come for ``free".
 
+The logic of this 
+
 \subsubsection{Questions}
 \begin{enumerate}
 \item Is it necessary to center the columns of $\B{X}_F$? The model for $\B{f}_j$ is: $\B{f}_j~\sim~\mbox{N}(\B{X}_F\B{b}_{F_j},\B{\Sigma}_j)$. A standard factor model would have $\B{f}_j \sim \mbox{N}(0,\B{I})$. Not centering the columns would allow the mean of $\B{f}_j \neq 0$. But this could be absorbed by the global intercept which is not penalized, so not sure it matters. I don't think this will affect the estimation of $\B{\Lambda}$.
-\item 
+\item With one random effect, the distribution of $\B{f}_j$ is: $$\B{f}_j | \B{b}_{F_j}~\sim~\mbox{N}(\B{X}_F\B{b}_{F_j},h^2_{F_j} \B{ZKZ}^T + (1-h^2)\B{I})$$. 
+This means that each factor has the variance = 1 regardless of the size of $\B{X}_F\B{b}_{F_j}$. What does this mean for the corresponding magnitude of $\B{\lambda}_j$? 
 \end{enumerate}
 
 

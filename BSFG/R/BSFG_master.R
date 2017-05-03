@@ -524,9 +524,9 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
     BSFG_state$current_state[names(data_model_state)] = data_model_state
 
     # -- adapt number of factors to samples ---#
-    if(i > 200 && i < burn && runif(1) < with(BSFG_state$run_parameters,1/exp(b0 + b1*i))){  # adapt with decreasing probability per iteration
-      BSFG_state$current_state = update_k(BSFG_state)
-    }
+    # if(i > 200 && i < burn && runif(1) < with(BSFG_state$run_parameters,1/exp(b0 + b1*i))){  # adapt with decreasing probability per iteration
+    #   BSFG_state$current_state = update_k(BSFG_state)
+    # }
 
     # -- save sampled values (after thinning) -- #
     if( (i-burn) %% thin == 0 && i > burn) {
