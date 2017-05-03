@@ -41,8 +41,29 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     # F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
     if(b_F > 0){
       prior_mean = matrix(0,b_F,k)
-      prior_prec = prec_B_F
-      B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, F_h2_index, tot_F_prec, prior_mean, prior_prec,grainSize)
+      prior_prec = sweep(prec_B_F,2,tot_F_prec,'*')  # prior for B_F includes tot_F_prec
+      if(b_F > 100){
+        n_sets = ceiling(b_F/100)
+        sets = gl(n_sets,b_F/n_sets)
+        for(set in unique(sets)){
+          index = sets==set
+          if(sum(!index) > 0){
+            X_F_set = X_F[,index,drop=FALSE]
+            F_tilde = F - X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE]
+          } else{
+            X_F_set = X_F
+            F_tilde = F
+          }
+          B_F[index,] = sample_MME_fixedEffects(F_tilde,X_F_set,
+                                        Sigma_Choleskys, F_h2_index, tot_F_prec,
+                                        prior_mean[index,],
+                                        prior_prec[index,],
+                                        grainSize)
+
+        }
+      } else{
+        B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, F_h2_index, tot_F_prec, prior_mean, prior_prec,grainSize)
+      }
       XFBF = X_F %*% B_F
       if(class(XFBF) == 'Matrix') XFBF = as.matrix(XFBF)
       F_tilde = F - XFBF
