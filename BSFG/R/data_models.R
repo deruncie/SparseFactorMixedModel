@@ -170,9 +170,10 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
     rownames(Eta) = Eta_row_names
 
     if(!exists('ncores')) ncores = 1
+    convert_Matrix = is( model_matrices[[1]]$X,'Matrix')
     Y_fitted = do.call(c,parallel::mclapply(1:n,function(i) {
       y_fitted = model_matrices[[i]]$X %*% Eta[i,]
-      if(is(y_fitted,'Matrix')) y_fitted = y_fitted@x
+      if(convert_Matrix) y_fitted = y_fitted@x
       y_fitted
     },mc.cores = ncores))
     Y_fitted = Y_fitted[order(do.call(c,lapply(model_matrices,function(x) x$position)))]
@@ -184,8 +185,8 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
     return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, global_b_spline = global_b_spline,Y_fitted=matrix(Y_fitted)))
   })
   return(list(state = data_model_state,
-              posteriorSample_params = c('Y_fitted','Eta'),
-              posteriorMean_params = c('resid_Y_prec')
+              posteriorSample_params = c('Y_fitted','Eta','resid_Y_prec'),
+              posteriorMean_params = c()
   )
   )
 }

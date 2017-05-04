@@ -7,7 +7,11 @@ library(BSFG)
 # setwd("~/Box Sync/DER_projects/BSFG/R_BSFG/Sim_FE3_1")
 seed = 1
 set.seed(seed)
-new_halfSib_simulation_eQTL('Sim_eQTL_1', nSire=50,nRep=10,p=100, b=1, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2,V_cis = 1,nSNP = 200,bSNP = 1)
+
+col_sha_geno_max_cor <- as.matrix(read.csv('~/Box Sync/DER_projects/NAM_CAM/BSFG_analysis/col_sha_markers_bsfg.csv', header = TRUE))
+col_sha_geno_max_cor = col_sha_geno_max_cor[,1:(ncol(col_sha_geno_max_cor)/2)]
+col_sha_geno_max_cor = col_sha_geno_max_cor[,sample(1:ncol(col_sha_geno_max_cor))]
+new_halfSib_simulation_eQTL('Sim_eQTL_1', nSire=50,nRep=10,p=100, b=1, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2,V_cis = 1,nSNP = 200,bSNP = 1,col_sha_geno_max_cor)
 
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)

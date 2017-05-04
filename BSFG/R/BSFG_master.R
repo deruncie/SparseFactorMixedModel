@@ -567,6 +567,7 @@ sample_latent_traits = function(BSFG_state,...){
 sample_Lambda_prec = function(BSFG_state) {
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables
+  run_parameters = BSFG_state$run_parameters
   current_state  = BSFG_state$current_state
 
   current_state = with(c(priors,run_variables,run_parameters),within(current_state,{
@@ -626,6 +627,7 @@ sample_prec_B_ARD = function(BSFG_state){
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables
   current_state  = BSFG_state$current_state
+
   current_state = with(c(priors,run_variables),within(current_state,{
     if(b > 0) {
       B2 = B^2
@@ -634,7 +636,7 @@ sample_prec_B_ARD = function(BSFG_state){
       prec_B[] = prec_B*c(tau_B)
       if(resid_intercept){
         tau_B[1,1] = 1e-10
-        prec_B[,1] = 1e-10
+        prec_B[1,] = 1e-10
       }
     }
     if(b_F > 0) {

@@ -1,4 +1,4 @@
-new_halfSib_simulation_eQTL = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, Ve = 0.2,Vb = 0,V_cis,nSNP,bSNP = 1){
+new_halfSib_simulation_eQTL = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, Ve = 0.2,Vb = 0,V_cis,nSNP,bSNP = 1,SNP_matrix = NULL){
   require(MCMCglmm)
   require(pedantics)
   # build pedigree
@@ -55,7 +55,12 @@ new_halfSib_simulation_eQTL = function(name, nSire,nRep,p, b, factor_h2s, Va = 0
   b_cis = rnorm(p,0,sqrt(V_cis))
 
   # eQTL - one per factor
-  X_SNP = matrix(sample(c(0,1),n*nSNP,replace=T),n,nSNP)
+  if(is.null(SNP_matrix)) {
+    X_SNP = matrix(sample(c(0,1),n*nSNP,replace=T),n,nSNP)
+  } else{
+    X_SNP = SNP_matrix[sample(1:nrow(SNP_matrix),n,replace=T),]
+    nSNP = ncol(X_SNP)
+  }
   B_SNP = matrix(0,nSNP,k)
   diag(B_SNP) = bSNP
 

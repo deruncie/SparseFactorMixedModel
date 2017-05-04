@@ -146,8 +146,8 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
     if(dim(B_factor)[1] > 1) {
       plot(c(B_factor),c(setup$B_F %*% t(setup$error_factor_Lambda)))
       abline(0,1)
-      xlim = ylim = range(c(B[-1,],B_factor))
-      plot(c(B_factor),c(B[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
+      xlim = ylim = range(c(B,B_factor))
+      plot(c(B_factor),c(B),xlim = xlim,ylim=ylim);abline(0,1)
     }
   }
 
@@ -232,7 +232,7 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
       plot(c(B_factor_mean),c(setup$B_F %*% t(setup$error_factor_Lambda)))
       abline(0,1)
       xlim = ylim = range(c(B_mean[-1,],B_factor_mean))
-      plot(c(B_factor_mean),c(B_mean[-1,]),xlim = xlim,ylim=ylim);abline(0,1)
+      plot(c(B_factor_mean),c(B_mean),xlim = xlim,ylim=ylim);abline(0,1)
       B_f_HPD = HPDinterval(mcmc(Posterior$B_F[,1,]))
       B_f_mean = colMeans(Posterior$B_F[,1,])
 
