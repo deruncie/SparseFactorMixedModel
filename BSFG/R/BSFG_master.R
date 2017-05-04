@@ -191,6 +191,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	# build X from fixed model
 	  # for Eta
 	X = model.matrix(nobars(model),data)
+	linear_combos = caret::findLinearCombos(X)
+	if(!is.null(linear_combos$remove)) {
+	  cat(sprintf('dropping column(s) %s to make X_resid full rank\n',paste(linear_combos$remove,sep=',')))
+	  X = X[,-linear_combos$remove]
+	}
 	if(all(X[,1] == 1)) {
 	  resid_intercept = TRUE   # is there an intercept? If so, don't penalize coefficient.
 	} else{

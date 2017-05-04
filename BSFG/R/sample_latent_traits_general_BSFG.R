@@ -55,10 +55,10 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
             F_tilde = F
           }
           B_F[index,] = sample_MME_fixedEffects(F_tilde,X_F_set,
-                                        Sigma_Choleskys, F_h2_index, tot_F_prec,
-                                        prior_mean[index,],
-                                        prior_prec[index,],
-                                        grainSize)
+                                                Sigma_Choleskys, F_h2_index, tot_F_prec,
+                                                prior_mean[index,],
+                                                prior_prec[index,],
+                                                grainSize)
 
         }
       } else{
@@ -73,7 +73,8 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     # -----Sample tot_F_prec, F_h2, U_F ---------------- #
     #conditioning on B, F, Lambda, F_h2, tot_F_prec
 
-    tot_F_prec[] = sample_tot_prec(F_tilde, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, F_h2_index,grainSize)
+    # tot_F_prec[] = sample_tot_prec(F_tilde, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, F_h2_index,grainSize)
+    tot_F_prec[] = 1
 
     if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
     if(is.null(h2_step_size)) {
