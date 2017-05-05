@@ -112,6 +112,93 @@ MatrixXd sample_coefs_parallel_sparse_c_Eigen(
   return(coefs);
 }
 
+
+// [[Rcpp::export()]]
+MatrixXd sample_coefs_parallel_sparse_c_Eigen_group(
+    MSpMat Ut,
+    Map<MatrixXd> Eta,
+    Map<MatrixXd> W,
+    Map<MatrixXd> old_coefs,  // previous iteration coefficients (this matrix may change?)
+    VectorXi row_groups,      // list of indexes (one-based) giving the beginnings of groups to sample jointly
+    Map<VectorXd> h2,
+    Map<VectorXd> tot_Eta_prec,
+    Map<VectorXd> s,
+    Map<MatrixXd> prior_mean,
+    Map<MatrixXd> prior_prec,
+    Map<MatrixXd> randn_theta,
+    Map<MatrixXd> randn_e,
+    int grainSize){
+
+  // Sample regression coefficients
+  // columns of matrices are independent
+  // each column conditional posterior is a MVN due to conjugacy
+
+  // Break problem into a set of samplings in a series. may be helpful to break up large matrix inversions
+
+  struct sampleColumn : public Worker {
+    MatrixXd UtW, UtEta;
+    MatrixXd prior_mean, prior_prec, randn_theta, randn_e;
+    VectorXd h2, tot_Eta_prec, s;
+    int b,n;
+    MatrixXd &coefs;
+
+    sampleColumn(MatrixXd UtW, MatrixXd UtEta, MatrixXd prior_mean, MatrixXd prior_prec, VectorXd h2, VectorXd tot_Eta_prec,
+                 MatrixXd randn_theta, MatrixXd randn_e,
+                 VectorXd s, int b, int n,
+                 MatrixXd &coefs) :
+      UtW(UtW), UtEta(UtEta), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
+      h2(h2), tot_Eta_prec(tot_Eta_prec),
+      s(s), b(b), n(n),
+      coefs(coefs) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      for(std::size_t j = begin; j < end; j++){
+        coefs.col(j) = sample_coefs_single(UtEta.col(j), UtW, prior_mean.col(j), prior_prec.col(j), h2(j), tot_Eta_prec(j), randn_theta.col(j),randn_e.col(j),s,b,n);
+      }
+    }
+  };
+
+  MatrixXd UtEta = Ut*Eta;
+  MatrixXd UtW = Ut*W;
+
+  int p = UtEta.cols();
+  int b = UtW.cols();
+  int n = UtW.rows();
+
+  MatrixXd coefs = old_coefs;
+  int n_groups = row_groups.size();
+
+  if(n_groups == 1){
+    sampleColumn sampler(UtW, UtEta, prior_mean, prior_prec, h2, tot_Eta_prec, randn_theta,randn_e, s, b, n, coefs);
+    RcppParallel::parallelFor(0,p,sampler,grainSize);
+  } else{
+    for(int i = 0; i < n_groups; i++){
+      int start = row_groups[i]-1;
+      int group_size = b - row_groups[i]+1;
+      if(i < (n_groups - 1)){
+        group_size = row_groups[i+1] - row_groups[i];
+      }
+      if(group_size <= 0) continue;
+      int end = start+group_size;
+      MatrixXd UtEta_resid(UtEta);
+      if(start > 0){
+        UtEta_resid -= UtW.block(0,0,n,start) * coefs.block(0,0,start,p);
+      }
+      if(end < b){
+        UtEta_resid -= UtW.block(0,end,n,b-end) * coefs.block(end,0,b-end,p);
+      }
+      MatrixXd coefs_block(group_size,p);
+      sampleColumn sampler(UtW.block(0,start,n,group_size), UtEta_resid,
+                           prior_mean.block(start,0,group_size,p), prior_prec.block(start,0,group_size,p),
+                           h2, tot_Eta_prec,
+                           randn_theta.block(start,0,group_size,p),randn_e.block(n*i,0,n,p), s, b, n, coefs_block);
+      RcppParallel::parallelFor(0,p,sampler,grainSize);
+      coefs.block(start,0,group_size,p) = coefs_block;
+    }
+  }
+  return(coefs);
+}
+
 // [[Rcpp::export()]]
 MatrixXd sample_coefs_set_c(
     Rcpp::List model_matrices,

@@ -97,22 +97,19 @@ voom_model = function(Y,data_model_parameters,BSFG_state = list()){
 }
 
 
-#' Sample Eta given B-splines individual-level model
+#' Sample Eta given regression-splines individual-level model
 #'
-#' Eta is a matrix of individual-level parmaters for a B-spline with
+#' Eta is a matrix of individual-level parmaters for a regression-spline with
 #'    equivalent knots over all individuals
 #'
 #' This function should pre-calculate design matrices for each individual (assuming they are all
-#'     unique), as well as SVDs for efficient repeated solvings of the posterior distributions
-#'     as resid_Y_prec, Eta_mean and resid_Eta_prec are updated each iteraction.
+#'     unique). During sampling, should sample regression coefficients \code{Eta} given the factor model state.
 #'
 #' @param Y a vector of observation. Pre-scaled and centered if desired.
 #' @param data_model_parameters a list including:
-#'     1) \code{observations}, a data.frame including columns: \code{ID}, and \code{covariate}, ordered by ID.
-#'     2) the variables df, knots, degree and intercept. Empty values will use the defaults for \code{bs()}
-#'     3) \code{individual_model} formula for each individual of form \code{~SPLINE:factor} using keyword
-#'         \code{SPLINE} to denote b-spline factors. If not included, will use model \code{~SPLINE}
-bs_model = function(Y,data_model_parameters,BSFG_state = list()){
+#'     1) \code{observations}, a data.frame with observation-level data including columns \code{ID} and \code{Y}
+#'     3) \code{individual_model} the model that should be applied to the data for each ID.
+regression_spline_model = function(Y,data_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
@@ -122,19 +119,13 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
       if(!'ID' %in% colnames(data)) stop('ID column required in data')
       if(!length(unique(data$ID)) == nrow(data)) stop('duplicate IDs in data')
 
-      if(!exists('df') || !is.numeric(df)) df = NULL
-      if(!exists('knots') || !is.numeric(knots)) knots = NULL
-      if(!exists('degree') || !is.numeric(degree)) degree = 3
-      if(!exists('intercept') || !is.numeric(intercept)) intercept = FALSE
-      if(!exists('individual_model')) individual_model = ~SPLINE
-      covariate = observations$covariate
-      global_b_spline = splines::bs(covariate,df = df,knots=knots,degree=degree,intercept = intercept)
+      lm1 = lm(individual_model,observations)
+      Terms = delete.response(terms(lm1))
 
       model_matrices = lapply(data$ID,function(id) {
         x = which(observations$ID == id)
-        SPLINE = predict(global_b_spline,newx = observations$covariate[x])
         list(
-          X = eval(parse(text = sprintf('model.matrix(%s,observations[x,])',paste(as.character(individual_model),collapse='')))),
+          X = model.matrix(Terms,observations[x,]),
           y = Y[x,,drop=FALSE],
           position = x
         )
@@ -182,7 +173,7 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
 
     resid_Y_prec = matrix(rgamma(1,shape = resid_Y_prec_shape + 0.5*n*p, rate = resid_Y_prec_rate + 0.5*sum(Y_tilde^2)))
 
-    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, global_b_spline = global_b_spline,Y_fitted=matrix(Y_fitted)))
+    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Terms = Terms,Y_fitted=matrix(Y_fitted)))
   })
   return(list(state = data_model_state,
               posteriorSample_params = c('Y_fitted','Eta','resid_Y_prec'),
@@ -190,6 +181,8 @@ bs_model = function(Y,data_model_parameters,BSFG_state = list()){
   )
   )
 }
+
+
 
 #' Sample Eta given B-splines individual-level model with binomial observations
 #'

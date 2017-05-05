@@ -26,6 +26,10 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
       randn_theta = matrix(rnorm(rows*p),rows)
       randn_e = matrix(rnorm(n*p),n)
       coefs = sample_coefs_parallel_sparse_c_Eigen( Ut,Eta,Design,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      # coefs = rbind(B,t(Lambda))
+      # groups = seq(1,rows,by=5)
+      # randn_e = matrix(rnorm(n*p*length(groups)),n*length(groups))
+      # coefs=sample_coefs_parallel_sparse_c_Eigen_group( Ut,Eta,Design,coefs,groups,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
       if(b > 0){
         B[] = coefs[1:b,,drop=FALSE]
       }

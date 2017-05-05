@@ -51,21 +51,28 @@ print('Initializing')
 load('../setup.RData')
 
 
+# data_model_parameters = list(
+#   observations = setup$observations,
+#   df = 40,
+#   # degree=6,
+#   intercept = TRUE,
+#   individual_model = ~SPLINE,
+#   resid_Y_prec_shape = 2,
+#   resid_Y_prec_rate = 1
+# )
 data_model_parameters = list(
   observations = setup$observations,
-  df = 40,
-  # degree=6,
-  intercept = TRUE,
-  individual_model = ~SPLINE,
+  individual_model = Y~poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=T),
   resid_Y_prec_shape = 2,
   resid_Y_prec_rate = 1
 )
+
 
 setup$data$ID = unique(setup$observations$ID)
 # options(error=recover)
 BSFG_state = with(setup,BSFG_init(observations$Y, model=~X2+(1|animal), data, #factor_model_fixed = ~1,
                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
-                                  data_model = bs_model, data_model_parameters = data_model_parameters,
+                                  data_model = regression_spline_model, data_model_parameters = data_model_parameters,
                                   posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects','U_R'),
                                   posteriorMean_params = c()
                                   ))
@@ -116,13 +123,15 @@ data$Y_fitted_high = apply(Posterior$Y_fitted,c(2,3),function(x) HPDinterval(mcm
 ggplot(data,aes(x=covariate,y=Y)) + geom_line(aes(group = ID)) + geom_line(aes(y=Y_fitted,group=ID),color ='red')
 ggplot(subset(data,ID %in% c(1,2,21,22)),aes(x=covariate,y=Y)) + geom_ribbon(aes(ymin = Y_fitted_low,ymax = Y_fitted_high,group = ID),alpha = 0.2) + geom_line(aes(group = ID)) + geom_line(aes(y=Y_fitted,group=ID),color ='red')
 
-
+newx = seq(1,60,length=100)
+new_MM = model.matrix(BSFG_state$current_state$Terms,data.frame(covariate=newx))
 
 
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
-plot(BSFG_state$Posterior$Eta,setup$Eta);abline(0,1)
-setup$observations$Y_fitted = sapply(1:nrow(setup$observations),function(i) predict(BSFG_state$current_state$coefficients,newx = setup$observations$covariate[i]) %*% BSFG_state$Posterior$Eta[setup$observations$ID[i],])
+plot(apply(BSFG_state$Posterior$Eta,c(2,3),mean),setup$Eta);abline(0,1)
+# setup$observations$Y_fitted = sapply(1:nrow(setup$observations),function(i) predict(BSFG_state$current_state$coefficients,newx = setup$observations$covariate[i]) %*% BSFG_state$Posterior$Eta[setup$observations$ID[i],])
+setup$observations$Y_fitted = sapply(1:nrow(setup$observations),function(i) model.matrix(BSFG_state$current_state$Terms,data.frame(covariate=setup$observations$covariate[i])) %*% colMeans(BSFG_state$Posterior$Eta[,setup$observations$ID[i],]))
 with(setup$observations,plot(Y,Y_fitted));abline(0,1)
 plot(c(with(BSFG_state$current_state,U_F %*% t(Lambda))),with(setup,c(as.matrix(U_F %*% t(error_factor_Lambda)))));abline(0,1)
 plot(c(with(BSFG_state$current_state,U_R + U_F %*% t(Lambda))),with(setup,c(as.matrix(U_R + U_F %*% t(error_factor_Lambda)))));abline(0,1)
@@ -137,7 +146,7 @@ Posterior_P = aperm(array(sapply(1:Posterior$total_samples,function(i) {
     Lambda[i,,] %*% t(Lambda[i,,]) + diag(1/tot_Eta_prec[i,,])
   })
 }),dim = c(rep(dim(Posterior$Lambda)[2],2),Posterior$total_samples)),c(3,1,2))
-dimnames(Posterior_P)[2:3] = dimnames(Posterior$Eta)[2]
+dimnames(Posterior_P)[2:3] = dimnames(Posterior$Eta)[3]
 
 library(heatmap3)
 i = 1:dim(Posterior_P)[2]
@@ -149,7 +158,7 @@ Posterior_G = aperm(array(sapply(1:Posterior$total_samples,function(i) {
     Lambda[i,,] %*% diag(F_h2[i,,]) %*% t(Lambda[i,,]) + diag(resid_h2[i,,]/tot_Eta_prec[i,,])
   })
 }),dim = c(rep(dim(Posterior$Lambda)[2],2),Posterior$total_samples)),c(3,1,2))
-dimnames(Posterior_G)[2:3] = dimnames(Posterior$Eta)[2]
+dimnames(Posterior_G)[2:3] = dimnames(Posterior$Eta)[3]
 heatmap3(cov2cor(apply(Posterior_G,c(2,3),mean))[i,i]^2,Rowv = NA,Colv=NA)
 trace_plot(Posterior_G[,i,6])
 boxplot(Posterior_G[,i[2:10],6]);abline(h=0)

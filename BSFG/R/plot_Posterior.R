@@ -141,19 +141,19 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
   if(dim(setup$B)[1] > 1) {
     B = BSFG_state$current_state$B
     B_factor = BSFG_state$current_state$B_F   %*% t(BSFG_state$current_state$Lambda)
-    plot(c(B),c(setup$B))
+    try({plot(c(B),c(setup$B))},silent = TRUE)
     abline(0,1)
     if(dim(B_factor)[1] > 1) {
-      plot(c(B_factor),c(setup$B_F %*% t(setup$error_factor_Lambda)))
+      try({plot(c(B_factor),c(setup$B_F %*% t(setup$error_factor_Lambda)))},silent = TRUE)
       abline(0,1)
       xlim = ylim = range(c(B,B_factor))
-      plot(c(B_factor),c(B),xlim = xlim,ylim=ylim);abline(0,1)
+      try({plot(c(B_factor),c(B),xlim = xlim,ylim=ylim);abline(0,1)},silent = TRUE)
     }
   }
 
   # cis_effects
   if(length(setup$cis_effects) > 0 &&  length(setup$cis_effects) == length(BSFG_state$current_state$cis_effects)){
-    plot(setup$cis_effects,BSFG_state$current_state$cis_effects);abline(0,1)
+    try({plot(setup$cis_effects,BSFG_state$current_state$cis_effects);abline(0,1)},silent = TRUE)
   }
 }
 
@@ -222,23 +222,24 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
 
   if(dim(setup$B)[1] > 1) {
     B_mean = apply(Posterior$B,c(2,3),mean)
-    plot(c(B_mean),c(setup$B))
+    try({plot(c(B_mean),c(setup$B))},silent = TRUE)
     abline(0,1)
     if(!is.null(setup$B_F) & ncol(BSFG_state$data_matrices$X_F) == nrow(setup$B_F)){
       B_factor_mean = with(c(Posterior,BSFG_state$data_matrices), {
         if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
         matrix(rowMeans(sapply(1:total_samples,function(i) B_F[i,,] %*% t(Lambda[i,,]))),nrow = ncol(X_F))
       })
-      plot(c(B_factor_mean),c(setup$B_F %*% t(setup$error_factor_Lambda)))
-      abline(0,1)
+      try({plot(c(B_factor_mean),c(setup$B_F %*% t(setup$error_factor_Lambda)));abline(0,1)},silent = TRUE)
       xlim = ylim = range(c(B_mean[-1,],B_factor_mean))
-      plot(c(B_factor_mean),c(B_mean),xlim = xlim,ylim=ylim);abline(0,1)
+      try({plot(c(B_factor_mean),c(B_mean),xlim = xlim,ylim=ylim);abline(0,1)},silent = TRUE)
       B_f_HPD = HPDinterval(mcmc(Posterior$B_F[,1,]))
       B_f_mean = colMeans(Posterior$B_F[,1,])
 
-      plot(1:length(B_f_mean),B_f_mean,xlim = c(1,length(B_f_mean)),ylim = range(B_f_HPD),xlab = '',main = 'Posterior B_F')
-      arrows(seq_along(B_f_mean),B_f_HPD[,1],seq_along(B_f_mean),B_f_HPD[,2],length=0)
-      abline(h=0)
+      try({
+        plot(1:length(B_f_mean),B_f_mean,xlim = c(1,length(B_f_mean)),ylim = range(B_f_HPD),xlab = '',main = 'Posterior B_F')
+        arrows(seq_along(B_f_mean),B_f_HPD[,1],seq_along(B_f_mean),B_f_HPD[,2],length=0)
+        abline(h=0)
+      },silent = TRUE)
     }
   }
 }

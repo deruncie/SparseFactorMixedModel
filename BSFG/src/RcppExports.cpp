@@ -28,6 +28,29 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_coefs_parallel_sparse_c_Eigen_group
+MatrixXd sample_coefs_parallel_sparse_c_Eigen_group(MSpMat Ut, Map<MatrixXd> Eta, Map<MatrixXd> W, Map<MatrixXd> old_coefs, VectorXi row_groups, Map<VectorXd> h2, Map<VectorXd> tot_Eta_prec, Map<VectorXd> s, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, Map<MatrixXd> randn_theta, Map<MatrixXd> randn_e, int grainSize);
+RcppExport SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen_group(SEXP UtSEXP, SEXP EtaSEXP, SEXP WSEXP, SEXP old_coefsSEXP, SEXP row_groupsSEXP, SEXP h2SEXP, SEXP tot_Eta_precSEXP, SEXP sSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< MSpMat >::type Ut(UtSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Eta(EtaSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type W(WSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type old_coefs(old_coefsSEXP);
+    Rcpp::traits::input_parameter< VectorXi >::type row_groups(row_groupsSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type h2(h2SEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type s(sSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_theta(randn_thetaSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_e(randn_eSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_coefs_parallel_sparse_c_Eigen_group(Ut, Eta, W, old_coefs, row_groups, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_coefs_set_c
 MatrixXd sample_coefs_set_c(Rcpp::List model_matrices, Rcpp::List randn_draws, Rcpp::List s_vectors, Map<VectorXd> h2s, Map<VectorXd> tot_Eta_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int n, int grainSize);
 RcppExport SEXP BSFG_sample_coefs_set_c(SEXP model_matricesSEXP, SEXP randn_drawsSEXP, SEXP s_vectorsSEXP, SEXP h2sSEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP nSEXP, SEXP grainSizeSEXP) {
