@@ -64,12 +64,26 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     Lambda = matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
     rownames(Lambda) = traitnames
 
-  # Factor scores:
-     # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
-	 #  Prior: Gamma distribution for each element
-     #       shape = tot_F_prec_shape
-     #       rate = tot_F_prec_rate
+    # residuals
+    # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
+    #  Prior: Gamma distribution for each element
+    #       shape = tot_Eta_prec_shape
+    #       rate = tot_Eta_prec_rate
+    tot_Eta_prec = with(priors,matrix(rgamma(p,shape = tot_Eta_prec_shape,rate = tot_Eta_prec_rate),nrow = 1))
+    colnames(tot_Eta_prec) = traitnames
+
+    # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
+    #  Prior: Gamma distribution for each element
+    #       shape = tot_F_prec_shape
+    #       rate = tot_F_prec_rate
     tot_F_prec = with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
+
+  # Factor scores:
+
+    # Resid discrete variances
+    # p-matrix of n_RE x p with
+    resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
+    resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
 
     # Factor discrete variances
      # k-matrix of n_RE x k with
@@ -81,39 +95,11 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     })
     names(U_F) = RE_names
 
-    # Factor fixed effects
-    B_F = matrix(rnorm(b_F * k),b_F,k)
-
-    F = X_F %*% B_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
-    for(effect in RE_names) {
-    	F = F + Z_matrices[[effect]] %*% U_F[[effect]]
-    }
-    F = as.matrix(F)
-    U_F = do.call(rbind,U_F)
-    rownames(U_F) = colnames(Z)
-
-  # residuals
-     # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
-	 #  Prior: Gamma distribution for each element
-     #       shape = tot_Eta_prec_shape
-     #       rate = tot_Eta_prec_rate
-    tot_Eta_prec = with(priors,matrix(rgamma(p,shape = tot_Eta_prec_shape,rate = tot_Eta_prec_rate),nrow = 1))
-    colnames(tot_Eta_prec) = traitnames
-
-    # Resid discrete variances
-     # p-matrix of n_RE x p with
-    resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
-    resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
-
     U_R = do.call(rbind,lapply(RE_names,function(effect){
-    	matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Eta_prec)),ncol = p, byrow = T)
+      matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Eta_prec)),ncol = p, byrow = T)
     }))
     colnames(U_R) = traitnames
     rownames(U_R) = colnames(Z)
-
-  # Fixed effects
-    B = matrix(rnorm(b*p), ncol = p)
-    colnames(B) = traitnames
 
     if(b > 0) {
       tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
@@ -129,10 +115,26 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     prec_B = matrix(tau_B,nrow = b, ncol = p)
     prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
 
+    # Fixed effects
+    B = matrix(rnorm(b*p), ncol = p) / sqrt(prec_B)
+    colnames(B) = traitnames
+
+    # Factor fixed effects
+    B_F = matrix(rnorm(b_F * k),b_F,k) / sqrt(prec_B_F)
+
+
     # cis effects
     cis_effects = matrix(rnorm(length(cis_effects_index),0,1),nrow=1)
 
     XB = X %*% B
+
+    F = X_F %*% B_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
+    for(effect in RE_names) {
+      F = F + Z_matrices[[effect]] %*% U_F[[effect]]
+    }
+    F = as.matrix(F)
+    U_F = do.call(rbind,U_F)
+    rownames(U_F) = colnames(Z)
 
 # ----------------------- #
 # ---Save initial values- #

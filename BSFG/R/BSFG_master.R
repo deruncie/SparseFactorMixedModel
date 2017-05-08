@@ -509,6 +509,7 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
   start_time = Sys.time()
   for(i in start_i+(1:n_samples)){
     BSFG_state$current_state$nrun = i
+    BSFG_state$current_state = BSFG_state$current_state[!sapply(BSFG_state$current_state,is.null)]
 
     # ----- Sample Lambda ---------------- #
     BSFG_state$current_state = sample_Lambda_B(BSFG_state,grainSize = grainSize,...)

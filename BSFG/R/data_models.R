@@ -122,10 +122,17 @@ regression_spline_model = function(Y,data_model_parameters,BSFG_state = list()){
       lm1 = lm(individual_model,observations)
       Terms = delete.response(terms(lm1))
 
+      if(!exists('var_Eta')) var_Eta = rep(1,length(coef(lm1)))
+
+      make_model_matrix = function(new_data) {
+        X = model.matrix(Terms,data = new_data)
+        sweep(X,2,sqrt(var_Eta),'*')
+      }
+
       model_matrices = lapply(data$ID,function(id) {
         x = which(observations$ID == id)
         list(
-          X = model.matrix(Terms,observations[x,]),
+          X = make_model_matrix(observations[x,]),
           y = Y[x,,drop=FALSE],
           position = x
         )
@@ -173,7 +180,7 @@ regression_spline_model = function(Y,data_model_parameters,BSFG_state = list()){
 
     resid_Y_prec = matrix(rgamma(1,shape = resid_Y_prec_shape + 0.5*n*p, rate = resid_Y_prec_rate + 0.5*sum(Y_tilde^2)))
 
-    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Terms = Terms,Y_fitted=matrix(Y_fitted)))
+    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Terms = Terms,var_Eta = var_Eta,Y_fitted=matrix(Y_fitted)))
   })
   return(list(state = data_model_state,
               posteriorSample_params = c('Y_fitted','Eta','resid_Y_prec'),
