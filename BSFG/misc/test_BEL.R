@@ -1,21 +1,24 @@
 library(Matrix)
 library(statmod)
 library(BSFG)
+library(MCMCpack)
 
 n = 200
-p = 500
+p = 1000
 b = 20
 
-# X = cbind(1,matrix(sample(c(0,1),n*p,replace=T),n,p))
+X = cbind(1,matrix(sample(c(0,1),n*p,replace=T),n,p))
+
+# K = matrix(rnorm(p*3),p); K = tcrossprod(K) + diag(1,p); cK = chol(K); X = matrix(rnorm(n*p),n,p) %*% (cK)
 # X = cbind(1,X)
 n = nrow(X)
 p = ncol(X)-1
 X = sweep(X,2,colMeans(X),'-')
 b_act = c(0,rep(0,p))
-b_act[sample(1:p,b)] = rnorm(b)
+b_act[sample(1:p,b)] = 1*rnorm(b)
 # b_act[1:b] = rnorm(b)
 
-y = X %*% b_act + .1*rnorm(n)
+y = X %*% b_act + sqrt(.1)*rnorm(n)
 
 
 l1 = 1
@@ -29,11 +32,12 @@ s = rep(1,n)
 h2 = 0
 prior_mean = rep(0,p+1)
 
-bs = c()
+bs = matrix(0,1000,p+1)
+prec_bs = matrix(0,1000,p+1)
 prec_ys = c()
-prec_bs = c()
 l1s = c()
 l2s = c()
+mu_hat = rep(0,length(y))
 
 t = 1
 
@@ -56,10 +60,12 @@ for(i in 1:1000){
 
   l1 = sqrt(rgamma(1,shape = 3+p/2, rate = 1+prec_y*t*sum(tau)/(8*l2)))
 
-  old_state = log(l2)
-  trial_state = old_state + rnorm(1,0,.5)
-  logps = log_post(c(old_state,trial_state),tau,l1,b[-1],prec_y,t,shape=3,rate=1)
-  if(log(runif(1)) < diff(logps)) l2 = exp(trial_state)
+  for(j in 1:20){
+    old_state = log(l2)
+    trial_state = old_state + rnorm(1,0,.5)
+    logps = log_post(c(old_state,trial_state),tau,l1,b[-1],prec_y,t,shape=3,rate=1)
+    if(log(runif(1)) < diff(logps)) l2 = exp(trial_state)
+  }
 
   scores = tot_prec_scores_c(y - X %*% b,h2,s)
   alpha = n/2 + p
@@ -70,25 +76,28 @@ for(i in 1:1000){
   }
   # prec_y = rgamma(1,shape = 2 + n/2,rate = 1.5 + 0.5*scores)
 
-  bs = rbind(bs,t(b))
-  prec_bs = rbind(prec_bs,prec_b)
+  bs[i,] = c(b)
+  prec_bs[i,] = c(prec_b)
   prec_ys = c(prec_ys,prec_y)
   l1s = c(l1s,l1)
   l2s = c(l2s,l2)
+  mu_hat = mu_hat + X %*% b / 1000
 
 }
 
 trace_plot(bs[,-1])
+plot(1/prec_ys)
 trace_plot(cbind(l1s,l2s))
 posterior_plot(bs[,-1])
 plot(colMeans(bs[,-1]),b_act[-1]);abline(0,1)
+plot(X %*% b_act,mu_hat);abline(0,1)
 
 
 prec_y = 10
 
-bs = c()
+bs = matrix(0,1000,p+1)
+prec_bs = matrix(0,1000,p+1)
 prec_ys = c()
-prec_bs = c()
 l1s = c()
 l2s = c()
 
@@ -121,8 +130,8 @@ for(i in 1:1000){
   scores = tot_prec_scores_c(y - X %*% b,h2,s)
   prec_y = rgamma(1,shape = 2 + n/2,rate = 1.5 + 0.5*scores)
 
-  bs = rbind(bs,t(b))
-  prec_bs = rbind(prec_bs,prec_b)
+  bs[i,] = c(b)
+  prec_bs[i,] = c(prec_b)
   prec_ys = c(prec_ys,prec_y)
   l1s = c(l1s,l1)
   l2s = c(l2s,l2)
@@ -131,6 +140,7 @@ for(i in 1:1000){
 
 trace_plot(bs[,-1])
 trace_plot(cbind(l1s,l2s))
+plot(1/prec_ys)
 posterior_plot(bs[,-1])
 plot(colMeans(bs[,-1]),b_act[-1]);abline(0,1)
 
@@ -164,12 +174,13 @@ for(i in 1:1000){
 }
 
 trace_plot(bs[,-1])
-p1=posterior_plot(bs[,-1]);p1 + geom_point(data = data.frame(x=1:p,y=b_act[-1]),aes(x=x,y=y))#geom_vline(xintercept = which(b_act[-1] != 0))
+p1=posterior_plot(bs[,-1]);p1 + geom_point(data = data.frame(x=1:p,y=b_act[-1]),aes(x=x,y=y)) + ylim(-1,1)#geom_vline(xintercept = which(b_act[-1] != 0))
 plot(colMeans(bs[,-1]),b_act[-1]);abline(0,1)
 
 
 ## Bayesian Lasso from BLR
-lambda = 50
+lambda = .13
+prec_b = c(1e-1,rep(1,p))
 bs = matrix(0,1000,length(b_act))
 prec_ys = c()
 prec_bs = c()
@@ -194,7 +205,7 @@ for(i in 1:1000){
   b = sample_coefs_parallel_sparse_c_Eigen(Ut,y,X,h2, prec_y,s, prior_mean,prec_b*t,randn_theta,randn_e,1)
 
   scores = tot_prec_scores_c(y - X %*% b,h2,s)
-  prec_y = rgamma(1,shape = 2 + n/2 + p/2,rate = 1.5 + 0.5*(scores + sum(b[-1]^2/tau_j)))
+  prec_y = rgamma(1,shape = 1 + n/2 + p/2,rate = 0 + 0.5*(scores + sum(b[-1]^2/tau_j)))
 
   bs[i,] = c(b)
   lambdas = c(lambdas,lambda)
@@ -202,16 +213,22 @@ for(i in 1:1000){
   # prec_bs = rbind(prec_bs,prec_b)
   prec_ys = c(prec_ys,prec_y)
 }
+plot(lambdas/prec_ys)
 
 trace_plot(bs[,-1])
+plot(lambdas)
 p1=posterior_plot(bs[,-1]);p1 + geom_point(data = data.frame(x=1:p,y=b_act[-1]),aes(x=x,y=y)) + ylim(c(-3,2))#geom_vline(xintercept = which(b_act[-1] != 0))
 plot(colMeans(bs[,-1]),b_act[-1]);abline(0,1)
 
 
 
 library(glmnet)
-res = cv.glmnet(X,y,alpha=0)
-plot(b_act,res$glmnet.fit$beta[,order(res$cvm)[1]])
+res = cv.glmnet(X,y,alpha=1,keep=T)
+res$lambda[order(res$cvm)[1]]
+alphas = seq(0.1,1,length=20)
+res_a = sapply(alphas,function(alpha) min(cv.glmnet(X,y,alpha=alpha,foldid = res$foldid)$cvm ))
+plot(alphas,res_a)
+plot(b_act,res$glmnet.fit$beta[,order(res$cvm)[1]]);abline(0,1)
 res = glmnet(X,y,alpha=l1)
 plot(res$beta,colMeans(bs));abline(0,1)
 
@@ -231,3 +248,37 @@ grav2$pheno = y
 out = scanone(grav2,pheno.col = 1,method='hk')
 plot(out$lod)
 
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+stan_model = stan('BEN.stan',chains=0)
+stan_data = list(
+  n = n,
+  p = p,
+  X = X[,-1],
+  y=y[,1]
+)
+
+Nchains <- 1
+Nwarm <- 20
+Niter <- Nwarm+100
+
+stan_fit = sampling(  object = get_stanmodel(stan_model),
+                      data =stan_data,
+                      iter=Niter,
+                      warmup = Nwarm,
+                      # init='0',
+                      init = list(list(beta = b[-1],lambda1=l1,lambda2=l2,
+                                       sigma = sqrt(1/prec_y),tau = tau)),
+                      chains = Nchains, verbose=F,
+                      refresh = 10,
+                      pars=c('beta','lambda1','lambda2','sigma','tau'), #
+                      open_progress = FALSE,
+                      show_messages = FALSE
+)
+plot(stan_fit)
+print(stan_fit)
+la = extract(stan_fit)
+plot(colMeans(la$beta),colMeans(bs[,-1]))
+trace_plot(cbind(la$lambda1,la$lambda2))
