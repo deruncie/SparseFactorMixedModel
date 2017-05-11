@@ -51,8 +51,8 @@ update_k = function( BSFG_state) {
 		p = nrow(Lambda)
 		b_F = ncol(X_F)
 
-		# to determine if Lambda is kept, first remove tot_F_prec
-		Lambda_star = sweep(Lambda,2,sqrt(1/tot_F_prec),'*')
+		# to determine if Lambda is kept, first remove empirical variance of F.
+		Lambda_star = sweep(Lambda,2,sqrt(1/colMeans(F^2)),'*')
 		lind = colMeans(abs(Lambda_star) < epsilon)    # proportion of elements in each column less than eps in magnitude
 		vec = lind >= prop
 		num = sum(vec)       # number of redundant columns
@@ -171,11 +171,11 @@ save_posterior_sample = function(BSFG_state) {
 	  U_R = as.matrix(BSFG_state$data_matrices$U_svd %*% U_R)
 	  U_F = as.matrix(BSFG_state$data_matrices$U_svd %*% U_F)
 		# transform variables so that the variance of each column of F is 1.
-		F_var = 1/tot_F_prec
-		U_F = sweep(U_F,2,sqrt(F_var),'/')
-		B_F = sweep(B_F,2,sqrt(F_var),'/')
-		F = sweep(F,2,sqrt(F_var),'/')
-		Lambda = sweep(Lambda,2,sqrt(F_var),'*')
+		# F_var = 1/tot_F_prec
+		# U_F = sweep(U_F,2,sqrt(F_var),'/')
+		# B_F = sweep(B_F,2,sqrt(F_var),'/')
+		# F = sweep(F,2,sqrt(F_var),'/')
+		# Lambda = sweep(Lambda,2,sqrt(F_var),'*')
 	})
 
 	sp = dim(Posterior$Lambda)[1]

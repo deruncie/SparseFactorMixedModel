@@ -101,12 +101,12 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
 
 
     if(b > 0) {
-      tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate)),nrow=1)
+      tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_resid_prec_shape, rate = priors$fixed_resid_prec_rate)),nrow=1)
     } else{
       tau_B = matrix(0,ncol=0,nrow=1)
     }
     if(b_F > 0) {
-      tau_B_F = matrix(rgamma(b_F,shape = priors$fixed_prec_shape, rate = priors$fixed_prec_rate),nrow=1)
+      tau_B_F = matrix(rgamma(b_F,shape = priors$fixed_factors_prec_shape, rate = priors$fixed_factors_prec_rate),nrow=1)
     } else{
       tau_B_F = matrix(0,ncol=0,nrow=1)
     }

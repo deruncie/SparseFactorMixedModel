@@ -103,11 +103,10 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @param data_model_parameters a list of parameters necessary for computing \code{data_model}.
 #'     Ex. Y_missing for the missing_data model.
 #'     If \code{data_model == 'missing_data'}, Y_missing is computed automatically.
-#' @param X_resid a design matrix. Alternative method for specifying fixed effects for \code{model}.
-#'     Care must be taken with the intercept if both a fixed effect model is specified for in both
-#'     \code{model} and \code{X_resid}.
-#' @param X_factor a design matrix. Alternative method for specifying \code{factor_model_fixed}.
-#'     Columns will be centered. Zero-variance columns will be assigned infinite precision.
+#' @param QTL_resid a design matrix. Intended for marker genotypes. Corresponding coefficients
+#'     will be modeled with the \code{QTL_resid_var} priors. Applies to factor residuals \eqn{Y - F\Lambda^T}
+#' @param QTL_factors a design matrix. Intended for marker genotypes. Corresponding coefficients
+#'     will be modeled with the \code{QTL_factor_var} priors. Applies to factors \eqn{F}.
 #' @param cis_genotypes a list of design matrices of length \code{p} (ie number of columns of \code{Eta})
 #'     This is used to specify trait-specific fixed effects, such a cis-genotypes
 #' @param posteriorSample_params A character vector giving names of parameters to save all posterior samples
@@ -125,7 +124,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'   parameters
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
-                     data_model = 'missing_data', data_model_parameters = NULL, X_resid = NULL, X_factor = NULL, cis_genotypes = NULL,
+                     data_model = 'missing_data', data_model_parameters = NULL, QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','U_R','tau_B','tau_B_F','cis_effects'),
                      posteriorMean_params = c(),
                      ncores = detectCores(),setup = NULL,verbose=T) {
@@ -190,6 +189,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 
 	# build X from fixed model
 	  # for Eta
+	resid_intercept = FALSE     # is there an intercept? If so, don't penalize coefficient.
+	QTL_columns_resid = NULL    # indexes of columns of X for QTLs. They get a different penalty
+
 	X = model.matrix(nobars(model),data)
 	linear_combos = caret::findLinearCombos(X)
 	if(!is.null(linear_combos$remove)) {
@@ -197,23 +199,24 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  X = X[,-linear_combos$remove]
 	}
 	if(all(X[,1] == 1)) {
-	  resid_intercept = TRUE   # is there an intercept? If so, don't penalize coefficient.
-	} else{
-	  resid_intercept = FALSE
+	  resid_intercept = TRUE
 	}
-	if(!is.null(X_resid)){
-	  if(is.data.frame(X_resid)) X_resid = as.matrix(X_resid)
-	  X = cbind(X, X_resid) # add in X_resid if provided.
+	if(!is.null(QTL_resid)){
+	  if(is.data.frame(QTL_resid)) QTL_resid = as.matrix(QTL_resid)
 	  same_fixed_model = FALSE
+	  QTL_columns_resid = ncol(X) + 1:ncol(QTL_resid)
+	  X = cbind(X, QTL_resid) # add in QTL_resid if provided.
 	}
 	b = ncol(X)
 
   # for F
+	QTL_columns_factors = NULL
 	  # note columns are centered, potentially resulting in zero-variance columns
 	X_F = model.matrix(factor_model_fixed,data)
-	if(!is.null(X_factor)){
-	  if(is.data.frame(X_factor)) X_factor = as.matrix(X_factor)
-	  X_F = cbind(X_F,X_factor)
+	if(!is.null(QTL_factors)){
+	  if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
+	  QTL_columns_factors = ncol(X_F) + 1:ncol(QTL_factors)
+	  X_F = cbind(X_F,QTL_factors)
 	  same_fixed_model = FALSE
 	}
 	X_F = sweep(X_F,2,colMeans(X_F),'-') #
@@ -385,6 +388,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  U_svd      = U_svd,  # matrix necessary to back-transform U_F and U_R (U*U_F and U*U_R) to get original random effects
 	  h2s_matrix = h2s_matrix,
 	  cis_genotypes = cis_genotypes,
+	  QTL_columns_resid = QTL_columns_resid,
+	  QTL_columns_factors = QTL_columns_factors,
 	  data       = data
 	)
 
@@ -411,9 +416,45 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	# ----------------------------- #
 	if(any(sapply(priors, function(x) {try({return(exists(x$nu) && x$nu <= 2)},silent=T);return(FALSE)}))) stop('priors nu must be > 2')
 	  # fixed effects
-	priors$fixed_prec_rate   = with(priors$fixed_var,V * nu)
-	priors$fixed_prec_shape  = with(priors$fixed_var,nu - 1)
+	if(length(priors$fixed_resid_var$V == 1)) {
+	  priors$fixed_resid_var$V = rep(priors$fixed_resid_var$V,b)
+	  priors$fixed_resid_var$nu = rep(priors$fixed_resid_var$nu,b)
+	}
+
+	if(length(priors$fixed_factors_var$V) == 0){
+	  priors$fixed_factors_var = priors$fixed_resid_var
+	} else if(length(priors$fixed_factors_var$V) == 1){
+	  priors$fixed_factors_var$V = rep(priors$fixed_factors_var$V,b)
+	  priors$fixed_factors_var$nu = rep(priors$fixed_factors_var$nu,b)
+	}
+
+	if(length(QTL_columns_resid)>0){
+	  if(length(priors$QTL_resid_var$V) == 1) {
+	    priors$QTL_resid_var$V = rep(priors$QTL_resid_var$V,length(QTL_columns_resid))
+	    priors$QTL_resid_var$nu = rep(priors$QTL_resid_var$nu,length(QTL_columns_resid))
+	  }
+	  priors$fixed_resid_var$V[QTL_columns_resid] = priors$QTL_resid_var$V
+	  priors$fixed_resid_var$nu[QTL_columns_resid] = priors$QTL_resid_var$nu
+	}
+	if(length(QTL_columns_factors)>0){
+	  if(length(priors$QTL_factors_var$V) == 1) {
+	    priors$QTL_factors_var$V = rep(priors$QTL_factors_var$V,length(QTL_columns_factors))
+	    priors$QTL_factors_var$nu = rep(priors$QTL_factors_var$nu,length(QTL_columns_factors))
+	  }
+	  priors$fixed_factors_var$V[QTL_columns_factors] = priors$QTL_factors_var$V
+	  priors$fixed_factors_var$nu[QTL_columns_factors] = priors$QTL_factors_var$nu
+	}
+
+	priors$fixed_resid_prec_rate   = with(priors$fixed_resid_var,V * nu)
+	priors$fixed_resid_prec_shape  = with(priors$fixed_resid_var,nu - 1)
+	priors$fixed_factors_prec_rate   = with(priors$fixed_factors_var,V * nu)
+	priors$fixed_factors_prec_shape  = with(priors$fixed_factors_var,nu - 1)
+
 	  # total precision
+	if(length(priors$tot_Y_var$V == 1)) {
+	  priors$tot_Y_var$V = rep(priors$tot_Y_var$V,p)
+	  priors$tot_Y_varnu = rep(priors$tot_Y_var$nu,p)
+	}
 	priors$tot_Eta_prec_rate   = with(priors$tot_Y_var,V * nu)
 	priors$tot_Eta_prec_shape  = with(priors$tot_Y_var,nu - 1)
 	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
@@ -523,7 +564,7 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
     BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
 
     # -----Sample prec_B ------------- #
-    BSFG_state$current_state = sample_prec_B_ARD(BSFG_state)
+    BSFG_state$current_state = sample_prec_B_QTLBEN(BSFG_state)
 
     # ----- sample Eta ----- #
     data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,BSFG_state)$state
@@ -604,7 +645,7 @@ sample_prec_B = function(BSFG_state){
       } else{
         B2 = B^2
       }
-      tau_B[1,] = rgamma(b, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
+      tau_B[1,] = rgamma(b, shape = fixed_resid_prec_shape + ncol(B2)/2, rate = fixed_resid_prec_rate + rowSums(B2)/2)
       if(resid_intercept){
         tau_B[1,1] = 1e-10
       }
@@ -615,7 +656,7 @@ sample_prec_B = function(BSFG_state){
         tau_B_F[1,] = tau_B[1,]
       } else{
         B_F2 = B_F^2
-        tau_B_F[1,] = rgamma(b_F, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2)/2)
+        tau_B_F[1,] = rgamma(b_F, shape = fixed_factors_prec_shape + ncol(B_F2)/2, rate = fixed_factors_prec_rate + rowSums(B_F2)/2)
       }
       tau_B_F[1,X_F_zero_variance] = 1e10
       prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
@@ -632,7 +673,7 @@ sample_prec_B_ARD = function(BSFG_state){
   current_state = with(c(priors,run_variables),within(current_state,{
     if(b > 0) {
       B2 = B^2
-      tau_B[1,] = rgamma(b, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums((B2 * prec_B/c(tau_B)))/2)
+      tau_B[1,] = rgamma(b, shape = fixed_resid_prec_shape + ncol(B2)/2, rate = fixed_resid_prec_rate + rowSums((B2 * prec_B/c(tau_B)))/2)
       prec_B[] = matrix(rgamma(b*p,shape = (B_df + 1)/2,rate = (B_df + B2*c(tau_B))/2),nr = b,nc = p)
       prec_B[] = prec_B*c(tau_B)
       if(resid_intercept){
@@ -642,9 +683,78 @@ sample_prec_B_ARD = function(BSFG_state){
     }
     if(b_F > 0) {
       B_F2 = B_F^2
-      tau_B_F[1,] = rgamma(b_F, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2 * prec_B_F/c(tau_B_F))/2)
+      tau_B_F[1,] = rgamma(b_F, shape = fixed_factors_prec_shape + ncol(B_F2)/2, rate = fixed_factors_prec_rate + rowSums(B_F2 * prec_B_F/c(tau_B_F))/2)
       prec_B_F[] = matrix(rgamma(b_F*k,shape = (B_F_df + 1)/2,rate = (B_F_df + B_F2*c(tau_B_F))/2),nr = b_F,nc = k)
       prec_B_F[] = prec_B_F*c(tau_B_F)
+      tau_B_F[1,X_F_zero_variance] = 1e10
+      prec_B_F[X_F_zero_variance,] = 1e10
+    }
+  }))
+  return(current_state)
+}
+
+sample_prec_B_QTLBEN = function(BSFG_state){
+  priors         = BSFG_state$priors
+  run_variables  = BSFG_state$run_variables
+  current_state  = BSFG_state$current_state
+
+  QTL_columns_resid = BSFG_state$data_matrices$QTL_columns_resid
+  QTL_columns_factors = BSFG_state$data_matrices$QTL_columns_factors
+
+  current_state = with(c(priors,run_variables),within(current_state,{
+    if(b > 0) {
+      non_QTL_resid = 1:nrow(B)
+      if(!is.null(QTL_columns_resid)){
+        non_QTL_resid = non_QTL_resid[-QTL_columns_resid]
+      }
+      B2 = B^2
+      tau_B[1,] = rgamma(b, shape = fixed_resid_prec_shape + ncol(B2)/2, rate = fixed_resid_prec_rate + rowSums((B2 * prec_B/c(tau_B)))/2)
+      # tau_B[1,non_QTL_resid] = rgamma(length(non_QTL_resid), shape = fixed_resid_prec_shape + ncol(B2)/2,
+                                      # rate = fixed_resid_prec_rate + rowSums((B2[non_QTL_resid,,drop=FALSE] * prec_B[non_QTL_resid,,drop=FALSE]/c(tau_B[non_QTL_resid])))/2)
+      prec_B[non_QTL_resid,] = matrix(rgamma(length(non_QTL_resid)*p,shape = (B_df + 1)/2,rate = (B_df + B2[non_QTL_resid,,drop=FALSE]*c(tau_B[non_QTL_resid]))/2),nr = length(non_QTL_resid),nc = p)
+      prec_B[non_QTL_resid,] = prec_B[non_QTL_resid,,drop=FALSE]*c(tau_B[non_QTL_resid])
+
+      # inverse Gaussian Bayesian Elastic Net from Li and Lin 2010
+      B_F_std = B_F[QTL_columns_resid,,drop=FALSE]
+      QTL_lambda1 = B_df
+      QTL_lambda2 = tau_B[QTL_columns_resid]
+      tau = matrix(1/rinvgauss(n=length(QTL_columns_resid)*p,
+                               mean = sqrt(QTL_lambda1)/(2*QTL_lambda2*abs(B_F_std)),
+                               shape = QTL_lambda1/(4*QTL_lambda2))+1,
+                  nr = length(QTL_columns_resid),nc = p)
+      prec_B[QTL_columns_resid,] = tau/(tau-1) * QTL_lambda2
+
+      if(resid_intercept){
+        tau_B[1,1] = 1e-10
+        prec_B[1,] = 1e-10
+      }
+    }
+    if(b_F > 0) {
+      non_QTL_factor = 1:nrow(B_F)
+      if(!is.null(QTL_columns_factors)){
+        non_QTL_factor = non_QTL_factor[-QTL_columns_factors]
+      }
+      B_F2 = B_F^2
+      tau_B_F[1,] = rgamma(b_F, shape = fixed_factors_prec_shape + ncol(B_F2)/2, rate = fixed_factors_prec_rate + rowSums(B_F2 * prec_B_F/c(tau_B_F))/2)
+      # tau_B_F[1,non_QTL_factor] = rgamma(length(non_QTL_factor), shape = fixed_factors_prec_shape + ncol(B_F2)/2,
+      #                                 rate = fixed_factors_prec_rate + rowSums((B_F2[non_QTL_factors,,drop=FALSE] * prec_B_F[non_QTL_factors,,drop=FALSE]/c(tau_B_F[non_QTL_factors])))/2)
+      prec_B_F[non_QTL_factor,] = matrix(rgamma(length(non_QTL_factor)*k,shape = (B_df + 1)/2,rate = (B_df + B_F2[non_QTL_factor,,drop=FALSE]*c(tau_B_F[non_QTL_factor]))/2),nr = length(non_QTL_factor),nc = k)
+      prec_B_F[non_QTL_factor,] = prec_B_F[non_QTL_factor,,drop=FALSE]*c(tau_B_F[non_QTL_factor])
+
+      # inverse Gaussian Bayesian Elastic Net from Li and Lin 2010
+      tau_B_F[QTL_columns_factors] = 1
+      QTL_lambda1 = B_df
+      QTL_lambda2 = B_df
+      tau = matrix(1/rinvgauss(n=length(QTL_columns_factors)*k,
+                               mean = sqrt(QTL_lambda1)/(2*QTL_lambda2*abs(B_F[QTL_columns_factors,,drop=FALSE])),
+                               shape = rep(QTL_lambda1*tau_B_F[QTL_columns_factors]/(4*QTL_lambda2),k)
+                               )+1,
+                   nr = length(QTL_columns_factors),nc = k)
+      prec_B_F[QTL_columns_factors,] = tau/(tau-1) * tau_B_F[QTL_columns_factors] * QTL_lambda2
+      prec_B_F[prec_B_F<0] = 1e-10
+      if(min(prec_B_F) < 0) recover()
+      rm(tau)
+
       tau_B_F[1,X_F_zero_variance] = 1e10
       prec_B_F[X_F_zero_variance,] = 1e10
     }
