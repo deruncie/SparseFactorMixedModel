@@ -54,11 +54,12 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
     BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
 
     # -----Sample prec_B ------------- #
-    BSFG_state$current_state = sample_prec_B_QTLBEN(BSFG_state)
+    BSFG_state$current_state = sample_prec_B_ARD(BSFG_state)
+    # BSFG_state$current_state = sample_prec_B_QTLBEN(BSFG_state)
 
     # ----- sample Eta ----- #
-    data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,BSFG_state)$state
-    BSFG_state$current_state[names(data_model_state)] = data_model_state
+    observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)$state
+    BSFG_state$current_state[names(observation_model_state)] = observation_model_state
 
     # -- adapt number of factors to samples ---#
     # if(i > 200 && i < burn && runif(1) < with(BSFG_state$run_parameters,1/exp(b0 + b1*i))){  # adapt with decreasing probability per iteration

@@ -66,15 +66,15 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'
 #'
 #' @param Y either a) a n x p matrix of data (n individuals x p traits), or b) a list describing
-#'     the data_model, data, and associated parameters. This list should contain:
-#'     i) \code{data_model}: a function modeled after \code{missing_data_model}
+#'     the observation_model, data, and associated parameters. This list should contain:
+#'     i) \code{observation_model}: a function modeled after \code{missing_observation_model}
 #'         (see code by typing this into the console) that draws posterior samples of Eta conditional on
 #'         the observations (Y) and the current state of the BSFG model (current_state).
 #'         The function should have the same form as \link{missing_data},
 #'         and must return Eta even if current_state is NULL.
 #'     ii) \code{observations}: a data.frame containing the observaition-level data and associated covariates.
 #'         This must include a column \code{ID} that is also present in \code{data}
-#'     iii) any other parameters necessary for \code{data_model}
+#'     iii) any other parameters necessary for \code{observation_model}
 #' @param model RHS of a model. The syntax is similar to \link{lmer}.
 #'     Random effects are specified by (1+factor | group), with the left side of the '|' a design
 #'     matrix, and the right side a random effect factor (group). For each random effect factor, a
@@ -124,7 +124,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'   parameters
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
-                     data_model = 'missing_data', data_model_parameters = NULL, QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
+                     QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','U_R','tau_B','tau_B_F','cis_effects'),
                      posteriorMean_params = c(),
                      ncores = detectCores(),setup = NULL,verbose=T) {
@@ -134,53 +134,55 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
   # ----------------------------- #
 
   if(is(Y,'list')){
-    if(!'data_model' %in% names(Y)) stop('data_model not specified in Y')
-    data_model = Y$data_model
-    data_model_parameters = Y[names(Y) != 'data_model']
-    Y = Y$observations$Y
-    if(is.character(data_model) && data_model == 'missing_data') {
-      data_model = missing_data_model
-      data_model_parameters = list(Y_missing = Matrix(is.na(Y)))
+    if(!'observation_model' %in% names(Y)) stop('observation_model not specified in Y')
+    observation_model = Y$observation_model
+    observation_model_parameters = Y[names(Y) != 'observation_model']
+  } else{
+    if(!is(Y,'matrix'))	Y = as.matrix(Y)
+    if(run_parameters$scale_Y){
+      Mean_Y = colMeans(Y,na.rm=T)
+      VY = apply(Y,2,var,na.rm=T)
+      Y = sweep(Y,2,Mean_Y,'-')
+      Y = sweep(Y,2,sqrt(VY),'/')
+    } else {
+      p_Y = dim(Y)[2]
+      Mean_Y = rep(0,p_Y)
+      VY = rep(1,p_Y)
     }
-    if(is.character(data_model) && data_model == 'voom_RNAseq') {
-      data_model = voom_model()
-      data_model_parameters$Y_std = Y * data_model_parameters$prec_Y
-    }
+    observation_model = missing_data_model
+    observation_model_parameters = list(
+      Y = Y,
+      Mean_Y = Mean_Y,
+      VY = VY
+    )
   }
 
-	# model dimensions
-	n = nrow(data)
-	p_Y = ncol(Y)
-	traitnames = colnames(Y)
-
-	Y_missing = Matrix(is.na(Y))
-
-	# scale Y
-	if(!is(Y,'matrix'))	Y = as.matrix(Y)
-	if(run_parameters$scale_Y){
-	  Mean_Y = colMeans(Y,na.rm=T)
-	  VY = apply(Y,2,var,na.rm=T)
-	  Y = sweep(Y,2,Mean_Y,'-')
-	  Y = sweep(Y,2,sqrt(VY),'/')
-	} else {
-	  p_Y = dim(Y)[2]
-	  Mean_Y = rep(0,p_Y)
-	  VY = rep(1,p_Y)
-	}
-
-	# use data_model to get dimensions, names of Y
-	if(is.character(data_model) && data_model == 'missing_data') {
-	  data_model = missing_data_model
-	  data_model_parameters = list(Y_missing = Matrix(is.na(Y)))
-	}
-	if(is.character(data_model) && data_model == 'voom_RNAseq') {
-	  data_model = voom_model()
-	  data_model_parameters$Y_std = Y * data_model_parameters$prec_Y
-	}
-	data_model_state = data_model(Y,data_model_parameters,list(data_matrices = list(data = data)))
-	Eta = data_model_state$state$Eta
-	p = ncol(Eta)
-	traitnames = colnames(Y)
+  # initialize Eta
+  observation_model_state = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
+  Eta = observation_model_state$state$Eta
+  n = nrow(data)
+  p = ncol(Eta)
+  traitnames = colnames(Y)
+#
+# 	# model dimensions
+# 	n = nrow(data)
+# 	p_Y = ncol(Y)
+# 	traitnames = colnames(Y)
+#
+# 	Y_missing = Matrix(is.na(Y))
+#
+# 	# scale Y
+# 	if(!is(Y,'matrix'))	Y = as.matrix(Y)
+#
+# 	# use observation_model to get dimensions, names of Y
+# 	if(is.character(observation_model) && observation_model == 'missing_data') {
+# 	  observation_model = missing_observation_model
+# 	  observation_model_parameters = list(Y_missing = Matrix(is.na(Y)))
+# 	}
+# 	if(is.character(observation_model) && observation_model == 'voom_RNAseq') {
+# 	  observation_model = voom_model()
+# 	  observation_model_parameters$Y_std = Y * observation_model_parameters$prec_Y
+# 	}
 
 	# if factor_model_fixed not specified, use fixed effects from model for both
 	if(is.null(factor_model_fixed)) {
@@ -395,7 +397,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	colnames(h2s_matrix) = NULL
 
 	data_matrices = list(
-	  Y          = Y,
 	  X          = X,
 	  X_F        = X_F,
 	  Z_matrices = Z_matrices,
@@ -414,16 +415,14 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  r_RE   = r_RE,
 	  b      = b,
 	  b_F    = b_F,
-	  Mean_Y = Mean_Y,
-	  VY     = VY,
 	  resid_intercept = resid_intercept,
 	  same_fixed_model = same_fixed_model,
 	  X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
 	  cis_effects_index = cis_effects_index
 	)
 
-	run_parameters$data_model = data_model
-	run_parameters$data_model_parameters = data_model_parameters
+	run_parameters$observation_model = observation_model
+	run_parameters$observation_model_parameters = observation_model_parameters
 
 
 	# ----------------------------- #
@@ -431,6 +430,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	# ----------------------------- #
 	if(any(sapply(priors, function(x) {try({return(exists(x$nu) && x$nu <= 2)},silent=T);return(FALSE)}))) stop('priors nu must be > 2')
 	  # fixed effects
+	if('fixed_var' %in% names(priors) && !'fixed_resid_var' %in% names(priors)) priors$fixed_resid_var = priors$fixed_var
+	if('fixed_var' %in% names(priors) && !'fixed_factors_var' %in% names(priors)) priors$fixed_factors_var = priors$fixed_var
 	if(length(priors$fixed_resid_var$V == 1)) {
 	  priors$fixed_resid_var$V = rep(priors$fixed_resid_var$V,b)
 	  priors$fixed_resid_var$nu = rep(priors$fixed_resid_var$nu,b)
@@ -498,15 +499,15 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,verbose=verbose,ncores=ncores)
 
 	# Initialize Eta
-	data_model_state = data_model(Y,data_model_parameters,BSFG_state)
-	BSFG_state$current_state[names(data_model_state$state)] = data_model_state$state
+	observation_model_state = observation_model(observation_model_parameters,BSFG_state)
+	BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
 
 	# ----------------------- #
 	# -Initialize Posterior-- #
 	# ----------------------- #
 	Posterior = list(
-	  posteriorSample_params = unique(c(posteriorSample_params,data_model_state$posteriorSample_params)),
-	  posteriorMean_params = unique(c(posteriorMean_params,data_model_state$posteriorMean_params)),
+	  posteriorSample_params = unique(c(posteriorSample_params,observation_model_state$posteriorSample_params)),
+	  posteriorMean_params = unique(c(posteriorMean_params,observation_model_state$posteriorMean_params)),
 	  total_samples = 0,
 	  folder = run_parameters$Posterior_folder,
 	  files = c()

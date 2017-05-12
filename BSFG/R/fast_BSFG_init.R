@@ -1,6 +1,5 @@
 initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = NULL,verbose=T,...){
 
-    Y          = BSFG_state$data_matrices$Y
     X          = BSFG_state$data_matrices$X
     X_F        = BSFG_state$data_matrices$X_F
     Z_matrices = BSFG_state$data_matrices$Z_matrices

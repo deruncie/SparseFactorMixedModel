@@ -1,4 +1,3 @@
-
 #' Sample missing data
 #'
 #' Function to sample missing data given model parameters.
@@ -11,13 +10,13 @@
 #'    These variables are added to current_state, but are not currently saved in Posterior
 #'
 #'    Initial values, hyperparameters, and any helper functions / parameters can be passed
-#'    in \code{data_model_parameters}.
+#'    in \code{observation_model_parameters}.
 #'
 #'    When run with an empty \code{current_state} and \code{data_matrices == NULL}, it should return
 #'    a matrix Eta of the correct dimensions, but the values are unimportant.
 #'
 #' @param Y data matrix n_Y x p_Y
-#' @param data_model_parameters List of parameters necessary for the data model.
+#' @param observation_model_parameters List of parameters necessary for the data model.
 #'      Here, a Matrix of coordinates of NAs in Y
 #' @param BSFG_state a BSFG_state object. Generally, only current_state and data_matrices is used. If
 #'    empty, will return a default set of parameters of the appropriate size for model initialization.
@@ -26,12 +25,13 @@
 #' @return posteriorSample_params a list of parameter names to record posterior samples of
 #' @return posteriorMean_params a list of parameters to record the posterior mean, but not save individual
 #'     posterior samples
-missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
+missing_data_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
   new_variables = c('Eta')
-  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
+  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+    if(!exists('Y_missing')) Y_missing = Matrix(is.na(Y))
     Eta = Y
     if(sum(Y_missing)  > 0){
       n = nrow(Y)
@@ -60,7 +60,7 @@ missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
 #' \code{voom} or \code{voomWithQualityWeights} (limma) should be run on RNAseq data,
 #'    resulting in logCPM (E) and inverseWeights (weights)
 #'    for each observation. The observations (E) should be passed as Y, and the weights as
-#'    data_model_parameters$prec_Y.
+#'    observation_model_parameters$prec_Y.
 #'
 #' When running \code{voom}, a fully-specified fixed effect model for the data should be specified.
 #'
@@ -69,12 +69,12 @@ missing_data_model = function(Y,data_model_parameters,BSFG_state = list()){
 #' @references Law, C. W., Chen, Y., Shi, W., & Smyth, G. K. (2014).
 #'     voom: precision weights unlock linear model analysis tools for RNA-seq read counts.
 #'     Genome Biology, 15(2), R29. http://doi.org/10.1186/gb-2004-5-10-r80
-voom_model = function(Y,data_model_parameters,BSFG_state = list()){
+voom_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
   new_variables = c('Eta')
-  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
+  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
     Eta = Y
     if(length(current_state) > 0){
       n = nrow(Y)
@@ -106,33 +106,32 @@ voom_model = function(Y,data_model_parameters,BSFG_state = list()){
 #'     unique). During sampling, should sample regression coefficients \code{Eta} given the factor model state.
 #'
 #' @param Y a vector of observation. Pre-scaled and centered if desired.
-#' @param data_model_parameters a list including:
+#' @param observation_model_parameters a list including:
 #'     1) \code{observations}, a data.frame with observation-level data including columns \code{ID} and \code{Y}
 #'     3) \code{individual_model} the model that should be applied to the data for each ID.
-regression_spline_model = function(Y,data_model_parameters,BSFG_state = list()){
+regression_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
-  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
+  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+
+    if(!exists('Y')) Y = NULL
 
     if(!exists('model_matrices')){
       if(!'ID' %in% colnames(data)) stop('ID column required in data')
       if(!length(unique(data$ID)) == nrow(data)) stop('duplicate IDs in data')
-
       lm1 = lm(individual_model,observations)
-      Terms = delete.response(terms(lm1))
+      t2 = delete.response(terms(lm1))
 
-      if(!exists('var_Eta')) var_Eta = rep(1,length(coef(lm1)))
-
-      make_model_matrix = function(new_data) {
-        X = model.matrix(Terms,data = new_data)
-        sweep(X,2,sqrt(var_Eta),'*')
-      }
+      mf = lm(individual_model,observations,method = 'model.frame')
+      traits = all.vars(update(individual_model,'~.0'))
+      Y = as.matrix(observations[,traits,drop=FALSE])
+      Terms = delete.response(terms(mf))
 
       model_matrices = lapply(data$ID,function(id) {
         x = which(observations$ID == id)
         list(
-          X = make_model_matrix(observations[x,]),
+          X = model.matrix(Terms,data = observations[x,]),
           y = Y[x,,drop=FALSE],
           position = x
         )
@@ -141,46 +140,58 @@ regression_spline_model = function(Y,data_model_parameters,BSFG_state = list()){
     }
 
     n = length(model_matrices)
-    p = ncol(model_matrices[[1]]$X)
-    Eta_col_names = colnames(model_matrices[[1]]$X)
+    n_traits = ncol(model_matrices[[1]]$y) # number of traits
+    p_trait = ncol(model_matrices[[1]]$X)  # number of coefficients per trait
+    p = p_trait * n_traits # total number of coefficients
+    traits = colnames(model_matrices[[1]]$y)
+    Eta_col_names = paste(rep(traits,each = p_trait),rep(colnames(model_matrices[[1]]$X),length(traits)),sep='::')
     Eta_row_names = data$ID
+    if(!exists('var_Eta')) var_Eta = rep(1,p)
 
     if(length(current_state) == 0){
       Eta_mean = matrix(0,n,p)
-      resid_Eta_prec = matrix(1e-10,1,p)
-      resid_Y_prec = matrix(1)  # only a single precision parameter for the data_model?
+      resid_Eta_prec = matrix(1,1,p)
+      resid_Y_prec = matrix(rep(1,n_traits),nr=1)  # only a single precision parameter for the data_model?
     } else{
       Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
-      if(!exists('resid_Y_prec')) resid_Y_prec = matrix(1)
+      if(!exists('resid_Y_prec')) resid_Y_prec = matrix(rep(1,n_traits),nr=1)
     }
+
+    # re-scale Eta_mean and resid_Eta_prec
+    Eta_mean = sweep(Eta_mean,2,sqrt(var_Eta),'*')
+    resid_Eta_prec[] = resid_Eta_prec / var_Eta
 
     randn_draws = lapply(1:n,function(i) {
       list(
-        randn_theta = rnorm(ncol(model_matrices[[i]]$X)),
-        randn_e = rnorm(length(model_matrices[[i]]$y))
+        randn_theta = matrix(rnorm(p),p_trait),
+        randn_e = matrix(rnorm(length(model_matrices[[i]]$y)),ncol = n_traits)
       )
     })
     s_vectors = lapply(1:n,function(i) rep(1,nrow(model_matrices[[i]]$X)))
-    Eta = sample_coefs_set_c(model_matrices,randn_draws,s_vectors,rep(0,n),rep(resid_Y_prec,n),as.matrix(t(Eta_mean)),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
+    Eta = sample_coefs_set_c(model_matrices,randn_draws,s_vectors,matrix(0,n,n_traits),
+                             matrix(resid_Y_prec,n,n_traits,byrow=T),as.matrix(t(Eta_mean)),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
     Eta = t(Eta)
     colnames(Eta) = Eta_col_names
     rownames(Eta) = Eta_row_names
 
+    # un-scale Eta
+    Eta = sweep(Eta,2,sqrt(var_Eta),'/')
+
     if(!exists('ncores')) ncores = 1
     convert_Matrix = is( model_matrices[[1]]$X,'Matrix')
-    Y_fitted = do.call(c,parallel::mclapply(1:n,function(i) {
-      y_fitted = model_matrices[[i]]$X %*% Eta[i,]
-      if(convert_Matrix) y_fitted = y_fitted@x
+    Y_fitted = do.call(rbind,parallel::mclapply(1:n,function(i) {
+      y_fitted = model_matrices[[i]]$X %*% matrix(Eta[i,],ncol=n_traits)
+      if(convert_Matrix) y_fitted = matrix(y_fitted@x,ncol=n_traits)
       y_fitted
     },mc.cores = ncores))
-    Y_fitted = Y_fitted[order(do.call(c,lapply(model_matrices,function(x) x$position)))]
+    Y_fitted = Y_fitted[order(do.call(c,lapply(model_matrices,function(x) x$position))),,drop=FALSE]
 
     Y_tilde = Y - Y_fitted
 
-    resid_Y_prec = matrix(rgamma(1,shape = resid_Y_prec_shape + 0.5*n*p, rate = resid_Y_prec_rate + 0.5*sum(Y_tilde^2)))
+    resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape + 0.5*nrow(Y_tilde), rate = resid_Y_prec_rate + 0.5*colSums(Y_tilde^2)),nr=1)
 
-    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Terms = Terms,var_Eta = var_Eta,Y_fitted=matrix(Y_fitted)))
+    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Terms = Terms,var_Eta = var_Eta,Y = Y, Y_fitted=Y_fitted))
   })
   return(list(state = data_model_state,
               posteriorSample_params = c('Y_fitted','Eta','resid_Y_prec'),
@@ -200,15 +211,15 @@ regression_spline_model = function(Y,data_model_parameters,BSFG_state = list()){
 #'     unique)
 #'
 #' @param Y a vector of observation. Pre-scaled and centered if desired.
-#' @param data_model_parameters a list including:
+#' @param observation_model_parameters a list including:
 #'     \code{observations}, a data.frame with columns: \code{ID}, \code{N} and \code{covariate}, ordered by ID.
 #'     and the variables df, knots, degree and intercept.
 #'     Empty values will use the defaults for \code{bs()}.
-bs_binomial_model = function(Y,data_model_parameters,BSFG_state = list()){
+bs_binomial_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
-  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
+  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
 
   log_binom = function(beta,X,y,N,mu, sigma2){
     Xbeta = X %*% beta
@@ -264,11 +275,11 @@ bs_binomial_model = function(Y,data_model_parameters,BSFG_state = list()){
   )
 }
 
-probe_gene_model = function(Y,data_model_parameters,BSFG_state = list()){
+probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
   new_variables = c('Eta','resid_Y_prec','mu_probe')
-  data_model_state = with(c(data_model_parameters,data_matrices,current_state),{
+  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
     p = nrow(Z_Y)
     n = nrow(Y)
 
@@ -321,9 +332,9 @@ probe_gene_model = function(Y,data_model_parameters,BSFG_state = list()){
 #'     as resid_Y_prec, Eta_mean and resid_Eta_prec are updated each iteraction.
 #'
 #' @param Y a vector of observation. Pre-scaled and centered if desired.
-#' @param data_model_parameters a list of model matrices for the cis-genotypes of each gene.
+#' @param observation_model_parameters a list of model matrices for the cis-genotypes of each gene.
 #'      If named, the names should correspond to the column names of Y
-# cis_eQTL_model = function(Y,data_model_parameters,BSFG_state = list()){
+# cis_eQTL_model = function(Y,observation_model_parameters,BSFG_state = list()){
 #   current_state = BSFG_state$current_state
 #   data_matrices = BSFG_state$data_matrices
 #
@@ -332,17 +343,17 @@ probe_gene_model = function(Y,data_model_parameters,BSFG_state = list()){
 #
 #     if(length(current_state) == 0){
 #       # prep model matrices
-#       if(!is.null(names(data_model_parameters))) {
-#         if(is.null(colnames(Y)) & length(data_model_parameters) == ncol(Y)) colnames(Y) = colnames(data_model_parameters)
-#         if(!all(colnames(Y) %in% colnames(data_model_parameters))) stop('column names of Y and cis-genotype names do not match')
+#       if(!is.null(names(observation_model_parameters))) {
+#         if(is.null(colnames(Y)) & length(observation_model_parameters) == ncol(Y)) colnames(Y) = colnames(observation_model_parameters)
+#         if(!all(colnames(Y) %in% colnames(observation_model_parameters))) stop('column names of Y and cis-genotype names do not match')
 #       } else{
 #         if(is.null(colnames(Y))){
-#           if(!length(data_model_parameters) == ncol(Y)) stop('wrong number of cis-genotypes provided')
-#           colnames(Y) = names(data_model_parameters) = 1:ncol(Y)
+#           if(!length(observation_model_parameters) == ncol(Y)) stop('wrong number of cis-genotypes provided')
+#           colnames(Y) = names(observation_model_parameters) = 1:ncol(Y)
 #         }
 #       }
 #       model_matrices = lapply(colnames(Y),function(i) {
-#         X = model.matrix(~0+data_model_parameters[[i]])
+#         X = model.matrix(~0+observation_model_parameters[[i]])
 #         XtX = crossprod(X)
 #         XtXiXt = solve(XtX) %*% t(X)
 #         chol_XtX = chol(XtX)
