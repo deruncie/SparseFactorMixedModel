@@ -53,16 +53,19 @@ run_parameters = BSFG_control(
   h2_divisions = 2,
   h2_step_size = .3,
   burn = 00,
-  k_init = 8
+  k_init = 10
 )
 
 priors = list(
-  # fixed_var = list(V = 5e5,   nu = 2.001),
-  fixed_var = list(V = 1/10000,     nu = 3*1000),
+  # fixed_resid_var = list(V = 5e5,   nu = 2.001),
+  fixed_resid_var = list(V = 1,     nu = 3),
+  QTL_resid_var = list(V = 1/10000,     nu = 3*1000),
+  QTL_factors_var = list(V = 1/10000,     nu = 3*1000),
   tot_Y_var = list(V = 0.5,   nu = 3),
   tot_F_var = list(V = 18/20, nu = 20),
+  # tot_F_var = list(V = 1, nu = 10000),
   delta_1   = list(shape = 2.1,  rate = 1/20),
-  delta_2   = list(shape = 3, rate = 1),
+  delta_2   = list(shape = 2, rate = 1),
   Lambda_df = 3,
   B_df      = 3,
   B_F_df    = 3
@@ -73,11 +76,11 @@ BSFG_state = BSFG_init(observations$Y, model=~1+(1|ID), data,
                        priors=priors,run_parameters=run_parameters,
                        data_model = regression_spline_model, data_model_parameters = data_model_parameters,
                        posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects','U_R','prec_B','prec_B_F'),
-                       posteriorMean_params = c(),X_factor = X#, X_resid = X
+                       posteriorMean_params = c(),QTL_factors = X#, QTL_resid = X
 )
 BSFG_state$current_state$F_h2
-BSFG_state$current_state$B_F[] = 0
-BSFG_state$current_state$B[] = 0
+# BSFG_state$current_state$B_F[] = 0
+# BSFG_state$current_state$B[] = 0
 
 h2_divisions = run_parameters$h2_divisions
 BSFG_state$priors$h2_priors_resids = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
@@ -103,6 +106,8 @@ rescale_model_matrices = function(var_Eta_factor,current_state){
 }
 
 n_samples = 200
+scanone_results = list()
+grav_eta = grav
 for(i  in 1:100) {
   print(sprintf('Run %d',i))
   BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
@@ -110,7 +115,8 @@ for(i  in 1:100) {
   if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
     BSFG_state = reorder_factors(BSFG_state)
   }
-  p = posterior_plot(BSFG_state$Posterior$B_F[,-1,1],colorGroup = Chr)
+  p1 = posterior_plot(BSFG_state$Posterior$B_F[,-1,1],colorGroup = Chr)
+  p2 = trace_plot(BSFG_state$Posterior$B_F[,-1,1])
   BSFG_state = save_posterior_chunk(BSFG_state)
   print(BSFG_state)
   plot(BSFG_state)
@@ -122,22 +128,29 @@ for(i  in 1:100) {
   print(ggplot(a,aes(x=X2,y=value,group=X1)) + geom_line())
   a = melt(sweep(Eta,2,sqrt(BSFG_state$current_state$var_Eta),'*')[,-c(1:3)])
   print(ggplot(a,aes(x=X2,y=value,group=X1)) + geom_line())
-  print(p)
+  print(p1)
+  print(p2)
   plot(BSFG_state$data_matrices$Y,BSFG_state$current_state$Y_fitted);abline(0,1)
   var_Eta = apply(BSFG_state$current_state$Eta,2,var)
   print(cbind(var_Eta,apply(BSFG_state$current_state$model_matrices[[1]]$X,2,var)))
-  if(i < 5) {
+  if(i < -5) {
     BSFG_state$current_state = rescale_model_matrices(var_Eta,BSFG_state$current_state)
-  } else if(i < 10 || (i-1) %% 20 == 0) {
-  BSFG_state$current_state = update_k(BSFG_state)
-  BSFG_state = reorder_factors(BSFG_state)
-  BSFG_state = clear_Posterior(BSFG_state)
+  } else if(i < 10 || (i-1) %% 10 == 0) {
+    # BSFG_state$current_state = update_k(BSFG_state)
+    BSFG_state = reorder_factors(BSFG_state)
+    BSFG_state = clear_Posterior(BSFG_state)
   }
+  grav_eta$pheno = BSFG_state$current_state$F
+  phecol = 1:ncol(grav_eta$pheno)
+  scanone_results[[i]] = scanone(grav_eta, phe=phecol, method="hk")
 }
 
-spline_X = model.matrix(BSFG_state$current_state$Terms,data = data.frame(Time = times))
+spline_X = model.matrix(BSFG_state$current_state$Terms,data = data.frame(Time = seq(min(times),max(times),length=30)))
+QTL_effects = 2:ncol(BSFG_state$data_matrices$X_F)
+QTL_Chr = Chr
 
 Posterior = reload_Posterior(BSFG_state)
+total_samples = Posterior$total_samples
 posterior_plot(Posterior$B_F[,-1,1],colorGroup = Chr)
 
 total_samples = Posterior$total_samples

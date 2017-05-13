@@ -204,76 +204,79 @@ MatrixXd sample_coefs_set_c(
     Rcpp::List model_matrices,
     Rcpp::List randn_draws,
     Rcpp::List s_vectors,
-    Map<VectorXd> h2s,
-    Map<VectorXd> tot_Eta_prec,
+    Map<MatrixXd> h2s,
+    Map<MatrixXd> tot_Eta_prec,
     Map<MatrixXd> prior_mean,
     Map<MatrixXd> prior_prec,
     int n,
     int grainSize){
 
   struct sampleColumn : public Worker {
-    std::vector<VectorXd> UtEta_list;
+    std::vector<MatrixXd> UtEta_list;
     std::vector<MatrixXd> UtW_list;
-    std::vector<VectorXd> randn_theta_list;
-    std::vector<VectorXd> randn_e_list;
+    std::vector<MatrixXd> randn_theta_list;
+    std::vector<MatrixXd> randn_e_list;
     std::vector<VectorXd> s_list;
-    VectorXd h2s,tot_Eta_prec;
+    MatrixXd h2s,tot_Eta_prec;
     MatrixXd prior_mean,prior_prec;
+    int n_traits;
     MatrixXd &coefs;
 
     sampleColumn(
-      std::vector<VectorXd> UtEta_list,
+      std::vector<MatrixXd> UtEta_list,
       std::vector<MatrixXd> UtW_list,
-      std::vector<VectorXd> randn_theta_list,
-      std::vector<VectorXd> randn_e_list,
+      std::vector<MatrixXd> randn_theta_list,
+      std::vector<MatrixXd> randn_e_list,
       std::vector<VectorXd> s_list,
-      VectorXd h2s,
-      VectorXd tot_Eta_prec,
+      MatrixXd h2s,
+      MatrixXd tot_Eta_prec,
       MatrixXd prior_mean,
       MatrixXd prior_prec,
+      int n_traits,
       MatrixXd &coefs) :
       UtEta_list(UtEta_list), UtW_list(UtW_list), randn_theta_list(randn_theta_list), randn_e_list(randn_e_list),s_list(s_list),
-      h2s(h2s), tot_Eta_prec(tot_Eta_prec),prior_mean(prior_mean), prior_prec(prior_prec),
+      h2s(h2s), tot_Eta_prec(tot_Eta_prec),prior_mean(prior_mean), prior_prec(prior_prec),n_traits(n_traits),
       coefs(coefs)
     {}
 
     void operator()(std::size_t begin, std::size_t end) {
       for(std::size_t j = begin; j < end; j++){
-        int b = randn_theta_list[j].size();
-        int n = randn_e_list[j].size();
-        coefs.col(j) = sample_coefs_single(UtEta_list[j], UtW_list[j], prior_mean.col(j),
-                  prior_prec.col(j), h2s(j), tot_Eta_prec(j), randn_theta_list[j],
-                                                                              randn_e_list[j],s_list[j],b,n);
+        int b = randn_theta_list[j].rows();
+        int n = randn_e_list[j].rows();
+        for(int t = 0; t < n_traits; t++) {
+          coefs.block(t*b,j,b,1) = sample_coefs_single(UtEta_list[j].col(t), UtW_list[j], prior_mean.block(t*b,j,b,1),
+                      prior_prec.block(t*b,j,b,1), h2s(j,t), tot_Eta_prec(j,t), randn_theta_list[j].col(t),randn_e_list[j].col(t),s_list[j],b,n);
+        }
       }
     }
   };
 
-  std::vector<VectorXd> UtEta_list;
+  std::vector<MatrixXd> UtEta_list;
   std::vector<MatrixXd> UtW_list;
-  std::vector<VectorXd> randn_theta_list;
-  std::vector<VectorXd> randn_e_list;
+  std::vector<MatrixXd> randn_theta_list;
+  std::vector<MatrixXd> randn_e_list;
   std::vector<VectorXd> s_list;
   for(int i = 0; i < n; i++){
     Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
     Rcpp::List randn_draws_i = Rcpp::as<Rcpp::List>(randn_draws[i]);
-    UtEta_list.push_back(Rcpp::as<VectorXd>(model_matrix_i["y"]));
+    UtEta_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["y"]));
     UtW_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));
-    randn_theta_list.push_back(Rcpp::as<VectorXd>(randn_draws_i["randn_theta"]));
-    randn_e_list.push_back(Rcpp::as<VectorXd>(randn_draws_i["randn_e"]));
+    randn_theta_list.push_back(Rcpp::as<MatrixXd>(randn_draws_i["randn_theta"]));
+    randn_e_list.push_back(Rcpp::as<MatrixXd>(randn_draws_i["randn_e"]));
     s_list.push_back(Rcpp::as<VectorXd>(s_vectors[i]));
   }
 
-  int b = randn_theta_list[0].size();
-  int p = UtEta_list.size();
+  int n_traits = UtEta_list[0].cols();
+  int b = randn_theta_list[0].rows()*n_traits;
 
+  MatrixXd coefs(b,n);
 
-  MatrixXd coefs(b,p);
-
-  sampleColumn sampler(UtEta_list, UtW_list,randn_theta_list,randn_e_list,s_list,h2s,tot_Eta_prec,prior_mean,prior_prec,coefs);
-  RcppParallel::parallelFor(0,p,sampler,grainSize);
+  sampleColumn sampler(UtEta_list, UtW_list,randn_theta_list,randn_e_list,s_list,h2s,tot_Eta_prec,prior_mean,prior_prec,n_traits,coefs);
+  RcppParallel::parallelFor(0,n,sampler,grainSize);
 
   return(coefs);
 }
+
 
 // -------------------------- //
 // -------------------------- //

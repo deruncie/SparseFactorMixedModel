@@ -52,7 +52,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_coefs_set_c
-MatrixXd sample_coefs_set_c(Rcpp::List model_matrices, Rcpp::List randn_draws, Rcpp::List s_vectors, Map<VectorXd> h2s, Map<VectorXd> tot_Eta_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int n, int grainSize);
+MatrixXd sample_coefs_set_c(Rcpp::List model_matrices, Rcpp::List randn_draws, Rcpp::List s_vectors, Map<MatrixXd> h2s, Map<MatrixXd> tot_Eta_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int n, int grainSize);
 RcppExport SEXP BSFG_sample_coefs_set_c(SEXP model_matricesSEXP, SEXP randn_drawsSEXP, SEXP s_vectorsSEXP, SEXP h2sSEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP nSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -60,8 +60,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Rcpp::List >::type model_matrices(model_matricesSEXP);
     Rcpp::traits::input_parameter< Rcpp::List >::type randn_draws(randn_drawsSEXP);
     Rcpp::traits::input_parameter< Rcpp::List >::type s_vectors(s_vectorsSEXP);
-    Rcpp::traits::input_parameter< Map<VectorXd> >::type h2s(h2sSEXP);
-    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s(h2sSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
     Rcpp::traits::input_parameter< int >::type n(nSEXP);

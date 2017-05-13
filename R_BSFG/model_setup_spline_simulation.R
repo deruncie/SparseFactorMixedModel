@@ -1,6 +1,8 @@
 library(microbenchmark)
 library(MCMCpack)
 library(BSFG)
+library(cowplot)
+library(splines)
 
 # set the directory to the location of the setup.RData or setup.mat file
 
@@ -60,9 +62,14 @@ load('../setup.RData')
 #   resid_Y_prec_shape = 2,
 #   resid_Y_prec_rate = 1
 # )
-data_model_parameters = list(
+setup$observations$A = setup$observations$Y
+setup$observations$B = setup$observations$Y
+setup$observations$C = setup$observations$Y
+observation_setup = list(
+  observation_model = regression_model,
   observations = setup$observations,
-  individual_model = Y~poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=T),
+  # individual_model = Y~ poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=F),
+  individual_model = cbind(A,B,C)~poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=F),
   resid_Y_prec_shape = 2,
   resid_Y_prec_rate = 1
 )
@@ -70,9 +77,8 @@ data_model_parameters = list(
 
 setup$data$ID = unique(setup$observations$ID)
 # options(error=recover)
-BSFG_state = with(setup,BSFG_init(observations$Y, model=~X2+(1|animal), data, #factor_model_fixed = ~1,
+BSFG_state = with(setup,BSFG_init(observation_setup, model=~X2+(1|animal), data, #factor_model_fixed = ~1,
                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
-                                  data_model = regression_spline_model, data_model_parameters = data_model_parameters,
                                   posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects','U_R'),
                                   posteriorMean_params = c()
                                   ))
@@ -111,14 +117,15 @@ for(i  in 1:70) {
     BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
     plot(BSFG_state)
-    plot(BSFG_state$data_matrices$Y,BSFG_state$current_state$Y_fitted);abline(0,1)
+    plot(BSFG_state$current_state$Y,BSFG_state$current_state$Y_fitted);abline(0,1)
 }
 
 Posterior = reload_Posterior(BSFG_state)
 data = setup$observations
-data$Y_fitted = apply(Posterior$Y_fitted,c(2,3),mean)
-data$Y_fitted_low = apply(Posterior$Y_fitted,c(2,3),function(x) HPDinterval(mcmc(x))[1])
-data$Y_fitted_high = apply(Posterior$Y_fitted,c(2,3),function(x) HPDinterval(mcmc(x))[2])
+trait = 2
+data$Y_fitted = colMeans(Posterior$Y_fitted[,,trait])
+data$Y_fitted_low = apply(Posterior$Y_fitted[,,trait],2,function(x) HPDinterval(mcmc(x))[1])
+data$Y_fitted_high = apply(Posterior$Y_fitted[,,trait],2,function(x) HPDinterval(mcmc(x))[2])
 # data$Y_fitted = BSFG_state$current_state$Y_fitted
 ggplot(data,aes(x=covariate,y=Y)) + geom_line(aes(group = ID)) + geom_line(aes(y=Y_fitted,group=ID),color ='red')
 ggplot(subset(data,ID %in% c(1,2,21,22)),aes(x=covariate,y=Y)) + geom_ribbon(aes(ymin = Y_fitted_low,ymax = Y_fitted_high,group = ID),alpha = 0.2) + geom_line(aes(group = ID)) + geom_line(aes(y=Y_fitted,group=ID),color ='red')

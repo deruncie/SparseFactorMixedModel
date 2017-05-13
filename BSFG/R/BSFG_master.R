@@ -65,7 +65,16 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' sampler.
 #'
 #'
-#' @param Y a n x p matrix of data (n individuals x p traits)
+#' @param Y either a) a n x p matrix of data (n individuals x p traits), or b) a list describing
+#'     the observation_model, data, and associated parameters. This list should contain:
+#'     i) \code{observation_model}: a function modeled after \code{missing_observation_model}
+#'         (see code by typing this into the console) that draws posterior samples of Eta conditional on
+#'         the observations (Y) and the current state of the BSFG model (current_state).
+#'         The function should have the same form as \link{missing_data},
+#'         and must return Eta even if current_state is NULL.
+#'     ii) \code{observations}: a data.frame containing the observaition-level data and associated covariates.
+#'         This must include a column \code{ID} that is also present in \code{data}
+#'     iii) any other parameters necessary for \code{observation_model}
 #' @param model RHS of a model. The syntax is similar to \link{lmer}.
 #'     Random effects are specified by (1+factor | group), with the left side of the '|' a design
 #'     matrix, and the right side a random effect factor (group). For each random effect factor, a
@@ -94,20 +103,10 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'   for K_inv_mats) for any of the random effects, K is assumed to be the identity.
 #' @param K_inv_mats list of precision matrices for random effects. If none provided (and none
 #'   provided for K_mats) for any of the random effects, K is assumed to be the identity.
-#' @param data_model either a character vector identifying a provided data_model
-#'     (ex. 'missing_data' calls \link{missing_data_model}),
-#'     or a function modeled after \code{missing_data_model} (see code by typing this into the console)
-#'     that draws posterior samples of Eta conditional on
-#'     the observations (Y) and the current state of the BSFG model (current_state). The function should have
-#'     the same form as \link{missing_data}, and must return Eta even if current_state is NULL
-#' @param data_model_parameters a list of parameters necessary for computing \code{data_model}.
-#'     Ex. Y_missing for the missing_data model.
-#'     If \code{data_model == 'missing_data'}, Y_missing is computed automatically.
-#' @param X_resid a design matrix. Alternative method for specifying fixed effects for \code{model}.
-#'     Care must be taken with the intercept if both a fixed effect model is specified for in both
-#'     \code{model} and \code{X_resid}.
-#' @param X_factor a design matrix. Alternative method for specifying \code{factor_model_fixed}.
-#'     Columns will be centered. Zero-variance columns will be assigned infinite precision.
+#' @param QTL_resid a design matrix. Intended for marker genotypes. Corresponding coefficients
+#'     will be modeled with the \code{QTL_resid_var} priors. Applies to factor residuals \eqn{Y - F\Lambda^T}
+#' @param QTL_factors a design matrix. Intended for marker genotypes. Corresponding coefficients
+#'     will be modeled with the \code{QTL_factor_var} priors. Applies to factors \eqn{F}.
 #' @param cis_genotypes a list of design matrices of length \code{p} (ie number of columns of \code{Eta})
 #'     This is used to specify trait-specific fixed effects, such a cis-genotypes
 #' @param posteriorSample_params A character vector giving names of parameters to save all posterior samples
@@ -125,7 +124,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #'   parameters
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
-                     data_model = 'missing_data', data_model_parameters = NULL, X_resid = NULL, X_factor = NULL, cis_genotypes = NULL,
+                     QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','U_R','tau_B','tau_B_F','cis_effects'),
                      posteriorMean_params = c(),
                      ncores = detectCores(),setup = NULL,verbose=T) {
@@ -134,39 +133,56 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
   # ---- build model matrices --- #
   # ----------------------------- #
 
-	# model dimensions
-	n = nrow(data)
-	p_Y = ncol(Y)
-	traitnames = colnames(Y)
+  if(is(Y,'list')){
+    if(!'observation_model' %in% names(Y)) stop('observation_model not specified in Y')
+    observation_model = Y$observation_model
+    observation_model_parameters = Y[names(Y) != 'observation_model']
+  } else{
+    if(!is(Y,'matrix'))	Y = as.matrix(Y)
+    if(run_parameters$scale_Y){
+      Mean_Y = colMeans(Y,na.rm=T)
+      VY = apply(Y,2,var,na.rm=T)
+      Y = sweep(Y,2,Mean_Y,'-')
+      Y = sweep(Y,2,sqrt(VY),'/')
+    } else {
+      p_Y = dim(Y)[2]
+      Mean_Y = rep(0,p_Y)
+      VY = rep(1,p_Y)
+    }
+    observation_model = missing_data_model
+    observation_model_parameters = list(
+      Y = Y,
+      Mean_Y = Mean_Y,
+      VY = VY
+    )
+  }
 
-	Y_missing = Matrix(is.na(Y))
-
-	# scale Y
-	if(!is(Y,'matrix'))	Y = as.matrix(Y)
-	if(run_parameters$scale_Y){
-	  Mean_Y = colMeans(Y,na.rm=T)
-	  VY = apply(Y,2,var,na.rm=T)
-	  Y = sweep(Y,2,Mean_Y,'-')
-	  Y = sweep(Y,2,sqrt(VY),'/')
-	} else {
-	  p_Y = dim(Y)[2]
-	  Mean_Y = rep(0,p_Y)
-	  VY = rep(1,p_Y)
-	}
-
-	# use data_model to get dimensions, names of Y
-	if(is.character(data_model) && data_model == 'missing_data') {
-	  data_model = missing_data_model
-	  data_model_parameters = list(Y_missing = Matrix(is.na(Y)))
-	}
-	if(is.character(data_model) && data_model == 'voom_RNAseq') {
-	  data_model = voom_model()
-	  data_model_parameters$Y_std = Y * data_model_parameters$prec_Y
-	}
-	data_model_state = data_model(Y,data_model_parameters,list(data_matrices = list(data = data)))
-	Eta = data_model_state$state$Eta
-	p = ncol(Eta)
-	traitnames = colnames(Y)
+  # initialize Eta
+  observation_model_state = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
+  Eta = observation_model_state$state$Eta
+  n = nrow(data)
+  p = ncol(Eta)
+  traitnames = colnames(Y)
+#
+# 	# model dimensions
+# 	n = nrow(data)
+# 	p_Y = ncol(Y)
+# 	traitnames = colnames(Y)
+#
+# 	Y_missing = Matrix(is.na(Y))
+#
+# 	# scale Y
+# 	if(!is(Y,'matrix'))	Y = as.matrix(Y)
+#
+# 	# use observation_model to get dimensions, names of Y
+# 	if(is.character(observation_model) && observation_model == 'missing_data') {
+# 	  observation_model = missing_observation_model
+# 	  observation_model_parameters = list(Y_missing = Matrix(is.na(Y)))
+# 	}
+# 	if(is.character(observation_model) && observation_model == 'voom_RNAseq') {
+# 	  observation_model = voom_model()
+# 	  observation_model_parameters$Y_std = Y * observation_model_parameters$prec_Y
+# 	}
 
 	# if factor_model_fixed not specified, use fixed effects from model for both
 	if(is.null(factor_model_fixed)) {
@@ -190,6 +206,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 
 	# build X from fixed model
 	  # for Eta
+	resid_intercept = FALSE     # is there an intercept? If so, don't penalize coefficient.
+	QTL_columns_resid = NULL    # indexes of columns of X for QTLs. They get a different penalty
+
 	X = model.matrix(nobars(model),data)
 	linear_combos = caret::findLinearCombos(X)
 	if(!is.null(linear_combos$remove)) {
@@ -197,23 +216,24 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  X = X[,-linear_combos$remove]
 	}
 	if(all(X[,1] == 1)) {
-	  resid_intercept = TRUE   # is there an intercept? If so, don't penalize coefficient.
-	} else{
-	  resid_intercept = FALSE
+	  resid_intercept = TRUE
 	}
-	if(!is.null(X_resid)){
-	  if(is.data.frame(X_resid)) X_resid = as.matrix(X_resid)
-	  X = cbind(X, X_resid) # add in X_resid if provided.
+	if(!is.null(QTL_resid)){
+	  if(is.data.frame(QTL_resid)) QTL_resid = as.matrix(QTL_resid)
 	  same_fixed_model = FALSE
+	  QTL_columns_resid = ncol(X) + 1:ncol(QTL_resid)
+	  X = cbind(X, QTL_resid) # add in QTL_resid if provided.
 	}
 	b = ncol(X)
 
   # for F
+	QTL_columns_factors = NULL
 	  # note columns are centered, potentially resulting in zero-variance columns
 	X_F = model.matrix(factor_model_fixed,data)
-	if(!is.null(X_factor)){
-	  if(is.data.frame(X_factor)) X_factor = as.matrix(X_factor)
-	  X_F = cbind(X_F,X_factor)
+	if(!is.null(QTL_factors)){
+	  if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
+	  QTL_columns_factors = ncol(X_F) + 1:ncol(QTL_factors)
+	  X_F = cbind(X_F,QTL_factors)
 	  same_fixed_model = FALSE
 	}
 	X_F = sweep(X_F,2,colMeans(X_F),'-') #
@@ -377,7 +397,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	colnames(h2s_matrix) = NULL
 
 	data_matrices = list(
-	  Y          = Y,
 	  X          = X,
 	  X_F        = X_F,
 	  Z_matrices = Z_matrices,
@@ -385,6 +404,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  U_svd      = U_svd,  # matrix necessary to back-transform U_F and U_R (U*U_F and U*U_R) to get original random effects
 	  h2s_matrix = h2s_matrix,
 	  cis_genotypes = cis_genotypes,
+	  QTL_columns_resid = QTL_columns_resid,
+	  QTL_columns_factors = QTL_columns_factors,
 	  data       = data
 	)
 
@@ -394,16 +415,14 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  r_RE   = r_RE,
 	  b      = b,
 	  b_F    = b_F,
-	  Mean_Y = Mean_Y,
-	  VY     = VY,
 	  resid_intercept = resid_intercept,
 	  same_fixed_model = same_fixed_model,
 	  X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
 	  cis_effects_index = cis_effects_index
 	)
 
-	run_parameters$data_model = data_model
-	run_parameters$data_model_parameters = data_model_parameters
+	run_parameters$observation_model = observation_model
+	run_parameters$observation_model_parameters = observation_model_parameters
 
 
 	# ----------------------------- #
@@ -411,9 +430,47 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	# ----------------------------- #
 	if(any(sapply(priors, function(x) {try({return(exists(x$nu) && x$nu <= 2)},silent=T);return(FALSE)}))) stop('priors nu must be > 2')
 	  # fixed effects
-	priors$fixed_prec_rate   = with(priors$fixed_var,V * nu)
-	priors$fixed_prec_shape  = with(priors$fixed_var,nu - 1)
+	if('fixed_var' %in% names(priors) && !'fixed_resid_var' %in% names(priors)) priors$fixed_resid_var = priors$fixed_var
+	if('fixed_var' %in% names(priors) && !'fixed_factors_var' %in% names(priors)) priors$fixed_factors_var = priors$fixed_var
+	if(length(priors$fixed_resid_var$V == 1)) {
+	  priors$fixed_resid_var$V = rep(priors$fixed_resid_var$V,b)
+	  priors$fixed_resid_var$nu = rep(priors$fixed_resid_var$nu,b)
+	}
+
+	if(length(priors$fixed_factors_var$V) == 0){
+	  priors$fixed_factors_var = priors$fixed_resid_var
+	} else if(length(priors$fixed_factors_var$V) == 1){
+	  priors$fixed_factors_var$V = rep(priors$fixed_factors_var$V,b)
+	  priors$fixed_factors_var$nu = rep(priors$fixed_factors_var$nu,b)
+	}
+
+	if(length(QTL_columns_resid)>0){
+	  if(length(priors$QTL_resid_var$V) == 1) {
+	    priors$QTL_resid_var$V = rep(priors$QTL_resid_var$V,length(QTL_columns_resid))
+	    priors$QTL_resid_var$nu = rep(priors$QTL_resid_var$nu,length(QTL_columns_resid))
+	  }
+	  priors$fixed_resid_var$V[QTL_columns_resid] = priors$QTL_resid_var$V
+	  priors$fixed_resid_var$nu[QTL_columns_resid] = priors$QTL_resid_var$nu
+	}
+	if(length(QTL_columns_factors)>0){
+	  if(length(priors$QTL_factors_var$V) == 1) {
+	    priors$QTL_factors_var$V = rep(priors$QTL_factors_var$V,length(QTL_columns_factors))
+	    priors$QTL_factors_var$nu = rep(priors$QTL_factors_var$nu,length(QTL_columns_factors))
+	  }
+	  priors$fixed_factors_var$V[QTL_columns_factors] = priors$QTL_factors_var$V
+	  priors$fixed_factors_var$nu[QTL_columns_factors] = priors$QTL_factors_var$nu
+	}
+
+	priors$fixed_resid_prec_rate   = with(priors$fixed_resid_var,V * nu)
+	priors$fixed_resid_prec_shape  = with(priors$fixed_resid_var,nu - 1)
+	priors$fixed_factors_prec_rate   = with(priors$fixed_factors_var,V * nu)
+	priors$fixed_factors_prec_shape  = with(priors$fixed_factors_var,nu - 1)
+
 	  # total precision
+	if(length(priors$tot_Y_var$V == 1)) {
+	  priors$tot_Y_var$V = rep(priors$tot_Y_var$V,p)
+	  priors$tot_Y_varnu = rep(priors$tot_Y_var$nu,p)
+	}
 	priors$tot_Eta_prec_rate   = with(priors$tot_Y_var,V * nu)
 	priors$tot_Eta_prec_shape  = with(priors$tot_Y_var,nu - 1)
 	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
@@ -442,15 +499,15 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,verbose=verbose,ncores=ncores)
 
 	# Initialize Eta
-	data_model_state = data_model(Y,data_model_parameters,BSFG_state)
-	BSFG_state$current_state[names(data_model_state$state)] = data_model_state$state
+	observation_model_state = observation_model(observation_model_parameters,BSFG_state)
+	BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
 
 	# ----------------------- #
 	# -Initialize Posterior-- #
 	# ----------------------- #
 	Posterior = list(
-	  posteriorSample_params = unique(c(posteriorSample_params,data_model_state$posteriorSample_params)),
-	  posteriorMean_params = unique(c(posteriorMean_params,data_model_state$posteriorMean_params)),
+	  posteriorSample_params = unique(c(posteriorSample_params,observation_model_state$posteriorSample_params)),
+	  posteriorMean_params = unique(c(posteriorMean_params,observation_model_state$posteriorMean_params)),
 	  total_samples = 0,
 	  folder = run_parameters$Posterior_folder,
 	  files = c()
@@ -465,191 +522,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 
 initialize_BSFG = function(BSFG_state,...){
   UseMethod("initialize_BSFG",BSFG_state)
-}
-
-#' Run BSFG Gibbs sampler
-#'
-#' Run MCMC chain for a specified number of iterations
-#'
-#' @param BSFG_state BSFG_state object of current chain
-#' @param n_samples Number of iterations to add to the chain (not number of posterior samples to draw.
-#'     This is determined by n_samples / thin)
-#' @param grainSize Minimum size of sub-problems for dividing among processes. Sent to RcppParallel
-sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
-  data_matrices  = BSFG_state$data_matrices
-  priors         = BSFG_state$priors
-  run_parameters = BSFG_state$run_parameters
-  run_variables  = BSFG_state$run_variables
-
-  # ----------------------------------------------- #
-  # -----------Reset Global Random Number Stream--- #
-  # ----------------------------------------------- #
-  do.call("RNGkind",as.list(BSFG_state$RNG$RNGkind))  ## must be first!
-  assign(".Random.seed", BSFG_state$RNG$Random.seed, .GlobalEnv)
-
-  # ----------------------------------------------- #
-  # ----------------Set up run--------------------- #
-  # ----------------------------------------------- #
-  save_freq    = run_parameters$save_freq
-  burn         = run_parameters$burn
-  thin         = run_parameters$thin
-  start_i      = BSFG_state$current_state$nrun
-
-  # ----------------------------------------------- #
-  # ---Extend posterior matrices for new samples--- #
-  # ----------------------------------------------- #
-
-  sp = (start_i + n_samples - burn)/thin - BSFG_state$Posterior$total_samples
-  BSFG_state$Posterior = expand_Posterior(BSFG_state$Posterior,max(0,sp))
-
-  # ----------------------------------------------- #
-  # --------------start gibbs sampling------------- #
-  # ----------------------------------------------- #
-
-  start_time = Sys.time()
-  for(i in start_i+(1:n_samples)){
-    BSFG_state$current_state$nrun = i
-    BSFG_state$current_state = BSFG_state$current_state[!sapply(BSFG_state$current_state,is.null)]
-
-    # ----- Sample Lambda ---------------- #
-    BSFG_state$current_state = sample_Lambda_B(BSFG_state,grainSize = grainSize,...)
-
-    # BSFG_state$current_state$Lambda[1,2:min(5,BSFG_state$current_state$k)] = 1  # TEMPORARY!!!
-
-    # ----- Sample other factor model parameters  ---------------- #
-    BSFG_state$current_state = sample_latent_traits(BSFG_state,grainSize = grainSize,...)
-
-    # -----Sample Lambda_prec ------------- #
-    BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
-
-    # -----Sample prec_B ------------- #
-    BSFG_state$current_state = sample_prec_B_ARD(BSFG_state)
-
-    # ----- sample Eta ----- #
-    data_model_state = run_parameters$data_model(data_matrices$Y,run_parameters$data_model_parameters,BSFG_state)$state
-    BSFG_state$current_state[names(data_model_state)] = data_model_state
-
-    # -- adapt number of factors to samples ---#
-    # if(i > 200 && i < burn && runif(1) < with(BSFG_state$run_parameters,1/exp(b0 + b1*i))){  # adapt with decreasing probability per iteration
-    #   BSFG_state$current_state = update_k(BSFG_state)
-    # }
-
-    # -- save sampled values (after thinning) -- #
-    if( (i-burn) %% thin == 0 && i > burn) {
-      BSFG_state$Posterior = save_posterior_sample(BSFG_state)
-    }
-  }
-  end_time = Sys.time()
-  print(end_time - start_time)
-  BSFG_state$current_state$total_time = BSFG_state$current_state$total_time + end_time - start_time
-
-  # ----------------------------------------------- #
-  # ------------Save state for restart------------- #
-  # ----------------------------------------------- #
-
-  current_state = BSFG_state$current_state
-  save(current_state,file='current_state.RData')
-
-  BSFG_state$RNG = list(
-    Random.seed = .Random.seed,
-    RNGkind = RNGkind()
-  )
-  return(BSFG_state)
-}
-
-sample_Lambda_B = function(BSFG_state,...){
-  UseMethod("sample_Lambda_B",BSFG_state)
-}
-
-sample_latent_traits = function(BSFG_state,...){
-  UseMethod("sample_latent_traits",BSFG_state)
-}
-
-sample_Lambda_prec = function(BSFG_state) {
-  priors         = BSFG_state$priors
-  run_variables  = BSFG_state$run_variables
-  run_parameters = BSFG_state$run_parameters
-  current_state  = BSFG_state$current_state
-
-  current_state = with(c(priors,run_variables,run_parameters),within(current_state,{
-		Lambda2 = Lambda^2
-		Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
-
-		# # trait one is special?
-		# Lambda_prec[1,] = 1e-10
-
-	 # # -----Sample delta, update tauh------ #
-		shapes = c(delta_1_shape + 0.5*p*k,
-		           delta_2_shape + 0.5*p*((k-1):1))
-		times = delta_iteractions_factor
-		randg_draws = matrix(rgamma(times*k,shape = shapes,rate = 1),nr=times,byrow=T)
-		delta[] = sample_delta_c_Eigen( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,randg_draws,Lambda2)
-		tauh[]  = matrix(cumprod(delta),nrow=1)
-
-	 # # -----Update Plam-------------------- #
-		Plam[] = sweep(Lambda_prec,2,tauh,'*')
-  }))
-  return(current_state)
-}
-
-sample_prec_B = function(BSFG_state){
-  priors         = BSFG_state$priors
-  run_variables  = BSFG_state$run_variables
-  current_state  = BSFG_state$current_state
-
-  current_state = with(c(priors,run_variables),within(current_state,{
-    if(b > 0) {
-      if(same_fixed_model) {  # want same tau for both
-        B2 = cbind(B,B_F)^2  # tauh
-      } else{
-        B2 = B^2
-      }
-      tau_B[1,] = rgamma(b, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums(B2)/2)
-      if(resid_intercept){
-        tau_B[1,1] = 1e-10
-      }
-      prec_B = matrix(tau_B,nrow = b, ncol = p)
-    }
-    if(b_F > 0){
-      if(same_fixed_model) {
-        tau_B_F[1,] = tau_B[1,]
-      } else{
-        B_F2 = B_F^2
-        tau_B_F[1,] = rgamma(b_F, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2)/2)
-      }
-      tau_B_F[1,X_F_zero_variance] = 1e10
-      prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
-    }
-  }))
-  return(current_state)
-}
-
-sample_prec_B_ARD = function(BSFG_state){
-  priors         = BSFG_state$priors
-  run_variables  = BSFG_state$run_variables
-  current_state  = BSFG_state$current_state
-
-  current_state = with(c(priors,run_variables),within(current_state,{
-    if(b > 0) {
-      B2 = B^2
-      tau_B[1,] = rgamma(b, shape = fixed_prec_shape + ncol(B2)/2, rate = fixed_prec_rate + rowSums((B2 * prec_B/c(tau_B)))/2)
-      prec_B[] = matrix(rgamma(b*p,shape = (B_df + 1)/2,rate = (B_df + B2*c(tau_B))/2),nr = b,nc = p)
-      prec_B[] = prec_B*c(tau_B)
-      if(resid_intercept){
-        tau_B[1,1] = 1e-10
-        prec_B[1,] = 1e-10
-      }
-    }
-    if(b_F > 0) {
-      B_F2 = B_F^2
-      tau_B_F[1,] = rgamma(b_F, shape = fixed_prec_shape + ncol(B_F2)/2, rate = fixed_prec_rate + rowSums(B_F2 * prec_B_F/c(tau_B_F))/2)
-      prec_B_F[] = matrix(rgamma(b_F*k,shape = (B_F_df + 1)/2,rate = (B_F_df + B_F2*c(tau_B_F))/2),nr = b_F,nc = k)
-      prec_B_F[] = prec_B_F*c(tau_B_F)
-      tau_B_F[1,X_F_zero_variance] = 1e10
-      prec_B_F[X_F_zero_variance,] = 1e10
-    }
-  }))
-  return(current_state)
 }
 
 #' Print more detailed statistics on current BSFG state
