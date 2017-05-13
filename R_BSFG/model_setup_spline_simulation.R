@@ -69,7 +69,7 @@ observation_setup = list(
   observation_model = regression_model,
   observations = setup$observations,
   # individual_model = Y~ poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=F),
-  individual_model = cbind(A,B,C)~poly(covariate,4),
+  individual_model = cbind(A,B,C)~poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=F),
   resid_Y_prec_shape = 2,
   resid_Y_prec_rate = 1
 )

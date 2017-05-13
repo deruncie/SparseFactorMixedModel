@@ -52,7 +52,7 @@ load('../setup_Sim_eQTL_1.RData')
 # sim_data$data = with(sim_data,data.frame(TRT = X[,'TRT'],Line = colnames(Z1)[apply(Z1,1,function(x) which(x==1))]))
 # sim_data$B = rbind(sim_data$mu,sim_data$B)
 BSFG_state = with(setup,BSFG_init(Y, model=~1+(1|animal), data, #factor_model_fixed = ~1,
-                                  X_factor = X_SNP,
+                                  QTL_factors = X_SNP,
                                   priors=priors,run_parameters=run_parameters,
                                   cis_genotypes = lapply(1:ncol(X_cis),function(x) matrix(X_cis[,x],ncol=1)),
                                   K_mats = list(animal = K),
