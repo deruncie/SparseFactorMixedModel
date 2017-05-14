@@ -104,6 +104,9 @@ for(i  in 1:70) {
     plot(BSFG_state)
 }
 
+
+Posterior = reload_Posterior(BSFG_state)
+
 library(shinystan)
 library(MCMCpack)
 samples = BSFG_state$Posterior$F_h2

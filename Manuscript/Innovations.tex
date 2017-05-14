@@ -8,6 +8,7 @@
 \usepackage{epstopdf}
 \usepackage{bm}
 \newcommand*{\B}[1]{\ifmmode\bm{#1}\else\textbf{#1}\fi}
+\DeclareMathOperator{\E}{\mathbb{E}}
 \DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
 
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=black,urlcolor=black]{hyperref}
@@ -142,7 +143,7 @@ Extending the formulation of BSFG, the random effect structure of each of the $k
 \sigma(\B{f}_{\bullet j} ) | \B{B}_F &= \sum \sigma^2_{F_{i_j}} \B{K}_i + \sigma^2_{F_{e_j}}\B{I}_n \\
 &= \sigma^2_{F_{P_j}} (\sum h^2_{F_{i_j}} \B{K}_i + (1 - \sum h^2_{F_{i_j}})\B{I}_n) 
 \end{split} \end{align}
-\noindent with the exception that we constrain $\sigma^2_{F_{P_j}} = 1$ for identifiability. However, to improve mixing of $\B{\Lambda}$ and $\B{F}$, we implement the parameter expansion proposed by (Dunson?) for factor models by allowing $\sigma^2_{F_{P_j}} \neq1$, but then correcting $\B{F}, \B{U_F}$, and $\B{\Lambda}$ by this factor in the posterior (see~\ref{Gibbs_sampler}).
+\noindent with the exception that we constrain $\sigma^2_{F_{P_j}} = 1$ for identifiability. However, to improve mixing of $\B{\Lambda}$ and $\B{F}$, we implement the parameter expansion proposed by (Ghosh and Dunson 2009) for factor models by allowing $\sigma^2_{F_{P_j}} \neq1$, but then correcting $\B{F}, \B{U_F}$, and $\B{\Lambda}$ by this factor in the posterior (see~\ref{Gibbs_sampler}).
 
 \subsection{Gibbs sampler}
 \label{Gibbs_sampler}
@@ -258,14 +259,13 @@ In SLAMglmm, we expand the model for the effects of fixed effects beyond BSFG. I
 \begin{align*}
 \B{Y} = \B{X}\B{B} + \B{F}\B{\Lambda}^T + \B{E}^*
 \end{align*}
-\noindent where $\B{E}^*$ is a random matrix of representing the sum of all random effects (genetic and residuals).
+\noindent where $\B{E}^*$ is a random matrix representing the sum of all random effects (genetic and residuals).
 
 In SLAMglmm, effects of the fixed covariates are modeled in two locations:
 \begin{align*}
 \B{H} &= \B{X}\B{B} + \B{F}\B{\Lambda}^T + \B{E}^* \\
 \B{F} &= \B{X}_F\B{B}_F + \B{E}^*_F
 \end{align*}
-\noindent where $\B{E}^*_F$ is a random matrix of representing the sum of all random effects (genetic and residuals) on the factors.
 
 Expanding this out, we have:
 \begin{align*}
@@ -273,15 +273,38 @@ Expanding this out, we have:
 &= [\B{X}\B{B} + \B{X}_F\B{B}_F\B{\Lambda}^T] + \B{E}^*_F\B{\Lambda}^T + \B{E}^* 
 \end{align*}
 
-\noindent with the brackets highlighting the fact that there are really two parallel models for the fixed effects. In the case that $\B{X} = \B{X}_F$, either $\B{B}$ or $\B{B}_F\B{\Lambda}^T$ could account for the relationship between $\B{X}$ and $\B{H}$. $\B{B}$ has $b \times p$ parameters and $\B{B}_F\B{\Lambda}^T$ has $b \times k + k \times p$ parameters. When $b > k$, the factors provide a potentially more parsimonious model for these fixed effects, under the assumption that these effects may be correlated. When $b < k$, $\B{B}$ has fewer parameters. However, the $k \times p$ parameters of $\B{\Lambda}^T$ are also shared by the ``genetic`` model: $\B{E}^*_F\B{\Lambda}^T$, so they come for ``free".
+\noindent with the brackets highlighting the fact that there are really two parallel models for the fixed effects. In the case that $\B{X} = \B{X}_F$, either $\B{B}$ or $\B{B}_F\B{\Lambda}^T$ could account for the relationship between $\B{X}$ and $\B{H}$. $\B{B}$ has $b \times p$ parameters and $\B{B}_F\B{\Lambda}^T$ has $b \times k + k \times p$ parameters. When $b > k$, the factors provide a potentially more parsimonious model for these fixed effects, under the assumption that these effects may be correlated. When $b < k$, $\B{B}$ has fewer parameters. However, the $k \times p$ parameters of $\B{\Lambda}^T$ are also shared by the ``genetic`` model: $\B{E}^*_F\B{\Lambda}^T$, so they come for ``free". In this case, $\B{B}_F$ should be used if the among-trait correlation induced by the fixed effects is similar to that caused by genetic effects or microenvironments, while $\B{B}$ should be chosen if the fixed effects induce correlation that is not related to the underlying biology (ex. batch or lane effects).
 
-The logic of this 
+The logic of this model is that the columns of $\B{F}$ are considered to be ``traits" just like the columns of $\B{Y}$ (BSFG) or $\B{H}$ (SLAMglmm), and every trait will vary among individuals due to a combination of environmental and genetic factors. Since in SLAMglmm, the higher-level traits $\B{H} = [\B{\eta}_1,\dots,\B{\eta}_p]$ are ``latent" too, I really would like to treat all traits equivalently with respect to the modeled factors. 
 
-\subsubsection{Questions}
+However, I am concerned about the structural consequences of this in the model, and identifiability. The issue is the following:
+
+In a standard factor model, $\B{f}_j \sim \mbox{N}(0,1)$, with unit variance. This constraint is introduced because for any nonsingular matrix $\B{\Sigma}$:
+\begin{align*}
+\B{F}^* &:= \B{\Sigma}^{1/2}\B{F}, \B{\Lambda}^* := \B{\Lambda} \B{\Sigma}^{-1/2} \\
+\B{F}\B{\Lambda}^T &= \B{F}^*\B{\Lambda}^{*T} \\ 
+\;\B{\Lambda}\B{\Lambda}^T &= \B{\Lambda}^* \B{\Sigma} \B{\Lambda}^{*T}
+\end{align*} 
+\noindent so that modeled covariance is the same despite different $\B{F}$ and $\B{\Lambda}$ matrices. Therefore, these parameters are not identifiable.
+
+In BSFG, I the replaced the above model for $\B{F}$ with $\B{f}_j \sim \mbox{N}(0,h^2\B{ZAZ}^T + (1-h^2)\B{I})$. Assuming $\B{ZAZ}^T$ is parameterized such that the diagonal is 1, this maintains the marginal variance of each $\B{f}_{ij} = 1$. I then assessed the importance of each factor based on the magnitude of the elements $\lambda_{ij}$. The magnitude of the loadings of each factor is important because the infinite-factor model (Bhattacharya and Dunson) imposes shrinkage on higher-order columns of $\B{\Lambda}$ through the stochastically increasing sequence of precision factors $\{\tau_h\} = \Big\{\prod\limits_{j=0}^{h} \delta_j, \delta_j \sim \mbox{Ga}(\alpha,\beta)\Big\}$. If factor variances $\sigma^2(\B{f}_j)$ were not fixed, then the sequence $\{\delta_j\}$  would not be identifiable.
+
+In SLAMglmm, I do two things that may break this infinite-factor prior. 
+
+\begin{enumerate}
+\item I introduce the non-identified working parameter $\B{\psi}^F = \mbox{Diag}(\psi^F_j)$, a diagonal matrix of column-specific variances for $\B{F}$. This is modeled after the factor model parameter expansion of (Ghosh and Dunson 2009). $\B{\psi}^F$ allows $\sigma^2(\B{f}_j)$ to vary during the sampling chain, reducing autocorrelation between $\lambda_{ij}$ and $f_{ij}$, but this factor is removed when samples of $\B{F}, \B{\Lambda}, \B{B}_F$, and $\B{U}_F$ are saved. Once $\B{\psi}^F$ is removed, the transformed parameters are identifiable. However, $\B{\Psi}^F$ and ${\delta_j}$ interact during the sampling since one penalizes $\B{F}$ and the other $\B{\Lambda}$, and I am concerned that this may break the increasing column-shrinkage on $\B{\Lambda}$. I think it's OK, and that the column-shrinkage sequence is now ${\tau^*_j} = {\tau_j / \psi^F_j}$, which simply has a more diffuse prior distribution, and as long as $\E[\delta_j/\psi^F_j]>1$ the prior will induce increasing shrinkage on higher-order columns. My early experimentation with this parameter expansion seemed to show big improvements in the mixing of $\lambda_{ij}$. But I wonder if it's really needed given the similarity in how $\delta_j$ and $\psi^F_j$ penalize the model, and haven't fully explored this issue with the re-formulated Gibbs sampler.
+
+\item I introduce fixed effects $\B{X}_F\B{B}_F$ into the model for $\B{F}$. Now, the model for each column of $\B{F}$ is $\B{f}_j \sim \mbox{N}(\B{X}_F\B{b}_{F_j},h^2\B{ZAZ}^T + (1-h^2)\B{I})$. My concern is that if we compare models with and without these fixed effects: 
+\begin{align*}
+\B{f}^{(1)}_j &\sim \mbox{N}(0, h^2\B{ZAZ}^T + (1-h^2)\B{I}) \\
+\B{f}^{(2)}_j &\sim \mbox{N}(\B{X}_F\B{b}_{F_j},h^2\B{ZAZ}^T + (1-h^2)\B{I}),
+\end{align*}
+\noindent the factor $\B{X}_F\B{b}_{F_j}$ should reduce the the residual variation (either from the genetic effects $h^2\B{ZAZ}^T$ or the noises $(1-h^2)\B{I}$) by explaining some of the variation in this latent trait. However, in the above parameterization, the noises are fixed to have total variance equal to 1. Therefore, to compensate, the model will reduce the loadings of the $j$th column of $\B{\Lambda}$ and choose a larger column-shrinkage parameter $\delta_j$ so that $|\B{f}^{(2)}| > |\B{f}^{(1)}|$ and the error variance can stay 1. Because the loadings are now smaller, we will conclude that this factor is less important. This is a problem because the factors with variation attributable to the fixed effects (ex. SNP genotype, environmental factor) will in some cases be the most interesting. A possible solution is to interpret factor importance based on $|\B{f}^{(2)}| \times |\lambda_{ij}|$ rather than $|\lambda_{ij}|$, similarly to the re-scaling by $\B{\Psi}^F$. However $\B{\Psi}^F$ is a parameter of the parameter expanded model and is explicitly sampled, while $|\B{f}^{(2)}|$ is not, so I'm not sure if this is valid.
+\end{enumerate}
+
+\subsubsection{Additional Questions}
 \begin{enumerate}
 \item Is it necessary to center the columns of $\B{X}_F$? The model for $\B{f}_j$ is: $\B{f}_j~\sim~\mbox{N}(\B{X}_F\B{b}_{F_j},\B{\Sigma}_j)$. A standard factor model would have $\B{f}_j \sim \mbox{N}(0,\B{I})$. Not centering the columns would allow the mean of $\B{f}_j \neq 0$. But this could be absorbed by the global intercept which is not penalized, so not sure it matters. I don't think this will affect the estimation of $\B{\Lambda}$.
-\item With one random effect, the distribution of $\B{f}_j$ is: $$\B{f}_j | \B{b}_{F_j}~\sim~\mbox{N}(\B{X}_F\B{b}_{F_j},h^2_{F_j} \B{ZKZ}^T + (1-h^2)\B{I})$$. 
-This means that each factor has the variance = 1 regardless of the size of $\B{X}_F\B{b}_{F_j}$. What does this mean for the corresponding magnitude of $\B{\lambda}_j$? 
 \end{enumerate}
 
 

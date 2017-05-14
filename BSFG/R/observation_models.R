@@ -30,7 +30,7 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
   data_matrices = BSFG_state$data_matrices
 
   new_variables = c('Eta')
-  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
     if(!exists('Y_missing')) Y_missing = Matrix(is.na(Y))
     Eta = Y
     if(sum(Y_missing)  > 0){
@@ -49,7 +49,7 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
     }
     return(list(Eta = as.matrix(Eta)))
   })
-  return(list(state = data_model_state[new_variables],
+  return(list(state = observation_model_state[new_variables],
               posteriorSample_params = c(),
               posteriorMean_params = c('Eta')
   ))
@@ -74,7 +74,7 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
   data_matrices = BSFG_state$data_matrices
 
   new_variables = c('Eta')
-  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
     Eta = Y
     if(length(current_state) > 0){
       n = nrow(Y)
@@ -89,7 +89,7 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
     }
     return(list(Eta = as.matrix(Eta)))
   })
-  return(list(state = data_model_state[new_variables],
+  return(list(state = observation_model_state[new_variables],
               posteriorSample_params = c(),
               posteriorMean_params = c('Eta')
              )
@@ -113,7 +113,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
-  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
 
     if(!exists('Y')) Y = NULL
 
@@ -193,13 +193,86 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
 
     return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Terms = Terms,var_Eta = var_Eta,Y = Y, Y_fitted=Y_fitted))
   })
-  return(list(state = data_model_state,
+  return(list(state = observation_model_state,
               posteriorSample_params = c('Y_fitted','Eta','resid_Y_prec'),
               posteriorMean_params = c()
   )
   )
 }
 
+
+#' Sample cis_eQTL coefficients
+#'
+#' @param observation_model_parameters list with:
+#'     \code{Y} gene expression data matrix n x p
+#'     \code{cis_genotypes} a list of design matrices of length \code{p} (ie number of columns of \code{Eta})
+#'     This is used to specify trait-specific fixed effects, such a cis-genotypes
+#'
+#' @param BSFG_state
+#'
+#' @return list including:
+#'     \code{state} parameters to add to \code{current_state}
+#'     \code{posteriorSample_params} character vector of parameter names to include in the list of parameters to record posterior samples
+#'     \code{posteriorMean_params} character vector of parameter names to include in the list of parameters to record posterior mean
+cis_eQTL_model = function(observation_model_parameters,BSFG_state = list()){
+  current_state = BSFG_state$current_state
+  data_matrices = BSFG_state$data_matrices
+
+  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+    n = nrow(Y)
+    p = ncol(Y)
+    Ut_cis = as(diag(1,n),'dgCMatrix')
+    s_cis = rep(1,n)
+    if(!exists('Eta_mean')) {
+      Eta_mean = matrix(0,n,p)
+    } else{
+      Eta_mean = XB + F %*% t(Lambda) + Z %*% U_R
+    }
+    if(!exists('resid_Eta_prec')) {
+      resid_Eta_prec = matrix(1,1,ncol(Y))
+    } else{
+      resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
+    }
+
+    Y_tilde = Y - Eta_mean
+    if(!exists('ncores')) ncores = 1
+    cis_effects_list = mclapply(1:p,function(j) {
+      cis_X_j = cis_genotypes[[j]]
+      b_j = ncol(cis_X_j)
+      if(b_j > 0) {
+        prior_mean = matrix(0,b_j,1)
+        prior_prec = matrix(1e-10,b_j,1)
+        prior_prec[apply(cis_X_j,2,var)==0] = 1e10
+        randn_theta = matrix(rnorm(b_j),b_j,1)
+        randn_e = matrix(rnorm(n),n,1)
+        coefs_j = sample_coefs_parallel_sparse_c_Eigen(Ut_cis,Y_tilde[,j],cis_X_j,
+                                           0, resid_Eta_prec[,j],
+                                           s_cis,prior_mean,prior_prec,
+                                           randn_theta,randn_e,
+                                           1)
+        return(coefs_j)
+      }
+      return(NULL)
+    },mc.cores = ncores)
+
+    cis_fitted = do.call(cbind,mclapply(1:p,function(j) {
+      cis_X_j = cis_genotypes[[j]]
+      if(ncol(cis_X_j) > 0) {
+        return(cis_X_j %*% cis_effects_list[[j]])
+      }
+      return(rep(0,n))
+    },mc.cores = ncores))
+
+    Eta = Y - Y_tilde
+    cis_effects = matrix(do.call(c,cis_effects_list),nrow=1)
+    return(list(Eta = Eta, cis_effects2 = cis_effects))
+  })
+  return(list(state = observation_model_state,
+              posteriorSample_params = c('Eta','cis_effects'),
+              posteriorMean_params = c()
+  )
+  )
+}
 
 
 #' Sample Eta given B-splines individual-level model with binomial observations
@@ -219,7 +292,7 @@ bs_binomial_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
-  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
 
   log_binom = function(beta,X,y,N,mu, sigma2){
     Xbeta = X %*% beta
@@ -268,7 +341,7 @@ bs_binomial_model = function(observation_model_parameters,BSFG_state = list()){
 
     return(list(Eta = Eta, model_matrices = model_matrices, coefficients = coefficients))
   })
-  return(list(state = data_model_state,
+  return(list(state = observation_model_state,
               posteriorSample_params = c(),
               posteriorMean_params = c('Eta')
   )
@@ -279,7 +352,7 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
   new_variables = c('Eta','resid_Y_prec','mu_probe')
-  data_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
     p = nrow(Z_Y)
     n = nrow(Y)
 
@@ -315,7 +388,7 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
                           rate = resid_Y_prec_rate + 0.5 * colSums(Y_tilde^2))
     return(list(Eta = Eta, mu_probe = mu_probe, resid_Y_prec = resid_Y_prec))
   })
-  return(list(state = data_model_state[new_variables],
+  return(list(state = observation_model_state[new_variables],
               posteriorSample_params = c(),
               posteriorMean_params = c('Eta','resid_Y_prec','mu_probe')
   )
@@ -339,7 +412,7 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
 #   data_matrices = BSFG_state$data_matrices
 #
 #   new_variables = c('Eta')
-#   data_model_state = with(data_matrices,current_state),{
+#   observation_model_state = with(data_matrices,current_state),{
 #
 #     if(length(current_state) == 0){
 #       # prep model matrices
@@ -425,7 +498,7 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
 #
 #     return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model.matrices = model.matrices, coefficients = coefficients))
 #   })
-#   return(list(state = data_model_state,
+#   return(list(state = observation_model_state,
 #               posteriorSample_params = c(),
 #               posteriorMean_params = c('Eta','resid_Y_prec')
 #   )

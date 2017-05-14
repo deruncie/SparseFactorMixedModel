@@ -35,7 +35,9 @@ run_parameters = BSFG_control(
 
 priors = list(
   # fixed_var = list(V = 5e5,   nu = 2.001),
-  fixed_var = list(V = 1/1000,     nu = 3),
+  fixed_var = list(V = 1,     nu = 3),
+  QTL_resid_var = list(V = 1/1000,     nu = 3),
+  QTL_factors_var = list(V = 1/1000,     nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 3),
   tot_F_var = list(V = 18/20, nu = 20),
   delta_1   = list(shape = 2.1,  rate = 1/20),
@@ -57,6 +59,17 @@ BSFG_state = with(setup,BSFG_init(Y, model=~1+(1|animal), data, #factor_model_fi
                                   cis_genotypes = lapply(1:ncol(X_cis),function(x) matrix(X_cis[,x],ncol=1)),
                                   K_mats = list(animal = K),
                                   setup = setup))
+
+BSFG_state = with(setup,BSFG_init(list(observation_model = cis_eQTL_model,
+                                       Y = Y,
+                                       cis_genotypes = lapply(1:ncol(X_cis),function(x) matrix(X_cis[,x],ncol=1)),
+                                       ncores = parallel::detectCores()),
+                                  model=~1+(1|animal), data, #factor_model_fixed = ~1,
+                                  QTL_factors = X_SNP,
+                                  priors=priors,run_parameters=run_parameters,
+                                  K_mats = list(animal = K),
+                                  setup = setup))
+
 BSFG_state$current_state$F_h2
 
 h2_divisions = run_parameters$h2_divisions

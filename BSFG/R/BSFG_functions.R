@@ -171,11 +171,12 @@ save_posterior_sample = function(BSFG_state) {
 	  U_R = as.matrix(BSFG_state$data_matrices$U_svd %*% U_R)
 	  U_F = as.matrix(BSFG_state$data_matrices$U_svd %*% U_F)
 		# transform variables so that the variance of each column of F is 1.
-		# F_var = 1/tot_F_prec
-		# U_F = sweep(U_F,2,sqrt(F_var),'/')
-		# B_F = sweep(B_F,2,sqrt(F_var),'/')
-		# F = sweep(F,2,sqrt(F_var),'/')
-		# Lambda = sweep(Lambda,2,sqrt(F_var),'*')
+		F_var = 1/tot_F_prec
+		U_F = sweep(U_F,2,sqrt(F_var),'/')
+		B_F = sweep(B_F,2,sqrt(F_var),'/')
+		F = sweep(F,2,sqrt(F_var),'/')
+		Lambda = sweep(Lambda,2,sqrt(F_var),'*')
+		tauh[] = tauh * tot_F_prec
 	})
 
 	sp = dim(Posterior$Lambda)[1]
