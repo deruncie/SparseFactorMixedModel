@@ -175,9 +175,6 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     colnames(Eta) = Eta_col_names
     rownames(Eta) = Eta_row_names
 
-    # un-scale Eta
-    Eta = sweep(Eta,2,sqrt(var_Eta),'/')
-
     if(!exists('ncores')) ncores = 1
     convert_Matrix = is( model_matrices[[1]]$X,'Matrix')
     Y_fitted = do.call(rbind,parallel::mclapply(1:n,function(i) {
@@ -188,6 +185,9 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     Y_fitted = Y_fitted[order(do.call(c,lapply(model_matrices,function(x) x$position))),,drop=FALSE]
 
     Y_tilde = Y - Y_fitted
+
+    # un-scale Eta
+    Eta = sweep(Eta,2,sqrt(var_Eta),'/')
 
     resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape + 0.5*nrow(Y_tilde), rate = resid_Y_prec_rate + 0.5*colSums(Y_tilde^2)),nr=1)
 

@@ -67,7 +67,7 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
             B[,j] = coefs_j[1:b]
           }
           Lambda[j,] = coefs_j[b+1:k]
-          cis_effects[,cis_effects_index[j]] = 0
+          cis_effects[,cis_effects_index == j] = 0
         }
       }
     }

@@ -37,9 +37,10 @@ Y = Y / sd(unlist(Y))
 observations = data.frame(Y = c(t(Y)),Time = times, ID = rep(data$ID,each = ncol(Y)))
 ggplot(observations,aes(x=Time,y=Y,group=ID)) + geom_line()
 
-data_model_parameters = list(
+observation_setup = list(
+  observation_model = regression_model,
   observations = observations,
-  individual_model = Y~bs(Time,df=20,intercept=F), #poly(Time,2) +
+  individual_model = Y~bs(Time,df=20,intercept=F),
   resid_Y_prec_shape = 2,
   resid_Y_prec_rate = 1/100
 )
@@ -72,9 +73,8 @@ priors = list(
 )
 K = diag(1,nrow(data))
 rownames(K) = data$ID
-BSFG_state = BSFG_init(observations$Y, model=~1+(1|ID), data,
+BSFG_state = BSFG_init(observation_setup, model=~1+(1|ID), data,
                        priors=priors,run_parameters=run_parameters,
-                       data_model = regression_spline_model, data_model_parameters = data_model_parameters,
                        posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects','U_R','prec_B','prec_B_F'),
                        posteriorMean_params = c(),QTL_factors = X#, QTL_resid = X
 )
@@ -94,7 +94,7 @@ BSFG_state$priors$h2_priors_factors = BSFG_state$priors$h2_priors_resids
 
 rescale_model_matrices = function(var_Eta_factor,current_state){
   current_state = within(current_state,{
-    var_Eta = var_Eta * var_Eta_factor
+    var_Eta = var_Eta_factor#var_Eta #* var_Eta_factor
     Lambda = sweep(Lambda,1,sqrt(var_Eta_factor),'/')
     Plam = sweep(Plam,1,sqrt(var_Eta_factor),'/')
     B = sweep(B,2,sqrt(var_Eta_factor),'/')
@@ -105,7 +105,7 @@ rescale_model_matrices = function(var_Eta_factor,current_state){
   current_state
 }
 
-n_samples = 200
+n_samples = 20
 scanone_results = list()
 grav_eta = grav
 for(i  in 1:100) {
@@ -130,11 +130,12 @@ for(i  in 1:100) {
   print(ggplot(a,aes(x=X2,y=value,group=X1)) + geom_line())
   print(p1)
   print(p2)
-  plot(BSFG_state$data_matrices$Y,BSFG_state$current_state$Y_fitted);abline(0,1)
-  var_Eta = apply(BSFG_state$current_state$Eta,2,var)
+  plot(BSFG_state$current_state$Y,BSFG_state$current_state$Y_fitted);abline(0,1)
+  var_Eta = apply(BSFG_state$current_state$Eta,2,var)/BSFG_state$current_state$var_Eta
   print(cbind(var_Eta,apply(BSFG_state$current_state$model_matrices[[1]]$X,2,var)))
-  if(i < -5) {
-    BSFG_state$current_state = rescale_model_matrices(var_Eta,BSFG_state$current_state)
+  if(i < 5) {
+    BSFG_state$current_state$var_Eta = var_Eta * BSFG_state$current_state$var_Eta
+    # BSFG_state$current_state = rescale_model_matrices(var_Eta,BSFG_state$current_state)
   } else if(i < 10 || (i-1) %% 10 == 0) {
     # BSFG_state$current_state = update_k(BSFG_state)
     BSFG_state = reorder_factors(BSFG_state)
