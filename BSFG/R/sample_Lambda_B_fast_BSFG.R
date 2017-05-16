@@ -52,7 +52,7 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
             B[,j] = coefs_j[1:b]
           }
           Lambda[j,] = coefs_j[b+1:k]
-          cis_effects[,cis_effects_index[j]] = coefs_j[-c(1:(b+k))]
+          cis_effects[,cis_effects_index == j] = coefs_j[-c(1:(b+k))]  # I think this is right
         } else{
           prior_mean_j = prior_mean[,j,drop=FALSE]
           prior_prec_j = prior_prec[,j,drop=FALSE]

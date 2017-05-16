@@ -37,7 +37,7 @@ sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
             B[,j] = coefs_j[1:b]
           }
           Lambda[j,] = coefs_j[b+1:k]
-          cis_effects[,cis_effects_index[j]] = coefs_j[-c(1:(b+k))]
+          cis_effects[,cis_effects_index == j] = coefs_j[-c(1:(b+k))]  # I think this is right
         } else{
           Design_j = Design
           prior_mean_j = prior_mean[,j,drop=FALSE]
@@ -47,7 +47,7 @@ sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
             B[,j] = coefs_j[1:b]
           }
           Lambda[j,] = coefs_j[b+1:k]
-          cis_effects[,cis_effects_index[j]] = 0
+          cis_effects[,cis_effects_index == j] = 0
         }
       }
     }

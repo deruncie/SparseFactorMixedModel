@@ -107,6 +107,8 @@ for(i  in 1:100) {
   print(sprintf('Run %d',i))
   BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
   trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
+  trace_plot(BSFG_state$Posterior$cis_effects[,1,1:10])
+  plot(setup$b_cis,BSFG_state$current_state$cis_effects);abline(0,1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
     }

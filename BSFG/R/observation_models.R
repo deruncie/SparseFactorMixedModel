@@ -223,13 +223,13 @@ cis_eQTL_model = function(observation_model_parameters,BSFG_state = list()){
     p = ncol(Y)
     Ut_cis = as(diag(1,n),'dgCMatrix')
     s_cis = rep(1,n)
-    if(!exists('Eta_mean')) {
+    if(!exists('Eta')) {
       Eta_mean = matrix(0,n,p)
     } else{
       Eta_mean = XB + F %*% t(Lambda) + Z %*% U_R
     }
-    if(!exists('resid_Eta_prec')) {
-      resid_Eta_prec = matrix(1,1,ncol(Y))
+    if(!exists('tot_Eta_prec')) {
+      resid_Eta_prec = matrix(1,1,p)
     } else{
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
     }
@@ -263,9 +263,9 @@ cis_eQTL_model = function(observation_model_parameters,BSFG_state = list()){
       return(rep(0,n))
     },mc.cores = ncores))
 
-    Eta = Y - Y_tilde
+    Eta = Y - cis_fitted
     cis_effects = matrix(do.call(c,cis_effects_list),nrow=1)
-    return(list(Eta = Eta, cis_effects2 = cis_effects))
+    return(list(Eta = Eta, cis_effects = cis_effects))
   })
   return(list(state = observation_model_state,
               posteriorSample_params = c('Eta','cis_effects'),

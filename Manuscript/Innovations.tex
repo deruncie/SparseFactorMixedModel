@@ -255,13 +255,13 @@ Another potential modification of the model for SLAMglmm would be to specify a u
 The following are several statistical issues with SLAMglmm that should be addressed:
 
 \subsection{Identifiability of fixed effects}
-In SLAMglmm, we expand the model for the effects of fixed effects beyond BSFG. In BSFG, fixed effects were specified as:
+In SLAMglmm, we expand the model for the effects of fixed effects beyond BSFG. In BSFG, fixed effects $\B{XB}$ were specified as:
 \begin{align*}
 \B{Y} = \B{X}\B{B} + \B{F}\B{\Lambda}^T + \B{E}^*
 \end{align*}
 \noindent where $\B{E}^*$ is a random matrix representing the sum of all random effects (genetic and residuals).
 
-In SLAMglmm, effects of the fixed covariates are modeled in two locations:
+In SLAMglmm, effects of the fixed covariates $\B{X}$ and $\B{X}_F$ are modeled in two locations:
 \begin{align*}
 \B{H} &= \B{X}\B{B} + \B{F}\B{\Lambda}^T + \B{E}^* \\
 \B{F} &= \B{X}_F\B{B}_F + \B{E}^*_F
@@ -292,14 +292,16 @@ In BSFG, I the replaced the above model for $\B{F}$ with $\B{f}_j \sim \mbox{N}(
 In SLAMglmm, I do two things that may break this infinite-factor prior. 
 
 \begin{enumerate}
-\item I introduce the non-identified working parameter $\B{\psi}^F = \mbox{Diag}(\psi^F_j)$, a diagonal matrix of column-specific variances for $\B{F}$. This is modeled after the factor model parameter expansion of (Ghosh and Dunson 2009). $\B{\psi}^F$ allows $\sigma^2(\B{f}_j)$ to vary during the sampling chain, reducing autocorrelation between $\lambda_{ij}$ and $f_{ij}$, but this factor is removed when samples of $\B{F}, \B{\Lambda}, \B{B}_F$, and $\B{U}_F$ are saved. Once $\B{\psi}^F$ is removed, the transformed parameters are identifiable. However, $\B{\Psi}^F$ and ${\delta_j}$ interact during the sampling since one penalizes $\B{F}$ and the other $\B{\Lambda}$, and I am concerned that this may break the increasing column-shrinkage on $\B{\Lambda}$. I think it's OK, and that the column-shrinkage sequence is now ${\tau^*_j} = {\tau_j / \psi^F_j}$, which simply has a more diffuse prior distribution, and as long as $\E[\delta_j/\psi^F_j]>1$ the prior will induce increasing shrinkage on higher-order columns. My early experimentation with this parameter expansion seemed to show big improvements in the mixing of $\lambda_{ij}$. But I wonder if it's really needed given the similarity in how $\delta_j$ and $\psi^F_j$ penalize the model, and haven't fully explored this issue with the re-formulated Gibbs sampler.
+
+\item I introduce the non-identified working parameter $\B{\psi}^F = \mbox{Diag}(\psi^F_j)$, a diagonal matrix of column-specific variances for $\B{F}$. This is modeled after the factor model parameter expansion of (Ghosh and Dunson 2009). $\B{\psi}^F$ allows $\sigma^2(\B{f}_j)$ to vary during the sampling chain, reducing autocorrelation between $\lambda_{ij}$ and $f_{ij}$. This factor is removed when samples of $\B{F}, \B{\Lambda}, \B{B}_F$, and $\B{U}_F$ are saved and the transformed parameters are identifiable. However, $\B{\Psi}^F$ and ${\delta_j}$ interact during the sampling since one penalizes $\B{F}$ and the other $\B{\Lambda}$, and I am concerned that this may break the increasing column-shrinkage on $\B{\Lambda}$. I think it's OK, and that the column-shrinkage sequence is now ${\tau^*_j} = {\tau_j / \psi^F_j}$, which simply has a more diffuse prior distribution, and as long as $\E[\delta_j/\psi^F_j]>1$ the prior will induce increasing shrinkage on higher-order columns. My early experimentation with this parameter expansion seemed to show big improvements in the mixing of $\lambda_{ij}$. But I wonder if it's really needed given the similarity in how $\delta_j$ and $\psi^F_j$ penalize the model, and haven't fully explored this issue with the re-formulated Gibbs sampler.
 
 \item I introduce fixed effects $\B{X}_F\B{B}_F$ into the model for $\B{F}$. Now, the model for each column of $\B{F}$ is $\B{f}_j \sim \mbox{N}(\B{X}_F\B{b}_{F_j},h^2\B{ZAZ}^T + (1-h^2)\B{I})$. My concern is that if we compare models with and without these fixed effects: 
 \begin{align*}
 \B{f}^{(1)}_j &\sim \mbox{N}(0, h^2\B{ZAZ}^T + (1-h^2)\B{I}) \\
 \B{f}^{(2)}_j &\sim \mbox{N}(\B{X}_F\B{b}_{F_j},h^2\B{ZAZ}^T + (1-h^2)\B{I}),
 \end{align*}
-\noindent the factor $\B{X}_F\B{b}_{F_j}$ should reduce the the residual variation (either from the genetic effects $h^2\B{ZAZ}^T$ or the noises $(1-h^2)\B{I}$) by explaining some of the variation in this latent trait. However, in the above parameterization, the noises are fixed to have total variance equal to 1. Therefore, to compensate, the model will reduce the loadings of the $j$th column of $\B{\Lambda}$ and choose a larger column-shrinkage parameter $\delta_j$ so that $|\B{f}^{(2)}| > |\B{f}^{(1)}|$ and the error variance can stay 1. Because the loadings are now smaller, we will conclude that this factor is less important. This is a problem because the factors with variation attributable to the fixed effects (ex. SNP genotype, environmental factor) will in some cases be the most interesting. A possible solution is to interpret factor importance based on $|\B{f}^{(2)}| \times |\lambda_{ij}|$ rather than $|\lambda_{ij}|$, similarly to the re-scaling by $\B{\Psi}^F$. However $\B{\Psi}^F$ is a parameter of the parameter expanded model and is explicitly sampled, while $|\B{f}^{(2)}|$ is not, so I'm not sure if this is valid.
+\noindent the factor $\B{X}_F\B{b}_{F_j}$ should reduce the the residual variation (either from the genetic effects $h^2\B{ZAZ}^T$ or the noises $(1-h^2)\B{I}$) by explaining some of the variation in this latent trait. However, in the above parameterization, the noises are fixed to have total variance equal to 1. Therefore $|\B{f}^{(2)}| > |\B{f}^{(1)}|$, and to compensate, the model will reduce the loadings of the $j$th column of $\B{\Lambda}$ and choose a larger column-shrinkage parameter $\delta_j$ so that  and the error variance can stay 1. Because the loadings are now smaller, we will conclude that this factor is less important. This is a problem because the factors with variation attributable to the fixed effects (ex. SNP genotype, environmental factor) will in some cases be the most interesting. A possible solution is to interpret factor importance based on $|\B{f}^{(2)}| \times |\lambda_{ij}|$ rather than $|\lambda_{ij}|$, similarly to the re-scaling by $\B{\Psi}^F$. However $\B{\Psi}^F$ is a parameter of the parameter expanded model and is explicitly sampled, while $|\B{f}^{(2)}|$ is not, so I'm not sure if this is valid.
+
 \end{enumerate}
 
 \subsubsection{Additional Questions}
