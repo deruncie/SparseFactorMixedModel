@@ -84,17 +84,11 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		#conditioning on F, U_F
 		UtF_tilde = as.matrix(Ut %*% F_tilde)
 
-		if(nrun > 0) {
-  		if(b_F == 0) {
-    		scores = tot_prec_scores_c(UtF_tilde,F_h2,s)
-    		tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2,rate = tot_F_prec_rate + 0.5*scores)
-  		} else{
-  		  scores = tot_prec_scores_withX_c(UtF_tilde,B_F,F_h2,s,prec_B_F)
-  		  tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2+ b_F/2,rate = tot_F_prec_rate + 0.5*scores)
-  		}
-		} else{
-		  tot_F_prec[] = 1
+		scores = tot_prec_scores_c(UtF_tilde,F_h2,s)
+		if(b_F > 0) {
+		  scores = scores + colSums(B_F^2*prec_B_F)   # add this if tot_F_prec part of the prior for B_F
 		}
+		tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2+ b_F/2,rate = tot_F_prec_rate + 0.5*scores)
 
 		if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
 		F_h2_index = sample_h2s_discrete_fast(UtF_tilde, tot_F_prec, h2_priors_factors,s,grainSize)

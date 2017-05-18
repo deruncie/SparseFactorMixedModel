@@ -9,8 +9,8 @@ using Eigen::ArrayXXd;                  // variable size array, double precision
 using Eigen::ArrayXd;                  // variable size array, double precision
 using Eigen::Upper;
 using Eigen::Lower;
-typedef Eigen::MappedSparseMatrix<double> MSpMat;
 typedef Eigen::SparseMatrix<double> SpMat;
+typedef Eigen::Map<SpMat> MSpMat;
 
 using namespace Rcpp;
 using namespace Eigen;

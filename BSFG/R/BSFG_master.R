@@ -226,6 +226,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	}
 	b = ncol(X)
 
+	if(any(is.na(X))) stop('Missing values in X_resid')
+
   # for F
 	QTL_columns_factors = NULL
 	  # note columns are centered, potentially resulting in zero-variance columns
@@ -239,6 +241,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	X_F = sweep(X_F,2,colMeans(X_F),'-') #
 	b_F = ncol(X_F)
 	X_F_zero_variance = apply(X_F,2,var) == 0
+	if(any(is.na(X_F))) stop('Missing values in X_F')
+
 
 	# -------- cis genotypes ---------- #
 	if(is.null(cis_genotypes)){

@@ -55,7 +55,7 @@ setup$data$Group = gl(3,1,length = nrow(setup$data))
                                   # setup = setup))
 # setup$Y[1:3] = NA
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
-BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #factor_model_fixed = ~1,
+BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #factor_model_fixed = ~0,
                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
                                   setup = setup))
 BSFG_state$current_state$F_h2

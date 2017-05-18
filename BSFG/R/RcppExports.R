@@ -73,3 +73,7 @@ sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2_index,
     .Call('BSFG_sample_h2s_discrete_MH_c', PACKAGE = 'BSFG', Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, state_draws, step_size, grainSize)
 }
 
+tot_prec_scores_withX_c2 <- function(UtEta, B_F, h2, s, prec_B_F) {
+    .Call('BSFG_tot_prec_scores_withX_c2', PACKAGE = 'BSFG', UtEta, B_F, h2, s, prec_B_F)
+}
+

@@ -28,7 +28,7 @@ Suggests:
   splines
 LinkingTo: 
   Rcpp (>= 0.11.2), 
-  RcppEigen (>= 0.3.2.2.0),
+  RcppEigen (>= 0.3.3.3.0),
   RcppParallel
 SystemRequirements: GNU make
 RoxygenNote: 6.0.0

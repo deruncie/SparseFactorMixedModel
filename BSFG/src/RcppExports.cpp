@@ -315,3 +315,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tot_prec_scores_withX_c2
+VectorXd tot_prec_scores_withX_c2(Map<MatrixXd> UtEta, Map<MatrixXd> B_F, Map<VectorXd> h2, Map<VectorXd> s, Map<MatrixXd> prec_B_F);
+RcppExport SEXP BSFG_tot_prec_scores_withX_c2(SEXP UtEtaSEXP, SEXP B_FSEXP, SEXP h2SEXP, SEXP sSEXP, SEXP prec_B_FSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type UtEta(UtEtaSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type B_F(B_FSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type h2(h2SEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type s(sSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prec_B_F(prec_B_FSEXP);
+    rcpp_result_gen = Rcpp::wrap(tot_prec_scores_withX_c2(UtEta, B_F, h2, s, prec_B_F));
+    return rcpp_result_gen;
+END_RCPP
+}

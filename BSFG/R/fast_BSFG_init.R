@@ -25,7 +25,6 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
 # ----------------------------- #
 # -----Initialize variables---- #
 # ----------------------------- #
-
     # Factors:
     #  initial number of factors
     k = run_parameters$k_init

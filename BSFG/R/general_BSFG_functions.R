@@ -53,13 +53,6 @@ sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h
 	theta = sample_MME_ZKZts_c(Y,W,tot_Eta_prec,randomEffect_C_Choleskys,h2s,h2s_index,randn_theta,randn_e,1)
 }
 
-sample_tot_prec = function(Y, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys,h2s_index,ncores){
-	n = nrow(Y)
-	p = ncol(Y)
-
-	scores = tot_prec_scores(Y,Sigma_Choleskys,h2s_index,1)
-	matrix(rgamma(p,shape = tot_Eta_prec_shape + n/2, rate = tot_Eta_prec_rate + 1/2*scores),nrow=1)
-}
 
 generate_candidate_states = function(h2s_matrix,step_size){
   candidate_states = lapply(1:dim(h2s_matrix)[2],function(i){

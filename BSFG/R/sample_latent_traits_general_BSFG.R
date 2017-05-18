@@ -22,7 +22,8 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     # -----Sample tot_Eta_prec, resid_h2, U_R ---------------- #
     #conditioning on B, F, Lambda, resid_h2, tot_Eta_prec
     Eta_tilde = Eta - XB - F %*% t(Lambda)
-    tot_Eta_prec[] = sample_tot_prec(Eta_tilde, tot_Eta_prec_shape, tot_Eta_prec_rate, Sigma_Choleskys, resid_h2_index,grainSize)
+    scores = tot_prec_scores(Eta_tilde,Sigma_Choleskys,resid_h2_index,1)
+    tot_Eta_prec[] = rgamma(p,shape = tot_Eta_prec_shape + n/2, rate = tot_Eta_prec_rate + 0.5*scores)
 
     if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
     if(is.null(h2_step_size)) {
@@ -73,8 +74,12 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     # -----Sample tot_F_prec, F_h2, U_F ---------------- #
     #conditioning on B, F, Lambda, F_h2, tot_F_prec
 
-    # tot_F_prec[] = sample_tot_prec(F_tilde, tot_F_prec_shape, tot_F_prec_rate, Sigma_Choleskys, F_h2_index,grainSize)
-    tot_F_prec[] = 1
+    scores = tot_prec_scores(F_tilde,Sigma_Choleskys,F_h2_index,1)
+    if(b_F > 0) {
+      scores = scores + colSums(B_F^2*prec_B_F)   # add this if tot_F_prec part of the prior for B_F
+    }
+    tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2, rate = tot_F_prec_rate + 0.5*scores)
+    # tot_F_prec[] = 1
 
     if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
     if(is.null(h2_step_size)) {

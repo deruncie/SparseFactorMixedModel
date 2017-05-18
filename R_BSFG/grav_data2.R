@@ -15,23 +15,23 @@ try(dir.create(folder))
 setwd(folder)
 
 data(grav)
+times <- attr(grav, "time")
 grav <- calc.genoprob(grav, step=1)
 grav <- reduce2grid(grav)
-grav = sim.geno(grav,stepwidth = 'fixed',step=1)
+grav <- fill.geno(grav)
+# grav = sim.geno(grav,stepwidth = 'fixed',step=1)
 phecol <- 1:nphe(grav)
 out <- scanone(grav, phe=phecol, method="hk")
 
 Y = grav$pheno
 X = do.call(cbind,lapply(grav$geno,function(x) x$data))
-X = apply(X,2,function(x) {x[is.na(x)] = mean(x,na.rm=T);x})
 Chr = do.call(c,sapply(1:length(grav$geno),function(x) rep(sprintf('Chr%d',x),ncol(grav$geno[[x]]$data))))
-X = do.call(cbind,lapply(grav$geno,function(x) apply(x$draws,c(1,2),mean)))
-Chr = do.call(c,sapply(1:length(grav$geno),function(x) rep(sprintf('Chr%d',x),ncol(grav$geno[[x]]$draws))))
+# X = do.call(cbind,lapply(grav$geno,function(x) apply(x$draws,c(1,2),mean)))
+# Chr = do.call(c,sapply(1:length(grav$geno),function(x) rep(sprintf('Chr%d',x),ncol(grav$geno[[x]]$draws))))
 
 data = data.frame(ID = 1:nrow(Y))
 
 
-times <- attr(grav, "time")
 Y = Y - mean(unlist(Y))
 Y = Y / sd(unlist(Y))
 observations = data.frame(Y = c(t(Y)),Time = times, ID = rep(data$ID,each = ncol(Y)))
@@ -92,21 +92,22 @@ BSFG_state$priors$h2_priors_resids[1] = 1
 BSFG_state$priors$h2_priors_resids = BSFG_state$priors$h2_priors_resids/sum(BSFG_state$priors$h2_priors_resids)
 BSFG_state$priors$h2_priors_factors = BSFG_state$priors$h2_priors_resids
 
-rescale_model_matrices = function(var_Eta_factor,current_state){
-  current_state = within(current_state,{
-    var_Eta = var_Eta_factor#var_Eta #* var_Eta_factor
+rescale_Eta = function(BSFG_state){
+  var_Eta_factor = apply(BSFG_state$current_state$Eta,2,var)
+  current_state = within(BSFG_state$current_state,{
+    var_Eta = var_Eta * var_Eta_factor
     Lambda = sweep(Lambda,1,sqrt(var_Eta_factor),'/')
     Plam = sweep(Plam,1,sqrt(var_Eta_factor),'/')
     B = sweep(B,2,sqrt(var_Eta_factor),'/')
     U_R = sweep(U_R,2,sqrt(var_Eta_factor),'/')
     tot_Eta_prec = tot_Eta_prec * var_Eta_factor
   })
-  current_state$model_matrices = NULL
   current_state
 }
 
-n_samples = 20
+n_samples = 200
 scanone_results = list()
+scanone_results2 = list()
 grav_eta = grav
 for(i  in 1:100) {
   print(sprintf('Run %d',i))
@@ -131,11 +132,11 @@ for(i  in 1:100) {
   print(p1)
   print(p2)
   plot(BSFG_state$current_state$Y,BSFG_state$current_state$Y_fitted);abline(0,1)
-  var_Eta = apply(BSFG_state$current_state$Eta,2,var)/BSFG_state$current_state$var_Eta
-  print(cbind(var_Eta,apply(BSFG_state$current_state$model_matrices[[1]]$X,2,var)))
+  var_Eta = apply(BSFG_state$current_state$Eta,2,var)
   if(i < 5) {
-    BSFG_state$current_state$var_Eta = var_Eta * BSFG_state$current_state$var_Eta
-    # BSFG_state$current_state = rescale_model_matrices(var_Eta,BSFG_state$current_state)
+    var_Eta = apply(BSFG_state$current_state$Eta,2,var)
+    BSFG_state$current_state = rescale_Eta(BSFG_state)
+    print(cbind(var_Eta,apply(BSFG_state$current_state$model_matrices[[1]]$X,2,var)))
   } else if(i < 10 || (i-1) %% 10 == 0) {
     # BSFG_state$current_state = update_k(BSFG_state)
     BSFG_state = reorder_factors(BSFG_state)
@@ -144,13 +145,32 @@ for(i  in 1:100) {
   grav_eta$pheno = BSFG_state$current_state$F
   phecol = 1:ncol(grav_eta$pheno)
   scanone_results[[i]] = scanone(grav_eta, phe=phecol, method="hk")
+  print(apply(scanone_results[[i]][,-c(1:2)],2,max))
+  grav_eta$pheno = with(BSFG_state,data_matrices$X_F %*% current_state$B_F)
+  phecol = 1:ncol(grav_eta$pheno)
+  scanone_results2[[i]] = scanone(grav_eta, phe=phecol, method="hk")
+  print(apply(scanone_results2[[i]][,-c(1:2)],2,max))
 }
 
-spline_X = model.matrix(BSFG_state$current_state$Terms,data = data.frame(Time = seq(min(times),max(times),length=30)))
+spline_X = model.matrix(BSFG_state$current_state$Terms,data = data.frame(Time = seq(min(times),max(times),length=241)))
+spline_X = sweep(spline_X,2,sqrt(BSFG_state$current_state$var_Eta),'*')
 QTL_effects = 2:ncol(BSFG_state$data_matrices$X_F)
 QTL_Chr = Chr
 
 Posterior = reload_Posterior(BSFG_state)
+
+pm_F = apply(Posterior$F,c(2,3),mean)
+grav_eta$pheno = pm_F
+phecol = 1:ncol(grav_eta$pheno)
+out_F = scanone(grav_eta, phe=phecol, method="hk")
+print(apply(out_F[,-c(1:2)],2,max))
+
+pm_XBf = BSFG_state$data_matrices$X_F %*% apply(Posterior$B_F,c(2,3),mean)
+grav_eta$pheno = pm_XBf
+phecol = 1:ncol(grav_eta$pheno)
+out_XBf = scanone(grav_eta, phe=phecol, method="hk")
+print(apply(out_XBf[,-c(1:2)],2,max))
+
 total_samples = Posterior$total_samples
 posterior_plot(Posterior$B_F[,-1,1],colorGroup = Chr)
 
@@ -162,6 +182,10 @@ B = aperm(array(sapply(1:total_samples,function(i) {
   })
 }),dim = c(dim(Posterior$B_F)[2],dim(Posterior$Lambda)[2],total_samples)),c(3,1,2))
 
-image(t(Matrix(apply(B,c(2,3),mean)))[dim(B)[3]:1,],at=c(-Inf,seq(-1,1,length=11),Inf))
+image(t(Matrix(apply(B,c(2,3),mean)))[dim(B)[3]:1,],at=c(-Inf,seq(-.01,.01,length=11),Inf),aspect=1/1.5)
 posterior_plot(B[,-1,1],colorGroup = Chr)
 
+grav_eta$pheno = apply(Posterior$F,c(2,3),mean)
+phecol = 1:ncol(grav_eta$pheno)
+scanone_pm = scanone(grav_eta, phe=phecol, method="hk")
+apply(scanone_pm[,-c(1:2)],2,max)
