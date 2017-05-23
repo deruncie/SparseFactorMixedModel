@@ -33,6 +33,8 @@ considered "large", signifying a factor should be kept. See Bhattacharya and Dun
 \item{prop}{proportion of \eqn{\lambda{ij}} elements in a column of \eqn{\Lambda} that must be smaller than
 \code{epsilon} before factor is dropped. See Bhattacharya and Dunson 2011}
 
+\item{k_init}{initial number of factors}
+
 \item{h2_divisions}{A scalar or vector of length equal to number of random effects. In BSFG, random
 effects are re-scaled as percentages of the total variation. Then a discrete prior spanning [0,1)
 with \code{h2_divisions} equally spaced values is constructred for each variance component. If
@@ -60,8 +62,6 @@ untransformed.}
 \item{thin}{thinning rate of the MCMC chain}
 
 \item{delta_iteractions_factor}{Number of times to iterate through sample_delta per iteration of the other parameters}
-
-\item{kinit}{initial number of factors}
 }
 \description{
 Function to create run_parameters list for initializing BSFG model

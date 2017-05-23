@@ -55,6 +55,7 @@ setup$data$Group = gl(3,1,length = nrow(setup$data))
                                   # setup = setup))
 # setup$Y[1:3] = NA
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
+setup$Y[sample(1:50000,30)]=NA
 BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #factor_model_fixed = ~0,
                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
                                   setup = setup))
@@ -113,7 +114,11 @@ XB = get_posterior_FUN(BSFG_state,B)
 B = get_posterior_mean(BSFG_state,'B')
 B2 = get_posteriorMean(BSFG_state,'B')
 
-G = get_posterior_FUN(BSFG_state,tcrossprod(sweep(Lambda,2,sqrt(F_h2))) + diag(resid_h2/tot_Eta_prec))
+G = get_posterior_FUN(BSFG_state,tcrossprod(sweep(Lambda,2,sqrt(F_h2),'*')) + diag(resid_h2[1,]/tot_Eta_prec[1,]))
+G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2[1,]) %*% t(Lambda) + diag(resid_h2[1,]/tot_Eta_prec[1,]))
+U_samples = get_posterior_FUN(BSFG_state, Z %*% U_F %*% t(Lambda) + Z %*% U_R)
+image(cov2cor(get_posterior_mean(G2)))
+plot(get_posterior_mean(G),setup$G);abline(0,1)
 
 library(shinystan)
 library(MCMCpack)

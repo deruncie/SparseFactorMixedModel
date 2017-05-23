@@ -29,27 +29,26 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
-  new_variables = c('Eta')
   observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
-    if(!exists('Y_missing')) Y_missing = Matrix(is.na(Y))
     Eta = Y
-    if(sum(Y_missing)  > 0){
+    n_missing = sum(Y_missing)
+    if(n_missing > 0){
       n = nrow(Y)
       p = ncol(Y)
       if(length(current_state) == 0) {
         Eta_mean = matrix(0,n,p)
-        resids = matrix(rnorm(n*p),n,p)
+        resids = rnorm(n_missing)
       } else{
         Eta_mean = XB + F %*% t(Lambda) + Z %*% U_R
         resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
-        resids = matrix(rnorm(p*n,0,sqrt(1/resid_Eta_prec)),nr = n,nc = p,byrow=T)
+        resids = rnorm(n_missing,0,sqrt(1/resid_Eta_prec[Y_missing@j+1]))  # sample resids from normal distribution with appropriate variance
       }
       missing_indices = which(Y_missing)
-      Eta[missing_indices] = Eta_mean[missing_indices] + resids[missing_indices]
+      Eta[missing_indices] = Eta_mean[missing_indices] + resids
     }
     return(list(Eta = as.matrix(Eta)))
   })
-  return(list(state = observation_model_state[new_variables],
+  return(list(state = observation_model_state,
               posteriorSample_params = c(),
               posteriorMean_params = c('Eta')
   ))

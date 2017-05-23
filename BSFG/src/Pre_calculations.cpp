@@ -4,9 +4,6 @@ using namespace Rcpp;
 using namespace Eigen;
 using namespace RcppParallel;
 
-
-
-
 SpMat make_C(SpMat chol_K_inv,VectorXd h2s, SpMat ZtZ){
   SpMat Ki = chol_K_inv.transpose() * chol_K_inv;
   SpMat C = ZtZ;

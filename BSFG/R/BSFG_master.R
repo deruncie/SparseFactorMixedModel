@@ -15,7 +15,7 @@
 #'   considered "large", signifying a factor should be kept. See Bhattacharya and Dunson 2011
 #' @param prop proportion of \eqn{\lambda{ij}} elements in a column of \eqn{\Lambda} that must be smaller than
 #'   \code{epsilon} before factor is dropped. See Bhattacharya and Dunson 2011
-#' @param kinit initial number of factors
+#' @param k_init initial number of factors
 #' @param h2_divisions A scalar or vector of length equal to number of random effects. In BSFG, random
 #'   effects are re-scaled as percentages of the total variation. Then a discrete prior spanning [0,1)
 #'   with \code{h2_divisions} equally spaced values is constructred for each variance component. If
@@ -153,7 +153,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
     observation_model_parameters = list(
       Y = Y,
       Mean_Y = Mean_Y,
-      VY = VY
+      VY = VY,
+      Y_missing = as(is.na(Y),'lgTMatrix')  # un-compressed logical sparse matrix
     )
   }
 

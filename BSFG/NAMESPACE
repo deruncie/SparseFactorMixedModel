@@ -10,4 +10,11 @@ importFrom(parallel,mclapply)
 importFrom(parallel,detectCores)
 importFrom(abind,abind)
 importFrom(reshape2,melt)
+importFrom("grDevices", "dev.list", "dev.new", "dev.off", "dev.set",
+           "pdf")
+importFrom("graphics", "abline", "arrows", "axis", "barplot", "hist",
+           "lines", "par", "plot", "points")
+importFrom("methods", "as", "is", "new")
+importFrom("stats", "cor", "model.matrix", "poly", "rgamma", "rnorm",
+           "runif", "var")
 useDynLib(BSFG)
