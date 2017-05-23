@@ -106,7 +106,14 @@ for(i  in 1:70) {
 
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
-XB = get_posterior_FUN(BSFG_state,X %*% B + Eta)
+XB = get_posterior_FUN(BSFG_state,'X %*% B')
+XB2 = get_posterior_FUN(BSFG_state,X %*% B)
+XB3 = get_posterior_FUN(BSFG_state,{a=X %*% B;a+Eta})
+XB = get_posterior_FUN(BSFG_state,B)
+B = get_posterior_mean(BSFG_state,'B')
+B2 = get_posteriorMean(BSFG_state,'B')
+
+G = get_posterior_FUN(BSFG_state,tcrossprod(sweep(Lambda,2,sqrt(F_h2))) + diag(resid_h2/tot_Eta_prec))
 
 library(shinystan)
 library(MCMCpack)

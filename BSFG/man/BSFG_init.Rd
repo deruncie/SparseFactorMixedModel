@@ -5,15 +5,24 @@
 \title{Initialize a BSFG model}
 \usage{
 BSFG_init(Y, model, data, factor_model_fixed = NULL, priors, run_parameters,
-  K_mats = NULL, K_inv_mats = NULL, data_model = "missing_data",
-  data_model_parameters = NULL, X_resid = NULL, X_factor = NULL,
-  cis_genotypes = NULL, posteriorSample_params = c("Lambda", "U_F", "F",
-  "delta", "tot_F_prec", "F_h2", "tot_Eta_prec", "resid_h2", "B", "B_F",
-  "tau_B", "tau_B_F", "cis_effects"), posteriorMean_params = c("U_R"),
-  ncores = detectCores(), setup = NULL, verbose = T)
+  K_mats = NULL, K_inv_mats = NULL, QTL_resid = NULL,
+  QTL_factors = NULL, cis_genotypes = NULL,
+  posteriorSample_params = c("Lambda", "U_F", "F", "delta", "tot_F_prec",
+  "F_h2", "tot_Eta_prec", "resid_h2", "B", "B_F", "U_R", "tau_B", "tau_B_F",
+  "cis_effects"), posteriorMean_params = c(), ncores = detectCores(),
+  setup = NULL, verbose = T)
 }
 \arguments{
-\item{Y}{a n x p matrix of data (n individuals x p traits)}
+\item{Y}{either a) a n x p matrix of data (n individuals x p traits), or b) a list describing
+the observation_model, data, and associated parameters. This list should contain:
+i) \code{observation_model}: a function modeled after \code{missing_observation_model}
+    (see code by typing this into the console) that draws posterior samples of Eta conditional on
+    the observations (Y) and the current state of the BSFG model (current_state).
+    The function should have the same form as \link{missing_data},
+    and must return Eta even if current_state is NULL.
+ii) \code{observations}: a data.frame containing the observaition-level data and associated covariates.
+    This must include a column \code{ID} that is also present in \code{data}
+iii) any other parameters necessary for \code{observation_model}}
 
 \item{model}{RHS of a model. The syntax is similar to \link{lmer}.
 Random effects are specified by (1+factor | group), with the left side of the '|' a design
@@ -29,8 +38,8 @@ by h2_divisions)}
 effects}
 
 \item{factor_model_fixed}{Fixed effect model formula specific to the latent factors. Optional. If NULL,
-the fixed effects for the latent factors will be the same as for Eta, except that the intercept
-will be removed. If a formula is provided (no random effects allowed), the model will be applied to
+the fixed effects for the latent factors will be the same as for Eta, except that the columns will be centered.
+If a formula is provided (no random effects allowed), the model will be applied to
 each factor, again with the intercept dropped (or set to zero). Note: Random effects in \code{model}
 are applied to both Eta and F.}
 
@@ -50,22 +59,11 @@ for K_inv_mats) for any of the random effects, K is assumed to be the identity.}
 \item{K_inv_mats}{list of precision matrices for random effects. If none provided (and none
 provided for K_mats) for any of the random effects, K is assumed to be the identity.}
 
-\item{data_model}{either a character vector identifying a provided data_model
-(ex. 'missing_data' calls \link{missing_data_model}),
-or a function modeled after \code{missing_data_model} (see code by typing this into the console)
-that draws posterior samples of Eta conditional on
-the observations (Y) and the current state of the BSFG model (current_state). The function should have
-the same form as \link{missing_data}, and must return Eta even if current_state is NULL}
+\item{QTL_resid}{a design matrix. Intended for marker genotypes. Corresponding coefficients
+will be modeled with the \code{QTL_resid_var} priors. Applies to factor residuals \eqn{Y - F\Lambda^T}}
 
-\item{data_model_parameters}{a list of parameters necessary for computing \code{data_model}.
-Ex. Y_missing for the missing_data model.
-If \code{data_model == 'missing_data'}, Y_missing is computed automatically.}
-
-\item{X_resid}{a design matrix. Alternative method for specifying fixed effects for \code{model}.
-Care must be taken with the intercept if both a fixed effect model is specified for in both
-\code{model} and \code{X_resid}.}
-
-\item{X_factor}{a design matrix. Alternative method for specifying \code{factor_model_fixed}}
+\item{QTL_factors}{a design matrix. Intended for marker genotypes. Corresponding coefficients
+will be modeled with the \code{QTL_factor_var} priors. Applies to factors \eqn{F}.}
 
 \item{cis_genotypes}{a list of design matrices of length \code{p} (ie number of columns of \code{Eta})
 This is used to specify trait-specific fixed effects, such a cis-genotypes}
