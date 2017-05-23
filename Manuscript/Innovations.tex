@@ -32,7 +32,7 @@ available methods are limited to one (or a few) responses per individual, allow 
 \item Add a new level between observed data and the linear mixed effect model based on a flexible link distribution. We develop link distributions for several disparate data types below including: partially missing observations, multiple-probe-per gene data, RNAseq data, time-series data.
 \end{enumerate}
 
-The SLAMglmm package is written in R, and draws heavily from the following packages: \emph{Matrix}, \emph{Rcpp}, \emph{RcppArmadillo}, \emph{lme4}, \emph{MCMCglmm}. The model syntax closely follows that of the widely used \emph{lme4} package. Prior specification is similar to \emph{MCMCglmm}.
+The SLAMglmm package is written in R, and draws heavily from the following packages: \emph{Matrix}, \emph{Rcpp}, \emph{RcppEigen}, \emph{lme4}, \emph{MCMCglmm}. The model syntax closely follows that of the widely used \emph{lme4} package. Prior specification is similar to \emph{MCMCglmm}.
 
 
 \section{Methods}
@@ -40,15 +40,6 @@ The SLAMglmm package is written in R, and draws heavily from the following packa
 The SLAMglmm model is specified as:
 \begin{align}
 \label{effect_model}
-\begin{split}
-\B{y}_i &\sim g(\B{\eta}_i,\Sigma_{i},\theta_y) \\
-[\B{\eta}_1, \B{\eta}_2, \dots, \B{\eta}_n]^T = \B{H} &=  \B{F}\B{\Lambda}^T + \B{X}\B{B} + \sum \B{Z}_i \B{U}_{R_i} + \B{E}_R \\
-\B{F} &= \B{X}_F\B{B}_F + \sum \B{Z}_i \B{U}_{F_i} + \B{E}_F 
-\end{split}
-\end{align}
-
-\begin{align}
-\label{effect_mode2l}
 \begin{split}
 \B{y}_i &\sim g(\B{\eta}_i,\Sigma_{i},\theta_y) \\
 [\B{\eta}_1, \B{\eta}_2, \dots, \B{\eta}_n]^T = \B{H} &=  \B{F}\B{\Lambda}^T + \B{X}\B{B} + \sum \B{Z}_i \B{U}_{R_i} + \B{E}_R \\
@@ -94,6 +85,7 @@ Beyond the identity $\B{y}_i = \B{\eta}_i$, the next simplest link function is o
 \begin{align}
 \B{y}_i &\sim \mbox{N}(g(\B{\eta}_i),\Sigma_y)
 \end{align}
+\noindent for known function $g(.)$, ex. $g(\B{\eta}) = \B{X}\B{\eta}$.
 
 \subsubsection{prior on factors}
 We use the same prior on $\B{\Lambda}$ as in BSFG. This is the ``infinite factor model" prior proposed by Bhattacharya and Dunson (2011) that imposes increasing column-wise shrinkage on higher order columns, which imposes sparsity by shrinking the number of important factors (ie paths), as well as element-wise shrinkage on each element of $\B{\Lambda}$ through and ARD-type prior. Other priors such as the \emph{TPB} prior of Engelhardt could be substituted. 
@@ -130,7 +122,7 @@ In BSFG, we avoided the inverse-Wishart distribution by the hierarchical factor 
 
 In SLAMglmm, we extend this re-formulation of the mixed effect model to the observational-level traits as well. Conditional on the latent factors, the covariance of a single trait ($j$) is:
 \begin{align} \begin{split}
-\sigma(\B{\eta}_{\bullet j}) | \B{\Lambda}, \B{F}, \B{B} = \B{P} &= \sum \sigma^2_{R_{i_j}} \B{K}_i + \sigma^2_{R_{e_j}}\B{I}_n \\
+\sigma(\B{\eta}_{\bullet j} - \B{X}\B{B}_i - \B{F}\B{\Lambda}^T_i)  &= \sum \sigma^2_{R_{i_j}} \B{K}_i + \sigma^2_{R_{e_j}}\B{I}_n \\
 &= \sigma^2_{R_{P_j}} (\sum h^2_{R_{i_j}} \B{K}_i + (1 - \sum h^2_{R_{i_j}})\B{I}_n) 
 \end{split} \end{align}
 
@@ -140,7 +132,7 @@ Thus, for each trait, we specify a total variance $\sigma^2_{R_{P_j}}$, and then
 
 Extending the formulation of BSFG, the random effect structure of each of the $k$ factors is specified similarly, conditional on the fixed effects:
 \begin{align} \begin{split}
-\sigma(\B{f}_{\bullet j} ) | \B{B}_F &= \sum \sigma^2_{F_{i_j}} \B{K}_i + \sigma^2_{F_{e_j}}\B{I}_n \\
+\sigma(\B{f}_{j} - \B{X}_F\B{B}_{F_j} ) &= \sum \sigma^2_{F_{i_j}} \B{K}_i + \sigma^2_{F_{e_j}}\B{I}_n \\
 &= \sigma^2_{F_{P_j}} (\sum h^2_{F_{i_j}} \B{K}_i + (1 - \sum h^2_{F_{i_j}})\B{I}_n) 
 \end{split} \end{align}
 \noindent with the exception that we constrain $\sigma^2_{F_{P_j}} = 1$ for identifiability. However, to improve mixing of $\B{\Lambda}$ and $\B{F}$, we implement the parameter expansion proposed by (Ghosh and Dunson 2009) for factor models by allowing $\sigma^2_{F_{P_j}} \neq1$, but then correcting $\B{F}, \B{U_F}$, and $\B{\Lambda}$ by this factor in the posterior (see~\ref{Gibbs_sampler}).

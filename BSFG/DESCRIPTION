@@ -25,10 +25,12 @@ Imports:
 Suggests:
   R.matlab,
   MCMCpack,
-  splines
+  splines,
+  pedantics
 LinkingTo: 
   Rcpp (>= 0.11.2), 
   RcppEigen (>= 0.3.3.3.0),
   RcppParallel
 SystemRequirements: GNU make
 RoxygenNote: 6.0.0
+ByteCompile: TRUE

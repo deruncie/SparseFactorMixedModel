@@ -343,3 +343,63 @@ reload_Posterior = function(BSFG_state){
   Posterior
 }
 
+
+make_current_state = function(Posterior,sample,terms){
+  sample_terms = terms[terms %in% Posterior$posteriorSample_params]
+  current_state = lapply(sample_terms,function(x) Posterior[[x]][sample,,])
+  names(current_state) = sample_terms
+  current_state
+}
+
+
+#' Calculates the posterior mean of a function of parameters
+#'
+#' This function will apply the supplied function to each posterior sample of the chain. Variables
+#'    referenced in FUN will be selected from the following search locations (in this order):
+#'    1) Posterior$posteriorSample_params
+#'    2) data_matrices
+#'    3) priors
+#'    4) current_state
+#'    5) global environment#'
+#'
+#' @param BSFG_state A BSFG_state object including a re-loaded Posterior list
+#' @param FUN Operations to be applied to each posterior sample. Write as if this were operating
+#'     within current_state. Can use priors, data_matrices, and other elements of current_state
+#' @param samples (optional) vector of sample indexes to use in the computation
+#'
+#' @return array of n_samples x dim1 x dim2 where dim1 and dim2 are the dimensions of the calculated
+#'     parameter per posterior sample
+#' @export
+#'
+#' @examples
+get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,...) {
+  FUN = substitute(FUN)
+  terms = all.names(FUN)
+  if(is.null(samples)) samples = 1:BSFG_state$Posterior$total_samples
+  per_sample_fun = function(i) {
+    # get current sample of each of the terms in FUN
+    current_sample = make_current_state(BSFG_state$Posterior,i,terms)
+    # evaluate FUN in an environment constructed from current_sample, and BSFG_state, taking current_sample first
+    with(BSFG_state,with(c(current_sample,data_matrices,priors,Posterior,current_state),eval(FUN)))
+  }
+  dim_1 = dim(per_sample_fun(1)) # get the dimension of the returned value
+  # calculate value for each sample
+  res = sapply(samples,per_sample_fun)
+  # re-formulate into an appropriate array with the first dimension as samples
+  array(t(res),dim = c(length(samples),dim_1))
+}
+
+get_posterior_mean = function(X,FUN,samples){
+  if(is.list(X)){
+    X = get_posterior_FUN(X,FUN,samples)
+  }
+  apply(X,c(2,3),mean)
+}
+
+
+saapply = function(X,dims,FUN,...){
+  res = apply(X,dims,FUN,...)
+
+  FUN = match.fun(FUN)
+  res = lapply()
+}

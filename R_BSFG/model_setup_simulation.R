@@ -105,7 +105,8 @@ for(i  in 1:70) {
 }
 
 
-Posterior = reload_Posterior(BSFG_state)
+BSFG_state$Posterior = reload_Posterior(BSFG_state)
+XB = get_posterior_FUN(BSFG_state,X %*% B + Eta)
 
 library(shinystan)
 library(MCMCpack)
