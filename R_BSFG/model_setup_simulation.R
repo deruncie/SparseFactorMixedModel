@@ -38,7 +38,11 @@ priors = list(
     delta_2   = list(shape = 3, rate = 1),
     Lambda_df = 3,
     B_df      = 3,
-    B_F_df    = 3
+    B_F_df    = 3,
+    # h2_priors_resids_fun = function(h2s) pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
+    # h2_priors_factors_fun = function(h2s) ifelse(h2s == 0,run_parameters$h2_divisions,run_parameters$h2_divisions/(run_parameters$h2_divisions-1))
+    h2_priors_resids = 1,
+    h2_priors_factors = 1
 )
 
 print('Initializing')
@@ -59,21 +63,8 @@ BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|anima
                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
                                   setup = setup))
 BSFG_state$current_state$F_h2
-
-h2_divisions = run_parameters$h2_divisions
-BSFG_state$priors$h2_priors_resids = with(BSFG_state$data_matrices, sapply(1:ncol(h2s_matrix),function(x) {
-    h2s = h2s_matrix[,x]
-    pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
-}))
-BSFG_state$priors$h2_priors_resids = BSFG_state$priors$h2_priors_resids/sum(BSFG_state$priors$h2_priors_resids)
-BSFG_state$priors$h2_priors_factors = BSFG_state$priors$h2_priors_resids
-
-# h2_divisions = ncol(BSFG_state$data_matrices$h2s_matrix)
-# BSFG_state$priors$h2_priors_factors = c(h2_divisions-1,rep(1,h2_divisions-1))/(2*(h2_divisions-1))
-# BSFG_state$priors$h2_priors_factors = with(BSFG_state$data_matrices, sapply(1:nrow(h2s_matrix),function(x) {
-#     h2s = h2s_matrix[x,]
-#     pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10)
-# }))
+BSFG_state$priors$h2_priors_resids
+BSFG_state$priors$h2_priors_factors
 
 save(BSFG_state,file="BSFG_state.RData")
 

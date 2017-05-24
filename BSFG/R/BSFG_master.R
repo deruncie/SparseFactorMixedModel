@@ -486,6 +486,24 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	priors$delta_2_rate    = priors$delta_2$rate
 	priors$delta_2_shape   = priors$delta_2$shape
 
+	# h2_priors_resids
+	if(exists('h2_priors_resids',priors)) {
+	  if(length(priors$h2_priors_resids) == 1) priors$h2_priors_resids = rep(priors$h2_priors_resids,ncol(h2s_matrix))
+	  if(!length(priors$h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_resids')
+	} else{
+	  if(!is(priors$h2_priors_resids_fun,'function')) stop('need to provide a priors$h2_priors_resids_fun() to specify discrete h2 prior for resids')
+	  priors$h2_priors_resids = apply(h2s_matrix,2,priors$h2_priors_resids_fun)
+	}
+	priors$h2_priors_resids = priors$h2_priors_resids/sum(priors$h2_priors_resids)
+	# h2_priors_factors
+	if(exists('h2_priors_factors',priors)) {
+	  if(length(priors$h2_priors_factors) == 1) priors$h2_priors_factors = rep(priors$h2_priors_factors,ncol(h2s_matrix))
+	  if(!length(priors$h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_factors')
+	} else{
+	  if(!is(priors$h2_priors_factors_fun,'function')) stop('need to provide a priors$h2_priors_factors_fun() to specify discrete h2 prior for factors')
+	  priors$h2_priors_factors = apply(h2s_matrix,2,priors$h2_priors_factors_fun)
+	}
+	priors$h2_priors_factors = priors$h2_priors_factors/sum(priors$h2_priors_factors)
 
 	# ----------------------------- #
 	# -- create BSFG_state object - #
