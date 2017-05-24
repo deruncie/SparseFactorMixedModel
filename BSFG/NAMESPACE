@@ -1,5 +1,5 @@
 exportPattern("^[[:alpha:]]+")
-import(Rcpp)
+import(methods,Rcpp)
 importFrom(Rcpp, evalCpp)
 importFrom(RcppParallel, RcppParallelLibs)
 import(Matrix)
@@ -17,4 +17,4 @@ importFrom("graphics", "abline", "arrows", "axis", "barplot", "hist",
 importFrom("methods", "as", "is", "new")
 importFrom("stats", "cor", "model.matrix", "poly", "rgamma", "rnorm",
            "runif", "var")
-useDynLib(BSFG)
+useDynLib(BSFG,.registration=TRUE)
