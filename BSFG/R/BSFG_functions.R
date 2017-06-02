@@ -381,7 +381,9 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
     # get current sample of each of the terms in FUN
     current_sample = make_current_state(BSFG_state$Posterior,sample_index_i,terms)
     # evaluate FUN in an environment constructed from current_sample, and BSFG_state, taking current_sample first
-    with(BSFG_state,with(c(current_sample,data_matrices,priors,Posterior,current_state),eval(FUN)))
+    result = with(BSFG_state,with(c(current_sample,data_matrices,priors,Posterior,current_state),eval(FUN)))
+    if(is(result,'Matrix')) result = as.matrix(result)
+    result
   }
   sample_1_result = per_sample_fun(1)
   dim_1 = dim(sample_1_result) # get the dimension of the returned value
@@ -404,8 +406,10 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
 #'
 #' @return posterior mean matrix
 get_posterior_mean = function(X,...){
-  if(is.list(X)){
+  if(!(is(X,'matrix') || is(X,'array'))){
     X = get_posterior_FUN(X,...)
   }
-  apply(X,c(2,3),mean)
+  if(length(dim(X)) == 3) result = apply(X,c(2,3),mean)
+  if(length(dim(X)) == 2) result = apply(X,2,mean)
+  result
 }

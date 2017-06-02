@@ -20,8 +20,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = BSFG_control(
-  # sampler = 'fast_BSFG',
-  sampler = 'general_BSFG',
+  sampler = 'fast_BSFG',
+  # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
@@ -105,7 +105,8 @@ B = get_posterior_mean(BSFG_state,'B')
 B2 = get_posteriorMean(BSFG_state,'B')
 
 G = get_posterior_FUN(BSFG_state,tcrossprod(sweep(Lambda,2,sqrt(F_h2),'*')) + diag(resid_h2[1,]/tot_Eta_prec[1,]))
-G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2[1,]) %*% t(Lambda) + diag(resid_h2[1,]/tot_Eta_prec[1,]))
+i = 1
+G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2[i,]) %*% t(Lambda) + diag(resid_h2[i,]/tot_Eta_prec[i,]))
 U_samples = get_posterior_FUN(BSFG_state, Z %*% U_F %*% t(Lambda) + Z %*% U_R)
 image(cov2cor(get_posterior_mean(G)))
 plot(get_posterior_mean(G),setup$G);abline(0,1)
