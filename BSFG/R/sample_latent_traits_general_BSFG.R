@@ -9,13 +9,12 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
   current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {
     k = ncol(Lambda)
 
-    if(is.null(cis_genotypes)){
-      XB = X %*% B
-    } else{
-      XB = matrix(0,ncol = p, nrow = n)
+    XB = X %*% B
+    if(inherits(XB,'Matrix')) XB = as.matrix(XB)
+    if(!is.null(cis_genotypes)){
       for(j in 1:p){
         cis_X_j = cis_genotypes[[j]]
-        XB[,j] = X %*% B[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]]
+        XB[,j] = XB[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]]
       }
     }
 
@@ -50,7 +49,7 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
           index = sets==set
           if(sum(!index) > 0){
             X_F_set = X_F[,index,drop=FALSE]
-            F_tilde = F - X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE]
+            F_tilde = F - as.matrix(X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE])
           } else{
             X_F_set = X_F
             F_tilde = F
@@ -66,7 +65,7 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
         B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, F_h2_index, tot_F_prec, prior_mean, prior_prec,grainSize)
       }
       XFBF = X_F %*% B_F
-      if(class(XFBF) == 'Matrix') XFBF = as.matrix(XFBF)
+      if(inherits(XFBF,'Matrix')) XFBF = as.matrix(XFBF)
       F_tilde = F - XFBF
     } else{
       F_tilde = F

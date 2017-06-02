@@ -12,16 +12,14 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 	current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {
 		k = ncol(Lambda)
 
-		if(is.null(cis_genotypes)){
-		  XB = X %*% B
-		} else{
-		  XB = matrix(0,ncol = p, nrow = n)
+		XB = X %*% B
+		if(inherits(XB,'Matrix')) XB = as.matrix(XB)
+		if(!is.null(cis_genotypes)){
 		  for(j in 1:p){
 		    cis_X_j = cis_genotypes[[j]]
-		    XB[,j] = X %*% B[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]]
+		    XB[,j] = XB[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]]
 		  }
 		}
-		if(class(XB) == 'Matrix') XB = as.matrix(XB)
 
 	 # -----Sample resid_h2, tot_Eta_prec, U_R ---------------- #
 		#conditioning on W, B, F, Lambda, marginalizing over U_R
@@ -53,7 +51,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		      index = sets==set
 		      if(sum(!index) > 0){
 		        X_F_set = X_F[,index,drop=FALSE]
-		        F_tilde = F - X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE]
+		        F_tilde = F - as.matrix(X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE])
 		      } else{
 		        X_F_set = X_F
 		        F_tilde = F
@@ -74,7 +72,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		    B_F = sample_coefs_parallel_sparse_c_Eigen(Ut,F,X_F,F_h2, tot_F_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
 		  }
 		  XFBF = X_F %*% B_F
-		  if(class(XFBF) == 'Matrix') XFBF = as.matrix(XFBF)
+		  if(inherits(XFBF,'Matrix')) XFBF = as.matrix(XFBF)
 		  F_tilde = F - XFBF # not sparse.
 		} else{
 		  F_tilde = F
@@ -84,11 +82,12 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		#conditioning on F, U_F
 		UtF_tilde = as.matrix(Ut %*% F_tilde)
 
-		scores = tot_prec_scores_c(UtF_tilde,F_h2,s)
-		if(b_F > 0) {
-		  scores = scores + colSums(B_F^2*prec_B_F)   # add this if tot_F_prec part of the prior for B_F
-		}
-		tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2+ b_F/2,rate = tot_F_prec_rate + 0.5*scores)
+		# scores = tot_prec_scores_c(UtF_tilde,F_h2,s)
+		# if(b_F > 0) {
+		#   scores = scores + colSums(B_F^2*prec_B_F)   # add this if tot_F_prec part of the prior for B_F
+		# }
+		# tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2+ b_F/2,rate = tot_F_prec_rate + 0.5*scores)
+		tot_F_prec[] = 1
 
 		if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
 		F_h2_index = sample_h2s_discrete_fast(UtF_tilde, tot_F_prec, h2_priors_factors,s,grainSize)

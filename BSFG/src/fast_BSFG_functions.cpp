@@ -59,7 +59,7 @@ VectorXd sample_coefs_single(
 MatrixXd sample_coefs_parallel_sparse_c_Eigen(
     MSpMat Ut,
     Map<MatrixXd> Eta,
-    Map<MatrixXd> W,
+    MSpMat W,
     Map<VectorXd> h2,
     Map<VectorXd> tot_Eta_prec,
     Map<VectorXd> s,

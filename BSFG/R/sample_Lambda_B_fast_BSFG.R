@@ -14,7 +14,7 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
 
     # -----Sample Lambda and B ------------------ #
     #conditioning on F, marginalizing over U_R
-    Design = as.matrix(cbind(X,F))
+    Design = cBind(X,F)
     rows = b + k
     prior_mean = matrix(0,rows,p)
     if(b > 0) {
@@ -37,7 +37,7 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
     } else{
       for(j in 1:p){
         cis_X_j = cis_genotypes[[j]]
-        Design_j = cbind(Design,cis_X_j)
+        Design_j = cBind(Design,cis_X_j)
         prior_mean_j = rbind(prior_mean[,j,drop=FALSE],matrix(0,ncol(cis_X_j)))
         prior_prec_j = rbind(prior_prec[,j,drop=FALSE],matrix(1e-10,ncol(cis_X_j)))
         randn_theta = matrix(rnorm(ncol(Design_j)),ncol(Design_j))

@@ -32,6 +32,7 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
   observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
     Eta = Y
     n_missing = sum(Y_missing)
+    Eta_mean = matrix(0,0,0)
     if(n_missing > 0){
       n = nrow(Y)
       p = ncol(Y)
@@ -46,11 +47,11 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
       missing_indices = which(Y_missing)
       Eta[missing_indices] = Eta_mean[missing_indices] + resids
     }
-    return(list(Eta = as.matrix(Eta)))
+    return(list(Eta = as.matrix(Eta),Eta_mean = as.matrix(Eta_mean)))
   })
   return(list(state = observation_model_state,
               posteriorSample_params = c(),
-              posteriorMean_params = c('Eta')
+              posteriorMean_params = c('Eta','Eta_mean')
   ))
 }
 

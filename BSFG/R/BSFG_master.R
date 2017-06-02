@@ -226,6 +226,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  X = cbind(X, QTL_resid) # add in QTL_resid if provided.
 	}
 	b = ncol(X)
+	X = as(X,'dgCMatrix')
 
 	if(any(is.na(X))) stop('Missing values in X_resid')
 
@@ -239,9 +240,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  X_F = cbind(X_F,QTL_factors)
 	  same_fixed_model = FALSE
 	}
-	X_F = sweep(X_F,2,colMeans(X_F),'-') #
+	# X_F = sweep(X_F,2,colMeans(X_F),'-') #
 	b_F = ncol(X_F)
 	X_F_zero_variance = apply(X_F,2,var) == 0
+	X_F = as(X_F,'dgCMatrix')
 	if(any(is.na(X_F))) stop('Missing values in X_F')
 
 
@@ -504,6 +506,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  priors$h2_priors_factors = apply(h2s_matrix,2,priors$h2_priors_factors_fun)
 	}
 	priors$h2_priors_factors = priors$h2_priors_factors/sum(priors$h2_priors_factors)
+
 
 	# ----------------------------- #
 	# -- create BSFG_state object - #

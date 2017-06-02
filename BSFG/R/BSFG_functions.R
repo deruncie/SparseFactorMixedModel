@@ -377,13 +377,15 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
   }
   terms = all.names(FUN)
   if(is.null(samples)) samples = 1:BSFG_state$Posterior$total_samples
-  per_sample_fun = function(i) {
+  per_sample_fun = function(sample_index_i) {
     # get current sample of each of the terms in FUN
-    current_sample = make_current_state(BSFG_state$Posterior,i,terms)
+    current_sample = make_current_state(BSFG_state$Posterior,sample_index_i,terms)
     # evaluate FUN in an environment constructed from current_sample, and BSFG_state, taking current_sample first
     with(BSFG_state,with(c(current_sample,data_matrices,priors,Posterior,current_state),eval(FUN)))
   }
-  dim_1 = dim(per_sample_fun(1)) # get the dimension of the returned value
+  sample_1_result = per_sample_fun(1)
+  dim_1 = dim(sample_1_result) # get the dimension of the returned value
+  if(is.null(dim_1)) dim_1 = length(sample_1_result)
   # calculate value for each sample
   res = sapply(samples,per_sample_fun)
   # re-formulate into an appropriate array with the first dimension as samples

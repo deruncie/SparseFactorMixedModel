@@ -23,8 +23,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = BSFG_control(
-  sampler = 'fast_BSFG',
-  # sampler = 'general_BSFG',
+  # sampler = 'fast_BSFG',
+  sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
@@ -95,7 +95,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 # Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
 # burn in
 
-n_samples = 200
+n_samples = 20
 for(i  in 1:100) {
   if(i < 10 || (i-1) %% 20 == 0) {
     BSFG_state$current_state = update_k(BSFG_state)

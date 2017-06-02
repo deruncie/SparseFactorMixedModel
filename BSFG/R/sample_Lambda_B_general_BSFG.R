@@ -11,7 +11,7 @@ sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
 
     # -----Sample Lambda and B ------------------ #
     #conditioning on W, F, marginalizing over random effects (conditional on resid_h2)
-    Design = cbind(X,F)
+    Design = cBind(X,F)
     rows = b + k
     prior_mean = matrix(0,rows,p)
     if(b > 0) {
@@ -28,7 +28,7 @@ sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     } else{
       for(j in 1:p){
         cis_X_j = cis_genotypes[[j]]
-        Design_j = cbind(Design,cis_X_j)
+        Design_j = cBind(Design,cis_X_j)
         prior_mean_j = rbind(prior_mean[,j,drop=FALSE],matrix(0,ncol(cis_X_j)))
         prior_prec_j = rbind(prior_prec[,j,drop=FALSE],matrix(1e-10,ncol(cis_X_j)))
         coefs_j = sample_MME_fixedEffects(Eta[,j,drop=FALSE],Design_j,Sigma_Choleskys,  resid_h2_index[j], tot_Eta_prec[,j,drop=FALSE], prior_mean_j, prior_prec_j,grainSize)

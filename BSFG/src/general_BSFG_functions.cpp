@@ -12,7 +12,7 @@ using namespace RcppParallel;
 
 VectorXd sample_MME_single_diagK(
     VectorXd y,
-    MatrixXd W,
+    SpMat W,
     VectorXd prior_mean,
     VectorXd prior_prec,
     SpMat chol_R,
@@ -27,7 +27,8 @@ VectorXd sample_MME_single_diagK(
   MatrixXd W_theta_star = W * theta_star;
   VectorXd y_resid = y - W_theta_star - e_star;
 
-  MatrixXd RinvSqW = chol_R.transpose().triangularView<Lower>().solve(W);
+  MatrixXd W_mat = W;
+  MatrixXd RinvSqW = chol_R.transpose().triangularView<Lower>().solve(W_mat);
   VectorXd WtRinvy = RinvSqW.transpose() * chol_R.transpose().triangularView<Lower>().solve(y_resid) * tot_Eta_prec;
 
   VectorXd theta_tilda;
@@ -53,7 +54,7 @@ VectorXd sample_MME_single_diagK(
 // [[Rcpp::export]]
 VectorXd sample_MME_single_diagK_c(
     Map<VectorXd> y,
-    Map<MatrixXd> W,
+    MSpMat W,
     Map<VectorXd> prior_mean,
     Map<VectorXd> prior_prec,
     MSpMat chol_R,
@@ -67,7 +68,7 @@ VectorXd sample_MME_single_diagK_c(
 // [[Rcpp::export()]]
 MatrixXd sample_MME_fixedEffects_c(
     Map<MatrixXd> Y,
-    Map<MatrixXd> W,
+    MSpMat W,
     Rcpp::List Sigma_Choleskys,
     Rcpp::IntegerVector h2s_index,
     Map<VectorXd> tot_Eta_prec,
@@ -78,14 +79,16 @@ MatrixXd sample_MME_fixedEffects_c(
     int grainSize) {
 
   struct sampleColumn : public Worker {
-    MatrixXd Y, W, prior_mean, prior_prec, randn_theta, randn_e;
+    MatrixXd Y;
+    SpMat W;
+    MatrixXd prior_mean, prior_prec, randn_theta, randn_e;
     const std::vector<MSpMat> chol_R_list;
     RVector<int> h2s_index;
     VectorXd tot_Eta_prec;
     MatrixXd &coefs;
 
     sampleColumn(MatrixXd Y,
-                 MatrixXd W,
+                 SpMat W,
                  MatrixXd prior_mean,
                  MatrixXd prior_prec,
                  const std::vector<MSpMat> chol_R_list,
