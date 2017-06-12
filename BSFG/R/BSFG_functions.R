@@ -70,7 +70,7 @@ update_k = function( BSFG_state) {
 			U_F           = cbind(U_F,rnorm(r,0,sqrt(sum(F_h2[,k]))))
 			B_F           = cbind(B_F,0*rnorm(b_F,0,1))
 			prec_B_F      = cbind(prec_B_F,c(tau_B_F))
-			F             = cbind(F,rnorm(n,X_F %*% B_F[,k] + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
+			F             = cbind(F,rnorm(n,as.matrix(X_F %*% B_F[,k]) + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
 		} else if(num > 0) { # drop redundant columns
 			nonred = which(vec == 0) # non-redundant loadings columns
 			while(length(nonred) < 2) {
