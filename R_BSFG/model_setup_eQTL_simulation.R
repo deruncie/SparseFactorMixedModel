@@ -45,8 +45,8 @@ priors = list(
   Lambda_df = 3,
   B_df      = 3,
   B_F_df    = 3,
-  # h2_priors_resids_fun = function(h2s) pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-  # h2_priors_factors_fun = function(h2s) ifelse(h2s == 0,run_parameters$h2_divisions,run_parameters$h2_divisions/(run_parameters$h2_divisions-1))
+  # h2_priors_resids_fun = function(h2s,n) pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
+  # h2_priors_factors_fun = function(h2s,n) ifelse(h2s == 0,n,n/(n-1))
   h2_priors_resids = 1,
   h2_priors_factors = 1
 )

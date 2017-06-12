@@ -54,6 +54,69 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
   return(all_args)
 }
 
+
+
+#' Set BSFG priors
+#'
+#' Function to create list of priors for BSFG model.
+#'
+#' Default values are provided, but any can be replaced. Note: \code{h2_priors_resids} and
+#'     \code{h2_priors_factors} can be set after calling \code{BSFG_init} and before \code{sample_BSFG}
+#'     if that is easier.
+#'
+#' @param fixed_var List of parameters of inverse gamma distribution for fixed effects, specifically:
+#'     \code{V} and \code{nu}, give shape = \code{nu/2} and scale = \code{nu*V/2}, so mean = \code{\frac{V*nu}{nu-2}}
+#'     Will be applied to fixed effects of residuals (\code{B}) and factors (\code{B_F}).
+#' @param fixed_resid_var If provided, overides \code{fixed_var} for fixed effects of residuals (\code{B}).
+#' @param fixed_factors_var If provided, overides \code{fixed_var} for fixed effects of factors (\code{B_F}).
+#' @param tot_Y_var List of parameters of inverse gamma distribution for residual variances. See \code{fixed_var}.
+#' @param tot_F_var List of parameters of inverse gamma distribution for factor variances. See \code{fixed_var}.
+#'     This parameter provides the parameter extension of Ghosh and Dunson (2009), but is removed
+#'     from all Factor parameters before they are saved in Posterior
+#' @param delta_1 List of parameters of inverse gamma distribution for \code{delta_1}. Specifically:
+#'     \code{shape} and \code{rate}. This parameter is the column-shrinkage of the first factor.
+#' @param delta_2 List of parameters of inverse gamma distribution for \code{delta_2 \dots delta_k}.
+#'     Specifically: \code{shape} and \code{rate}.
+#'     This is provides the additional column-shrinkage of higher-order columns.
+#' @param Lambda_df Degrees of freedom of individual parameter shrinkage of Lambda from implied
+#'     t-distribution
+#' @param B_df Degrees of freedom of individual parameter shrinkage of B from implied
+#'     t-distribution
+#' @param B_F_df Degrees of freedom of individual parameter shrinkage of B_F from implied
+#'     t-distribution
+#' @param h2_priors_resids_fun function for that returns prior probability for a given value of h2
+#'     for each random effect. Should take two argument - a vector \code{h2} values for each random effect,
+#'     and \code{n} - the number of discrete levels of the prior.
+#'     Alternatively, can be a scalar or vector of (relative) prior values for each value of the
+#'     discrete prior.
+#' @param h2_priors_factors_fun see \code{h2_priors_resids_fun}. Same, but for the h2s of the factors.
+#'
+#' @return a list with each of the prior components specified above.
+#' @export
+#'
+#' @examples
+BSFG_priors = function(
+                        fixed_var = list(V = 1,     nu = 3),
+                        fixed_resid_var = NULL,
+                        fixed_factors_var = NULL,
+                        tot_Y_var = list(V = 0.5,   nu = 3),
+                        tot_F_var = list(V = 18/20, nu = 20),
+                        delta_1   = list(shape = 2.1,  rate = 1/20),
+                        delta_2   = list(shape = 3, rate = 1),
+                        Lambda_df = 3,
+                        B_df      = 3,
+                        B_F_df    = 3,
+                        h2_priors_resids_fun = function(h2s, n) 1,
+                        h2_priors_factors_fun = function(h2s, n) 1
+                    ) {
+  all_args = lapply(formals(),function(x) eval(x))
+  passed_args = lapply(as.list(match.call())[-1],function(x) eval(x))
+  all_args[names(passed_args)] = passed_args
+  return(all_args)
+}
+
+
+
 #' Initialize a BSFG model
 #'
 #' Sets up the BSFG model, selects starting values, and pre-calculates matrices for the GIBBS
@@ -123,7 +186,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
 #' @return run_parameters, run_variables, data_matrices, priors, simulation: input data and
 #'   parameters
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'
-BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_parameters, K_mats = NULL, K_inv_mats = NULL,
+BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_priors(), run_parameters = BSFG_control(), K_mats = NULL, K_inv_mats = NULL,
                      QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','U_R','tau_B','tau_B_F','cis_effects'),
                      posteriorMean_params = c(),
@@ -437,8 +500,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	# ----------------------------- #
 	if(any(sapply(priors, function(x) {try({return(exists(x$nu) && x$nu <= 2)},silent=T);return(FALSE)}))) stop('priors nu must be > 2')
 	  # fixed effects
-	if('fixed_var' %in% names(priors) && !'fixed_resid_var' %in% names(priors)) priors$fixed_resid_var = priors$fixed_var
-	if('fixed_var' %in% names(priors) && !'fixed_factors_var' %in% names(priors)) priors$fixed_factors_var = priors$fixed_var
+	if(is.null(priors$fixed_resid_var)) priors$fixed_resid_var = priors$fixed_var
+	if(is.null(priors$fixed_factors_var)) priors$fixed_factors_var = priors$fixed_var
 	if(length(priors$fixed_resid_var$V == 1)) {
 	  priors$fixed_resid_var$V = rep(priors$fixed_resid_var$V,b)
 	  priors$fixed_resid_var$nu = rep(priors$fixed_resid_var$nu,b)
@@ -494,7 +557,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  if(!length(priors$h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_resids')
 	} else{
 	  if(!is(priors$h2_priors_resids_fun,'function')) stop('need to provide a priors$h2_priors_resids_fun() to specify discrete h2 prior for resids')
-	  priors$h2_priors_resids = apply(h2s_matrix,2,priors$h2_priors_resids_fun)
+	  priors$h2_priors_resids = apply(h2s_matrix,2,priors$h2_priors_resids_fun,n = ncol(h2s_matrix))
 	}
 	priors$h2_priors_resids = priors$h2_priors_resids/sum(priors$h2_priors_resids)
 	# h2_priors_factors
@@ -503,7 +566,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors, run_para
 	  if(!length(priors$h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_factors')
 	} else{
 	  if(!is(priors$h2_priors_factors_fun,'function')) stop('need to provide a priors$h2_priors_factors_fun() to specify discrete h2 prior for factors')
-	  priors$h2_priors_factors = apply(h2s_matrix,2,priors$h2_priors_factors_fun)
+	  priors$h2_priors_factors = apply(h2s_matrix,2,priors$h2_priors_factors_fun,n = ncol(h2s_matrix))
 	}
 	priors$h2_priors_factors = priors$h2_priors_factors/sum(priors$h2_priors_factors)
 

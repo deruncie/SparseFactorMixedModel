@@ -4,9 +4,9 @@
 \alias{BSFG_init}
 \title{Initialize a BSFG model}
 \usage{
-BSFG_init(Y, model, data, factor_model_fixed = NULL, priors, run_parameters,
-  K_mats = NULL, K_inv_mats = NULL, QTL_resid = NULL,
-  QTL_factors = NULL, cis_genotypes = NULL,
+BSFG_init(Y, model, data, factor_model_fixed = NULL, priors = BSFG_priors(),
+  run_parameters = BSFG_control(), K_mats = NULL, K_inv_mats = NULL,
+  QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
   posteriorSample_params = c("Lambda", "U_F", "F", "delta", "tot_F_prec",
   "F_h2", "tot_Eta_prec", "resid_h2", "B", "B_F", "U_R", "tau_B", "tau_B_F",
   "cis_effects"), posteriorMean_params = c(), ncores = detectCores(),
