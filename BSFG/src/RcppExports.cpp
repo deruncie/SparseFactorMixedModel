@@ -7,6 +7,17 @@
 
 using namespace Rcpp;
 
+// LDLt
+List LDLt(MSpMat A);
+RcppExport SEXP BSFG_LDLt(SEXP ASEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< MSpMat >::type A(ASEXP);
+    rcpp_result_gen = Rcpp::wrap(LDLt(A));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_coefs_parallel_sparse_c_Eigen
 MatrixXd sample_coefs_parallel_sparse_c_Eigen(MSpMat Ut, Map<MatrixXd> Eta, MSpMat W, Map<VectorXd> h2, Map<VectorXd> tot_Eta_prec, Map<VectorXd> s, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, Map<MatrixXd> randn_theta, Map<MatrixXd> randn_e, int grainSize);
 RcppExport SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen(SEXP UtSEXP, SEXP EtaSEXP, SEXP WSEXP, SEXP h2SEXP, SEXP tot_Eta_precSEXP, SEXP sSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP, SEXP grainSizeSEXP) {

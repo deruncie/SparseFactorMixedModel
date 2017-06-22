@@ -11,9 +11,19 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, V
   K = forceSymmetric(solve(Kinv))
   rownames(K) = rownames(Kinv)
   K = K[children,children]
+
+  # for more informative K
   # K[K>0 & K<1] = 0.5
 
-  K_chol = chol(K)
+  # for low-rank K
+  # rownames_K = rownames(K)
+  # K = tcrossprod(matrix(rnorm(nrow(K)*100),ncol=100))
+  # sd_K = sqrt(diag(K))
+  # K = t(K / sd_K)/sd_K
+  # rownames(K) = rownames_K
+
+  # incase K is low-rank
+  K_chol = chol(K+diag(1e-6,nrow(K)))
 
   # Lambda matrix
   # factor_h2s = rep(0,k)

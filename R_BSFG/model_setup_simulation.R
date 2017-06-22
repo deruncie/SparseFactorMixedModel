@@ -10,6 +10,8 @@ library(BSFG)
 seed = 1
 new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2)
 set.seed(seed)
+load('setup.RData')
+
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
 rep = "2"
@@ -82,12 +84,13 @@ for(i  in 1:70) {
     BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
+      BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100)
+      print(BSFG_state$run_parameters$burn)
     }
     BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
     plot(BSFG_state)
 }
-
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
 XB = get_posterior_FUN(BSFG_state,'X %*% B')
@@ -96,6 +99,14 @@ XB3 = get_posterior_FUN(BSFG_state,{a=X %*% B;a+Eta})
 XB = get_posterior_FUN(BSFG_state,B)
 B = get_posterior_mean(BSFG_state,'B')
 B2 = get_posteriorMean(BSFG_state,'B')
+
+U = get_posterior_mean(BSFG_state,U_F %*% t(Lambda) + U_R)
+plot(U,with(setup,U_F %*% t(error_factor_Lambda) + U_R));abline(0,1)
+
+
+U = get_posterior_mean(BSFG_state,U_F %*% t(Lambda) + U_R)
+plot(U,with(setup,U_F %*% t(error_factor_Lambda) + U_R))
+
 
 G = get_posterior_FUN(BSFG_state,tcrossprod(sweep(Lambda,2,sqrt(F_h2),'*')) + diag(resid_h2[1,]/tot_Eta_prec[1,]))
 i = 1

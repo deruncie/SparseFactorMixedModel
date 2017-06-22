@@ -7,6 +7,8 @@
 BSFG_init(Y, model, data, factor_model_fixed = NULL, priors = BSFG_priors(),
   run_parameters = BSFG_control(), K_mats = NULL, K_inv_mats = NULL,
   QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
+  Sigma_Choleskys = NULL, randomEffect_C_Choleskys = NULL,
+  invert_aI_bZKZ = NULL, invert_aZZt_Kinv = NULL,
   posteriorSample_params = c("Lambda", "U_F", "F", "delta", "tot_F_prec",
   "F_h2", "tot_Eta_prec", "resid_h2", "B", "B_F", "U_R", "tau_B", "tau_B_F",
   "cis_effects"), posteriorMean_params = c(), ncores = detectCores(),
@@ -67,6 +69,18 @@ will be modeled with the \code{QTL_factor_var} priors. Applies to factors \eqn{F
 
 \item{cis_genotypes}{a list of design matrices of length \code{p} (ie number of columns of \code{Eta})
 This is used to specify trait-specific fixed effects, such a cis-genotypes}
+
+\item{Sigma_Choleskys}{Pre-calculated matrices from \code{BSFG_state$run_variables$Sigma_Choleskys}
+can be provide directly. For general_BSFG sampler.}
+
+\item{randomEffect_C_Choleskys}{Pre-calculated matrices from \code{BSFG_state$run_variables$randomEffect_C_Choleskys}
+can be provide directly. For general_BSFG sampler.}
+
+\item{invert_aI_bZKZ}{Pre-calculated matrices from \code{BSFG_state$run_variables$invert_aI_bZKZ}
+can be provide directly. For fast_BSFG sampler.}
+
+\item{invert_aZZt_Kinv}{Pre-calculated matrices from \code{BSFG_state$run_variables$invert_aZZt_Kinv}
+can be provide directly. For fast_BSFG sampler.#'}
 
 \item{posteriorSample_params}{A character vector giving names of parameters to save all posterior samples}
 

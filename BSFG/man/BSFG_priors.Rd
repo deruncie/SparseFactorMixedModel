@@ -5,10 +5,11 @@
 \title{Set BSFG priors}
 \usage{
 BSFG_priors(fixed_var = list(V = 1, nu = 3), fixed_resid_var = NULL,
-  fixed_factors_var = NULL, tot_Y_var = list(V = 0.5, nu = 3),
-  tot_F_var = list(V = 18/20, nu = 20), delta_1 = list(shape = 2.1, rate =
-  1/20), delta_2 = list(shape = 3, rate = 1), Lambda_df = 3, B_df = 3,
-  B_F_df = 3, h2_priors_resids_fun = function(h2s, n) 1,
+  fixed_factors_var = NULL, QTL_resid_var = NULL, QTL_factors_var = NULL,
+  tot_Y_var = list(V = 0.5, nu = 3), tot_F_var = list(V = 18/20, nu = 20),
+  delta_1 = list(shape = 2.1, rate = 1/20), delta_2 = list(shape = 3, rate =
+  1), Lambda_df = 3, B_df = 3, B_F_df = 3,
+  h2_priors_resids_fun = function(h2s, n) 1,
   h2_priors_factors_fun = function(h2s, n) 1)
 }
 \arguments{

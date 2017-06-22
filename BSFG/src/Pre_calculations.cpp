@@ -4,6 +4,18 @@ using namespace Rcpp;
 using namespace Eigen;
 using namespace RcppParallel;
 
+// [[Rcpp::export()]]
+List LDLt(MSpMat A) {
+  Eigen::SimplicialLDLT<SpMat> chol_A;
+  chol_A.compute(A);
+  SpMat Pinv = chol_A.permutationPinv().toDenseMatrix().cast<double>().sparseView();
+  SpMat PiL = Pinv * chol_A.matrixL();
+  return(List::create(
+      Named("PiL") =  PiL,
+      Named("d") = chol_A.vectorD()));
+}
+
+
 SpMat make_C(SpMat chol_K_inv,VectorXd h2s, SpMat ZtZ){
   SpMat Ki = chol_K_inv.transpose() * chol_K_inv;
   SpMat C = ZtZ;

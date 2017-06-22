@@ -8,6 +8,7 @@
 */
 
 /* .Call calls */
+extern SEXP BSFG_LDLt(SEXP);
 extern SEXP BSFG_find_candidate_states(SEXP, SEXP, SEXP);
 extern SEXP BSFG_log_p_h2s(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_log_p_h2s_fast(SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -29,6 +30,7 @@ extern SEXP BSFG_tot_prec_scores_withX_c(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _rcpp_module_boot_Pre_calculations(void);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"BSFG_LDLt",                                         (DL_FUNC) &BSFG_LDLt,                                          1},
     {"BSFG_find_candidate_states",                        (DL_FUNC) &BSFG_find_candidate_states,                         3},
     {"BSFG_log_p_h2s",                                    (DL_FUNC) &BSFG_log_p_h2s,                                     5},
     {"BSFG_log_p_h2s_fast",                               (DL_FUNC) &BSFG_log_p_h2s_fast,                                5},

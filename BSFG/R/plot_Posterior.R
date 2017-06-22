@@ -40,7 +40,7 @@ trace_plot_h2s = function(F_h2_samples, n_factors = 8, device = NULL){
   }
 }
 
-trace_plot_Lambda = function(Lambda, n_factors = 16, device = NULL){
+trace_plot_Lambda = function(Lambda, n_factors = 16, device = NULL,main = 'Lambda'){
   if(!is.null(device)) {
     set_device(device)
   }
@@ -51,8 +51,19 @@ trace_plot_Lambda = function(Lambda, n_factors = 16, device = NULL){
 
   for(k in 1:min(n_factors,dim(Lambda)[3])){
     o = order(-abs(colMeans(Lambda[,,k])))
-    traces = Lambda[,o[1:5],k]
-    trace_plot(traces,main = sprintf('Factor %d lambdas',k))
+    o = o[1:min(5,length(o))]
+    traces = Lambda[,o,k]
+    trace_plot(traces,main = sprintf('Factor %d %s',k,main))
+    abline(h=0)
+  }
+}
+
+boxplot_Bs = function(B,main = ''){
+  k = dim(B)[3]
+  b = dim(B)[2]
+  par(mfrow=c(3,3))
+  for(i in 1:min(9,k)) {
+    boxplot(B[,,i],main = sprintf('%s %d',main,i),outpch=NA,boxlty=0,whisklty=1,staplelty=0)
     abline(h=0)
   }
 }
@@ -264,6 +275,8 @@ plot_diagnostics = function(BSFG_state){
   if(BSFG_state$Posterior$total_samples > 0) {
     trace_plot_h2s(load_posterior_param(BSFG_state,'F_h2'))
     trace_plot_Lambda(load_posterior_param(BSFG_state,'Lambda'))
+    try({trace_plot_Lambda(load_posterior_param(BSFG_state,'B_F'),main='B_F')},silent=T)
+    try({boxplot_Bs(load_posterior_param(BSFG_state,'B'),'B')},silent=T)
   }
 }
 

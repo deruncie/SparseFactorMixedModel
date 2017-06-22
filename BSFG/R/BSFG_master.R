@@ -1,4 +1,4 @@
-#' Set BSFG run parameters
+  #' Set BSFG run parameters
 #'
 #' Function to create run_parameters list for initializing BSFG model
 #'
@@ -99,6 +99,8 @@ BSFG_priors = function(
                         fixed_var = list(V = 1,     nu = 3),
                         fixed_resid_var = NULL,
                         fixed_factors_var = NULL,
+                        QTL_resid_var = NULL,
+                        QTL_factors_var = NULL,
                         tot_Y_var = list(V = 0.5,   nu = 3),
                         tot_F_var = list(V = 18/20, nu = 20),
                         delta_1   = list(shape = 2.1,  rate = 1/20),
@@ -177,7 +179,14 @@ BSFG_priors = function(
 #' @param ncores for \code{general_BSFG}, number of cores to use during initialization.
 #' @param setup optional - a list of known values for Lambda (error_factor_lambda), h2, factor_h2s
 #' @param verbose should progress in initialization be reported?
-#'
+#' @param Sigma_Choleskys Pre-calculated matrices from \code{BSFG_state$run_variables$Sigma_Choleskys}
+#'     can be provide directly. For general_BSFG sampler.
+#' @param randomEffect_C_Choleskys Pre-calculated matrices from \code{BSFG_state$run_variables$randomEffect_C_Choleskys}
+#'     can be provide directly. For general_BSFG sampler.
+#' @param invert_aI_bZKZ Pre-calculated matrices from \code{BSFG_state$run_variables$invert_aI_bZKZ}
+#'     can be provide directly. For fast_BSFG sampler.
+#' @param invert_aZZt_Kinv Pre-calculated matrices from \code{BSFG_state$run_variables$invert_aZZt_Kinv}
+#'     can be provide directly. For fast_BSFG sampler.#'
 #' @return An object of class BSFG_state with components:
 #' @return current_state: a list of parameters in the current iteration of the sampler
 #' @return Posterior: a list of arrays of posterior samples
@@ -188,6 +197,8 @@ BSFG_priors = function(
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_priors(), run_parameters = BSFG_control(), K_mats = NULL, K_inv_mats = NULL,
                      QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
+                     Sigma_Choleskys = NULL, randomEffect_C_Choleskys = NULL,
+                     invert_aI_bZKZ = NULL, invert_aZZt_Kinv = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','U_R','tau_B','tau_B_F','cis_effects'),
                      posteriorMean_params = c(),
                      ncores = detectCores(),setup = NULL,verbose=T) {
@@ -375,49 +386,49 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
 
 	# construct K matrices for each random effect
-	    # if K is PSD, find K = USVt and set K* = S and Z* of ZU
-	svd_Ks = lapply(K_mats,function(K) svd(K))
-	RE_U_matrices = list()
+	    # if K is PSD, find K = LDLt and set K* = D and Z* of ZL
+	ldl_ks = lapply(K_mats,function(K) LDLt(as(K,'dgCMatrix'))) # actually calculates K = PiLDLtP
+	RE_L_matrices = list()
 
 	for(i in 1:length(RE_names)){
 	  re = RE_covs[i]
 	  re_name = RE_names[i]
-	  if(re %in% names(svd_Ks)) {
-	    svd_K = svd_Ks[[re]]
-	    r_eff = sum(svd_K$d > run_parameters$K_eigen_tol)  # truncate eigenvalues at this value
-	    # if need to use reduced rank model, then use the svd of K in place of K and merge U into Z
-	    # otherwise, use original K, set U = Diagonal(1,r)
-	    if(r_eff < length(svd_K$d)) {
-  	    K = Diagonal(r_eff,svd_K$d[1:r_eff])
-  	    U = Matrix(svd_K$u[,1:r_eff])
+	  if(re %in% names(ldl_ks)) {
+	    ldl_k = ldl_ks[[re]]
+	    r_eff = sum(ldl_k$d > run_parameters$K_eigen_tol)  # truncate eigenvalues at this value
+	    # if need to use reduced rank model, then use the svd of K in place of K and merge L into Z
+	    # otherwise, use original K, set L = Diagonal(1,r)
+	    if(r_eff < length(ldl_k$d)) {
+  	    K = Diagonal(r_eff,ldl_k$d[1:r_eff])
+  	    L = Matrix(ldl_k$PiL[,1:r_eff])
 	    } else{
 	      K = K_mats[[re]]
-	      U = Diagonal(nrow(K),1)
+	      L = Diagonal(nrow(K),1)
 	    }
 	  } else if(re %in% names(K_inv_mats)){
 	    K_mats[[re]] = solve(K_inv_mats[[re]])
 	    rownames(K_mats[[re]]) = rownames(K_inv_mats[[re]])
 	    K = K_mats[[re]]
-	    U = Diagonal(nrow(K),1)
+	    L = Diagonal(nrow(K),1)
 	  } else{
 	    K_mats[[re]] = Diagonal(ncol(Z_matrices[[re_name]]))
 	    rownames(K_mats[[re]]) = levels(data[[re]])
 	    K = K_mats[[re]]
-	    U = Diagonal(nrow(K),1)
+	    L = Diagonal(nrow(K),1)
 	  }
 	  K_mats[[re_name]] = fix_K(K)
-	  RE_U_matrices[[re_name]] = U
-	  Z_matrices[[re_name]] = Z_matrices[[re_name]] %*% U
+	  RE_L_matrices[[re_name]] = L
+	  Z_matrices[[re_name]] = Z_matrices[[re_name]] %*% L
 	}
 	K_mats = K_mats[RE_names]
 	# Fix Z_matrices based on PSD K's
 	Z = do.call(cbind,Z_matrices[RE_names])
-	Z = as(do.call(cbind,Z_matrices[RE_names]),'dgCMatrix')
+	Z = as(Z,'dgCMatrix')
 	# The following matrix is used to transform random effects back to the original space had we sampoled from the original (PSD) K.
 	if(length(RE_names) > 1) {
-	  U_svd = do.call(bdiag,RE_U_matrices[RE_names])
+	  RE_L = do.call(bdiag,RE_L_matrices[RE_names])
 	} else{
-	  U_svd = RE_U_matrices[[1]]
+	  RE_L = RE_L_matrices[[1]]
 	}
 	r_RE = sapply(Z_matrices,function(x) ncol(x))  # re-calculate
 
@@ -471,7 +482,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  X_F        = X_F,
 	  Z_matrices = Z_matrices,
 	  Z          = Z,
-	  U_svd      = U_svd,  # matrix necessary to back-transform U_F and U_R (U*U_F and U*U_R) to get original random effects
+	  RE_L       = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
 	  h2s_matrix = h2s_matrix,
 	  cis_genotypes = cis_genotypes,
 	  QTL_columns_resid = QTL_columns_resid,
@@ -585,7 +596,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	)
 	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',run_parameters$sampler))
 
-	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,verbose=verbose,ncores=ncores)
+	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,
+	                             Sigma_Choleskys = Sigma_Choleskys, randomEffect_C_Choleskys = randomEffect_C_Choleskys,  # in case these are provided
+	                             invert_aI_bZKZ = invert_aI_bZKZ, invert_aZZt_Kinv = invert_aZZt_Kinv,   # in case these are provided
+	                             verbose=verbose,ncores=ncores)
 
 	# Initialize Eta
 	observation_model_state = observation_model(observation_model_parameters,BSFG_state)
