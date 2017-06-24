@@ -14,7 +14,7 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     if(!is.null(cis_genotypes)){
       for(j in 1:p){
         cis_X_j = cis_genotypes[[j]]
-        XB[,j] = XB[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]]
+        XB[,j] = XB[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]:(cis_effects_index[j+1]-1)]
       }
     }
 

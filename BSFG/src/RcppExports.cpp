@@ -238,6 +238,29 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_MME_fixedEffects_cis_c
+Rcpp::List sample_MME_fixedEffects_cis_c(Map<MatrixXd> Y, Map<MatrixXd> W, Rcpp::List cis_genotypes, Rcpp::List Sigma_Choleskys, Rcpp::IntegerVector h2s_index, Map<VectorXd> tot_Eta_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, Map<MatrixXd> randn_theta, Map<MatrixXd> randn_e, Map<VectorXd> randn_cis, Map<VectorXd> cis_effect_index, int grainSize);
+RcppExport SEXP BSFG_sample_MME_fixedEffects_cis_c(SEXP YSEXP, SEXP WSEXP, SEXP cis_genotypesSEXP, SEXP Sigma_CholeskysSEXP, SEXP h2s_indexSEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP, SEXP randn_cisSEXP, SEXP cis_effect_indexSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type W(WSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type cis_genotypes(cis_genotypesSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type Sigma_Choleskys(Sigma_CholeskysSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type h2s_index(h2s_indexSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_theta(randn_thetaSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_e(randn_eSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type randn_cis(randn_cisSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type cis_effect_index(cis_effect_indexSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_MME_fixedEffects_cis_c(Y, W, cis_genotypes, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, randn_cis, cis_effect_index, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_MME_single_diagR
 VectorXd sample_MME_single_diagR(VectorXd Y, SpMat W, SpMat chol_C, double pe, SpMat chol_K_inv, double tot_Eta_prec, VectorXd randn_theta, VectorXd randn_e);
 RcppExport SEXP BSFG_sample_MME_single_diagR(SEXP YSEXP, SEXP WSEXP, SEXP chol_CSEXP, SEXP peSEXP, SEXP chol_K_invSEXP, SEXP tot_Eta_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP) {

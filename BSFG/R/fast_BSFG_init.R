@@ -128,7 +128,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     B_F = matrix(rnorm(b_F * k),b_F,k) / sqrt(prec_B_F)
 
     # cis effects
-    cis_effects = matrix(rnorm(length(cis_effects_index),0,1),nrow=1)
+    cis_effects = matrix(rnorm(cis_effects_index[length(cis_effects_index)]-1,0,1),nrow=1)
 
     XB = X %*% B
 

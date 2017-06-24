@@ -23,10 +23,6 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
     b    = BSFG_state$run_variables$b
     b_F  = BSFG_state$run_variables$b_F
 
-    # cis effects
-    cis_effects = matrix(rnorm(length(cis_effects_index),0,1),nrow=1)
-
-
 # ----------------------------- #
 # -----Initialize variables---- #
 # ----------------------------- #
@@ -124,7 +120,7 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
 
 
     # cis effects
-    cis_effects = matrix(rnorm(length(cis_effects_index),0,1),nrow=1)
+    cis_effects = matrix(rnorm(cis_effects_index[length(cis_effects_index)]-1,0,1),nrow=1)
 
     XB = X %*% B
 

@@ -38,6 +38,20 @@ sample_MME_fixedEffects = function(Y,W,Sigma_Choleskys,h2s_index, tot_Eta_prec, 
 
 	return(res)
 }
+sample_MME_fixedEffects_cis = function(Y,W,cis_genotypes,cis_effects_index, Sigma_Choleskys,h2s_index, tot_Eta_prec, prior_mean, prior_prec,ncores){
+  # using method described in MCMC Course notes
+  p = ncol(Y)
+  n = nrow(Y)
+  b = ncol(W)
+
+  # pre-sample z-scores because draws from parallel processes not consecutive
+  randn_theta = matrix(rnorm(b*p),ncol = p)
+  randn_e = matrix(rnorm(n*p),ncol = p)
+  randn_cis = rnorm(cis_effects_index[length(cis_effects_index)]-1)
+  res = sample_MME_fixedEffects_cis_c(Y,as.matrix(W),cis_genotypes,Sigma_Choleskys,h2s_index,tot_Eta_prec,prior_mean,prior_prec,randn_theta,randn_e,randn_cis,cis_effects_index-1,1)
+
+  return(res)
+}
 
 sample_MME_ZKZts = function(Y, W, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, ncores){
 	# using method described in MCMC Course notes

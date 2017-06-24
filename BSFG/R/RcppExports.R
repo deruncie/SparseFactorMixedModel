@@ -53,6 +53,10 @@ sample_MME_fixedEffects_c <- function(Y, W, Sigma_Choleskys, h2s_index, tot_Eta_
     .Call(BSFG_sample_MME_fixedEffects_c, Y, W, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
 }
 
+sample_MME_fixedEffects_cis_c <- function(Y, W, cis_genotypes, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, randn_cis, cis_effect_index, grainSize) {
+    .Call(BSFG_sample_MME_fixedEffects_cis_c, Y, W, cis_genotypes, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, randn_cis, cis_effect_index, grainSize)
+}
+
 sample_MME_single_diagR <- function(Y, W, chol_C, pe, chol_K_inv, tot_Eta_prec, randn_theta, randn_e) {
     .Call(BSFG_sample_MME_single_diagR, Y, W, chol_C, pe, chol_K_inv, tot_Eta_prec, randn_theta, randn_e)
 }

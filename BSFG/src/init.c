@@ -21,6 +21,7 @@ extern SEXP BSFG_sample_factors_scores_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SE
 extern SEXP BSFG_sample_h2s(SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_h2s_discrete_MH_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_fixedEffects_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_MME_fixedEffects_cis_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_single_diagK_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_single_diagR(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_ZKZts_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -44,6 +45,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"BSFG_sample_h2s",                                   (DL_FUNC) &BSFG_sample_h2s,                                    3},
     {"BSFG_sample_h2s_discrete_MH_c",                     (DL_FUNC) &BSFG_sample_h2s_discrete_MH_c,                     10},
     {"BSFG_sample_MME_fixedEffects_c",                    (DL_FUNC) &BSFG_sample_MME_fixedEffects_c,                    10},
+    {"BSFG_sample_MME_fixedEffects_cis_c",                (DL_FUNC) &BSFG_sample_MME_fixedEffects_cis_c,                13},
     {"BSFG_sample_MME_single_diagK_c",                    (DL_FUNC) &BSFG_sample_MME_single_diagK_c,                     8},
     {"BSFG_sample_MME_single_diagR",                      (DL_FUNC) &BSFG_sample_MME_single_diagR,                       8},
     {"BSFG_sample_MME_ZKZts_c",                           (DL_FUNC) &BSFG_sample_MME_ZKZts_c,                            9},

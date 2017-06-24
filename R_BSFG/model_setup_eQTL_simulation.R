@@ -64,15 +64,15 @@ BSFG_state = with(setup,BSFG_init(Y, model=~1+(1|animal), data, #factor_model_fi
                                   K_mats = list(animal = K),
                                   setup = setup))
 
-BSFG_state = with(setup,BSFG_init(list(observation_model = cis_eQTL_model,
-                                       Y = Y,
-                                       cis_genotypes = lapply(1:ncol(X_cis),function(x) matrix(X_cis[,x],ncol=1)),
-                                       ncores = parallel::detectCores()),
-                                  model=~1+(1|animal), data, #factor_model_fixed = ~1,
-                                  QTL_factors = X_SNP,
-                                  priors=priors,run_parameters=run_parameters,
-                                  K_mats = list(animal = K),
-                                  setup = setup))
+# BSFG_state = with(setup,BSFG_init(list(observation_model = cis_eQTL_model,
+#                                        Y = Y,
+#                                        cis_genotypes = lapply(1:ncol(X_cis),function(x) matrix(X_cis[,x],ncol=1)),
+#                                        ncores = parallel::detectCores()),
+#                                   model=~1+(1|animal), data, #factor_model_fixed = ~1,
+#                                   QTL_factors = X_SNP,
+#                                   priors=priors,run_parameters=run_parameters,
+#                                   K_mats = list(animal = K),
+#                                   setup = setup))
 
 BSFG_state$current_state$F_h2
 BSFG_state$priors$h2_priors_resids
@@ -98,7 +98,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 20
 for(i  in 1:100) {
   if(i < 10 || (i-1) %% 20 == 0) {
-    BSFG_state$current_state = update_k(BSFG_state)
+    # BSFG_state$current_state = update_k(BSFG_state)
     BSFG_state = reorder_factors(BSFG_state)
     BSFG_state = clear_Posterior(BSFG_state)
   }

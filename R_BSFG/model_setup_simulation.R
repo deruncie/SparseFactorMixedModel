@@ -30,8 +30,8 @@ X = setup$X
 setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  sampler = 'fast_BSFG',
-  # sampler = 'general_BSFG',
+  # sampler = 'fast_BSFG',
+  sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
@@ -94,7 +94,7 @@ for(i  in 1:70) {
     BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
-      # BSFG_state = update_k(BSFG_state)
+      BSFG_state$current_state = update_k(BSFG_state)
       BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100)
       print(BSFG_state$run_parameters$burn)
     }

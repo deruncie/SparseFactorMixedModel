@@ -26,18 +26,12 @@ sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
       }
       Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
     } else{
-      for(j in 1:p){
-        cis_X_j = cis_genotypes[[j]]
-        Design_j = cBind(Design,cis_X_j)
-        prior_mean_j = rbind(prior_mean[,j,drop=FALSE],matrix(0,ncol(cis_X_j)))
-        prior_prec_j = rbind(prior_prec[,j,drop=FALSE],matrix(1e-10,ncol(cis_X_j)))
-        coefs_j = sample_MME_fixedEffects(Eta[,j,drop=FALSE],Design_j,Sigma_Choleskys,  resid_h2_index[j], tot_Eta_prec[,j,drop=FALSE], prior_mean_j, prior_prec_j,grainSize)
-        if(b > 0){
-          B[,j] = coefs_j[1:b]
-        }
-        Lambda[j,] = coefs_j[b+1:k]
-        cis_effects[,cis_effects_index == j] = coefs_j[-c(1:(b+k))]  # I think this is right
+      result = sample_MME_fixedEffects_cis(Eta,Design,cis_genotypes,cis_effects_index,Sigma_Choleskys, resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,grainSize)
+      if(b > 0){
+        B[] = result[[1]][1:b,,drop=FALSE]
       }
+      Lambda[] = t(result[[1]][b+1:k,,drop=FALSE])
+      cis_effects[] = result[[2]]
     }
   }))
   current_state = current_state[current_state_names]
