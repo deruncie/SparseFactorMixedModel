@@ -39,6 +39,30 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_cis_coefs_parallel_sparse_c_Eigen
+Rcpp::List sample_cis_coefs_parallel_sparse_c_Eigen(MSpMat Ut, Map<MatrixXd> Eta, Map<MatrixXd> W, Rcpp::List cis_genotypes, Map<VectorXd> h2, Map<VectorXd> tot_Eta_prec, Map<VectorXd> s, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, Map<MatrixXd> randn_theta, Map<MatrixXd> randn_e, Map<VectorXd> randn_cis, Map<VectorXd> cis_effect_index, int grainSize);
+RcppExport SEXP BSFG_sample_cis_coefs_parallel_sparse_c_Eigen(SEXP UtSEXP, SEXP EtaSEXP, SEXP WSEXP, SEXP cis_genotypesSEXP, SEXP h2SEXP, SEXP tot_Eta_precSEXP, SEXP sSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP, SEXP randn_cisSEXP, SEXP cis_effect_indexSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< MSpMat >::type Ut(UtSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Eta(EtaSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type W(WSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type cis_genotypes(cis_genotypesSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type h2(h2SEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type s(sSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_theta(randn_thetaSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_e(randn_eSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type randn_cis(randn_cisSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type cis_effect_index(cis_effect_indexSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_cis_coefs_parallel_sparse_c_Eigen(Ut, Eta, W, cis_genotypes, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, randn_cis, cis_effect_index, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_coefs_parallel_sparse_c_Eigen_group
 MatrixXd sample_coefs_parallel_sparse_c_Eigen_group(MSpMat Ut, Map<MatrixXd> Eta, Map<MatrixXd> W, Map<MatrixXd> old_coefs, VectorXi row_groups, Map<VectorXd> h2, Map<VectorXd> tot_Eta_prec, Map<VectorXd> s, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, Map<MatrixXd> randn_theta, Map<MatrixXd> randn_e, int grainSize);
 RcppExport SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen_group(SEXP UtSEXP, SEXP EtaSEXP, SEXP WSEXP, SEXP old_coefsSEXP, SEXP row_groupsSEXP, SEXP h2SEXP, SEXP tot_Eta_precSEXP, SEXP sSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP, SEXP grainSizeSEXP) {

@@ -13,6 +13,7 @@ extern SEXP BSFG_find_candidate_states(SEXP, SEXP, SEXP);
 extern SEXP BSFG_log_p_h2s(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_log_p_h2s_fast(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_cis_coefs_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen_group(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_coefs_set_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_delta_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -35,6 +36,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"BSFG_log_p_h2s",                                    (DL_FUNC) &BSFG_log_p_h2s,                                     5},
     {"BSFG_log_p_h2s_fast",                               (DL_FUNC) &BSFG_log_p_h2s_fast,                                5},
     {"BSFG_sample_coefs_parallel_sparse_c_Eigen",         (DL_FUNC) &BSFG_sample_coefs_parallel_sparse_c_Eigen,         11},
+    {"BSFG_sample_cis_coefs_parallel_sparse_c_Eigen",     (DL_FUNC) &BSFG_sample_cis_coefs_parallel_sparse_c_Eigen,     14},
     {"BSFG_sample_coefs_parallel_sparse_c_Eigen_group",   (DL_FUNC) &BSFG_sample_coefs_parallel_sparse_c_Eigen_group,   13},
     {"BSFG_sample_coefs_set_c",                           (DL_FUNC) &BSFG_sample_coefs_set_c,                            9},
     {"BSFG_sample_delta_c_Eigen",                         (DL_FUNC) &BSFG_sample_delta_c_Eigen,                          9},

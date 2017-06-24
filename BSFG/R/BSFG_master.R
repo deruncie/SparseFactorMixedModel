@@ -325,7 +325,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	if(is.null(cis_genotypes)){
 	  cis_effects_index = NULL
 	} else{
-	  cis_effects_index = do.call(c,lapply(1:length(cis_genotypes),function(j) rep(j,ncol(cis_genotypes[[j]]))))
+	  # cis_effects_index = do.call(c,lapply(1:length(cis_genotypes),function(j) rep(j,ncol(cis_genotypes[[j]]))))
+	  cis_effects_index = c(0,cumsum(sapply(cis_genotypes,ncol)))[1:length(cis_genotypes)]+1  # doesn't work for general_BSFG!
 	}
 
 	# -------- Random effects ---------- #

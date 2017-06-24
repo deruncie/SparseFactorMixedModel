@@ -21,7 +21,36 @@ setwd(folder)
 
 print('Initializing')
 load('../setup.RData')
+
+Y = setup$Y
+K = setup$K
+data = setup$data
+X = setup$X
+
 setup$data$Group = gl(3,1,length = nrow(setup$data))
+
+run_parameters = BSFG_control(
+  sampler = 'fast_BSFG',
+  # sampler = 'general_BSFG',
+  scale_Y = FALSE,
+  simulation = TRUE,
+  h2_divisions = 20,
+  h2_step_size = NULL,
+  burn = 100
+)
+
+priors = BSFG_priors(
+  fixed_var = list(V = 1,     nu = 3),
+  tot_Y_var = list(V = 0.5,   nu = 3),
+  tot_F_var = list(V = 18/20, nu = 20),
+  delta_1   = list(shape = 2.1,  rate = 1/20),
+  delta_2   = list(shape = 3, rate = 1),
+  Lambda_df = 3,
+  B_df      = 3,
+  B_F_df    = 3,
+  h2_priors_resids_fun = function(h2s,n) pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
+  h2_priors_factors_fun = function(h2s,n) ifelse(h2s == 0,n,n/(n-1))
+)
 
 # to test non-PD K matrix:
 # X = matrix(sample(c(0,1),dim(setup$K)^2,replace=T),dim(setup$K)[1])
@@ -33,30 +62,11 @@ setup$data$Group = gl(3,1,length = nrow(setup$data))
                                   # setup = setup))
 # setup$Y[1:3] = NA
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
-BSFG_state = with(setup,BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
-                                  run_parameters=BSFG_control(
-                                    sampler = 'fast_BSFG',
-                                    # sampler = 'general_BSFG',
-                                    scale_Y = FALSE,
-                                    simulation = TRUE,
-                                    h2_divisions = 20,
-                                    h2_step_size = NULL,
-                                    burn = 100
-                                  ),
-                                  priors=BSFG_priors(
-                                    fixed_var = list(V = 1,     nu = 3),
-                                    tot_Y_var = list(V = 0.5,   nu = 3),
-                                    tot_F_var = list(V = 18/20, nu = 20),
-                                    delta_1   = list(shape = 2.1,  rate = 1/20),
-                                    delta_2   = list(shape = 3, rate = 1),
-                                    Lambda_df = 3,
-                                    B_df      = 3,
-                                    B_F_df    = 3,
-                                    h2_priors_resids_fun = function(h2s,n) pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-                                    h2_priors_factors_fun = function(h2s,n) ifelse(h2s == 0,n,n/(n-1))
-                                  ),
-                                  setup = setup))
+                                  run_parameters=run_parameters,
+                                  priors=priors,
+                                  setup = setup)
 BSFG_state$current_state$F_h2
 BSFG_state$priors$h2_priors_resids
 BSFG_state$priors$h2_priors_factors
@@ -84,6 +94,7 @@ for(i  in 1:70) {
     BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
+      # BSFG_state = update_k(BSFG_state)
       BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100)
       print(BSFG_state$run_parameters$burn)
     }
@@ -93,6 +104,12 @@ for(i  in 1:70) {
 }
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
+
+post_mean_Lambda = get_posterior_mean(BSFG_state,Lambda)
+post_mean_F = get_posterior_mean(BSFG_state,U_F)
+post_mean_Lambda = get_posterior_mean(BSFG_state, F %*% t(Lambda))
+post_mean_P = get_posterior_FUN(BSFG_state,tcrossprod(Lambda))
+
 XB = get_posterior_FUN(BSFG_state,'X %*% B')
 XB2 = get_posterior_FUN(BSFG_state,X %*% B)
 XB3 = get_posterior_FUN(BSFG_state,{a=X %*% B;a+Eta})

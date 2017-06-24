@@ -9,6 +9,10 @@ sample_coefs_parallel_sparse_c_Eigen <- function(Ut, Eta, W, h2, tot_Eta_prec, s
     .Call(BSFG_sample_coefs_parallel_sparse_c_Eigen, Ut, Eta, W, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
 }
 
+sample_cis_coefs_parallel_sparse_c_Eigen <- function(Ut, Eta, W, cis_genotypes, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, randn_cis, cis_effect_index, grainSize) {
+    .Call(BSFG_sample_cis_coefs_parallel_sparse_c_Eigen, Ut, Eta, W, cis_genotypes, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, randn_cis, cis_effect_index, grainSize)
+}
+
 sample_coefs_parallel_sparse_c_Eigen_group <- function(Ut, Eta, W, old_coefs, row_groups, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize) {
     .Call(BSFG_sample_coefs_parallel_sparse_c_Eigen_group, Ut, Eta, W, old_coefs, row_groups, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
 }

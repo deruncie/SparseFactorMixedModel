@@ -112,6 +112,99 @@ MatrixXd sample_coefs_parallel_sparse_c_Eigen(
   return(coefs);
 }
 
+// [[Rcpp::export()]]
+Rcpp::List sample_cis_coefs_parallel_sparse_c_Eigen(
+    MSpMat Ut,
+    Map<MatrixXd> Eta,
+    Map<MatrixXd> W,
+    Rcpp::List cis_genotypes,
+    Map<VectorXd> h2,
+    Map<VectorXd> tot_Eta_prec,
+    Map<VectorXd> s,
+    Map<MatrixXd> prior_mean,
+    Map<MatrixXd> prior_prec,
+    Map<MatrixXd> randn_theta,
+    Map<MatrixXd> randn_e,
+    Map<VectorXd> randn_cis,
+    Map<VectorXd> cis_effect_index,
+    int grainSize){
+
+  // Sample regression coefficients
+  // columns of matrices are independent
+  // each column conditional posterior is a MVN due to conjugacy
+
+  MatrixXd UtEta = Ut*Eta;
+  MatrixXd UtW = Ut*W;
+
+  int p = UtEta.cols();
+  int b = UtW.cols();
+  int n = UtW.rows();
+
+  std::vector<MatrixXd> cis_X;
+  int length_cis = 0;
+  for(int i = 0; i < p; i++){
+    MatrixXd cXi = Rcpp::as<MatrixXd>(cis_genotypes[i]);
+    cis_X.push_back(cXi);
+    length_cis += cXi.cols();
+  }
+
+  MatrixXd coefs(b,p);
+  VectorXd cis_effects(length_cis);
+
+  struct sampleColumn : public Worker {
+    MatrixXd UtW, UtEta;
+    SpMat Ut;
+    std::vector<MatrixXd> cis_X;
+    MatrixXd prior_mean, prior_prec, randn_theta, randn_e;
+    VectorXd randn_cis;
+    VectorXd h2, tot_Eta_prec, cis_effect_index,s;
+    int b,n;
+    MatrixXd &coefs;
+    VectorXd &cis_effects;
+
+    sampleColumn(MatrixXd UtW, MatrixXd UtEta, SpMat Ut, std::vector<MatrixXd> cis_X,
+                 MatrixXd prior_mean, MatrixXd prior_prec, VectorXd h2,
+                 VectorXd tot_Eta_prec, VectorXd cis_effect_index,
+                 MatrixXd randn_theta, MatrixXd randn_e,VectorXd randn_cis,
+                 VectorXd s, int b, int n,
+                 MatrixXd &coefs, VectorXd &cis_effects) :
+      UtW(UtW), UtEta(UtEta),
+      Ut(Ut), cis_X(cis_X),
+      prior_mean(prior_mean), prior_prec(prior_prec),
+      randn_theta(randn_theta), randn_e(randn_e), randn_cis(randn_cis),
+      h2(h2), tot_Eta_prec(tot_Eta_prec), cis_effect_index(cis_effect_index),
+      s(s), b(b), n(n),
+      coefs(coefs), cis_effects(cis_effects) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      for(std::size_t j = begin; j < end; j++){
+        int b_cis = cis_X[j].cols();
+        MatrixXd UtW_cisj(n,b+b_cis);
+        UtW_cisj << UtW, Ut*cis_X[j];
+
+        VectorXd prior_mean_j = VectorXd::Zero(b+b_cis);
+        prior_mean_j.head(b) = prior_mean.col(j);
+
+        VectorXd prior_prec_j = VectorXd::Constant(b+b_cis,1e-10);
+        prior_prec_j.head(b) = prior_prec.col(j);
+
+        VectorXd randn_theta_j(b+b_cis);
+        randn_theta_j.head(b) = randn_theta.col(j);
+        randn_theta_j.tail(b_cis) = randn_cis.segment(cis_effect_index[j],b_cis);
+
+        VectorXd result = sample_coefs_single(UtEta.col(j), UtW_cisj, prior_mean_j, prior_prec_j, h2(j), tot_Eta_prec(j), randn_theta_j,randn_e.col(j),s,b,n);
+        coefs.col(j) = result.head(b);
+        cis_effects.segment(cis_effect_index[j],b_cis) = result.tail(b_cis);
+      }
+    }
+  };
+
+  sampleColumn sampler(UtW, UtEta, Ut, cis_X, prior_mean, prior_prec, h2, tot_Eta_prec, cis_effect_index, randn_theta,randn_e, randn_cis, s, b, n, coefs,cis_effects);
+  RcppParallel::parallelFor(0,p,sampler,grainSize);
+
+  return(Rcpp::List::create(coefs,cis_effects));
+}
+
 
 // [[Rcpp::export()]]
 MatrixXd sample_coefs_parallel_sparse_c_Eigen_group(
