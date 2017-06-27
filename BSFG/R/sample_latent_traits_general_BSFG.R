@@ -77,10 +77,10 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     if(b_F > 0) {
       scores = scores + colSums(B_F^2*prec_B_F)   # add this if tot_F_prec part of the prior for B_F
     }
-    tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2, rate = tot_F_prec_rate + 0.5*scores)
+    tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2+ b_F/2, rate = tot_F_prec_rate + 0.5*scores)
     # tot_F_prec[] = 1
 
-    if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
+       if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
     if(is.null(h2_step_size)) {
       F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys,h2_priors_factors,grainSize)
     } else{
