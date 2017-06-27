@@ -7,14 +7,25 @@
 
 using namespace Rcpp;
 
-// LDLt
-List LDLt(MSpMat A);
-RcppExport SEXP BSFG_LDLt(SEXP ASEXP) {
+// LDLt_sparse
+List LDLt_sparse(MSpMat A);
+RcppExport SEXP BSFG_LDLt_sparse(SEXP ASEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< MSpMat >::type A(ASEXP);
-    rcpp_result_gen = Rcpp::wrap(LDLt(A));
+    rcpp_result_gen = Rcpp::wrap(LDLt_sparse(A));
+    return rcpp_result_gen;
+END_RCPP
+}
+// LDLt_notSparse
+List LDLt_notSparse(Map<MatrixXd> A);
+RcppExport SEXP BSFG_LDLt_notSparse(SEXP ASEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type A(ASEXP);
+    rcpp_result_gen = Rcpp::wrap(LDLt_notSparse(A));
     return rcpp_result_gen;
 END_RCPP
 }

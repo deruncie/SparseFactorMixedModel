@@ -23,8 +23,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = BSFG_control(
-  sampler = 'fast_BSFG',
-  # sampler = 'general_BSFG',
+  # sampler = 'fast_BSFG',
+  sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
@@ -84,8 +84,8 @@ BSFG_state = clear_Posterior(BSFG_state)
 
 
 # # optional: To load from end of previous run, run above code, then run these lines:
-# load('Posterior.RData')
-# load('BSFG_state.RData')
+load('Posterior.RData')
+load('BSFG_state.RData')
 # load('Priors.RData')
 #  BSFG_state$current_state = current_state
 #  BSFG_state$Posterior = Posterior

@@ -4,17 +4,41 @@ using namespace Rcpp;
 using namespace Eigen;
 using namespace RcppParallel;
 
+#include <math.h>
+#include <iostream>
+#include "BSFG_types.h"
+
+// [[Rcpp::depends(RcppEigen)]]
+using namespace Eigen;
+using namespace RcppParallel;
+
 // [[Rcpp::export()]]
-List LDLt(MSpMat A) {
+List LDLt_sparse(MSpMat A) {
   Eigen::SimplicialLDLT<SpMat> chol_A;
   chol_A.compute(A);
-  SpMat Pinv = chol_A.permutationPinv().toDenseMatrix().cast<double>().sparseView();
-  SpMat PiL = Pinv * chol_A.matrixL();
+  MatrixXd I = MatrixXd::Identity(chol_A.rows(), chol_A.rows());
+  MatrixXd P = chol_A.permutationP() * I;
   return(List::create(
-      Named("PiL") =  PiL,
-      Named("d") = chol_A.vectorD()));
+      Named("P") = P.sparseView(),
+      Named("L") =  chol_A.matrixL(),
+      Named("d") = chol_A.vectorD()
+  ));
 }
 
+// [[Rcpp::export()]]
+List LDLt_notSparse(Map<MatrixXd> A) {
+  Eigen::LDLT<MatrixXd> chol_A;
+  chol_A.compute(A);
+  MatrixXd I = MatrixXd::Identity(chol_A.rows(), chol_A.rows());
+  MatrixXd P = chol_A.transpositionsP() * I;
+  VectorXd d = chol_A.vectorD();
+  MatrixXd L = chol_A.matrixL();
+  return(List::create(
+      Named("P") = P.sparseView(),
+      Named("L") =L.sparseView(),
+      Named("d") = d
+  ));
+}
 
 SpMat make_C(SpMat chol_K_inv,VectorXd h2s, SpMat ZtZ){
   SpMat Ki = chol_K_inv.transpose() * chol_K_inv;

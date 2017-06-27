@@ -6,6 +6,36 @@
 // using namespace Eigen;
 // using namespace RcppParallel;
 //
+// // [[Rcpp::export()]]
+// List LDLt_sparse(MSpMat A) {
+//   Eigen::SimplicialLDLT<SpMat> chol_A;
+//   chol_A.compute(A);
+//   MatrixXd I = MatrixXd::Identity(chol_A.rows(), chol_A.rows());
+//   MatrixXd P = chol_A.permutationP() * I;
+//   return(List::create(
+//       Named("P") = P.sparseView(),
+//       Named("L") =  chol_A.matrixL(),
+//       Named("d") = chol_A.vectorD()
+//            ));
+// }
+//
+// // [[Rcpp::export()]]
+// List LDLt2(Map<MatrixXd> A) {
+//   Eigen::LDLT<MatrixXd> chol_A;
+//   chol_A.compute(A);
+//   MatrixXd I = MatrixXd::Identity(chol_A.rows(), chol_A.rows());
+//   MatrixXd P = chol_A.transpositionsP() * I;
+//   VectorXd d = chol_A.vectorD();
+//   MatrixXd L = chol_A.matrixL();
+//   return(List::create(
+//       Named("P") = P.sparseView(),
+//       Named("L") =L.sparseView(),
+//       Named("d") = d
+//   ));
+// }
+
+
+//
 // VectorXd sample_MME_single_diagK(
 //     VectorXd y,
 //     SpMat W,

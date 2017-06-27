@@ -30,13 +30,13 @@ X = setup$X
 setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  # sampler = 'fast_BSFG',
-  sampler = 'general_BSFG',
+  sampler = 'fast_BSFG',
+  # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
   h2_step_size = NULL,
-  burn = 100
+  burn = 500
 )
 
 priors = BSFG_priors(
@@ -62,7 +62,10 @@ priors = BSFG_priors(
                                   # setup = setup))
 # setup$Y[1:3] = NA
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
+data$ID = sample(1:nrow(data))
+# diag(K) = diag(K) + 1e-6
 BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #factor_model_fixed = ~0,
+# BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
                                   run_parameters=run_parameters,
                                   priors=priors,
@@ -76,6 +79,10 @@ save(BSFG_state,file="BSFG_state.RData")
 BSFG_state = clear_Posterior(BSFG_state)
 
 
+# load('current_state.RData')
+# load('BSFG_state.RData')
+# BSFG_state$current_state = current_state
+# load('Posterior/Posterior_base.RData')
 # # optional: To load from end of previous run, run above code, then run these lines:
 # load('Posterior.RData')
 # load('BSFG_state.RData')
@@ -98,6 +105,7 @@ for(i  in 1:70) {
       BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100)
       print(BSFG_state$run_parameters$burn)
     }
+    try(print(apply(abs(cor(as.matrix(setup$F),apply(BSFG_state$Posterior$F,c(2,3),mean))),1,max)))
     BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
     plot(BSFG_state)

@@ -13,7 +13,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, V
   K = K[children,children]
 
   # for more informative K
-  # K[K>0 & K<1] = 0.5
+  K[K>0 & K<1] = 1
 
   # for low-rank K
   # rownames_K = rownames(K)
@@ -97,6 +97,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, V
     X_F = X_F,
     U_F = U_F,
     U_R = U_R,
+    F = F,
     # E_F = E_F,
     # E_R = E_R,
     name = name

@@ -384,10 +384,15 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
 	  # function to ensure that covariance matrices are sparse and symmetric
 	fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
-
+recover()
 	# construct K matrices for each random effect
 	    # if K is PSD, find K = LDLt and set K* = D and Z* of ZL
-	ldl_ks = lapply(K_mats,function(K) LDLt(as(K,'dgCMatrix'))) # actually calculates K = PiLDLtP
+	ldl_ks = lapply(K_mats,function(K) {
+	  res = LDLt_sparse(as(K,'dgCMatrix')) # actually calculates K = PtLDLtP
+	  if(max(abs(res$L@i)) > nrow(res$L)) res = LDLt_notSparse(as.matrix(K))
+	  res
+	})
+
 	RE_L_matrices = list()
 
 	for(i in 1:length(RE_names)){
@@ -395,12 +400,13 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  re_name = RE_names[i]
 	  if(re %in% names(ldl_ks)) {
 	    ldl_k = ldl_ks[[re]]
-	    r_eff = sum(ldl_k$d > run_parameters$K_eigen_tol)  # truncate eigenvalues at this value
-	    # if need to use reduced rank model, then use the svd of K in place of K and merge L into Z
+	    large_d = ldl_k$d > run_parameters$K_eigen_tol
+	    r_eff = sum(large_d)
+	    # if need to use reduced rank model, then use D of K in place of K and merge L into Z
 	    # otherwise, use original K, set L = Diagonal(1,r)
 	    if(r_eff < length(ldl_k$d)) {
-  	    K = Diagonal(r_eff,ldl_k$d[1:r_eff])
-  	    L = Matrix(ldl_k$PiL[,1:r_eff])
+	      K = Diagonal(r_eff,ldl_k$d[large_d])
+	      L = Matrix(t(ldl_k$P) %*% ldl_k$L[,large_d])
 	    } else{
 	      K = K_mats[[re]]
 	      L = Diagonal(nrow(K),1)
@@ -666,11 +672,13 @@ print.BSFG_state = function(BSFG_state){
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}},
 #'   \code{\link{print.BSFG_state}}, \code{\link{summary.BSFG_state}}
 plot.BSFG_state = function(BSFG_state,file = 'diagnostics_plots.pdf'){
-  pdf(file)
+  tempfile = 'diagnostics_plots_temp.pdf'
+  pdf(tempfile)
   if(BSFG_state$run_parameters$simulation){
     plot_diagnostics_simulation(BSFG_state)
   } else{
     plot_diagnostics(BSFG_state)
   }
   dev.off()
+  system(sprintf('mv %s %s',tempfile,file))
 }
