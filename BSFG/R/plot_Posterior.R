@@ -112,11 +112,15 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
   run_variables = BSFG_state$run_variables
 
   current_state = within(BSFG_state$current_state,{
+    U_R = as.matrix(BSFG_state$data_matrices$RE_L %*% U_R)
+    U_F = as.matrix(BSFG_state$data_matrices$RE_L %*% U_F)
     # transform variables so that the variance of each column of F is 1.
     F_var = 1/tot_F_prec
     U_F = sweep(U_F,2,sqrt(F_var),'/')
+    B_F = sweep(B_F,2,sqrt(F_var),'/')
     F = sweep(F,2,sqrt(F_var),'/')
     Lambda = sweep(Lambda,2,sqrt(F_var),'*')
+    tauh[] = tauh * tot_F_prec
   })
 
   Lambda = current_state$Lambda

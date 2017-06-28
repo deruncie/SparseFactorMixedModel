@@ -13,7 +13,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, V
   K = K[children,children]
 
   # for more informative K
-  K[K>0 & K<1] = 1
+  # K[K>0 & K<1] = 1
 
   # for low-rank K
   # rownames_K = rownames(K)
@@ -22,7 +22,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, V
   # K = t(K / sd_K)/sd_K
   # rownames(K) = rownames_K
 
-  # incase K is low-rank
+  # in case K is low-rank
   K_chol = chol(K+diag(1e-6,nrow(K)))
 
   # Lambda matrix

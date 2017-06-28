@@ -23,6 +23,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 
 	 # -----Sample resid_h2, tot_Eta_prec, U_R ---------------- #
 		#conditioning on W, B, F, Lambda, marginalizing over U_R
+
 		Eta_tilde = Eta - XB - F %*% t(Lambda)
 		UtEta_tilde = as.matrix(Ut %*% Eta_tilde)
 		scores = tot_prec_scores_c(UtEta_tilde,resid_h2,s)

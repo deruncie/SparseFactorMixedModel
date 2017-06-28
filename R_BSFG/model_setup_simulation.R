@@ -27,29 +27,30 @@ K = setup$K
 data = setup$data
 X = setup$X
 
-setup$data$Group = gl(3,1,length = nrow(setup$data))
+# setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
   sampler = 'fast_BSFG',
   # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
-  h2_divisions = 20,
+  h2_divisions = 200,
   h2_step_size = NULL,
   burn = 500
 )
 
 priors = BSFG_priors(
   fixed_var = list(V = 1,     nu = 3),
-  tot_Y_var = list(V = 0.5,   nu = 3),
+  # tot_Y_var = list(V = 0.5,   nu = 3),
+  tot_Y_var = list(V = 0.5,   nu = 10),
   tot_F_var = list(V = 18/20, nu = 20),
   delta_1   = list(shape = 2.1,  rate = 1/20),
   delta_2   = list(shape = 3, rate = 1),
   Lambda_df = 3,
   B_df      = 3,
   B_F_df    = 3,
-  h2_priors_resids_fun = function(h2s,n) pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-  h2_priors_factors_fun = function(h2s,n) ifelse(h2s == 0,n,n/(n-1))
+  h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
+  h2_priors_factors_fun = function(h2s,n) 1#ifelse(h2s == 0,n,n/(n-1))
 )
 
 # to test non-PD K matrix:
@@ -70,9 +71,9 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #
                                   run_parameters=run_parameters,
                                   priors=priors,
                                   setup = setup)
-BSFG_state$current_state$F_h2
-BSFG_state$priors$h2_priors_resids
-BSFG_state$priors$h2_priors_factors
+# BSFG_state$current_state$F_h2
+# BSFG_state$priors$h2_priors_resids
+# BSFG_state$priors$h2_priors_factors
 
 save(BSFG_state,file="BSFG_state.RData")
 
@@ -101,7 +102,7 @@ for(i  in 1:70) {
     BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
-      BSFG_state$current_state = update_k(BSFG_state)
+      # BSFG_state$current_state = update_k(BSFG_state)
       BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100)
       print(BSFG_state$run_parameters$burn)
     }
@@ -138,7 +139,7 @@ i = 1
 G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2[i,]) %*% t(Lambda) + diag(resid_h2[i,]/tot_Eta_prec[i,]))
 U_samples = get_posterior_FUN(BSFG_state, Z %*% U_F %*% t(Lambda) + Z %*% U_R)
 image(cov2cor(get_posterior_mean(G)))
-plot(get_posterior_mean(G),setup$G);abline(0,1)
+plot(get_posterior_mean(G)~setup$G,ylim=c(-4,4));abline(0,1)
 
 library(shinystan)
 library(MCMCpack)

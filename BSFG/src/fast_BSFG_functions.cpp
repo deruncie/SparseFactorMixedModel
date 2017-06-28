@@ -379,7 +379,7 @@ MatrixXd sample_coefs_set_c(
 VectorXd tot_prec_scores_c (
     Map<MatrixXd> UtEta,
     Map<VectorXd> h2,
-    Map<VectorXd> s
+    Map<ArrayXd> s
 ) {
 
   int p = UtEta.cols();
@@ -387,7 +387,7 @@ VectorXd tot_prec_scores_c (
   VectorXd scores(p);
 
   for(int i = 0; i < p; i++){
-    ArrayXd Sigma_sqrt = sqrt(h2(i) * s.array() + (1.0 - h2(i)));
+    ArrayXd Sigma_sqrt = sqrt(h2(i) * s + (1.0 - h2(i)));
     VectorXd SiUtEta_i = UtEta.col(i).array() / Sigma_sqrt;
     scores(i) = SiUtEta_i.dot(SiUtEta_i);
   }
