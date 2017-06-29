@@ -22,7 +22,8 @@ Imports:
   parallel,
   abind,
   reshape2,
-  compiler
+  compiler,
+  coda
 Suggests:
   R.matlab,
   MCMCpack,

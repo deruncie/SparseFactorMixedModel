@@ -285,36 +285,4 @@ plot_diagnostics = function(BSFG_state){
 }
 
 
-#' Calculates posterior means of specific parameters of a BSFG model
-#'
-#' @param BSFG_state a BSFG_state object
-#' @param parameter the parameter to return the posterior means
-#' @param samples (optionally) a vector of sample indices (for example, to exclude samples prior
-#'    to convergence, or to thin saved samples)
-#' @return matrix of posterior means of same dimension as parameter in current_state
-get_posteriorMean = function(BSFG_state,parameter = c('Lambda','F','U_F','F_h2','B','B_F'),samples = NULL){
-  post_samples = load_posterior_param(BSFG_state,parameter)
-  if(!is.null(samples)) post_samples = post_samples[samples,,]
-  return(apply(post_samples,c(2,3),mean))
-}
-
-
-#' Calculates HPDintervals for the specified parameter of a BSFG model
-#'
-#' @param BSFG_state a BSFG_state object
-#' @param parameter the parameter to return the posterior means
-#' @param samples (optionally) a vector of sample indices (for example, to exclude samples prior
-#'    to convergence, or to thin saved samples)
-#' @return array of HPDintervals. The dimensions correspond to the dimensions in Posterior
-#'     (the first dimension holds the lower and upper bounds, the other two the matrix of parameters)
-HPDinterval.BSFG_state = function(obj,prob,parameter = 'F_h2',samples = NULL){
-  post_samples = load_posterior_param(obj,parameter)
-  if(!is.null(samples)) post_samples = post_samples[samples,,]
-  intervals = apply(post_samples,3,function(x) HPDinterval(mcmc(x)))
-  dims = dim(post_samples)[-1]
-  intervals = array(intervals,dim = c(dims[1],2,dims[2]))
-  intervals = aperm(intervals,c(2,1,3))
-  return(intervals)
-}
-
 

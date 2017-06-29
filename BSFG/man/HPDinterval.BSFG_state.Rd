@@ -4,7 +4,8 @@
 \alias{HPDinterval.BSFG_state}
 \title{Calculates HPDintervals for the specified parameter of a BSFG model}
 \usage{
-HPDinterval.BSFG_state(obj, prob, parameter = "F_h2", samples = NULL)
+\method{HPDinterval}{BSFG_state}(obj, prob, parameter = "F_h2",
+  samples = NULL)
 }
 \arguments{
 \item{parameter}{the parameter to return the posterior means}
