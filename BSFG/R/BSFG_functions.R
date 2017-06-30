@@ -278,22 +278,6 @@ save_posterior_chunk = function(BSFG_state){
   save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
   return(BSFG_state)
 }
-# save_posterior_chunk = function(BSFG_state){
-#   Posterior = BSFG_state$Posterior
-#   folder = Posterior$folder
-#   if(!dir.exists(folder)) dir.create(folder)
-#   res = sapply(c(Posterior$posteriorSample_params,Posterior$posteriorMean_params),function(param) {
-#     file_name = sprintf('%s/%s.csv',folder,param)
-#     samples = Posterior[[param]]
-#     if(length(samples) > 0) {
-#       fwrite(as.data.frame(matrix(samples,nrow = dim(samples)[1])),file = file_name,append = T)
-#     }
-#   })
-#   Posterior = reset_Posterior(Posterior,BSFG_state)
-#   BSFG_state$Posterior = Posterior
-#   save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
-#   return(BSFG_state)
-# }
 
 #' load the posterior samples of a single parameter from all saved chunks
 #'
@@ -349,30 +333,6 @@ load_posterior_param = function(BSFG_state,param){
 
   return(all_samples)
 }
-# load_posterior_param = function(BSFG_state,param,samples = NULL){
-#   file = sprintf('%s/%s.csv',BSFG_state$Posterior$folder,param)
-#   if(!file.exists(file)) {
-#     if(any(grepl(sprintf('%s_[0-9]+.RData',param),list.files(path=BSFG_state$Posterior$folder)))) {
-#       return(load_posterior_param_old(BSFG_state,param))
-#     }
-#     return()
-#   }
-#   if(param %in% BSFG_state$Posterior$posteriorSample_params){
-#     if(is.null(samples)) samples = 1:BSFG_state$Posterior$total_samples
-#     posterior_samples = as.matrix(fread(input = file,fill = TRUE)[samples,])
-#     posterior_samples = array(posterior_samples,dim = c(nrow(posterior_samples),dim(BSFG_state$Posterior[[param]])[-1]))
-#     dimnames(posterior_samples) = dimnames(BSFG_state$Posterior[[param]])
-#     return(posterior_samples)
-#   }
-#   if(param %in% BSFG_state$Posterior$posteriorMean_params){
-#     posterior_means = as.matrix(fread(input = file,fill = TRUE))
-#     dims = dim(BSFG_state$Posterior[[param]])
-#     posterior_means = array(posterior_means,dim = c(nrow(posterior_means)/dims[1],dims))
-#     posterior_means = apply(posterior_means,c(2,3),mean)
-#     dimnames(posterior_means) = dimnames(BSFG_state$Posterior[[param]])
-#     return(posterior_means)
-#   }
-# }
 
 #' load the posterior samples of a single parameter from all saved chunks
 #'
