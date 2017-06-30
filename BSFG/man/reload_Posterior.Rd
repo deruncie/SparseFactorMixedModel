@@ -4,12 +4,12 @@
 \alias{reload_Posterior}
 \title{Re-loads a full Posterior list with all parameters}
 \usage{
-reload_Posterior(BSFG_state)
+reload_Posterior(BSFG_state, params = NULL)
 }
 \arguments{
-\item{Posterior}{an empty Posterior list (after call to \link{clear_Posterior})}
+\item{params}{list of parameters to load. If NULL, all parameters will be loaded}
 
-\item{folder}{folder with all posterior chunk files}
+\item{Posterior}{an empty Posterior list (after call to \link{clear_Posterior})}
 }
 \value{
 Posterior list, as part of a BSFG_state object

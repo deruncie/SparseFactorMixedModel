@@ -24,6 +24,8 @@ This function will apply the supplied function to each posterior sample of the c
    1) Posterior$posteriorSample_params
    2) data_matrices
    3) priors
-   4) current_state
-   5) global environment
+   4) Posterior$posteriorMean_params
+   5) current_state
+   6) calling environment (ex. sapply)
+   7) global environment
 }

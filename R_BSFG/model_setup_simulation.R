@@ -36,7 +36,7 @@ run_parameters = BSFG_control(
   simulation = TRUE,
   h2_divisions = 200,
   h2_step_size = NULL,
-  burn = 500
+  burn = 100
 )
 
 priors = BSFG_priors(

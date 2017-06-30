@@ -264,12 +264,13 @@ save_posterior_chunk = function(BSFG_state){
   Posterior = BSFG_state$Posterior
   folder = Posterior$folder
   if(!dir.exists(folder)) dir.create(folder)
-
-  file_suffix = sprintf('%d.RData',Posterior$total_samples)
+  file_suffix = sprintf('%d.rds',Posterior$total_samples)
   res = sapply(c(Posterior$posteriorSample_params,Posterior$posteriorMean_params),function(param) {
     file_name = sprintf('%s/%s_%s',folder,param,file_suffix)
     samples = Posterior[[param]]
-    if(dim(samples)[1] > 0) save(samples,file = file_name)
+    if(length(samples) > 0) {
+      saveRDS(samples,file = file_name,compress = FALSE)
+    }
   })
   Posterior$files = unique(c(Posterior$files,file_suffix))
   Posterior = reset_Posterior(Posterior,BSFG_state)
@@ -277,13 +278,108 @@ save_posterior_chunk = function(BSFG_state){
   save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
   return(BSFG_state)
 }
+# save_posterior_chunk = function(BSFG_state){
+#   Posterior = BSFG_state$Posterior
+#   folder = Posterior$folder
+#   if(!dir.exists(folder)) dir.create(folder)
+#   res = sapply(c(Posterior$posteriorSample_params,Posterior$posteriorMean_params),function(param) {
+#     file_name = sprintf('%s/%s.csv',folder,param)
+#     samples = Posterior[[param]]
+#     if(length(samples) > 0) {
+#       fwrite(as.data.frame(matrix(samples,nrow = dim(samples)[1])),file = file_name,append = T)
+#     }
+#   })
+#   Posterior = reset_Posterior(Posterior,BSFG_state)
+#   BSFG_state$Posterior = Posterior
+#   save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
+#   return(BSFG_state)
+# }
+
+#' load the posterior samples of a single parameter from all saved chunks
+#'
+#' @param folder folder to find Posterior chunk files
+#' @param param Name of parameter to load
+#' @param samples vector of sample indices to load. If NULL, all samples loaded
+#' @return array with all chuncks of Posterior samples appended together
+load_posterior_param = function(BSFG_state,param){
+  if(length(BSFG_state$Posterior$files) == 0) return(c())
+  if(grepl('RData',BSFG_state$Posterior$files[1])) {
+    return(load_posterior_param_old(BSFG_state,param))
+  }
+  folder = BSFG_state$Posterior$folder
+  param_files = paste0(folder,'/',param,'_',BSFG_state$Posterior$files)
+  all_files = list.files(path=folder,full.names = T)
+  param_files = param_files[param_files %in% all_files]
+  if(length(param_files) == 0) return(c())
+
+  samples = readRDS(param_files[1])
+  samples_dim = dim(samples)
+  current_row = 0
+  if(param %in% BSFG_state$Posterior$posteriorMean_params) {
+    all_samples = samples / length(param_files)
+  } else{
+    all_samples = array(0,dim = c(BSFG_state$Posterior$total_samples,samples_dim[2:3]))
+    all_samples[1:samples_dim[1],,] = samples
+    current_row = samples_dim[1]
+    if(current_row == 0) return(c())
+  }
+
+  # load other files
+  if(length(param_files) > 1) {
+    for(i in 2:length(param_files)){
+      samples = readRDS(param_files[i])
+      if(length(samples_dim) == 2) {
+        all_samples = all_samples + samples / length(param_files)
+      } else{
+        samples_dim = dim(samples)
+        if(current_row+samples_dim[1] > dim(all_samples)[1]){
+          all_samples = abind(all_samples,array(0,dim = c(current_row+samples_dim[1] - dim(all_samples)[1],dim(all_samples)[2:3])),along = 1)
+        }
+        if(samples_dim[2] > dim(all_samples)[2]){
+          all_samples = abind(all_samples,array(0,dim = c(samples_dim[1],samples_dim[2]-dim(all_samples)[2],dim(all_samples)[3])),along = 2)
+        }
+        if(samples_dim[3] > dim(all_samples)[3]){
+          all_samples = abind(all_samples,array(0,dim = c(dim(all_samples)[1:2],samples_dim[3]-dim(all_samples)[3])),along = 3)
+        }
+        all_samples[current_row+1:dim(samples)[1],1:samples_dim[2],1:samples_dim[3]] = samples
+        current_row = current_row+dim(samples)[1]
+      }
+    }
+  }
+
+  return(all_samples)
+}
+# load_posterior_param = function(BSFG_state,param,samples = NULL){
+#   file = sprintf('%s/%s.csv',BSFG_state$Posterior$folder,param)
+#   if(!file.exists(file)) {
+#     if(any(grepl(sprintf('%s_[0-9]+.RData',param),list.files(path=BSFG_state$Posterior$folder)))) {
+#       return(load_posterior_param_old(BSFG_state,param))
+#     }
+#     return()
+#   }
+#   if(param %in% BSFG_state$Posterior$posteriorSample_params){
+#     if(is.null(samples)) samples = 1:BSFG_state$Posterior$total_samples
+#     posterior_samples = as.matrix(fread(input = file,fill = TRUE)[samples,])
+#     posterior_samples = array(posterior_samples,dim = c(nrow(posterior_samples),dim(BSFG_state$Posterior[[param]])[-1]))
+#     dimnames(posterior_samples) = dimnames(BSFG_state$Posterior[[param]])
+#     return(posterior_samples)
+#   }
+#   if(param %in% BSFG_state$Posterior$posteriorMean_params){
+#     posterior_means = as.matrix(fread(input = file,fill = TRUE))
+#     dims = dim(BSFG_state$Posterior[[param]])
+#     posterior_means = array(posterior_means,dim = c(nrow(posterior_means)/dims[1],dims))
+#     posterior_means = apply(posterior_means,c(2,3),mean)
+#     dimnames(posterior_means) = dimnames(BSFG_state$Posterior[[param]])
+#     return(posterior_means)
+#   }
+# }
 
 #' load the posterior samples of a single parameter from all saved chunks
 #'
 #' @param folder folder to find Posterior chunk files
 #' @param param Name of parameter to load
 #' @return array with all chuncks of Posterior samples appended together
-load_posterior_param = function(BSFG_state,param){
+load_posterior_param_old = function(BSFG_state,param){
   if(length(BSFG_state$Posterior$files) == 0) return(c())
   folder = BSFG_state$Posterior$folder
   param_files = paste0(folder,'/',param,'_',BSFG_state$Posterior$files)
