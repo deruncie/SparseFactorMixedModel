@@ -1,16 +1,7 @@
 new_halfSib_simulation_eQTL = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, Ve = 0.2,Vb = 0,V_cis,nSNP,bSNP = 1,SNP_matrix = NULL){
-  require(MCMCglmm)
-  require(pedantics)
-  # build pedigree
-  pedigree = data.frame(ind=nSire*nRep + nSire + 1:(nSire*nRep),dam=1:(nSire*nRep) + nSire, sire = gl(nSire,nRep))
-  pedigree<-fixPedigree(pedigree)
-  children = !is.na(pedigree[,3])
-
-  #generate A matrix as 2* kinship matrix from whole pedigree
-  Kinv = forceSymmetric(inverseA(pedigree)$Ainv)
-  K = forceSymmetric(solve(Kinv))
-  rownames(K) = rownames(Kinv)
-  K = K[children,children]
+  Sire = gl(nSire,nRep)
+  K = .25*tcrossprod(Matrix(model.matrix(~0+Sire))) + diag(.75,length(Sire))
+  rownames(K) = 1:nrow(K)
   # K[K>0 & K<1] = 0.5
 
   K_chol = chol(K)
@@ -66,7 +57,7 @@ new_halfSib_simulation_eQTL = function(name, nSire,nRep,p, b, factor_h2s, Va = 0
 
 
   # RE design
-  data = droplevels(data.frame(X,Sire=factor(pedigree$sire[children]),animal = as.factor(pedigree$id[children])))
+  data = droplevels(data.frame(X,Sire=Sire,animal = rownames(K)))
   Z = diag(1,n)
   # Z = model.matrix(~0+Sire,data)
   # r = ncol(Z)

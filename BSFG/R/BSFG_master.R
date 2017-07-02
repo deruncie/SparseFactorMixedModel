@@ -308,6 +308,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	QTL_columns_factors = NULL
 	  # note columns are centered, potentially resulting in zero-variance columns
 	X_F = model.matrix(factor_model_fixed,data)
+	linear_combos = caret::findLinearCombos(X_F)
+	if(!is.null(linear_combos$remove)) {
+	  cat(sprintf('dropping column(s) %s to make X_factor full rank\n',paste(linear_combos$remove,sep=',')))
+	  X_F = X_F[,-linear_combos$remove]
+	}
 	if(!is.null(QTL_factors)){
 	  if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
 	  QTL_columns_factors = ncol(X_F) + 1:ncol(QTL_factors)

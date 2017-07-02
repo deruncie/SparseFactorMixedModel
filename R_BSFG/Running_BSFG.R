@@ -1,0 +1,150 @@
+library(BSFG)
+
+
+# ---------------------------------------------------------- #
+# Set the base directory for your analysis
+# ---------------------------------------------------------- #
+folder = 'Simulation_1'
+try(dir.create(folder),silent=T)
+setwd(folder)
+
+
+# ---------------------------------------------------------- #
+# The following code generates simulated data, and then loads it into the R workspace
+# can be skipped if you are loading your own data in a different way
+# ---------------------------------------------------------- #
+seed = 1  # for reproducibility
+nSire = 50 # simulation design is a half-sib design: each of nSire fathers has nRep children, each with a different female
+nRep = 10
+nTraits = 100
+nFixedEffects = 2 # fixed effects are effects on the factors
+nFactors = 10
+factor_h2s = c(rep(0,nFactors/2),rep(0.3,nFactors/2))  # factor_h2 is the % of variance in each factor trait that is explained by additive genetic variation.
+# The is after accounting for the fixed effects on the factors
+Va = 2 # residual genetic variance in each of the observed traits after accounting for the factors
+Ve = 2 # residual microenvironmental variance in each of the observed traits after accounting for the factors
+Vb = 2 # magnitude of the fixed effects (just factors)
+new_halfSib_simulation('Sim_FE_1', nSire=nSire,nRep=nRep,p=nTraits, b=nFixedEffects, factor_h2s= factor_h2s,Va = Va, Ve = Ve,Vb = Vb)
+set.seed(seed)
+load('setup.RData')
+
+Y = setup$Y
+data = setup$data
+K = setup$K
+
+# ---------------------------------------------------------- #
+# Set the parameters of the BSFG model
+# see ?BSFG_control
+# ---------------------------------------------------------- #
+run_parameters = BSFG_control(
+  sampler = 'fast_BSFG',  #
+  # sampler = 'general_BSFG',
+  scale_Y = FALSE,
+  simulation = TRUE,
+  h2_divisions = 200,
+  h2_step_size = NULL,
+  burn = 100
+)
+
+
+# ---------------------------------------------------------- #
+# Set the prior hyperparameters of the BSFG model
+# see ?BSFG_control
+# ---------------------------------------------------------- #
+priors = BSFG_priors(
+  fixed_var = list(V = 1,     nu = 3),
+  # tot_Y_var = list(V = 0.5,   nu = 3),
+  tot_Y_var = list(V = 0.5,   nu = 5),
+  tot_F_var = list(V = 18/20, nu = 20),
+  delta_1   = list(shape = 2.1,  rate = 1/20),
+  delta_2   = list(shape = 3, rate = 1),
+  Lambda_df = 3,
+  B_df      = 3,
+  B_F_df    = 3,
+  h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
+  h2_priors_factors_fun = function(h2s,n) 1#ifelse(h2s == 0,n,n/(n-1))
+)
+
+
+# ---------------------------------------------------------- #
+# Construct the model
+# see ?BSFG_init
+# ---------------------------------------------------------- #
+BSFG_state = BSFG_init(Y,
+                       model=~Fixed1+(1|animal), # This model has one fixed and one random term.
+                       #factor_model_fixed = ~0, # we could specify a different fixed effect model for the factors
+                       data = data, # the data.frame with information for constructing the model matrices
+                       K_mats = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated
+                       run_parameters=run_parameters,
+                       priors=priors,
+                       setup = setup  # only if running simulated data. Stores simulated values for comparison
+                       )
+
+
+# ---------------------------------------------------------- #
+# Run MCMC
+# see ?sample_BSFG
+# A MCMC chain is a way of fitting parameters from a Bayesian model
+# The chain is a sequence of draws from the Posterior distribution of each parameter.
+# BSFG uses a Gibbs sampler, which means that we iterate through all of the model's parameters
+# and for each parameter draw a new value from it's posterior holding all other parameters constant
+# This works, but the individual draws are not independent draws from the joint posterior of all parameters.
+# Therefore, to get independent draws, we have to collect many posterior samples, and then save only a portion of them.
+# Also, it may take many iterations for the MCMC chain to converge to the central part of the distribution.
+# This is the burnin period, and we do not store these values (they are not useful).
+# At the end, we have a collection of samples from the posterior distribution of each parameter.
+# We can use these samples to characterize each distribution: mean, SD, histogram, HPDinterval, etc.
+#
+# The way BSFG works is that you ask the program to collect a small number of samples
+# And then can assess how the chain is performing (how well it is mixing, is it converged?)
+# And then either save the samples as posterior samples, or declare them as burn-in and discard them.
+# Then, you can ask for more samples, and repeat until you have enough.
+# ---------------------------------------------------------- #
+
+# Tools for re-setting Posterior samples, and helping chain converge
+# BSFG_state = clear_Posterior(BSFG_state)
+# BSFG_state = reorder_factors(BSFG_state)
+
+n_samples = 100;  # how many samples to collect at once?
+for(i  in 1:70) {
+  print(sprintf('Run %d',i))
+  BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)  # run MCMC chain n_samples iterations. grainSize is a paramter for parallelization (smaller = more parallelization)
+
+  # set of commands to run during burn-in period to help chain converge
+  if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
+    BSFG_state = reorder_factors(BSFG_state) # Factor order doesn't "mix" well in the MCMC. We can help it by manually re-ordering from biggest to smallest
+    # BSFG_state$current_state = update_k(BSFG_state) # use to drop insignificant factors
+    BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100) # if you made changes, set a new burn-in period
+    print(BSFG_state$run_parameters$burn)
+  }
+  BSFG_state = save_posterior_chunk(BSFG_state)  # save any accumulated posterior samples in the database to release memory
+  print(BSFG_state) # print status of current chain
+  plot(BSFG_state) # make some diagnostic plots. These are saved in a pdf booklet: diagnostic_plots.pdf
+}
+
+
+# ---------------------------------------------------------- #
+# Work with the Posterior samples
+# ---------------------------------------------------------- #
+
+# reload the whole database of posterior samples
+BSFG_state$Posterior = reload_Posterior(BSFG_state)
+
+# all parameter names in Posterior
+BSFG_state$Posterior$posteriorSample_params
+BSFG_state$Posterior$posteriorMean_params  # these ones only have the posterior mean saved, not individual posterior samples
+
+# instead, load only a specific parameter
+Lambda = load_posterior_param(BSFG_state,'Lambda')
+
+# boxplots are good ways to visualize Posterior distributions on sets of related parameters
+boxplot(BSFG_state$Posterior$F_h2[,1,])
+
+# get posterior distribution on a function of parameters
+G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2[1,]) %*% t(Lambda) + resid_h2[1,]/tot_Eta_prec[1,])
+
+# get posterior mean of a parameter
+G = get_posterior_mean(G_samples)
+
+# get Highest Posterior Density intervals for paramters
+F_h2_HPD = get_posterior_HPDinterval(BSFG_state,F_h2)

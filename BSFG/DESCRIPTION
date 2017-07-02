@@ -23,12 +23,10 @@ Imports:
   abind,
   reshape2,
   compiler,
+  caret,
   coda
 Suggests:
-  R.matlab,
-  MCMCpack,
   splines,
-  pedantics
 LinkingTo: 
   Rcpp (>= 0.11.2), 
   RcppEigen (>= 0.3.3.3.0),
