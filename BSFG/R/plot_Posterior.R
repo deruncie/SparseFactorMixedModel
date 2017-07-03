@@ -29,7 +29,8 @@ trace_plot_h2s = function(F_h2_samples, n_factors = 8, device = NULL){
   cols = 2*ceiling(n_factors / rows)
   par(mfrow=c(rows,cols))
 
-  for(k in 1:min(n_factors,dim(F_h2_samples)[3])){
+  # for(k in 1:min(n_factors,dim(F_h2_samples)[3])){
+  for(k in 1:dim(F_h2_samples)[3]){
     trace_plot(as.matrix(F_h2_samples[,,k,drop=F]),main = sprintf('Factor %d h2s',k),ylim = c(0,1))
     hist(F_h2_samples[,1,k],breaks=seq(0,1,length=100),xlim = c(-0.1,1),main = sprintf('Factor %d',k))
     if(dim(F_h2_samples)[2] > 1) {
@@ -49,7 +50,8 @@ trace_plot_Lambda = function(Lambda, n_factors = 16, device = NULL,main = 'Lambd
   cols = ceiling(n_factors / rows)
   par(mfrow=c(rows,cols))
 
-  for(k in 1:min(n_factors,dim(Lambda)[3])){
+  # for(k in 1:min(n_factors,dim(Lambda)[3])){
+  for(k in 1:dim(Lambda)[3]){
     o = order(-abs(colMeans(Lambda[,,k])))
     o = o[1:min(5,length(o))]
     traces = Lambda[,o,k]
@@ -62,8 +64,10 @@ boxplot_Bs = function(B,main = ''){
   k = dim(B)[3]
   b = dim(B)[2]
   par(mfrow=c(3,3))
-  for(i in 1:min(9,k)) {
-    boxplot(B[,,i],main = sprintf('%s %d',main,i),outpch=NA,boxlty=0,whisklty=1,staplelty=0)
+  for(i in 1:min(27,k)) {
+    data = B[,,i]
+    ylim = range(c(0,data))
+    boxplot(data,ylim=ylim,main = sprintf('%s %d',main,i),outpch=NA,boxlty=0,whisklty=1,staplelty=0)
     abline(h=0)
   }
 }
