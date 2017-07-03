@@ -4,7 +4,7 @@
 \alias{load_posterior_param}
 \title{load the posterior samples of a single parameter from all saved chunks}
 \usage{
-load_posterior_param(BSFG_state, param)
+load_posterior_param(BSFG_state, param, chunks = NULL)
 }
 \arguments{
 \item{param}{Name of parameter to load}

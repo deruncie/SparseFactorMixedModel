@@ -1,28 +1,28 @@
 load_simulation_data = function(file = NULL){
-    if(is.null(file)){
-      if(file.exists('../setup.RData')) {
-        load('../setup.RData')
-        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
-      } else{
-        if (!requireNamespace("R.matlab", quietly = TRUE)) {
-          stop("R.matlab needed to load setup.mat. Please install it.",
-               call. = FALSE)
-        }
-        setup = readMat('../setup.mat')
-        for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
-      }
+  if(is.null(file)){
+    if(file.exists('../setup.RData')) {
+      load('../setup.RData')
+      for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
     } else{
-      load(file)
+      if (!requireNamespace("R.matlab", quietly = TRUE)) {
+        stop("R.matlab needed to load setup.mat. Please install it.",
+             call. = FALSE)
+      }
+      setup = readMat('../setup.mat')
+      for(i in 1:10) names(setup) = sub('.','_',names(setup),fixed=T)
     }
-    Y = setup$Y
-    K = setup$A
-    r = dim(K)[1]
-    n = nrow(Y)
-    if(dim(setup$X)[1] != n) setup$X = t(setup$X)
-    data = data.frame(animal = gl(r,n/r))
-    rownames(K) = data$animal
-    if(is.null(colnames(Y))) colnames(Y) = paste('Trait',1:ncol(Y),sep='_')
-    return(list(Y = Y, data = data, K_mats = list(animal = K),setup = setup))
+  } else{
+    load(file)
+  }
+  Y = setup$Y
+  K = setup$A
+  r = dim(K)[1]
+  n = nrow(Y)
+  if(dim(setup$X)[1] != n) setup$X = t(setup$X)
+  data = data.frame(animal = gl(r,n/r))
+  rownames(K) = data$animal
+  if(is.null(colnames(Y))) colnames(Y) = paste('Trait',1:ncol(Y),sep='_')
+  return(list(Y = Y, data = data, K_mats = list(animal = K),setup = setup))
 }
 
 
@@ -42,110 +42,110 @@ update_k = function( BSFG_state) {
   run_parameters = BSFG_state$run_parameters
   current_state  = BSFG_state$current_state
 
-	current_state_members = names(current_state)
-	current_state = with(c(priors,run_parameters,data_matrices),within(current_state, {
-		i = nrun
-		n = nrow(F)
-		k = ncol(Lambda)
-		r = nrow(U_F)
-		p = nrow(Lambda)
-		b_F = ncol(X_F)
+  current_state_members = names(current_state)
+  current_state = with(c(priors,run_parameters,data_matrices),within(current_state, {
+    i = nrun
+    n = nrow(F)
+    k = ncol(Lambda)
+    r = nrow(U_F)
+    p = nrow(Lambda)
+    b_F = ncol(X_F)
 
-		# to determine if Lambda is kept, first remove empirical variance of F.
-		Lambda_star = sweep(Lambda,2,sqrt(1/colMeans(F^2)),'*')
-		lind = colMeans(abs(Lambda_star) < epsilon)    # proportion of elements in each column less than eps in magnitude
-		vec = lind >= prop
-		num = sum(vec)       # number of redundant columns
+    # to determine if Lambda is kept, first remove empirical variance of F.
+    Lambda_star = sweep(Lambda,2,sqrt(1/colMeans(F^2)),'*')
+    lind = colMeans(abs(Lambda_star) < epsilon)    # proportion of elements in each column less than eps in magnitude
+    vec = lind >= prop
+    num = sum(vec)       # number of redundant columns
 
-		if(num == 0 && all(lind < 0.995) && k < 2*p) { #add a column
-			k             = k+1
-			Lambda_prec   = cbind(Lambda_prec,rgamma(p,shape = Lambda_df/2, rate = Lambda_df/2))
-			delta         = cbind(delta,rgamma(1,shape = delta_2_shape,rate = delta_2_rate))
-			tauh          = matrix(cumprod(delta),nrow = 1)
-			Plam          = sweep(Lambda_prec,2,tauh,'*')
-			Lambda        = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
-			F_h2_index    = c(F_h2_index,sample(1:ncol(h2s_matrix),1))
-			F_h2          = h2s_matrix[,F_h2_index,drop=FALSE]
-			tot_F_prec    = cbind(tot_F_prec,1)
-			U_F           = cbind(U_F,rnorm(r,0,sqrt(sum(F_h2[,k]))))
-			B_F           = cbind(B_F,0*rnorm(b_F,0,1))
-			prec_B_F      = cbind(prec_B_F,c(tau_B_F))
-			F             = cbind(F,rnorm(n,as.matrix(X_F %*% B_F[,k]) + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
-		} else if(num > 0) { # drop redundant columns
-			nonred = which(vec == 0) # non-redundant loadings columns
-			while(length(nonred) < 2) {
-				nonred = c(nonred,which(vec != 0)[1])
-				vec[nonred[length(nonred)]] = 0
-			}
-			k = length(nonred)
-			Lambda = Lambda[,nonred,drop=FALSE]
-			Lambda_prec = Lambda_prec[,nonred,drop=FALSE]
-			F = F[,nonred,drop=FALSE]
-			for(red in which(vec == 1)){
-				if(red == length(vec)) next
-				# combine deltas so that the shrinkage of kept columns doesnt
-				# decrease after dropping redundant columns
-				delta[red+1] = delta[red+1]*delta[red]
-			}
-			if(is.null(dim(delta))) recover()
-			delta = delta[,nonred,drop=FALSE]
-			tauh = matrix(cumprod(delta),nrow=1)
-			Plam = sweep(Lambda_prec,2,tauh,'*')
-			F_h2 = F_h2[,nonred,drop=FALSE]
-			F_h2_index = F_h2_index[nonred]
-			tot_F_prec = tot_F_prec[,nonred,drop=FALSE]
-			U_F = U_F[,nonred,drop=FALSE]
-			B_F = B_F[,nonred,drop=FALSE]
-			prec_B_F = prec_B_F[,nonred,drop=FALSE]
-		}
-	}))
-	current_state = current_state[current_state_members]
+    if(num == 0 && all(lind < 0.995) && k < 2*p) { #add a column
+      k             = k+1
+      Lambda_prec   = cbind(Lambda_prec,rgamma(p,shape = Lambda_df/2, rate = Lambda_df/2))
+      delta         = cbind(delta,rgamma(1,shape = delta_2_shape,rate = delta_2_rate))
+      tauh          = matrix(cumprod(delta),nrow = 1)
+      Plam          = sweep(Lambda_prec,2,tauh,'*')
+      Lambda        = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
+      F_h2_index    = c(F_h2_index,sample(1:ncol(h2s_matrix),1))
+      F_h2          = h2s_matrix[,F_h2_index,drop=FALSE]
+      tot_F_prec    = cbind(tot_F_prec,1)
+      U_F           = cbind(U_F,rnorm(r,0,sqrt(sum(F_h2[,k]))))
+      B_F           = cbind(B_F,0*rnorm(b_F,0,1))
+      prec_B_F      = cbind(prec_B_F,c(tau_B_F))
+      F             = cbind(F,rnorm(n,as.matrix(X_F %*% B_F[,k]) + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
+    } else if(num > 0) { # drop redundant columns
+      nonred = which(vec == 0) # non-redundant loadings columns
+      while(length(nonred) < 2) {
+        nonred = c(nonred,which(vec != 0)[1])
+        vec[nonred[length(nonred)]] = 0
+      }
+      k = length(nonred)
+      Lambda = Lambda[,nonred,drop=FALSE]
+      Lambda_prec = Lambda_prec[,nonred,drop=FALSE]
+      F = F[,nonred,drop=FALSE]
+      for(red in which(vec == 1)){
+        if(red == length(vec)) next
+        # combine deltas so that the shrinkage of kept columns doesnt
+        # decrease after dropping redundant columns
+        delta[red+1] = delta[red+1]*delta[red]
+      }
+      if(is.null(dim(delta))) recover()
+      delta = delta[,nonred,drop=FALSE]
+      tauh = matrix(cumprod(delta),nrow=1)
+      Plam = sweep(Lambda_prec,2,tauh,'*')
+      F_h2 = F_h2[,nonred,drop=FALSE]
+      F_h2_index = F_h2_index[nonred]
+      tot_F_prec = tot_F_prec[,nonred,drop=FALSE]
+      U_F = U_F[,nonred,drop=FALSE]
+      B_F = B_F[,nonred,drop=FALSE]
+      prec_B_F = prec_B_F[,nonred,drop=FALSE]
+    }
+  }))
+  current_state = current_state[current_state_members]
 
-	return(current_state)
+  return(current_state)
 }
 
 #' Re-orders factors in decreasing order of magnitude
 #'
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 reorder_factors = function(BSFG_state){
-	# re-orders factors in decreasing size of Lambda %*% F
-	# based on current state
-	# also re-orders Posterior
+  # re-orders factors in decreasing size of Lambda %*% F
+  # based on current state
+  # also re-orders Posterior
 
-	current_state = BSFG_state$current_state
+  current_state = BSFG_state$current_state
 
-	Lambda = current_state$Lambda
-	F = current_state$F
+  Lambda = current_state$Lambda
+  F = current_state$F
 
-	# size is sum lambda_ij^2 * var(F_i)
-	sizes = colSums(Lambda^2) * colMeans(F^2)
-	factor_order = order(sizes,decreasing=T)
+  # size is sum lambda_ij^2 * var(F_i)
+  sizes = colSums(Lambda^2) * colMeans(F^2)
+  factor_order = order(sizes,decreasing=T)
 
-	reorder_params = c('Lambda','Lambda_prec','Plam',
-						'delta','tauh',
-						'F','B_F','U_F','F_h2','U_F_prec','F_e_prec','tot_F_prec'
-						)
+  reorder_params = c('Lambda','Lambda_prec','Plam',
+                     'delta','tauh',
+                     'F','B_F','U_F','F_h2','U_F_prec','F_e_prec','tot_F_prec'
+  )
 
-	# reorder currrent state
-	for(param in reorder_params){
-		if(! param %in% names(current_state)) next
-		current_state[[param]] = current_state[[param]][,factor_order,drop=FALSE]
-	}
-	current_state$delta = matrix(c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)]),nrow=1)
-	BSFG_state$current_state = current_state
+  # reorder currrent state
+  for(param in reorder_params){
+    if(! param %in% names(current_state)) next
+    current_state[[param]] = current_state[[param]][,factor_order,drop=FALSE]
+  }
+  current_state$delta = matrix(c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)]),nrow=1)
+  BSFG_state$current_state = current_state
 
-	# reorder Posterior
-	Posterior = BSFG_state$Posterior
+  # reorder Posterior
+  Posterior = BSFG_state$Posterior
 
-	for(param in reorder_params){
-		if(! param %in% names(Posterior)) next
-		if(dim(Posterior[[param]])[1] == 0) next
-		Posterior[[param]] = Posterior[[param]][,,factor_order,drop=FALSE]
-	}
+  for(param in reorder_params){
+    if(! param %in% names(Posterior)) next
+    if(dim(Posterior[[param]])[1] == 0) next
+    Posterior[[param]] = Posterior[[param]][,,factor_order,drop=FALSE]
+  }
 
-	BSFG_state$Posterior = Posterior
+  BSFG_state$Posterior = Posterior
 
-	return(BSFG_state)
+  return(BSFG_state)
 }
 
 #' Saves current state in Posterior
@@ -153,10 +153,10 @@ reorder_factors = function(BSFG_state){
 #' Saves current state in Posterior
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 save_posterior_sample = function(BSFG_state) {
-	# All parameters in current are matrices.
-	# Posterior is a list of arrays.
-	# All factor parameters are matrices with ncol == k
-	# Posterior arrays are expanded / contracted as the number of factors changes (with update_k)
+  # All parameters in current are matrices.
+  # Posterior is a list of arrays.
+  # All factor parameters are matrices with ncol == k
+  # Posterior arrays are expanded / contracted as the number of factors changes (with update_k)
 
   current_state = BSFG_state$current_state
   Posterior = BSFG_state$Posterior
@@ -166,38 +166,38 @@ save_posterior_sample = function(BSFG_state) {
   Posterior$total_samples = total_samples
   Posterior$sp_num = sp_num
 
-	current_state = within(current_state,{
-	  # re-transform random effects using RE_L (RE_L %*% diag(D) %*% t(RE_L) = bdiag(K_mats))
-	  U_R = as.matrix(BSFG_state$data_matrices$RE_L %*% U_R)
-	  U_F = as.matrix(BSFG_state$data_matrices$RE_L %*% U_F)
-		# transform variables so that the variance of each column of F is 1.
-		F_var = 1/tot_F_prec
-		U_F = sweep(U_F,2,sqrt(F_var),'/')
-		B_F = sweep(B_F,2,sqrt(F_var),'/')
-		F = sweep(F,2,sqrt(F_var),'/')
-		Lambda = sweep(Lambda,2,sqrt(F_var),'*')
-		tauh[] = tauh * tot_F_prec
-	})
+  current_state = within(current_state,{
+    # re-transform random effects using RE_L (RE_L %*% diag(D) %*% t(RE_L) = bdiag(K_mats))
+    U_R = as.matrix(BSFG_state$data_matrices$RE_L %*% U_R)
+    U_F = as.matrix(BSFG_state$data_matrices$RE_L %*% U_F)
+    # transform variables so that the variance of each column of F is 1.
+    F_var = 1/tot_F_prec
+    U_F = sweep(U_F,2,sqrt(F_var),'/')
+    B_F = sweep(B_F,2,sqrt(F_var),'/')
+    F = sweep(F,2,sqrt(F_var),'/')
+    Lambda = sweep(Lambda,2,sqrt(F_var),'*')
+    tauh[] = tauh * tot_F_prec
+  })
 
-	sp = dim(Posterior$Lambda)[1]
+  sp = dim(Posterior$Lambda)[1]
 
-	for(param in Posterior$posteriorSample_params){
-		ncol_current = ncol(current_state[[param]])
-		ncol_Posterior = dim(Posterior[[param]])[3]
-		if(ncol_current > ncol_Posterior){
-			Posterior[[param]] = abind(Posterior[[param]],array(0,dim = c(sp,nrow(current_state[[param]]),ncol_current-ncol_Posterior)),along=3)
-		}
-		if(ncol_current < ncol_Posterior) {
-			Posterior[[param]] = Posterior[[param]][,,1:ncol_current,drop=F]
-		}
-		Posterior[[param]][sp_num,,] = current_state[[param]]
-	}
+  for(param in Posterior$posteriorSample_params){
+    ncol_current = ncol(current_state[[param]])
+    ncol_Posterior = dim(Posterior[[param]])[3]
+    if(ncol_current > ncol_Posterior){
+      Posterior[[param]] = abind(Posterior[[param]],array(0,dim = c(sp,nrow(current_state[[param]]),ncol_current-ncol_Posterior)),along=3)
+    }
+    if(ncol_current < ncol_Posterior) {
+      Posterior[[param]] = Posterior[[param]][,,1:ncol_current,drop=F]
+    }
+    Posterior[[param]][sp_num,,] = current_state[[param]]
+  }
 
-	for(param in Posterior$posteriorMean_params){
-	  Posterior[[param]] = (Posterior[[param]]*(total_samples - 1) + current_state[[param]])/total_samples
-	}
+  for(param in Posterior$posteriorMean_params){
+    Posterior[[param]] = (Posterior[[param]]*(total_samples - 1) + current_state[[param]])/total_samples
+  }
 
-	return(Posterior)
+  return(Posterior)
 }
 
 reset_Posterior = function(Posterior,BSFG_state){
@@ -222,10 +222,10 @@ reset_Posterior = function(Posterior,BSFG_state){
 }
 
 expand_Posterior = function(Posterior,size){
-	for(param in Posterior$posteriorSample_params){
-		Posterior[[param]] = abind(Posterior[[param]],array(NA,dim = c(size,dim(Posterior[[param]])[2:3])),along = 1)
-	}
-	Posterior
+  for(param in Posterior$posteriorSample_params){
+    Posterior[[param]] = abind(Posterior[[param]],array(NA,dim = c(size,dim(Posterior[[param]])[2:3])),along = 1)
+  }
+  Posterior
 }
 
 #' Resets Posterior samples
@@ -234,13 +234,13 @@ expand_Posterior = function(Posterior,size){
 #'     \code{run_parameters} to reflect all previous samples in the chain now count as burnin
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
 clear_Posterior = function(BSFG_state) {
-	# resets Posterior samples if burnin was not sufficient
-	Posterior = BSFG_state$Posterior
-	run_parameters = BSFG_state$run_parameters
+  # resets Posterior samples if burnin was not sufficient
+  Posterior = BSFG_state$Posterior
+  run_parameters = BSFG_state$run_parameters
 
-	run_parameters$burn = run_parameters$burn + run_parameters$thin*Posterior$total_samples
+  run_parameters$burn = run_parameters$burn + run_parameters$thin*Posterior$total_samples
 
-	Posterior$total_samples = 0
+  Posterior$total_samples = 0
   Posterior = reset_Posterior(Posterior,BSFG_state)
 
   if(length(list.files(path = Posterior$folder))>0) system('rm Posterior/*')
@@ -285,16 +285,20 @@ save_posterior_chunk = function(BSFG_state){
 #' @param param Name of parameter to load
 #' @param samples vector of sample indices to load. If NULL, all samples loaded
 #' @return array with all chuncks of Posterior samples appended together
-load_posterior_param = function(BSFG_state,param){
+load_posterior_param = function(BSFG_state,param,chunks = NULL){
   if(length(BSFG_state$Posterior$files) == 0) return(c())
   if(grepl('RData',BSFG_state$Posterior$files[1])) {
-    return(load_posterior_param_old(BSFG_state,param))
+    return(load_posterior_param_old(BSFG_state,param,chunks))
   }
   folder = BSFG_state$Posterior$folder
   param_files = paste0(folder,'/',param,'_',BSFG_state$Posterior$files)
   all_files = list.files(path=folder,full.names = T)
   param_files = param_files[param_files %in% all_files]
   if(length(param_files) == 0) return(c())
+  n_files = length(param_files)
+  if(is.null(chunks)) chunks = 1:n_files
+  param_files = param_files[chunks]
+  if(is.na(param_files)) return(c())
 
   samples = readRDS(param_files[1])
   samples_dim = dim(samples)
@@ -302,7 +306,7 @@ load_posterior_param = function(BSFG_state,param){
   if(param %in% BSFG_state$Posterior$posteriorMean_params) {
     all_samples = samples / length(param_files)
   } else{
-    all_samples = array(0,dim = c(BSFG_state$Posterior$total_samples,samples_dim[2:3]))
+    all_samples = array(0,dim = c(BSFG_state$Posterior$total_samples*length(chunks)/n_files,samples_dim[2:3]))
     all_samples[1:samples_dim[1],,] = samples
     current_row = samples_dim[1]
     if(current_row == 0) return(c())
@@ -339,13 +343,19 @@ load_posterior_param = function(BSFG_state,param){
 #' @param folder folder to find Posterior chunk files
 #' @param param Name of parameter to load
 #' @return array with all chuncks of Posterior samples appended together
-load_posterior_param_old = function(BSFG_state,param){
+load_posterior_param_old = function(BSFG_state,param,chunks=NULL){
   if(length(BSFG_state$Posterior$files) == 0) return(c())
   folder = BSFG_state$Posterior$folder
+  n_files = length(BSFG_state$Posterior$files)
+  if(is.null(chunks)) chunks = 1:n_files
   param_files = paste0(folder,'/',param,'_',BSFG_state$Posterior$files)
   all_files = list.files(path=folder,full.names = T)
   param_files = param_files[param_files %in% all_files]
   if(length(param_files) == 0) return(c())
+  n_files = length(param_files)
+  if(is.null(chunks)) chunks = 1:n_files
+  param_files = param_files[chunks]
+  if(is.na(param_files)) return(c())
 
   load(param_files[1])
   samples_dim = dim(samples)
@@ -353,7 +363,7 @@ load_posterior_param_old = function(BSFG_state,param){
   if(param %in% BSFG_state$Posterior$posteriorMean_params) {
     all_samples = samples / length(param_files)
   } else{
-    all_samples = array(0,dim = c(BSFG_state$Posterior$total_samples,samples_dim[2:3]))
+    all_samples = array(0,dim = c(BSFG_state$Posterior$total_samples*length(chunks)/n_files,samples_dim[2:3]))
     all_samples[1:samples_dim[1],,] = samples
     current_row = samples_dim[1]
     if(current_row == 0) return(c())
@@ -440,7 +450,10 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
   for(term in extra_terms){
     if(term %in% ls(parent.frame(2))) extra_env[[term]] = parent.frame(2)[[term]]
   }
-  if(is.null(samples)) samples = 1:BSFG_state$Posterior$total_samples
+  if(is.null(samples)) {  # count # available samples for the first term in terms (assuming it is in Posterior)
+    term1 = terms[terms %in% BSFG_state$Posterior$posteriorSample_params][1]
+    samples = 1:dim(BSFG_state$Posterior[[term1]])[1]
+  }
   per_sample_fun = function(sample_index_i) {
     # get current sample of each of the terms in FUN
     current_sample = make_current_state(BSFG_state$Posterior,sample_index_i,terms)
@@ -468,19 +481,46 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
 #' @param X either an array of posterior samples (either a parameter from \code{Posterior}, or
 #'     an object generated by \link{get_posterior_fun}), or the BSFG_state object with re-loaded Posterior
 #' @param FUN (optional) if \code{X} is a BSFG_state object, the function to calculate the synthetic parameter
-#' @param samples (optional) vector of posterior sample indexes to use for calculations
+#' @param bychunk (optional) if \code{TRUE}, will re-load each chunk of the Posterior separately
+#'     and calculate the posterior mean of \code{FUN} separately for each chunk, and then return
+#'     the overall posterior mean. This saves memory because the whole posterior does not need to be
+#'     loaded into memory at once. Only necessary terms from Posterior are loaded.
 #'
 #' @return posterior mean matrix
-get_posterior_mean = function(X,...){
-  if(is(X,'BSFG_state')) {
+get_posterior_mean = function(X,FUN,bychunk = FALSE,...){
+  if(!bychunk) {
+    if(is(X,'BSFG_state')) {
+      BSFG_state = X
+      FUN = match.call()$FUN
+      X = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN))
+    }
+    if(length(dim(X)) == 3) result = apply(X,c(2,3),mean)
+    if(length(dim(X)) == 2) result = apply(X,2,mean)
+  } else{
+    if(!is(X,'BSFG_state')) stop('Provide a BSFG_state object as "X"')
     BSFG_state = X
-    FUN = match.call()[[3]]
-    X = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN))
+    FUN = match.call()$FUN
+    if(is(FUN,'character')){
+      FUN = parse(text=FUN)
+    }
+    terms = all.vars(FUN)
+    n_files = length(BSFG_state$Posterior$files)
+    result = 0
+    for(chunk in 1:n_files){
+      for(term in terms){
+        if(term %in% BSFG_state$Posterior$posteriorSample_params){
+          BSFG_state$Posterior[[term]] = load_posterior_param(BSFG_state,term,chunks = chunk)
+        }
+      }
+      if(length(BSFG_state$Posterior[[term]]) == 0) next
+      samples = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN))
+      result = result + dim(samples)[1]*get_posterior_mean(samples,bychunk = FALSE)
+    }
+    result = result / BSFG_state$Posterior$total_samples
   }
-  if(length(dim(X)) == 3) result = apply(X,c(2,3),mean)
-  if(length(dim(X)) == 2) result = apply(X,2,mean)
   result
 }
+
 
 
 #' Calculates Highest Posteriod Density intervals of a function of parameters
