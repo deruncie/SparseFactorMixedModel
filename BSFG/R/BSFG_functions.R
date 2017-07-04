@@ -272,7 +272,9 @@ save_posterior_chunk = function(BSFG_state){
       saveRDS(samples,file = file_name,compress = FALSE)
     }
   })
-  Posterior$files = unique(c(Posterior$files,file_suffix))
+  if(length(grep(file_suffix,list.files(path = folder)))>0) {
+    Posterior$files = unique(c(Posterior$files,file_suffix))
+  }
   Posterior = reset_Posterior(Posterior,BSFG_state)
   BSFG_state$Posterior = Posterior
   save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
@@ -294,11 +296,10 @@ load_posterior_param = function(BSFG_state,param,chunks = NULL){
   param_files = paste0(folder,'/',param,'_',BSFG_state$Posterior$files)
   all_files = list.files(path=folder,full.names = T)
   param_files = param_files[param_files %in% all_files]
-  if(length(param_files) == 0) return(c())
   n_files = length(param_files)
   if(is.null(chunks)) chunks = 1:n_files
-  param_files = param_files[chunks]
-  if(is.na(param_files)) return(c())
+  param_files = na.omit(param_files[chunks])
+  if(length(param_files) == 0) return(c())
 
   samples = readRDS(param_files[1])
   samples_dim = dim(samples)
@@ -347,15 +348,13 @@ load_posterior_param_old = function(BSFG_state,param,chunks=NULL){
   if(length(BSFG_state$Posterior$files) == 0) return(c())
   folder = BSFG_state$Posterior$folder
   n_files = length(BSFG_state$Posterior$files)
-  if(is.null(chunks)) chunks = 1:n_files
   param_files = paste0(folder,'/',param,'_',BSFG_state$Posterior$files)
   all_files = list.files(path=folder,full.names = T)
   param_files = param_files[param_files %in% all_files]
-  if(length(param_files) == 0) return(c())
   n_files = length(param_files)
   if(is.null(chunks)) chunks = 1:n_files
-  param_files = param_files[chunks]
-  if(is.na(param_files)) return(c())
+  param_files = na.omit(param_files[chunks])
+  if(length(param_files) == 0) return(c())
 
   load(param_files[1])
   samples_dim = dim(samples)
@@ -506,16 +505,21 @@ get_posterior_mean = function(X,FUN,bychunk = FALSE,...){
     terms = all.vars(FUN)
     n_files = length(BSFG_state$Posterior$files)
     result = 0
+
+    pb = txtProgressBar(min=0,max = n_files,style=3)
     for(chunk in 1:n_files){
       for(term in terms){
         if(term %in% BSFG_state$Posterior$posteriorSample_params){
           BSFG_state$Posterior[[term]] = load_posterior_param(BSFG_state,term,chunks = chunk)
         }
       }
-      if(length(BSFG_state$Posterior[[term]]) == 0) next
-      samples = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN))
-      result = result + dim(samples)[1]*get_posterior_mean(samples,bychunk = FALSE)
+      if(length(BSFG_state$Posterior[[term]]) > 0) {
+        samples = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN))
+        result = result + dim(samples)[1]*get_posterior_mean(samples,bychunk = FALSE)
+      }
+      setTxtProgressBar(pb, chunk)
     }
+    close(pb)
     result = result / BSFG_state$Posterior$total_samples
   }
   result
