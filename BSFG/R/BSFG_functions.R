@@ -431,14 +431,19 @@ make_current_state = function(Posterior,sample,terms){
 #'    6) calling environment (ex. sapply)
 #'    7) global environment
 #'
+#' The operations will be parallelized by default. This can cause memory issues. Ideally, make sure
+#'     that the current environment doesn't have very large objects. Alternatively, reduce number
+#'     of cores with \code{mc.cores}, as each fork duplicates the memory of the calling environment (I think).
+#'
 #' @param BSFG_state A BSFG_state object including a re-loaded Posterior list
 #' @param FUN Operations to be applied to each posterior sample. Write as if this were operating
 #'     within current_state. Can use priors, data_matrices, and other elements of current_state
 #' @param samples (optional) vector of sample indexes to use in the computation
+#' @param mc.cores (optional) number of cores to use for computations. See note about memory requirements.
 #'
 #' @return array of n_samples x dim1 x dim2 where dim1 and dim2 are the dimensions of the calculated
 #'     parameter per posterior sample
-get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
+get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCores()) {
   FUN = match.call()[[3]]
   if(is(FUN,'character')){
     FUN = parse(text=FUN)
@@ -457,7 +462,7 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
     # get current sample of each of the terms in FUN
     current_sample = make_current_state(BSFG_state$Posterior,sample_index_i,terms)
     # evaluate FUN in an environment constructed from current_sample, and BSFG_state, taking current_sample first
-    env = with(BSFG_state,c(current_sample,data_matrices,priors,Posterior,current_state))
+    env = with(BSFG_state,c(current_sample,data_matrices,priors,Posterior[BSFG_state$Posterior$posteriorMean_params],current_state))
     env = c(env,extra_env)
     result = eval(FUN,envir = env)
     if(is(result,'Matrix')) result = as.matrix(result)
@@ -467,9 +472,9 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
   dim_1 = dim(sample_1_result) # get the dimension of the returned value
   if(is.null(dim_1)) dim_1 = length(sample_1_result)
   # calculate value for each sample
-  res = sapply(samples,per_sample_fun)
+  res = do.call(c,mclapply(samples,per_sample_fun,mc.cores = mc.cores))
   # re-formulate into an appropriate array with the first dimension as samples
-  array(t(res),dim = c(length(samples),dim_1))
+  aperm(array(res,dim = c(dim_1,length(samples))),c(3,1,2))
 }
 
 #' Calculates posterior mean of a function of parameters
@@ -486,15 +491,15 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL) {
 #'     loaded into memory at once. Only necessary terms from Posterior are loaded.
 #'
 #' @return posterior mean matrix
-get_posterior_mean = function(X,FUN,bychunk = FALSE,...){
+get_posterior_mean = function(X,FUN,bychunk = FALSE,mc.cores = detectCores(),...){
   if(!bychunk) {
     if(is(X,'BSFG_state')) {
       BSFG_state = X
       FUN = match.call()$FUN
-      X = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN))
+      X = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN,mc.cores=mc.cores))
     }
-    if(length(dim(X)) == 3) result = apply(X,c(2,3),mean)
-    if(length(dim(X)) == 2) result = apply(X,2,mean)
+    if(length(dim(X)) == 3) result = matrix(colMeans(matrix(X,nr = dim(X)[1])),nr = dim(X)[2])
+    if(length(dim(X)) == 2) result = colMeans(X)
   } else{
     if(!is(X,'BSFG_state')) stop('Provide a BSFG_state object as "X"')
     BSFG_state = X
@@ -503,19 +508,21 @@ get_posterior_mean = function(X,FUN,bychunk = FALSE,...){
       FUN = parse(text=FUN)
     }
     terms = all.vars(FUN)
+    terms = terms[terms %in% BSFG_state$Posterior$posteriorSample_params]
     n_files = length(BSFG_state$Posterior$files)
     result = 0
-
+    chunk=1
+#
     pb = txtProgressBar(min=0,max = n_files,style=3)
     for(chunk in 1:n_files){
       for(term in terms){
-        if(term %in% BSFG_state$Posterior$posteriorSample_params){
-          BSFG_state$Posterior[[term]] = load_posterior_param(BSFG_state,term,chunks = chunk)
-        }
+        BSFG_state$Posterior[[term]] = load_posterior_param(BSFG_state,term,chunks = chunk)
       }
       if(length(BSFG_state$Posterior[[term]]) > 0) {
-        samples = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN))
+        samples = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN,mc.cores=mc.cores))
         result = result + dim(samples)[1]*get_posterior_mean(samples,bychunk = FALSE)
+        rm(samples)
+        gc()
       }
       setTxtProgressBar(pb, chunk)
     }

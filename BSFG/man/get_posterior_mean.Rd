@@ -4,7 +4,7 @@
 \alias{get_posterior_mean}
 \title{Calculates posterior mean of a function of parameters}
 \usage{
-get_posterior_mean(X, FUN, bychunk = FALSE, ...)
+get_posterior_mean(X, FUN, bychunk = FALSE, mc.cores = detectCores(), ...)
 }
 \arguments{
 \item{X}{either an array of posterior samples (either a parameter from \code{Posterior}, or

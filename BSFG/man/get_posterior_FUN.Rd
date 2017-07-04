@@ -4,7 +4,7 @@
 \alias{get_posterior_FUN}
 \title{Calculates the posterior mean of a function of parameters}
 \usage{
-get_posterior_FUN(BSFG_state, FUN, samples = NULL)
+get_posterior_FUN(BSFG_state, FUN, samples = NULL, mc.cores = detectCores())
 }
 \arguments{
 \item{BSFG_state}{A BSFG_state object including a re-loaded Posterior list}
@@ -13,6 +13,8 @@ get_posterior_FUN(BSFG_state, FUN, samples = NULL)
 within current_state. Can use priors, data_matrices, and other elements of current_state}
 
 \item{samples}{(optional) vector of sample indexes to use in the computation}
+
+\item{mc.cores}{(optional) number of cores to use for computations. See note about memory requirements.}
 }
 \value{
 array of n_samples x dim1 x dim2 where dim1 and dim2 are the dimensions of the calculated
@@ -28,4 +30,9 @@ This function will apply the supplied function to each posterior sample of the c
    5) current_state
    6) calling environment (ex. sapply)
    7) global environment
+}
+\details{
+The operations will be parallelized by default. This can cause memory issues. Ideally, make sure
+    that the current environment doesn't have very large objects. Alternatively, reduce number
+    of cores with \code{mc.cores}, as each fork duplicates the memory of the calling environment (I think).
 }
