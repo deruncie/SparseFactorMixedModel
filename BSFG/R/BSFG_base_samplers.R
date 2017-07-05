@@ -6,7 +6,7 @@
 #' @param n_samples Number of iterations to add to the chain (not number of posterior samples to draw.
 #'     This is determined by n_samples / thin)
 #' @param grainSize Minimum size of sub-problems for dividing among processes. Sent to RcppParallel
-sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
+sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
   run_parameters = BSFG_state$run_parameters
@@ -37,6 +37,7 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
   # --------------start gibbs sampling------------- #
   # ----------------------------------------------- #
 
+  if(verbose) pb = txtProgressBar(min=start_i,max = start_i+n_samples,style=3)
   start_time = Sys.time()
   for(i in start_i+(1:n_samples)){
     BSFG_state$current_state$nrun = i
@@ -70,8 +71,10 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,...) {
     if( (i-burn) %% thin == 0 && i > burn) {
       BSFG_state$Posterior = save_posterior_sample(BSFG_state)
     }
+    if(verbose) setTxtProgressBar(pb, i)
   }
   end_time = Sys.time()
+  if(verbose) close(pb)
   print(end_time - start_time)
   BSFG_state$current_state$total_time = BSFG_state$current_state$total_time + end_time - start_time
 

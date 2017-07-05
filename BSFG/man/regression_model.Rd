@@ -11,7 +11,9 @@ regression_model(observation_model_parameters, BSFG_state = list())
 1) \code{observations}, a data.frame with observation-level data including columns \code{ID} and \code{Y}
 3) \code{individual_model} the model that should be applied to the data for each ID.}
 
-\item{Y}{a vector of observation. Pre-scaled and centered if desired.}
+\item{BSFG_state}{The current \code{BSFG_state}.
+For initialization, can be a list with \code{data_matrices = list(data=data)}
+Where \code{data} contains \code{ID} for ordering.}
 }
 \description{
 Eta is a matrix of individual-level parmaters for a regression-spline with

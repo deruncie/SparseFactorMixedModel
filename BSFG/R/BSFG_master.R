@@ -238,26 +238,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   n = nrow(data)
   p = ncol(Eta)
   traitnames = colnames(Y)
-#
-# 	# model dimensions
-# 	n = nrow(data)
-# 	p_Y = ncol(Y)
-# 	traitnames = colnames(Y)
-#
-# 	Y_missing = Matrix(is.na(Y))
-#
-# 	# scale Y
-# 	if(!is(Y,'matrix'))	Y = as.matrix(Y)
-#
-# 	# use observation_model to get dimensions, names of Y
-# 	if(is.character(observation_model) && observation_model == 'missing_data') {
-# 	  observation_model = missing_observation_model
-# 	  observation_model_parameters = list(Y_missing = Matrix(is.na(Y)))
-# 	}
-# 	if(is.character(observation_model) && observation_model == 'voom_RNAseq') {
-# 	  observation_model = voom_model()
-# 	  observation_model_parameters$Y_std = Y * observation_model_parameters$prec_Y
-# 	}
 
 	# if factor_model_fixed not specified, use fixed effects from model for both
 	if(is.null(factor_model_fixed)) {

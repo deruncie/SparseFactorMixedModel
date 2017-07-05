@@ -429,29 +429,6 @@ combined_model = function(observation_model_parameters,BSFG_state = list()){
     names(new_state$state) = paste(names(new_state$state),i,sep='.')
     if(length(new_state$posteriorSample_params)>0) new_state$posteriorSample_params = paste(new_state$posteriorSample_params,i,sep='.')
     if(length(new_state$posteriorMean_params)>0) new_state$posteriorMean_params = paste(new_state$posteriorMean_params,i,sep='.')
-      # # Eta: give column names
-      # if(is.null(names(new_state$Eta))) {
-      #   names(new_state$Eta) = 1:ncol(names(new_state$Eta))
-      # }
-      # names(new_state$Eta) = paste(names(new_state$Eta),i,sep='.')
-      #
-      # # append model name to each new parameter
-      #
-      # except Eta
-      # new_params = names(new_state$state)
-      # names(new_params) = new_params
-      # new_params[new_params != 'Eta'] = paste(new_params[new_params != 'Eta'],i,sep='.')
-      # names(new_state$state) = new_params
-      #
-      # # correct names in posteriorSample_params and posteriorMean_params
-      # for(param in names(new_params)){
-      #   if(param %in% new_state$posteriorSample_params) {
-      #     new_state$posteriorSample_params[new_state$posteriorSample_params == param] = new_params[param]
-      #   }
-      #   if(param %in% new_state$posteriorMean_params) {
-      #     new_state$posteriorMean_params[new_state$posteriorMean_params == param] = new_params[param]
-      #   }
-      # }
 
     # return new_state
     new_state

@@ -4,7 +4,7 @@
 \alias{sample_BSFG}
 \title{Run BSFG Gibbs sampler}
 \usage{
-sample_BSFG(BSFG_state, n_samples, grainSize = 1, ...)
+sample_BSFG(BSFG_state, n_samples, grainSize = 1, verbose = TRUE, ...)
 }
 \arguments{
 \item{BSFG_state}{BSFG_state object of current chain}
