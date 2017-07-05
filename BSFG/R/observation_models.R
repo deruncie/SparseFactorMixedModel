@@ -105,10 +105,12 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
 #' This function should pre-calculate design matrices for each individual (assuming they are all
 #'     unique). During sampling, should sample regression coefficients \code{Eta} given the factor model state.
 #'
-#' @param Y a vector of observation. Pre-scaled and centered if desired.
 #' @param observation_model_parameters a list including:
 #'     1) \code{observations}, a data.frame with observation-level data including columns \code{ID} and \code{Y}
 #'     3) \code{individual_model} the model that should be applied to the data for each ID.
+#' @param BSFG_state The current \code{BSFG_state}.
+#'     For initialization, can be a list with \code{data_matrices = list(data=data)}
+#'     Where \code{data} contains \code{ID} for ordering.
 regression_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
@@ -394,6 +396,85 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
   )
   )
 }
+
+
+
+#' Sample Eta given a list of different observation_models
+#'
+#'
+#' @param observation_model_parameters a list of observation_model lists
+#' @param BSFG_state the current BSFG_state object. Can be just a list with \code{data}
+#'
+#' @return
+#' @export
+#'
+#' @examples
+combined_model = function(observation_model_parameters,BSFG_state = list()){
+  n_models = length(observation_model_parameters)
+  if(is.null(names(observation_model_parameters))) names(observation_model_parameters) = 1:n_models
+
+  # run each of the separate observation models
+  results = lapply(names(observation_model_parameters),function(i) {
+    Y = observation_model_parameters[[i]]
+    if(!'observation_model' %in% names(Y)) stop(sprintf('observation_model not specified in model %s',i))
+    observation_model = Y$observation_model
+
+    # adjust model-specific parameter names
+    names(BSFG_state$current_state) = sub(sprintf('.%s',i),'',names(BSFG_state$current_state))
+
+    # run observation_model
+    new_state = observation_model(Y[names(Y) != 'observation_model'],BSFG_state)
+
+    # fix names of parameters
+    names(new_state$state) = paste(names(new_state$state),i,sep='.')
+    if(length(new_state$posteriorSample_params)>0) new_state$posteriorSample_params = paste(new_state$posteriorSample_params,i,sep='.')
+    if(length(new_state$posteriorMean_params)>0) new_state$posteriorMean_params = paste(new_state$posteriorMean_params,i,sep='.')
+      # # Eta: give column names
+      # if(is.null(names(new_state$Eta))) {
+      #   names(new_state$Eta) = 1:ncol(names(new_state$Eta))
+      # }
+      # names(new_state$Eta) = paste(names(new_state$Eta),i,sep='.')
+      #
+      # # append model name to each new parameter
+      #
+      # except Eta
+      # new_params = names(new_state$state)
+      # names(new_params) = new_params
+      # new_params[new_params != 'Eta'] = paste(new_params[new_params != 'Eta'],i,sep='.')
+      # names(new_state$state) = new_params
+      #
+      # # correct names in posteriorSample_params and posteriorMean_params
+      # for(param in names(new_params)){
+      #   if(param %in% new_state$posteriorSample_params) {
+      #     new_state$posteriorSample_params[new_state$posteriorSample_params == param] = new_params[param]
+      #   }
+      #   if(param %in% new_state$posteriorMean_params) {
+      #     new_state$posteriorMean_params[new_state$posteriorMean_params == param] = new_params[param]
+      #   }
+      # }
+
+    # return new_state
+    new_state
+  })
+  names(results) = names(observation_model_parameters)
+
+  # merge Etas
+  Eta = do.call(cbind,lapply(results,function(x) x$state$Eta))
+
+  # make combined new_state
+  new_state = do.call(c,lapply(results,function(x) x$state))
+  new_state$Eta = Eta
+
+  posteriorSample_params = do.call(c,lapply(results,function(x) x$posteriorSample_params))
+  posteriorMean_params = do.call(c,lapply(results,function(x) x$posteriorMean_params))
+
+  return(list(state = new_state,
+              posteriorSample_params = posteriorSample_params,
+              posteriorMean_params = posteriorMean_params
+            )
+        )
+}
+
 
 
 #' Sample Eta given gene-specific cis-eQTL genotypes
