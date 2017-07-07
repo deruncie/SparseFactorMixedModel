@@ -144,7 +144,7 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
 }
 
 
-sample_Lambda_prec_TPB = function(BSFG_state,ncores = detectCores(),...) {
+sample_Lambda_prec_TPB = function(BSFG_state,ncores = detectCores(),cluster = NULL,...) {
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables
   run_parameters = BSFG_state$run_parameters
@@ -175,10 +175,40 @@ sample_Lambda_prec_TPB = function(BSFG_state,ncores = detectCores(),...) {
 
                          Lambda_psi[1,] = rgamma(k,shape=p*Lambda_B + 1/2, rate = colSums(Lambda_lambda) + 1)
                          Lambda_lambda[] = rgamma(p*k,shape = Lambda_A + Lambda_B, rate = 1/Lambda_prec + Lambda_psi[rep(1,p),])
+
                          if(!exists('Lambda_ncores')) Lambda_ncores = ncores
-                         Lambda_prec[] = 1/do.call(cbind,mclapply(1:k,function(j) {
-                           sapply(1:p,function(i) GIGrvg::rgig(n=1,lambda = Lambda_A-1/2, chi = Lambda2[i,j]*tauh[j], psi = 2*Lambda_lambda[i,j]))
-                         },mc.cores = Lambda_ncores))  # this replaces Lambda_tau - BSFG requires precision, not variance.
+                         if(is.null(cluster[1])) {
+                           Lambda_prec[] = 1/do.call(cbind,mclapply(1:k,function(j) {
+                             sapply(1:p,function(i) GIGrvg::rgig(n=1,lambda = Lambda_A-1/2, chi = Lambda2[i,j]*tauh[j], psi = 2*Lambda_lambda[i,j]))
+                           },mc.cores = Lambda_ncores))  # this replaces Lambda_tau - BSFG requires precision, not variance.
+                         } else {
+                           rm_cluster=FALSE
+                           if(is.na(cluster[1])){
+                             rm_cluster=TRUE
+                             cluster = makeCluster(1)
+                             print(cluster)
+                           }
+                           vars = c('k','p','Lambda_A','Lambda2','tauh','Lambda_lambda','Lambda_ncores')
+                           clusterEnv = lapply(vars,function(x) eval(parse(text=x)))
+                           names(clusterEnv) = vars
+                           clusterEnv = as.environment(clusterEnv)
+                           clusterExport(cluster,vars,envir = clusterEnv)
+                           clusterEvalQ(cluster,library(parallel))
+                           Lambda_prec[] = 1/do.call(cbind,parLapply(cluster,1,function(x) {
+                             mclapply(1:k,function(j) {
+                               sapply(1:p,function(i) GIGrvg::rgig(n=1,lambda = Lambda_A-1/2, chi = Lambda2[i,j]*tauh[j], psi = 2*Lambda_lambda[i,j]))
+                             },mc.cores = Lambda_ncores)
+                           })[[1]])
+                           clusterEvalQ(cluster,gc)
+                           if(rm_cluster){
+                             stopCluster(cluster)
+                             cluster=NA
+                           }
+                           rm(clusterEnv)
+                           rm(vars)
+                           gc()
+                         }
+
                          Lambda_prec[Lambda_prec < 1e-10] = 1e-10
                          Lambda_prec[Lambda_prec > 1e10] = 1e10
 
@@ -282,7 +312,7 @@ sample_B_prec_ARD = function(BSFG_state,...){
 }
 
 
-sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),...){
+sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),cluster=NULL,...){
   # following https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4214276/
   # uses GIGrvg for GIG
   priors         = BSFG_state$priors
@@ -316,12 +346,43 @@ sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),...){
       }
     }
     if(b > 0) { # B[i,j] ~ N(0,B_prec[i,j]^{-1})
+      # recover()
       B_psi[1,] = rgamma(p,shape=b*B_B + 1/2, rate = colSums(B_lambda) + B_omega)
       B_lambda[] = rgamma(b*p,shape = B_A + B_B, rate = sweep(1/B_prec,2,B_psi,'+'))
+
       if(!exists('B_ncores')) B_ncores = ncores
-      B_prec[] = 1/do.call(cbind,mclapply(1:p,function(j) {
-        sapply(1:b,function(i) GIGrvg::rgig(n=1,lambda = B_A-1/2, chi = B[i,j]^2, psi = 2*B_lambda[i,j]))
-      },mc.cores = B_ncores))  # this replaces B_tau - BSFG requires precision, not variance.
+      if(is.null(cluster)) {
+        B_prec[] = 1/do.call(cbind,mclapply(1:p,function(j) {
+          sapply(1:b,function(i) GIGrvg::rgig(n=1,lambda = B_A-1/2, chi = B[i,j]^2, psi = 2*B_lambda[i,j]))
+        },mc.cores = B_ncores))  # this replaces B_tau - BSFG requires precision, not variance.
+      } else{
+        rm_cluster=FALSE
+        if(is.na(cluster[1])){
+          rm_cluster=TRUE
+          cluster = makeCluster(1)
+          print(cluster)
+        }
+        vars = c('b','p','B_A','B','B_lambda','B_ncores')
+        clusterEnv = lapply(vars,function(x) eval(parse(text=x)))
+        names(clusterEnv) = vars
+        clusterEnv = as.environment(clusterEnv)
+        clusterExport(cluster,vars,envir = clusterEnv)
+        clusterEvalQ(cluster,library(parallel))
+        B_prec[] = 1/do.call(cbind,parLapply(cluster,1,function(x) {
+          mclapply(1:p,function(j) {
+            sapply(1:b,function(i) GIGrvg::rgig(n=1,lambda = B_A-1/2, chi = B[i,j]^2, psi = 2*B_lambda[i,j]))
+          },mc.cores = B_ncores)
+        })[[1]])
+        clusterEvalQ(cluster,gc)
+        if(rm_cluster){
+          stopCluster(cluster)
+          cluster=NA
+        }
+        rm(clusterEnv)
+        rm(vars)
+        gc()
+      }
+
       B_prec[B_prec==0] = 1e-10
       if(resid_intercept){
         B_prec[1,] = 1e-10
@@ -330,10 +391,56 @@ sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),...){
     if(b_F > 0) { # B_F[i,j] ~ N(0,B_F_prec[i,j]^{-1} * tot_F_prec[j]^{-1})
       B_F_psi[1,] = rgamma(k,shape=b_F*B_F_B + 1/2, rate = colSums(B_F_lambda) + B_F_omega)
       B_F_lambda[] = rgamma(b_F*k,shape = B_F_A + B_F_B, rate = sweep(1/B_F_prec,2,B_F_psi,'+'))
+
       if(!exists('B_F_ncores')) B_F_ncores = ncores
-      B_F_prec[] = 1/do.call(cbind,mclapply(1:k,function(j) {
-        sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
-      },mc.cores = ncores))  # this replaces B_F_tau - BSFG requires precision, not variance.
+      if(is.null(cluster)) {
+        B_F_prec[] = 1/do.call(cbind,mclapply(1:k,function(j) {
+          sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
+        },mc.cores = B_F_ncores))  # this replaces B_F_tau - BSFG requires precision, not variance.
+      } else {
+        rm_cluster=FALSE
+        if(is.na(cluster[1])){
+          rm_cluster=TRUE
+          cluster = makeCluster(1)
+          print(cluster)
+        }
+        vars = c('k','b_F','B_F_A','B_F','tot_F_prec','B_F_lambda','B_F_ncores')
+        clusterEnv = lapply(vars,function(x) eval(parse(text=x)))
+        names(clusterEnv) = vars
+        clusterEnv = as.environment(clusterEnv)
+        clusterExport(cluster,vars,envir = clusterEnv)
+        clusterEvalQ(cluster,library(parallel))
+        B_F_prec[] = 1/do.call(cbind,parLapply(cluster,1,function(x) {
+          mclapply(1:k,function(j) {
+            sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
+          },mc.cores = B_F_ncores)
+        })[[1]])
+        clusterEvalQ(cluster,gc)
+        if(rm_cluster){
+          stopCluster(cluster)
+          cluster=NA
+        }
+        rm(clusterEnv)
+        rm(vars)
+        gc()
+      }
+
+
+
+        if(is.na(cluster)){
+        cl = makeCluster(spec = B_ncores,type='PSOCK')
+        # clusterExport(cl, c('B_A','B','B_lambda','b'))
+        # clusterEvalQ(cl, library(GIGrvg))
+        B_F_prec[] = 1/do.call(cbind,parLapply(cl,1:k,function(j) {
+          sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
+        }))
+        stopCluster(cl)
+      } else{
+        B_F_prec[] = 1/do.call(cbind,parLapply(cluster,1:k,function(j) {
+          sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
+        }))
+      }
+
       B_F_prec[B_F_prec==0] = 1e-10
       B_F_prec[X_F_zero_variance,] = 1e10
     }

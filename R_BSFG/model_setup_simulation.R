@@ -50,11 +50,6 @@ priors = BSFG_priors(
   #   delta_1   = list(shape = 2.1,  rate = 1/20),
   #   delta_2   = list(shape = 3, rate = 1)
   # ),
-  # B_prior = list(
-  #   sampler = sample_B_prec_ARD,
-  #   B_df      = 3,
-  #   B_F_df    = 3
-  # )
   Lambda_prior = list(
     sampler = sample_Lambda_prec_TPB,
     Lambda_A      = .5,
@@ -63,14 +58,19 @@ priors = BSFG_priors(
     delta_2   = list(shape = 3, rate = 1)
   ),
   B_prior = list(
-    sampler = sample_B_prec_TPB,
-    B_A      = .5,
-    B_B      = .5,
-    B_omega  = 1/10,
-    B_F_A      = .5,
-    B_F_B      = .5,
-    B_F_omega  = 1/10
+    sampler = sample_B_prec_ARD,
+    B_df      = 3,
+    B_F_df    = 3
   )
+  # B_prior = list(
+  #   sampler = sample_B_prec_TPB,
+  #   B_A      = .5,
+  #   B_B      = .5,
+  #   B_omega  = 1/10,
+  #   B_F_A      = .5,
+  #   B_F_B      = .5,
+  #   B_F_omega  = 1/10
+  # )
 )
 
 # to test non-PD K matrix:
