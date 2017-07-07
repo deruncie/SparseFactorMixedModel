@@ -173,12 +173,13 @@ sample_Lambda_prec_TPB = function(BSFG_state,ncores = detectCores(),...) {
 
                          Lambda2 = Lambda^2
                          Lambda_psi[1,] = rgamma(k,shape=p*Lambda_B + 1/2, rate = colSums(Lambda_lambda) + 1)
-                         Lambda_lambda[] = rgamma(p*k,shape = Lambda_A + Lambda_B, rate = sweep(1/Lambda_prec,2,Lambda_psi,'+'))
+                         Lambda_lambda[] = rgamma(p*k,shape = Lambda_A + Lambda_B, rate = 1/Lambda_prec + Lambda_psi[rep(1,p),])
                          if(!exists('Lambda_ncores')) Lambda_ncores = ncores
                          Lambda_prec[] = 1/do.call(cbind,mclapply(1:k,function(j) {
                            sapply(1:p,function(i) GIGrvg::rgig(n=1,lambda = Lambda_A-1/2, chi = Lambda2[i,j]*tauh[j], psi = 2*Lambda_lambda[i,j]))
                          },mc.cores = Lambda_ncores))  # this replaces Lambda_tau - BSFG requires precision, not variance.
-                         Lambda_prec[Lambda_prec==0] = 1e-10
+                         Lambda_prec[Lambda_prec < 1e-10] = 1e-10
+                         Lambda_prec[Lambda_prec > 1e10] = 1e10
 
                          # # trait one is special?
                          # Lambda_prec[1,] = 1e-10
