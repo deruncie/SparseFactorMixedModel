@@ -8,9 +8,10 @@ BSFG_priors(fixed_var = list(V = 1, nu = 3), fixed_resid_var = NULL,
   fixed_factors_var = NULL, QTL_resid_var = NULL, QTL_factors_var = NULL,
   tot_Y_var = list(V = 0.5, nu = 3), tot_F_var = list(V = 18/20, nu = 20),
   delta_1 = list(shape = 2.1, rate = 1/20), delta_2 = list(shape = 3, rate =
-  1), Lambda_df = 3, B_df = 3, B_F_df = 3,
-  h2_priors_resids_fun = function(h2s, n) 1,
-  h2_priors_factors_fun = function(h2s, n) 1)
+  1), h2_priors_resids_fun = function(h2s, n) 1,
+  h2_priors_factors_fun = function(h2s, n) 1,
+  sample_Lambda_prec = sample_Lambda_prec_ARD, Lambda_df = 3,
+  sample_B_prec = sample_B_prec_ARD, B_df = 3, B_F_df = 3)
 }
 \arguments{
 \item{fixed_var}{List of parameters of inverse gamma distribution for fixed effects, specifically:
@@ -34,6 +35,14 @@ from all Factor parameters before they are saved in Posterior}
 Specifically: \code{shape} and \code{rate}.
 This is provides the additional column-shrinkage of higher-order columns.}
 
+\item{h2_priors_resids_fun}{function for that returns prior probability for a given value of h2
+for each random effect. Should take two argument - a vector \code{h2} values for each random effect,
+and \code{n} - the number of discrete levels of the prior.
+Alternatively, can be a scalar or vector of (relative) prior values for each value of the
+discrete prior.}
+
+\item{h2_priors_factors_fun}{see \code{h2_priors_resids_fun}. Same, but for the h2s of the factors.}
+
 \item{Lambda_df}{Degrees of freedom of individual parameter shrinkage of Lambda from implied
 t-distribution}
 
@@ -42,14 +51,6 @@ t-distribution}
 
 \item{B_F_df}{Degrees of freedom of individual parameter shrinkage of B_F from implied
 t-distribution}
-
-\item{h2_priors_resids_fun}{function for that returns prior probability for a given value of h2
-for each random effect. Should take two argument - a vector \code{h2} values for each random effect,
-and \code{n} - the number of discrete levels of the prior.
-Alternatively, can be a scalar or vector of (relative) prior values for each value of the
-discrete prior.}
-
-\item{h2_priors_factors_fun}{see \code{h2_priors_resids_fun}. Same, but for the h2s of the factors.}
 }
 \value{
 a list with each of the prior components specified above.

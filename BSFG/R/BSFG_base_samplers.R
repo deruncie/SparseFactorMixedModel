@@ -52,10 +52,10 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
     BSFG_state$current_state = sample_latent_traits(BSFG_state,grainSize = grainSize,...)
 
     # -----Sample Lambda_prec ------------- #
-    BSFG_state$current_state = sample_Lambda_prec(BSFG_state)
+    BSFG_state$current_state = BSFG_state$priors$sample_Lambda_prec(BSFG_state)
 
     # -----Sample prec_B ------------- #
-    BSFG_state$current_state = sample_prec_B_ARD(BSFG_state)
+    BSFG_state$current_state = BSFG_state$priors$sample_B_prec(BSFG_state)
     # BSFG_state$current_state = sample_prec_B_QTLBEN(BSFG_state)
 
     # ----- sample Eta ----- #
@@ -100,15 +100,21 @@ sample_latent_traits = function(BSFG_state,...){
   UseMethod("sample_latent_traits",BSFG_state)
 }
 
-sample_Lambda_prec = function(BSFG_state) {
+sample_Lambda_prec_ARD = function(BSFG_state) {
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables
   run_parameters = BSFG_state$run_parameters
   current_state  = BSFG_state$current_state
 
   current_state = with(c(priors,run_variables,run_parameters),within(current_state,{
+    # initialize variables if needed
+    if(!exists('delta')){
+      delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
+      tauh  = matrix(cumprod(delta),nrow=1)
+      Lambda_prec = Plam = matrix(1,p,k)
+    }
     Lambda2 = Lambda^2
-    Lambda_prec = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
+    Lambda_prec[] = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
     # # trait one is special?
     # Lambda_prec[1,] = 1e-10
@@ -127,7 +133,7 @@ sample_Lambda_prec = function(BSFG_state) {
   return(current_state)
 }
 
-sample_prec_B = function(BSFG_state){
+sample_B_prec = function(BSFG_state){
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables
   current_state  = BSFG_state$current_state
@@ -159,12 +165,28 @@ sample_prec_B = function(BSFG_state){
   return(current_state)
 }
 
-sample_prec_B_ARD = function(BSFG_state){
+sample_B_prec_ARD = function(BSFG_state){
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables
   current_state  = BSFG_state$current_state
 
   current_state = with(c(priors,run_variables),within(current_state,{
+    # initialize variables if needed
+    if(!exists('tau_B')){
+      if(b > 0) {
+        tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_resid_prec_shape, rate = priors$fixed_resid_prec_rate)),nrow=1)
+      } else{
+        tau_B = matrix(0,ncol=0,nrow=1)
+      }
+      if(b_F > 0) {
+        tau_B_F = matrix(rgamma(b_F,shape = priors$fixed_factors_prec_shape, rate = priors$fixed_factors_prec_rate),nrow=1)
+      } else{
+        tau_B_F = matrix(0,ncol=0,nrow=1)
+      }
+
+      prec_B = matrix(tau_B,nrow = b, ncol = p)
+      prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
+    }
     if(b > 0) {
       B2 = B^2
       tau_B[1,] = rgamma(b, shape = fixed_resid_prec_shape + ncol(B2)/2, rate = fixed_resid_prec_rate + rowSums((B2 * prec_B/c(tau_B)))/2)

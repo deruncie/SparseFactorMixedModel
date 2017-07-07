@@ -105,11 +105,14 @@ BSFG_priors = function(
                         tot_F_var = list(V = 18/20, nu = 20),
                         delta_1   = list(shape = 2.1,  rate = 1/20),
                         delta_2   = list(shape = 3, rate = 1),
-                        Lambda_df = 3,
-                        B_df      = 3,
-                        B_F_df    = 3,
                         h2_priors_resids_fun = function(h2s, n) 1,
-                        h2_priors_factors_fun = function(h2s, n) 1
+                        h2_priors_factors_fun = function(h2s, n) 1,
+                        sample_Lambda_prec = sample_Lambda_prec_ARD,
+                        Lambda_df = 3,
+                        sample_B_prec = sample_B_prec_ARD,
+                        B_df      = 3,
+                        B_F_df    = 3
+
                     ) {
   all_args = lapply(formals(),function(x) eval(x))
   passed_args = lapply(as.list(match.call())[-1],function(x) eval(x))
@@ -582,27 +585,29 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	#  initial number of factors
 	k = run_parameters$k_init
 
-	# Factor loading precisions (except column penalty tauh).
-	#  Prior: Gamma distribution for each element.
-	#       shape = Lambda_df/2
-	#       rate = Lambda_df/2
-	#    Marginilizes to t-distribution with Lambda_df degrees of freedom
-	#    on each factor loading, conditional on tauh
-	Lambda_prec = with(priors,matrix(rgamma(p*k,shape = Lambda_df/2,rate = Lambda_df/2),nr = p,nc = k))
+	# # Factor loading precisions (except column penalty tauh).
+	# #  Prior: Gamma distribution for each element.
+	# #       shape = Lambda_df/2
+	# #       rate = Lambda_df/2
+	# #    Marginilizes to t-distribution with Lambda_df degrees of freedom
+	# #    on each factor loading, conditional on tauh
+	# Lambda_prec = with(priors,matrix(rgamma(p*k,shape = Lambda_df/2,rate = Lambda_df/2),nr = p,nc = k))
+	#
+	# # Factor penalty. tauh(h) = \prod_{i=1}^h \delta_i
+	# #  Prior: Gamma distribution for each element of delta
+	# #     delta_1:
+	# #       shape = delta_1_shape
+	# #       rate = delta_1_rate
+	# #     delta_2 ... delta_m:
+	# #       shape = delta_2_shape
+	# #       rate = delta_2_rate
+	# delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
+	# tauh  = matrix(cumprod(delta),nrow=1)
+	#
+	# # Total Factor loading precisions Lambda_prec * tauh
+	# Plam = sweep(Lambda_prec,2,tauh,'*')
 
-	# Factor penalty. tauh(h) = \prod_{i=1}^h \delta_i
-	#  Prior: Gamma distribution for each element of delta
-	#     delta_1:
-	#       shape = delta_1_shape
-	#       rate = delta_1_rate
-	#     delta_2 ... delta_m:
-	#       shape = delta_2_shape
-	#       rate = delta_2_rate
-	delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
-	tauh  = matrix(cumprod(delta),nrow=1)
-
-	# Total Factor loading precisions Lambda_prec * tauh
-	Plam = sweep(Lambda_prec,2,tauh,'*')
+	Plam = matrix(1,p,k)
 
 	# Lambda - factor loadings
 	#   Prior: Normal distribution for each element.
@@ -649,26 +654,26 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	colnames(U_R) = traitnames
 	rownames(U_R) = colnames(Z)
 
-	if(b > 0) {
-	  tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_resid_prec_shape, rate = priors$fixed_resid_prec_rate)),nrow=1)
-	} else{
-	  tau_B = matrix(0,ncol=0,nrow=1)
-	}
-	if(b_F > 0) {
-	  tau_B_F = matrix(rgamma(b_F,shape = priors$fixed_factors_prec_shape, rate = priors$fixed_factors_prec_rate),nrow=1)
-	} else{
-	  tau_B_F = matrix(0,ncol=0,nrow=1)
-	}
-
-	prec_B = matrix(tau_B,nrow = b, ncol = p)
-	prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
+	# if(b > 0) {
+	#   tau_B = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_resid_prec_shape, rate = priors$fixed_resid_prec_rate)),nrow=1)
+	# } else{
+	#   tau_B = matrix(0,ncol=0,nrow=1)
+	# }
+	# if(b_F > 0) {
+	#   tau_B_F = matrix(rgamma(b_F,shape = priors$fixed_factors_prec_shape, rate = priors$fixed_factors_prec_rate),nrow=1)
+	# } else{
+	#   tau_B_F = matrix(0,ncol=0,nrow=1)
+	# }
+	#
+	# prec_B = matrix(tau_B,nrow = b, ncol = p)
+	# prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
 
 	# Fixed effects
-	B = matrix(rnorm(b*p), ncol = p) / sqrt(prec_B)
+	B = matrix(rnorm(b*p), ncol = p) #/ sqrt(prec_B)
 	colnames(B) = traitnames
 
 	# Factor fixed effects
-	B_F = matrix(rnorm(b_F * k),b_F,k) / sqrt(prec_B_F)
+	B_F = matrix(rnorm(b_F * k),b_F,k) #/ sqrt(prec_B_F)
 
 
 	# cis effects
@@ -689,10 +694,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# ----------------------- #
 	current_state = list(
 	  k              = k,
-	  Lambda_prec    = Lambda_prec,
-	  delta          = delta,
-	  tauh           = tauh,
-	  Plam           = Plam,
+	  # Lambda_prec    = Lambda_prec,
+	  # delta          = delta,
+	  # tauh           = tauh,
+	  # Plam           = Plam,
 	  Lambda         = Lambda,
 	  tot_F_prec     = tot_F_prec,
 	  F_h2_index     = F_h2_index,
@@ -706,10 +711,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  B              = B,
 	  B_F            = B_F,
 	  XB             = XB,
-	  tau_B          = tau_B,
-	  tau_B_F        = tau_B_F,
-	  prec_B         = prec_B,
-	  prec_B_F       = prec_B_F,
+	  # tau_B          = tau_B,
+	  # tau_B_F        = tau_B_F,
+	  # prec_B         = prec_B,
+	  # prec_B_F       = prec_B_F,
 	  cis_effects    = cis_effects,
 	  traitnames     = traitnames,
 	  nrun           = 0,
@@ -739,6 +744,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# Initialize Eta
 	observation_model_state = observation_model(observation_model_parameters,BSFG_state)
 	BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
+
+	BSFG_state$current_state = BSFG_state$priors$sample_Lambda_prec(BSFG_state)
+	BSFG_state$current_state = BSFG_state$priors$sample_B_prec(BSFG_state)
 
 	# ----------------------- #
 	# -Initialize Posterior-- #

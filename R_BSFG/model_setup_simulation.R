@@ -63,7 +63,7 @@ priors = BSFG_priors(
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
 data$ID = sample(1:nrow(data))
 # diag(K) = diag(K) + 1e-6
-BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, #factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~1+(1|ID), data, factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
@@ -103,6 +103,7 @@ for(i  in 1:70) {
       BSFG_state = reorder_factors(BSFG_state)
       # BSFG_state$current_state = update_k(BSFG_state)
       BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100)
+      BSFG_state = clear_Posterior(BSFG_state)
       print(BSFG_state$run_parameters$burn)
     }
     try(print(apply(abs(cor(as.matrix(setup$F),apply(BSFG_state$Posterior$F,c(2,3),mean))),1,max)))
