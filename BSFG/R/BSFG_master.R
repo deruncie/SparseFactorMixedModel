@@ -103,15 +103,19 @@ BSFG_priors = function(
                         QTL_factors_var = NULL,
                         tot_Y_var = list(V = 0.5,   nu = 3),
                         tot_F_var = list(V = 18/20, nu = 20),
-                        delta_1   = list(shape = 2.1,  rate = 1/20),
-                        delta_2   = list(shape = 3, rate = 1),
                         h2_priors_resids_fun = function(h2s, n) 1,
                         h2_priors_factors_fun = function(h2s, n) 1,
-                        sample_Lambda_prec = sample_Lambda_prec_ARD,
-                        Lambda_df = 3,
-                        sample_B_prec = sample_B_prec_ARD,
-                        B_df      = 3,
-                        B_F_df    = 3
+                        Lambda_prior = list(
+                                            sampler = sample_Lambda_prec_ARD,
+                                            Lambda_df = 3,
+                                            delta_1   = list(shape = 2.1,  rate = 1/20),
+                                            delta_2   = list(shape = 3, rate = 1)
+                          ),
+                        B_prior = list(
+                                        sampler = sample_B_prec_ARD,
+                                        B_df      = 3,
+                                        B_F_df    = 3
+                                        )
 
                     ) {
   all_args = lapply(formals(),function(x) eval(x))
@@ -202,7 +206,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
                      QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
                      Sigma_Choleskys = NULL, randomEffect_C_Choleskys = NULL,
                      invert_aI_bZKZ = NULL, invert_aZZt_Kinv = NULL,
-                     posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','U_R','tau_B','tau_B_F','cis_effects'),
+                     posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','U_R','cis_effects'),
                      posteriorMean_params = c(),
                      ncores = detectCores(),setup = NULL,verbose=T) {
 
@@ -552,11 +556,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	priors$tot_Eta_prec_shape  = with(priors$tot_Y_var,nu - 1)
 	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
 	priors$tot_F_prec_shape    = with(priors$tot_F_var,nu - 1)
-	  # delta: column shrinkage of Lambda
-	priors$delta_1_rate    = priors$delta_1$rate
-	priors$delta_1_shape   = priors$delta_1$shape
-	priors$delta_2_rate    = priors$delta_2$rate
-	priors$delta_2_shape   = priors$delta_2$shape
+	#   # delta: column shrinkage of Lambda
+	# priors$delta_1_rate    = priors$delta_1$rate
+	# priors$delta_1_shape   = priors$delta_1$shape
+	# priors$delta_2_rate    = priors$delta_2$rate
+	# priors$delta_2_shape   = priors$delta_2$shape
 
 	# h2_priors_resids
 	if(exists('h2_priors_resids',priors)) {
@@ -745,8 +749,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	observation_model_state = observation_model(observation_model_parameters,BSFG_state)
 	BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
 
-	BSFG_state$current_state = BSFG_state$priors$sample_Lambda_prec(BSFG_state)
-	BSFG_state$current_state = BSFG_state$priors$sample_B_prec(BSFG_state)
+	# Initialize parameters for Lambda_prior and B_prior (may be model-specific)
+	BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state)
+	BSFG_state$current_state = BSFG_state$priors$B_prior$sampler(BSFG_state)
 
 	# ----------------------- #
 	# -Initialize Posterior-- #

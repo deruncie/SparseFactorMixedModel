@@ -41,7 +41,7 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     # F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
     if(b_F > 0){
       prior_mean = matrix(0,b_F,k)
-      prior_prec = sweep(prec_B_F,2,tot_F_prec,'*')  # prior for B_F includes tot_F_prec
+      prior_prec = sweep(B_F_prec,2,tot_F_prec,'*')  # prior for B_F includes tot_F_prec
       if(b_F > 100){
         n_sets = ceiling(b_F/100)
         sets = gl(n_sets,b_F/n_sets)
@@ -75,7 +75,7 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
 
     scores = tot_prec_scores(F_tilde,Sigma_Choleskys,F_h2_index,1)
     if(b_F > 0) {
-      scores = scores + colSums(B_F^2*prec_B_F)   # add this if tot_F_prec part of the prior for B_F
+      scores = scores + colSums(B_F^2*B_F_prec)   # add this if tot_F_prec part of the prior for B_F
     }
     tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2+ b_F/2, rate = tot_F_prec_rate + 0.5*scores)
     # tot_F_prec[] = 1

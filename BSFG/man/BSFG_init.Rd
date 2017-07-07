@@ -10,9 +10,9 @@ BSFG_init(Y, model, data, factor_model_fixed = NULL, priors = BSFG_priors(),
   Sigma_Choleskys = NULL, randomEffect_C_Choleskys = NULL,
   invert_aI_bZKZ = NULL, invert_aZZt_Kinv = NULL,
   posteriorSample_params = c("Lambda", "U_F", "F", "delta", "tot_F_prec",
-  "F_h2", "tot_Eta_prec", "resid_h2", "B", "B_F", "U_R", "tau_B", "tau_B_F",
-  "cis_effects"), posteriorMean_params = c(), ncores = detectCores(),
-  setup = NULL, verbose = T)
+  "F_h2", "tot_Eta_prec", "resid_h2", "B", "B_F", "U_R", "cis_effects"),
+  posteriorMean_params = c(), ncores = detectCores(), setup = NULL,
+  verbose = T)
 }
 \arguments{
 \item{Y}{either a) a n x p matrix of data (n individuals x p traits), or b) a list describing

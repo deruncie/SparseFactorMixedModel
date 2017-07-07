@@ -18,7 +18,7 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
     rows = b + k
     prior_mean = matrix(0,rows,p)
     if(b > 0) {
-      prior_prec = rbind(prec_B,t(Plam))
+      prior_prec = rbind(B_prec,t(Plam))
     } else{ # b == 0
       prior_prec = t(Plam)
     }

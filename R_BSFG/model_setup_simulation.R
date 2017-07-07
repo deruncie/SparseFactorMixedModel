@@ -42,13 +42,36 @@ priors = BSFG_priors(
   # tot_Y_var = list(V = 0.5,   nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 10),
   tot_F_var = list(V = 18/20, nu = 20),
-  delta_1   = list(shape = 2.1,  rate = 1/20),
-  delta_2   = list(shape = 3, rate = 1),
-  Lambda_df = 3,
-  B_df      = 3,
-  B_F_df    = 3,
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-  h2_priors_factors_fun = function(h2s,n) 1#ifelse(h2s == 0,n,n/(n-1))
+  h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1))
+  # Lambda_prior = list(
+  #   sampler = sample_Lambda_prec_ARD,
+  #   Lambda_df = 3,
+  #   delta_1   = list(shape = 2.1,  rate = 1/20),
+  #   delta_2   = list(shape = 3, rate = 1)
+  # ),
+  # B_prior = list(
+  #   sampler = sample_B_prec_ARD,
+  #   B_df      = 3,
+  #   B_F_df    = 3
+  # )
+  Lambda_prior = list(
+    sampler = sample_Lambda_prec_TPB,
+    Lambda_A      = .5,
+    Lambda_B      = .5,
+    Lambda_omega  = 1/10,
+    delta_1   = list(shape = 2.1,  rate = 1/20),
+    delta_2   = list(shape = 3, rate = 1)
+  ),
+  B_prior = list(
+    sampler = sample_B_prec_TPB,
+    B_A      = .5,
+    B_B      = .5,
+    B_omega  = 1/10,
+    B_F_A      = .5,
+    B_F_B      = .5,
+    B_F_omega  = 1/10
+  )
 )
 
 # to test non-PD K matrix:
@@ -63,7 +86,7 @@ priors = BSFG_priors(
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
 data$ID = sample(1:nrow(data))
 # diag(K) = diag(K) + 1e-6
-BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data, factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~1+(1|ID), data, factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
@@ -98,11 +121,11 @@ BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
 for(i  in 1:70) {
     print(sprintf('Run %d',i))
-    BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
+    BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores = 1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
       # BSFG_state$current_state = update_k(BSFG_state)
-      BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100)
+      BSFG_state$run_parameters$burn = max(c(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100))
       BSFG_state = clear_Posterior(BSFG_state)
       print(BSFG_state$run_parameters$burn)
     }

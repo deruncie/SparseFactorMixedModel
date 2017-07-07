@@ -23,33 +23,56 @@ setwd(folder)
 
 # initialize priors
 run_parameters = BSFG_control(
-  # sampler = 'fast_BSFG',
-  sampler = 'general_BSFG',
+  sampler = 'fast_BSFG',
+  # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
   h2_step_size = NULL,
   burn = 00,
-  k_init = 10
+  k_init = 15
 )
 
-priors = list(
-  # fixed_var = list(V = 5e5,   nu = 2.001),
+priors = BSFG_priors(
+  # fixed_var = list(V = 1,     nu = 3),
   fixed_var = list(V = 1,     nu = 3),
   QTL_resid_var = list(V = 1/1000,     nu = 3),
   QTL_factors_var = list(V = 1/1000,     nu = 3),
-  tot_Y_var = list(V = 0.5,   nu = 3),
+  # tot_Y_var = list(V = 0.5,   nu = 3),
+  tot_Y_var = list(V = 0.5,   nu = 10),
   tot_F_var = list(V = 18/20, nu = 20),
-  delta_1   = list(shape = 2.1,  rate = 1/20),
-  delta_2   = list(shape = 3, rate = 1),
-  Lambda_df = 3,
-  B_df      = 3,
-  B_F_df    = 3,
-  # h2_priors_resids_fun = function(h2s,n) pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-  # h2_priors_factors_fun = function(h2s,n) ifelse(h2s == 0,n,n/(n-1))
-  h2_priors_resids = 1,
-  h2_priors_factors = 1
+  h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
+  h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1))
+  # Lambda_prior = list(
+  #   sampler = sample_Lambda_prec_ARD,
+  #   Lambda_df = 3,
+  #   delta_1   = list(shape = 2.1,  rate = 1/20),
+  #   delta_2   = list(shape = 3, rate = 1)
+  # ),
+  Lambda_prior = list(
+    sampler = sample_Lambda_prec_TPB,
+    Lambda_A      = .5,
+    Lambda_B      = .5,
+    Lambda_omega  = 1/10,
+    delta_1   = list(shape = 2.1,  rate = 1/20),
+    delta_2   = list(shape = 3, rate = 1)
+  ),
+  # B_prior = list(
+  #   sampler = sample_B_prec_ARD,
+  #   B_df      = 3,
+  #   B_F_df    = 3
+  # )
+  B_prior = list(
+    sampler = sample_B_prec_TPB,
+    B_A      = .5,
+    B_B      = .5,
+    B_omega  = 1/10,
+    B_F_A      = .5,
+    B_F_B      = .5,
+    B_F_omega  = 1/10
+  )
 )
+
 
 print('Initializing')
 # setup = load_simulation_data()
@@ -84,8 +107,8 @@ BSFG_state = clear_Posterior(BSFG_state)
 
 
 # # optional: To load from end of previous run, run above code, then run these lines:
-load('Posterior.RData')
-load('BSFG_state.RData')
+# load('Posterior.RData')
+# load('BSFG_state.RData')
 # load('Priors.RData')
 #  BSFG_state$current_state = current_state
 #  BSFG_state$Posterior = Posterior
@@ -96,19 +119,23 @@ load('BSFG_state.RData')
 # burn in
 
 n_samples = 20
-for(i  in 1:100) {
+for(i  in 20:100) {
   if(i < 10 || (i-1) %% 20 == 0) {
-    BSFG_state$current_state = update_k(BSFG_state)
+    # BSFG_state$current_state = update_k(BSFG_state)
     BSFG_state = reorder_factors(BSFG_state)
     BSFG_state = clear_Posterior(BSFG_state)
   }
   print(sprintf('Run %d',i))
-  BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)
+  BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores=1)
   trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
   # trace_plot(BSFG_state$Posterior$cis_effects[,1,1:10])
   # plot(setup$b_cis,BSFG_state$current_state$cis_effects);abline(0,1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
+      # BSFG_state$current_state = update_k(BSFG_state)
+      BSFG_state$run_parameters$burn = max(c(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100))
+      BSFG_state = clear_Posterior(BSFG_state)
+      print(BSFG_state$run_parameters$burn)
     }
     BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
@@ -137,6 +164,19 @@ posterior_plot(BSFG_state$Posterior$B_F[,,1])
 posterior_plot(BSFG_state$Posterior$B_F[,,2])
 
 order(BSFG_state$current_state$Lambda[,1])
+
+
+I =100
+bf = array(0,dim=c(I,dim(BSFG_state$current_state$B_F)))
+for(i in 1:I){
+  BSFG_state$current_state$Lambda = setup$error_factor_Lambda
+  BSFG_state$current_state$F_h2[1,] = setup$factor_h2s
+  BSFG_state$current_state$F = as.matrix(setup$X_F %*% setup$B_F + BSFG_state$data_matrices$Z %*% setup$U_F)[,1:10]
+  BSFG_state$current_state = BSFG_state$priors$B_prior$sampler(BSFG_state,ncores=1)
+  BSFG_state$current_state = sample_latent_traits(BSFG_state,1)
+  bf[i,,] = BSFG_state$current_state$B_F
+}
+trace_plot(bf[,,1])
 
 
 
