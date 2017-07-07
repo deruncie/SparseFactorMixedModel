@@ -425,22 +425,6 @@ sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),cluster=NULL,...)
         gc()
       }
 
-
-
-        if(is.na(cluster)){
-        cl = makeCluster(spec = B_ncores,type='PSOCK')
-        # clusterExport(cl, c('B_A','B','B_lambda','b'))
-        # clusterEvalQ(cl, library(GIGrvg))
-        B_F_prec[] = 1/do.call(cbind,parLapply(cl,1:k,function(j) {
-          sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
-        }))
-        stopCluster(cl)
-      } else{
-        B_F_prec[] = 1/do.call(cbind,parLapply(cluster,1:k,function(j) {
-          sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
-        }))
-      }
-
       B_F_prec[B_F_prec==0] = 1e-10
       B_F_prec[X_F_zero_variance,] = 1e10
     }
