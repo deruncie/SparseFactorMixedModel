@@ -172,6 +172,7 @@ sample_Lambda_prec_TPB = function(BSFG_state,ncores = detectCores(),...) {
                          }
 
                          Lambda2 = Lambda^2
+
                          Lambda_psi[1,] = rgamma(k,shape=p*Lambda_B + 1/2, rate = colSums(Lambda_lambda) + 1)
                          Lambda_lambda[] = rgamma(p*k,shape = Lambda_A + Lambda_B, rate = 1/Lambda_prec + Lambda_psi[rep(1,p),])
                          if(!exists('Lambda_ncores')) Lambda_ncores = ncores
@@ -269,7 +270,7 @@ sample_B_prec_ARD = function(BSFG_state,...){
       }
     }
     if(b_F > 0) {
-      B_F2 = B_F^2
+      B_F2 = B_F^2 * tot_F_prec[rep(1,b_F),]  # need to account for tot_F_prec
       B_F_tau[1,] = rgamma(b_F, shape = fixed_factors_prec_shape + ncol(B_F2)/2, rate = fixed_factors_prec_rate + rowSums(B_F2 * B_F_prec/c(B_F_tau))/2)
       B_F_prec[] = matrix(rgamma(b_F*k,shape = (B_F_df + 1)/2,rate = (B_F_df + B_F2*c(B_F_tau))/2),nr = b_F,nc = k)
       B_F_prec[] = B_F_prec*c(B_F_tau)
@@ -314,26 +315,24 @@ sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),...){
         B_F_prec = 1/matrix(rgamma(b_F*k,shape = B_F_A,rate = B_F_lambda),b_F,k)
       }
     }
-    if(b > 0) {
-      B2 = B^2
+    if(b > 0) { # B[i,j] ~ N(0,B_prec[i,j]^{-1})
       B_psi[1,] = rgamma(p,shape=b*B_B + 1/2, rate = colSums(B_lambda) + B_omega)
       B_lambda[] = rgamma(b*p,shape = B_A + B_B, rate = sweep(1/B_prec,2,B_psi,'+'))
       if(!exists('B_ncores')) B_ncores = ncores
       B_prec[] = 1/do.call(cbind,mclapply(1:p,function(j) {
-        sapply(1:b,function(i) GIGrvg::rgig(n=1,lambda = B_A-1/2, chi = B2[i,j], psi = 2*B_lambda[i,j]))
+        sapply(1:b,function(i) GIGrvg::rgig(n=1,lambda = B_A-1/2, chi = B[i,j]^2, psi = 2*B_lambda[i,j]))
       },mc.cores = B_ncores))  # this replaces B_tau - BSFG requires precision, not variance.
       B_prec[B_prec==0] = 1e-10
       if(resid_intercept){
         B_prec[1,] = 1e-10
       }
     }
-    if(b_F > 0) {
-      B_F2 = B_F^2
+    if(b_F > 0) { # B_F[i,j] ~ N(0,B_F_prec[i,j]^{-1} * tot_F_prec[j]^{-1})
       B_F_psi[1,] = rgamma(k,shape=b_F*B_F_B + 1/2, rate = colSums(B_F_lambda) + B_F_omega)
       B_F_lambda[] = rgamma(b_F*k,shape = B_F_A + B_F_B, rate = sweep(1/B_F_prec,2,B_F_psi,'+'))
       if(!exists('B_F_ncores')) B_F_ncores = ncores
       B_F_prec[] = 1/do.call(cbind,mclapply(1:k,function(j) {
-        sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F2[i,j], psi = 2*B_F_lambda[i,j]))
+        sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
       },mc.cores = ncores))  # this replaces B_F_tau - BSFG requires precision, not variance.
       B_F_prec[B_F_prec==0] = 1e-10
       B_F_prec[X_F_zero_variance,] = 1e10

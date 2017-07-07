@@ -5,7 +5,7 @@ library(BSFG)
 # set the directory to the location of the setup.RData or setup.mat file
 
 # setwd("~/Box Sync/DER_projects/BSFG/R_BSFG/Sim_FE3_1")
-seed = 1
+seed = 2
 set.seed(seed)
 
 col_sha_geno_max_cor <- as.matrix(read.csv('~/Box Sync/DER_projects/NAM_CAM/BSFG_analysis/col_sha_markers_bsfg.csv', header = TRUE))
@@ -53,7 +53,6 @@ priors = BSFG_priors(
     sampler = sample_Lambda_prec_TPB,
     Lambda_A      = .5,
     Lambda_B      = .5,
-    Lambda_omega  = 1/10,
     delta_1   = list(shape = 2.1,  rate = 1/20),
     delta_2   = list(shape = 3, rate = 1)
   ),

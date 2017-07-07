@@ -5,7 +5,7 @@ library(BSFG)
 
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
-seed = 1
+seed = 2
 new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2)
 set.seed(seed)
 load('setup.RData')
@@ -59,7 +59,6 @@ priors = BSFG_priors(
     sampler = sample_Lambda_prec_TPB,
     Lambda_A      = .5,
     Lambda_B      = .5,
-    Lambda_omega  = 1/10,
     delta_1   = list(shape = 2.1,  rate = 1/20),
     delta_2   = list(shape = 3, rate = 1)
   ),
@@ -125,8 +124,8 @@ for(i  in 1:70) {
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
       # BSFG_state$current_state = update_k(BSFG_state)
-      BSFG_state$run_parameters$burn = max(c(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100))
       BSFG_state = clear_Posterior(BSFG_state)
+      BSFG_state$run_parameters$burn = max(c(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100))
       print(BSFG_state$run_parameters$burn)
     }
     try(print(apply(abs(cor(as.matrix(setup$F),apply(BSFG_state$Posterior$F,c(2,3),mean))),1,max)))
