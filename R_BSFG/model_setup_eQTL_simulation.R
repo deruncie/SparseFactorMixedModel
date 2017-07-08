@@ -11,7 +11,7 @@ set.seed(seed)
 col_sha_geno_max_cor <- as.matrix(read.csv('~/Box Sync/DER_projects/NAM_CAM/BSFG_analysis/col_sha_markers_bsfg.csv', header = TRUE))
 col_sha_geno_max_cor = col_sha_geno_max_cor[,1:(ncol(col_sha_geno_max_cor)/2)]
 col_sha_geno_max_cor = col_sha_geno_max_cor[,sample(1:ncol(col_sha_geno_max_cor))]
-new_halfSib_simulation_eQTL('Sim_eQTL_1', nSire=50,nRep=10,p=100, b=1, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2,V_cis = 1,nSNP = 200,bSNP = 1,col_sha_geno_max_cor)
+new_halfSib_simulation_eQTL('Sim_eQTL_1', nSire=20,nRep=10,p=500, b=1, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2,V_cis = 1,nSNP = 200,bSNP = 1,col_sha_geno_max_cor)
 
 
 # create a folder for holding the posterior samples of the current chain (multiple folders could be used for different chains)
@@ -37,10 +37,10 @@ priors = BSFG_priors(
   # fixed_var = list(V = 1,     nu = 3),
   fixed_var = list(V = 1,     nu = 3),
   QTL_resid_var = list(V = 1/1000,     nu = 3),
-  QTL_factors_var = list(V = 1/1000,     nu = 3),
+  QTL_factors_var = list(V = 1000,     nu = 3),
   # tot_Y_var = list(V = 0.5,   nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 10),
-  tot_F_var = list(V = 18/20, nu = 20),
+  tot_F_var = list(V = 18/20, nu = 1e6),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
   h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1))
   Lambda_prior = list(
@@ -118,7 +118,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 # burn in
 
 n_samples = 20
-for(i  in 20:100) {
+for(i  in 21:100) {
   if(i < 10 || (i-1) %% 20 == 0) {
     # BSFG_state$current_state = update_k(BSFG_state)
     BSFG_state = reorder_factors(BSFG_state)
@@ -127,20 +127,27 @@ for(i  in 20:100) {
   print(sprintf('Run %d',i))
   BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores=1)
   trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
+  print(BSFG_state$current_state$delta*BSFG_state$current_state$tot_F_prec[1])
+  print(BSFG_state$current_state$tot_F_prec)
   # trace_plot(BSFG_state$Posterior$cis_effects[,1,1:10])
   # plot(setup$b_cis,BSFG_state$current_state$cis_effects);abline(0,1)
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
       # BSFG_state$current_state = update_k(BSFG_state)
-      BSFG_state$run_parameters$burn = max(c(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100))
       BSFG_state = clear_Posterior(BSFG_state)
+      BSFG_state$run_parameters$burn = max(c(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100))
       print(BSFG_state$run_parameters$burn)
     }
     BSFG_state = save_posterior_chunk(BSFG_state)
+    print(length(BSFG_state$Posterior$files))
     print(BSFG_state)
     plot(BSFG_state)
+    # B_F = load_posterior_param(BSFG_state,'B_F')
+    # par(mfrow=c(2,2))
+    # a=sapply(1:4,function(x) boxplot(B_F[,,x],outline=F))
 }
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
+a=sapply(1:10,function(i) print(posterior_plot(BSFG_state$Posterior$B_F[,,i])))
 
 trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
 trace_plot(BSFG_state$Posterior$delta[,1,2:4])

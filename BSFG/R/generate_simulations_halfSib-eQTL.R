@@ -84,6 +84,7 @@ new_halfSib_simulation_eQTL = function(name, nSire,nRep,p, b, factor_h2s, Va = 0
     data = data,
     K = K,
     B = B,
+    F = F,
     B_F = B_F,
     error_factor_Lambda = Lambda,
     h2 = resid_h2,

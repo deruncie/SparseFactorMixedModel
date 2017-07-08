@@ -276,18 +276,21 @@ sample_B_prec_ARD = function(BSFG_state,...){
     # initialize variables if needed
     if(!exists('B_tau')){
       if(b > 0) {
-        B_tau = matrix(c(1e-10,rgamma(b-1,shape = priors$fixed_resid_prec_shape, rate = priors$fixed_resid_prec_rate)),nrow=1)
+        B_tau = matrix(c(1e-10,rgamma(b-1,shape = fixed_resid_prec_shape, rate = fixed_resid_prec_rate)),nrow=1)
       } else{
         B_tau = matrix(0,nrow=1,ncol=0)
       }
       if(b_F > 0) {
-        B_F_tau = matrix(rgamma(b_F,shape = priors$fixed_factors_prec_shape, rate = priors$fixed_factors_prec_rate),nrow=1)
+        B_F_beta = matrix(rgamma(b_F,shape = fixed_factors_prec_shape, rate = fixed_factors_prec_rate),nrow=1)
+        # B_F_tau = matrix(rgamma(b_F,shape = fixed_factors_prec_shape, rate = fixed_factors_prec_rate),nrow=1)
       } else{
-        B_F_tau = matrix(0,nrow=1,ncol=0)
+        B_F_beta = matrix(0,nrow=1,ncol=0)
+        # B_F_tau = matrix(0,nrow=1,ncol=0)
       }
 
       B_prec = matrix(B_tau,nrow = b, ncol = p)
-      B_F_prec = matrix(B_F_tau,nrow = b_F, ncol = k)
+      B_F_prec = matrix(B_F_beta,nrow = b_F, ncol = k)
+      # B_F_prec = matrix(B_F_tau,nrow = b_F, ncol = k)
     }
     if(b > 0) {
       B2 = B^2
@@ -301,10 +304,14 @@ sample_B_prec_ARD = function(BSFG_state,...){
     }
     if(b_F > 0) {
       B_F2 = B_F^2 * tot_F_prec[rep(1,b_F),]  # need to account for tot_F_prec
-      B_F_tau[1,] = rgamma(b_F, shape = fixed_factors_prec_shape + ncol(B_F2)/2, rate = fixed_factors_prec_rate + rowSums(B_F2 * B_F_prec/c(B_F_tau))/2)
-      B_F_prec[] = matrix(rgamma(b_F*k,shape = (B_F_df + 1)/2,rate = (B_F_df + B_F2*c(B_F_tau))/2),nr = b_F,nc = k)
-      B_F_prec[] = B_F_prec*c(B_F_tau)
-      B_F_tau[1,X_F_zero_variance] = 1e10
+
+      B_F_beta[1,] = rgamma(b_F,shape = fixed_factors_prec_shape + k*B_F_df, rate = fixed_factors_prec_rate + rowSums(B_F_prec))
+      B_F_prec[] = rgamma(b_F*k,shape = (B_F_df + 1)/2,rate = (t(B_F_beta)[,rep(1,k)] + B_F2)/2)
+
+      # B_F_tau[1,] = rgamma(b_F, shape = fixed_factors_prec_shape + ncol(B_F2)/2, rate = fixed_factors_prec_rate + rowSums(B_F2 * B_F_prec/c(B_F_tau))/2)
+      # B_F_prec[] = matrix(rgamma(b_F*k,shape = (B_F_df + 1)/2,rate = (B_F_df + B_F2*c(B_F_tau))/2),nr = b_F,nc = k)
+      # B_F_prec[] = B_F_prec*c(B_F_tau)
+      # B_F_tau[1,X_F_zero_variance] = 1e10
       B_F_prec[X_F_zero_variance,] = 1e10
     }
   })))
@@ -348,7 +355,7 @@ sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),cluster=NULL,...)
     if(b > 0) { # B[i,j] ~ N(0,B_prec[i,j]^{-1})
       # recover()
       B_psi[1,] = rgamma(p,shape=b*B_B + 1/2, rate = colSums(B_lambda) + B_omega)
-      B_lambda[] = rgamma(b*p,shape = B_A + B_B, rate = sweep(1/B_prec,2,B_psi,'+'))
+      B_lambda[] = rgamma(b*p,shape = B_A + B_B, rate = 1/B_prec + B_psi[rep(1,b),])
 
       if(!exists('B_ncores')) B_ncores = ncores
       if(is.null(cluster)) {
@@ -389,13 +396,15 @@ sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),cluster=NULL,...)
       }
     }
     if(b_F > 0) { # B_F[i,j] ~ N(0,B_F_prec[i,j]^{-1} * tot_F_prec[j]^{-1})
-      B_F_psi[1,] = rgamma(k,shape=b_F*B_F_B + 1/2, rate = colSums(B_F_lambda) + B_F_omega)
-      B_F_lambda[] = rgamma(b_F*k,shape = B_F_A + B_F_B, rate = sweep(1/B_F_prec,2,B_F_psi,'+'))
+      B_F_psi[1,] = rgamma(k,shape=sum(!X_F_zero_variance)*B_F_B + 1/2, rate = colSums(B_F_lambda[!X_F_zero_variance,]) + B_F_omega)
+      B_F_lambda[] = rgamma(b_F*k,shape = B_F_A + B_F_B, rate = 1/B_F_prec + B_F_psi[rep(1,b_F),])
 
       if(!exists('B_F_ncores')) B_F_ncores = ncores
       if(is.null(cluster)) {
         B_F_prec[] = 1/do.call(cbind,mclapply(1:k,function(j) {
-          sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
+          res = sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
+          res[res == Inf] = 1e-10  # sometimes returns Inf instead of 0?
+          res
         },mc.cores = B_F_ncores))  # this replaces B_F_tau - BSFG requires precision, not variance.
       } else {
         rm_cluster=FALSE
@@ -412,7 +421,9 @@ sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),cluster=NULL,...)
         clusterEvalQ(cluster,library(parallel))
         B_F_prec[] = 1/do.call(cbind,parLapply(cluster,1,function(x) {
           mclapply(1:k,function(j) {
-            sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
+            res = sapply(1:b_F,function(i) GIGrvg::rgig(n=1,lambda = B_F_A-1/2, chi = B_F[i,j]^2*tot_F_prec[j], psi = 2*B_F_lambda[i,j]))
+            res[res == Inf] = 1e-10
+            res
           },mc.cores = B_F_ncores)
         })[[1]])
         clusterEvalQ(cluster,gc)
@@ -425,7 +436,8 @@ sample_B_prec_TPB = function(BSFG_state,ncores = detectCores(),cluster=NULL,...)
         gc()
       }
 
-      B_F_prec[B_F_prec==0] = 1e-10
+      B_F_prec[B_F_prec < 1e-10] = 1e-10
+      B_F_prec[B_F_prec > 1e10] = 1e10
       B_F_prec[X_F_zero_variance,] = 1e10
     }
   })))
