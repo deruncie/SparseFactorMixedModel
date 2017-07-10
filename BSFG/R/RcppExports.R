@@ -45,10 +45,6 @@ sample_factors_scores_sparse_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, 
     .Call(BSFG_sample_factors_scores_sparse_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws)
 }
 
-sample_delta_c_Eigen <- function(delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, randg_draws, Lambda2) {
-    .Call(BSFG_sample_delta_c_Eigen, delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, randg_draws, Lambda2)
-}
-
 sample_MME_single_diagK_c <- function(y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {
     .Call(BSFG_sample_MME_single_diagK_c, y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e)
 }
@@ -87,5 +83,13 @@ find_candidate_states <- function(h2s_matrix, step_size, old_state) {
 
 sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, state_draws, step_size, grainSize) {
     .Call(BSFG_sample_h2s_discrete_MH_c, Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, state_draws, step_size, grainSize)
+}
+
+sample_delta_c_Eigen <- function(delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws) {
+    .Call(BSFG_sample_delta_c_Eigen, delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws)
+}
+
+rgig_multiple <- function(n, lambda, chi, psi) {
+    .Call(BSFG_rgig_multiple, n, lambda, chi, psi)
 }
 

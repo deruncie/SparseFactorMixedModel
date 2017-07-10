@@ -31,7 +31,8 @@ Suggests:
 LinkingTo: 
   Rcpp (>= 0.11.2), 
   RcppEigen (>= 0.3.3.3.0),
-  RcppParallel
+  RcppParallel,
+  GIGrvg
 SystemRequirements: GNU make
 RoxygenNote: 6.0.1
 ByteCompile: TRUE

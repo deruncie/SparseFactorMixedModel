@@ -6,7 +6,7 @@ library(BSFG)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 2
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=1000, b=5, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2)
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2)
 set.seed(seed)
 load('setup.RData')
 
@@ -41,36 +41,42 @@ priors = BSFG_priors(
   fixed_var = list(V = 1,     nu = 3),
   # tot_Y_var = list(V = 0.5,   nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 10),
-  tot_F_var = list(V = 18/20, nu = 1e6),
+  tot_F_var = list(V = 18/20, nu = 20),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
   h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1))
-  Lambda_prior = list(
-    sampler = sample_Lambda_prec_ARD,
-    Lambda_df = 3,
-    delta_1   = list(shape = 2.1,  rate = 1/20),
-    delta_2   = list(shape = 3, rate = 1)
-  ),
   # Lambda_prior = list(
-  #   sampler = sample_Lambda_prec_TPB,
-  #   Lambda_A      = .5,
-  #   Lambda_B      = .5,
+  #   sampler = sample_Lambda_prec_ARD,
+  #   Lambda_df = 3,
   #   delta_1   = list(shape = 2.1,  rate = 1/20),
   #   delta_2   = list(shape = 3, rate = 1)
   # ),
-  B_prior = list(
-    sampler = sample_B_prec_ARD,
-    B_df      = 3,
-    B_F_df    = 3
-  )
+  # Lambda_prior = list(
+  #   sampler = sample_Lambda_prec_ARD_v2,
+  #   Lambda_df = 3,
+  #   delta_1   = list(shape = 2,  rate = 40),
+  #   delta_2   = list(shape = 2, rate = 3)
+  # ),
+  Lambda_prior = list(
+    sampler = sample_Lambda_prec_TPB,
+    Lambda_A      = .5,
+    Lambda_B      = .5,
+    delta_1   = list(shape = 2.1,  rate = 1/20),
+    delta_2   = list(shape = 3, rate = 1)
+  ),
   # B_prior = list(
-  #   sampler = sample_B_prec_TPB,
-  #   B_A      = .5,
-  #   B_B      = .5,
-  #   B_omega  = 1/10,
-  #   B_F_A      = .5,
-  #   B_F_B      = .5,
-  #   B_F_omega  = 1/10
+  #   sampler = sample_B_prec_ARD,
+  #   B_df      = 3,
+  #   B_F_df    = 3
   # )
+  B_prior = list(
+    sampler = sample_B_prec_TPB,
+    B_A      = .5,
+    B_B      = .5,
+    B_omega  = 1/10,
+    B_F_A      = .5,
+    B_F_B      = .5,
+    B_F_omega  = 1/10
+  )
 )
 
 # to test non-PD K matrix:
@@ -117,11 +123,18 @@ BSFG_state = clear_Posterior(BSFG_state)
 # Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
 # burn in
 
+BSFG_state = reorder_factors(BSFG_state)
+BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
-for(i  in 1:70) {
+for(i  in 1:20) {
+    if(i == 10){
+      BSFG_state = reorder_factors(BSFG_state)
+      BSFG_state = clear_Posterior(BSFG_state)
+    }
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores = 1)
     if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
+    if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
       # BSFG_state$current_state = update_k(BSFG_state)
@@ -136,6 +149,7 @@ for(i  in 1:70) {
 }
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
+BSFG_state1 = BSFG_state
 
 post_mean_Lambda = get_posterior_mean(BSFG_state,Lambda)
 post_mean_F = get_posterior_mean(BSFG_state,U_F)

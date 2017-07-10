@@ -5,7 +5,7 @@ library(BSFG)
 # set the directory to the location of the setup.RData or setup.mat file
 
 # setwd("~/Box Sync/DER_projects/BSFG/R_BSFG/Sim_FE3_1")
-seed = 2
+seed = 3
 set.seed(seed)
 
 col_sha_geno_max_cor <- as.matrix(read.csv('~/Box Sync/DER_projects/NAM_CAM/BSFG_analysis/col_sha_markers_bsfg.csv', header = TRUE))
@@ -37,10 +37,10 @@ priors = BSFG_priors(
   # fixed_var = list(V = 1,     nu = 3),
   fixed_var = list(V = 1,     nu = 3),
   QTL_resid_var = list(V = 1/1000,     nu = 3),
-  QTL_factors_var = list(V = 1000,     nu = 3),
+  QTL_factors_var = list(V = 1/10000,     nu = 3),
   # tot_Y_var = list(V = 0.5,   nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 10),
-  tot_F_var = list(V = 18/20, nu = 1e6),
+  tot_F_var = list(V = 18/20, nu = 20),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
   h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1))
   Lambda_prior = list(
@@ -56,20 +56,21 @@ priors = BSFG_priors(
   #   delta_1   = list(shape = 2.1,  rate = 1/20),
   #   delta_2   = list(shape = 3, rate = 1)
   # ),
-  # B_prior = list(
-  #   sampler = sample_B_prec_ARD,
-  #   B_df      = 3,
-  #   B_F_df    = 3
-  # )
   B_prior = list(
-    sampler = sample_B_prec_TPB,
-    B_A      = .5,
-    B_B      = .5,
-    B_omega  = 1/10,
-    B_F_A      = .5,
-    B_F_B      = .5,
-    B_F_omega  = 1/10
+    sampler = sample_B_prec_ARD_v2,
+    B_df      = 3,
+    B_F_df    = 3
   )
+  # B_prior = list(
+  #   sampler = sample_B_prec_TPB,
+  #   B_A      = .5,
+  #   B_B      = .5,
+  #   B_omega  = 1/10,
+  #   B_F_A      = .5,
+  #   B_F_B      = .5,
+  #   B_F_omega  = 1/10,
+  #   B_F_ncores = 1
+  # )
 )
 
 
@@ -118,7 +119,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 # burn in
 
 n_samples = 20
-for(i  in 21:100) {
+for(i  in 15:100) {
   if(i < 10 || (i-1) %% 20 == 0) {
     # BSFG_state$current_state = update_k(BSFG_state)
     BSFG_state = reorder_factors(BSFG_state)
@@ -147,7 +148,8 @@ for(i  in 21:100) {
     # a=sapply(1:4,function(x) boxplot(B_F[,,x],outline=F))
 }
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
-a=sapply(1:10,function(i) print(posterior_plot(BSFG_state$Posterior$B_F[,,i])))
+# a=sapply(1:9,function(i) print(posterior_plot(BSFG_state$Posterior$B_F[,,i])+ggtitle(i)))
+a=sapply(1:9,function(i) trace_plot(BSFG_state$Posterior$B_F[,,i],main = i))
 
 trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
 trace_plot(BSFG_state$Posterior$delta[,1,2:4])

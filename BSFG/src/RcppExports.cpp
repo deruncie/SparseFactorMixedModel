@@ -192,25 +192,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// sample_delta_c_Eigen
-VectorXd sample_delta_c_Eigen(VectorXd delta, VectorXd tauh, Map<MatrixXd> Lambda_prec, double delta_1_shape, double delta_1_rate, double delta_2_shape, double delta_2_rate, Map<MatrixXd> randg_draws, Map<MatrixXd> Lambda2);
-RcppExport SEXP BSFG_sample_delta_c_Eigen(SEXP deltaSEXP, SEXP tauhSEXP, SEXP Lambda_precSEXP, SEXP delta_1_shapeSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_shapeSEXP, SEXP delta_2_rateSEXP, SEXP randg_drawsSEXP, SEXP Lambda2SEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< VectorXd >::type delta(deltaSEXP);
-    Rcpp::traits::input_parameter< VectorXd >::type tauh(tauhSEXP);
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Lambda_prec(Lambda_precSEXP);
-    Rcpp::traits::input_parameter< double >::type delta_1_shape(delta_1_shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type delta_1_rate(delta_1_rateSEXP);
-    Rcpp::traits::input_parameter< double >::type delta_2_shape(delta_2_shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type delta_2_rate(delta_2_rateSEXP);
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randg_draws(randg_drawsSEXP);
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Lambda2(Lambda2SEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_delta_c_Eigen(delta, tauh, Lambda_prec, delta_1_shape, delta_1_rate, delta_2_shape, delta_2_rate, randg_draws, Lambda2));
-    return rcpp_result_gen;
-END_RCPP
-}
 // sample_MME_single_diagK_c
 VectorXd sample_MME_single_diagK_c(Map<VectorXd> y, MSpMat W, Map<VectorXd> prior_mean, Map<VectorXd> prior_prec, MSpMat chol_R, double tot_Eta_prec, Map<VectorXd> randn_theta, Map<VectorXd> randn_e);
 RcppExport SEXP BSFG_sample_MME_single_diagK_c(SEXP ySEXP, SEXP WSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP chol_RSEXP, SEXP tot_Eta_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP) {
@@ -381,6 +362,36 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type step_size(step_sizeSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
     rcpp_result_gen = Rcpp::wrap(sample_h2s_discrete_MH_c(Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, state_draws, step_size, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_delta_c_Eigen
+VectorXd sample_delta_c_Eigen(VectorXd delta, VectorXd tauh, Map<VectorXd> scores, double delta_1_rate, double delta_2_rate, Map<MatrixXd> randg_draws);
+RcppExport SEXP BSFG_sample_delta_c_Eigen(SEXP deltaSEXP, SEXP tauhSEXP, SEXP scoresSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_rateSEXP, SEXP randg_drawsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< VectorXd >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type tauh(tauhSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type scores(scoresSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_1_rate(delta_1_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_2_rate(delta_2_rateSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randg_draws(randg_drawsSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_delta_c_Eigen(delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws));
+    return rcpp_result_gen;
+END_RCPP
+}
+// rgig_multiple
+NumericVector rgig_multiple(int n, NumericVector lambda, NumericVector chi, NumericVector psi);
+RcppExport SEXP BSFG_rgig_multiple(SEXP nSEXP, SEXP lambdaSEXP, SEXP chiSEXP, SEXP psiSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type n(nSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type chi(chiSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type psi(psiSEXP);
+    rcpp_result_gen = Rcpp::wrap(rgig_multiple(n, lambda, chi, psi));
     return rcpp_result_gen;
 END_RCPP
 }

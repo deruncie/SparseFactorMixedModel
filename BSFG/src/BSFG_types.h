@@ -1,5 +1,7 @@
 #include <RcppEigen.h>
 #include <RcppParallel.h>
+#include <GIGrvg.h>
+
 
 using Eigen::Map;               	      // 'Eigen::Maps' rather than copies
 using Eigen::MatrixXd;                  // variable size matrix, double precision
@@ -14,4 +16,3 @@ typedef Eigen::Map<SpMat> MSpMat;
 
 using namespace Rcpp;
 using namespace Eigen;
-

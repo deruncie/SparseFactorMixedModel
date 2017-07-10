@@ -30,6 +30,7 @@ extern SEXP BSFG_sample_randomEffects_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, 
 extern SEXP BSFG_tot_prec_scores(SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_tot_prec_scores_c(SEXP, SEXP, SEXP);
 extern SEXP BSFG_tot_prec_scores_withX_c(SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_rgig_multiple(SEXP, SEXP, SEXP, SEXP);
 extern SEXP _rcpp_module_boot_Pre_calculations(void);
 
 static const R_CallMethodDef CallEntries[] = {
@@ -55,6 +56,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"BSFG_tot_prec_scores",                              (DL_FUNC) &BSFG_tot_prec_scores,                               4},
     {"BSFG_tot_prec_scores_c",                            (DL_FUNC) &BSFG_tot_prec_scores_c,                             3},
     {"BSFG_tot_prec_scores_withX_c",                      (DL_FUNC) &BSFG_tot_prec_scores_withX_c,                       5},
+    {"BSFG_rgig_multiple",                                (DL_FUNC) &BSFG_rgig_multiple,                                 4},
     {"_rcpp_module_boot_Pre_calculations",                (DL_FUNC) &_rcpp_module_boot_Pre_calculations,                 0},
     {NULL, NULL, 0}
 };

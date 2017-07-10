@@ -109,6 +109,10 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		randn = matrix(rnorm(n*k),n)
 		F[] = sample_factors_scores_sparse_c_Eigen( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec,randn )
 		# tot_F_prec[] = temp
+		# F[] = setup$F
+		# tot_F_prec[] = 1
+		# F_h2[] = setup$factor_h2s
+		# U_F[] = setup$U_F
   }))
 	current_state = current_state[current_state_names]
 
