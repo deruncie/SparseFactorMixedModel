@@ -243,7 +243,7 @@ clear_Posterior = function(BSFG_state) {
   Posterior$total_samples = 0
   Posterior = reset_Posterior(Posterior,BSFG_state)
 
-  if(length(list.files(path = Posterior$folder))>0) system('rm Posterior/*')
+  if(length(list.files(path = Posterior$folder))>0) system(sprintf('rm %s/*',Posterior$folder))
   Posterior$files = c()
 
   BSFG_state$Posterior = Posterior

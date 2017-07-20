@@ -65,30 +65,30 @@ initialize_BSFG.general_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats 
   	for(i in 1:n_RE){
   		ZKZts[[i]] = forceSymmetric(drop0(Z_matrices[[i]] %*% K_mats[[i]] %*% t(Z_matrices[[i]]),tol = run_parameters$drop0_tol))
   	}
-  	Sigma_Choleskys_c = new(Sigma_Cholesky_database,lapply(ZKZts,function(x) as(x,'dgCMatrix')),h2s_matrix,run_parameters$drop0_tol,1)
-  	Sigma_Choleskys = lapply(1:ncol(h2s_matrix),function(i) {
-  	  list(log_det = Sigma_Choleskys_c$get_log_det(i),
-  	       chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
-  	})
+  	# Sigma_Choleskys_c = new(Sigma_Cholesky_database,lapply(ZKZts,function(x) as(x,'dgCMatrix')),h2s_matrix,run_parameters$drop0_tol,1)
+  	# Sigma_Choleskys = lapply(1:ncol(h2s_matrix),function(i) {
+  	#   list(log_det = Sigma_Choleskys_c$get_log_det(i),
+  	#        chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
+  	# })
 
   	# do calculations in several sets
-  	# group_size = 2*detectCores()
-  	# n_groups = ceiling(ncol(h2s_matrix)/group_size)
-  	# col_groups = tapply(1:ncol(h2s_matrix),gl(n_groups,group_size,ncol(h2s_matrix)),function(x) x)
-  	# Sigma_Choleskys_c_list = list()
-  	# if(verbose) pb = txtProgressBar(min=0,max = n_groups,style=3)
-  	# for(i in 1:length(col_groups)){
-  	#   Sigma_Choleskys_c_list[[i]] = new(Sigma_Cholesky_database,lapply(ZKZts,function(x) as(x,'dgCMatrix')),h2s_matrix[,col_groups[[i]],drop=FALSE],run_parameters$drop0_tol,1)
-  	#   if(verbose) setTxtProgressBar(pb, i)
-  	# }
-  	# if(verbose) close(pb)
-  	# Sigma_Choleskys = do.call(c,lapply(1:length(col_groups),function(j) {
-  	#   Sigma_Choleskys_c = Sigma_Choleskys_c_list[[j]]
-  	#   lapply(1:length(col_groups[[j]]),function(i) {
-  	#     list(log_det = Sigma_Choleskys_c$get_log_det(i),
-  	#          chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
-  	#   })
-  	# }))
+  	group_size = 2*detectCores()
+  	n_groups = ceiling(ncol(h2s_matrix)/group_size)
+  	col_groups = tapply(1:ncol(h2s_matrix),gl(n_groups,group_size,ncol(h2s_matrix)),function(x) x)
+  	Sigma_Choleskys_c_list = list()
+  	if(verbose) pb = txtProgressBar(min=0,max = n_groups,style=3)
+  	for(i in 1:length(col_groups)){
+  	  Sigma_Choleskys_c_list[[i]] = new(Sigma_Cholesky_database,lapply(ZKZts,function(x) as(x,'dgCMatrix')),h2s_matrix[,col_groups[[i]],drop=FALSE],run_parameters$drop0_tol,1)
+  	  if(verbose) setTxtProgressBar(pb, i)
+  	}
+  	if(verbose) close(pb)
+  	Sigma_Choleskys = do.call(c,lapply(1:length(col_groups),function(j) {
+  	  Sigma_Choleskys_c = Sigma_Choleskys_c_list[[j]]
+  	  lapply(1:length(col_groups[[j]]),function(i) {
+  	    list(log_det = Sigma_Choleskys_c$get_log_det(i),
+  	         chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
+  	  })
+  	}))
 	}
 
 	if(verbose) print('done')
