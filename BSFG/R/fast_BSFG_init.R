@@ -16,7 +16,6 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
 # ----Precalculate some matrices------ #
 # ------------------------------------ #
 
-    # recover()
     #invert the random effect covariance matrices
     K = K_mats[[1]]
     chol_Kinv = chol_Ki_mats[[1]]

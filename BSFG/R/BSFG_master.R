@@ -592,28 +592,20 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  priors         = priors,
 	  run_parameters = run_parameters,
 	  run_variables  = run_variables,
-	  setup          = setup,
-	  traitnames     = traitnames
+	  setup          = setup
 	)
 	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',run_parameters$sampler))
 
 	# ----------------------------- #
 	# --- Initialize BSFG_state --- #
 	# ----------------------------- #
-	BSFG_state = initialize_variables(BSFG_state)
 
 	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,
 	                             Sigma_Choleskys = Sigma_Choleskys, randomEffect_C_Choleskys = randomEffect_C_Choleskys,  # in case these are provided
 	                             invert_aI_bZKZ = invert_aI_bZKZ, invert_aZZt_Kinv = invert_aZZt_Kinv,   # in case these are provided
 	                             verbose=verbose,ncores=ncores)
-#
-# 	# Initialize Eta
-# 	observation_model_state = observation_model(observation_model_parameters,BSFG_state)
-# 	BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
-#
-# 	# Initialize parameters for Lambda_prior and B_prior (may be model-specific)
-# 	BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state)
-# 	BSFG_state$current_state = BSFG_state$priors$B_prior$sampler(BSFG_state)
+
+	BSFG_state = initialize_variables(BSFG_state)
 
 	# ----------------------- #
 	# -Initialize Posterior-- #
