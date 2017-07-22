@@ -21,8 +21,8 @@ sample_coefs_parallel_sparse_c_Eigen_group <- function(Ut, Eta, W, old_coefs, ro
     .Call(BSFG_sample_coefs_parallel_sparse_c_Eigen_group, Ut, Eta, W, old_coefs, row_groups, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
 }
 
-sample_coefs_set_c <- function(model_matrices, randn_draws, s_vectors, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize) {
-    .Call(BSFG_sample_coefs_set_c, model_matrices, randn_draws, s_vectors, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize)
+sample_coefs_set_c <- function(model_matrices, randn_theta_vec, randn_e_vec, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize) {
+    .Call(BSFG_sample_coefs_set_c, model_matrices, randn_theta_vec, randn_e_vec, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize)
 }
 
 tot_prec_scores_c <- function(UtEta, h2, s) {

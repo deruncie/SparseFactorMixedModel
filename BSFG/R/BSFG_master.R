@@ -244,7 +244,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   Eta = observation_model_state$state$Eta
   n = nrow(data)
   p = ncol(Eta)
-  traitnames = colnames(Y)
+  traitnames = colnames(Eta)
 
 	# if factor_model_fixed not specified, use fixed effects from model for both
 	if(is.null(factor_model_fixed)) {

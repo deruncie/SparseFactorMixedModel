@@ -471,11 +471,15 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
   }
   sample_1_result = per_sample_fun(1)
   dim_1 = dim(sample_1_result) # get the dimension of the returned value
-  if(is.null(dim_1)) dim_1 = length(sample_1_result)
   # calculate value for each sample
   res = do.call(c,mclapply(samples,per_sample_fun,mc.cores = mc.cores))
   # re-formulate into an appropriate array with the first dimension as samples
-  aperm(array(res,dim = c(dim_1,length(samples))),c(3,1,2))
+  if(is.null(dim_1)) {
+    dim_1 = length(sample_1_result)
+    matrix(res,ncol = dim_1,byrow=T)
+  } else {
+    aperm(array(res,dim = c(dim_1,length(samples))),c(3,1,2))
+  }
 }
 
 #' Calculates posterior mean of a function of parameters

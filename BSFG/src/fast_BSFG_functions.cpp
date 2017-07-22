@@ -293,10 +293,10 @@ MatrixXd sample_coefs_parallel_sparse_c_Eigen_group(
 }
 
 // [[Rcpp::export()]]
-MatrixXd sample_coefs_set_c(
+List sample_coefs_set_c(
     Rcpp::List model_matrices,
-    Rcpp::List randn_draws,
-    Rcpp::List s_vectors,
+    Map<VectorXd> randn_theta_vec,
+    Map<VectorXd> randn_e_vec,
     Map<MatrixXd> h2s,
     Map<MatrixXd> tot_Eta_prec,
     Map<MatrixXd> prior_mean,
@@ -304,7 +304,7 @@ MatrixXd sample_coefs_set_c(
     int n,
     int grainSize){
 
-  struct sampleColumn : public Worker {
+  struct sampleColumn : public RcppParallel::Worker {
     std::vector<MatrixXd> UtEta_list;
     std::vector<MatrixXd> UtW_list;
     std::vector<MatrixXd> randn_theta_list;
@@ -314,6 +314,7 @@ MatrixXd sample_coefs_set_c(
     MatrixXd prior_mean,prior_prec;
     int n_traits;
     MatrixXd &coefs;
+    MatrixXd &Y_fitted;
 
     sampleColumn(
       std::vector<MatrixXd> UtEta_list,
@@ -326,10 +327,11 @@ MatrixXd sample_coefs_set_c(
       MatrixXd prior_mean,
       MatrixXd prior_prec,
       int n_traits,
-      MatrixXd &coefs) :
+      MatrixXd &coefs,
+      MatrixXd &Y_fitted) :
       UtEta_list(UtEta_list), UtW_list(UtW_list), randn_theta_list(randn_theta_list), randn_e_list(randn_e_list),s_list(s_list),
       h2s(h2s), tot_Eta_prec(tot_Eta_prec),prior_mean(prior_mean), prior_prec(prior_prec),n_traits(n_traits),
-      coefs(coefs)
+      coefs(coefs),Y_fitted(Y_fitted)
     {}
 
     void operator()(std::size_t begin, std::size_t end) {
@@ -340,34 +342,50 @@ MatrixXd sample_coefs_set_c(
           coefs.block(t*b,j,b,1) = sample_coefs_single(UtEta_list[j].col(t), UtW_list[j], prior_mean.block(t*b,j,b,1),
                       prior_prec.block(t*b,j,b,1), h2s(j,t), tot_Eta_prec(j,t), randn_theta_list[j].col(t),randn_e_list[j].col(t),s_list[j],b,n);
         }
+        Map<MatrixXd> Eta_i(coefs.col(j).data(),b,n_traits);
+        Y_fitted.row(j) = UtW_list[j] * Eta_i;
       }
     }
   };
 
   std::vector<MatrixXd> UtEta_list;
   std::vector<MatrixXd> UtW_list;
+  std::vector<VectorXd> s_list;
   std::vector<MatrixXd> randn_theta_list;
   std::vector<MatrixXd> randn_e_list;
-  std::vector<VectorXd> s_list;
+  int randn_theta_index = 0;
+  int randn_e_index = 0;
   for(int i = 0; i < n; i++){
     Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
-    Rcpp::List randn_draws_i = Rcpp::as<Rcpp::List>(randn_draws[i]);
     UtEta_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["y"]));
     UtW_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));
-    randn_theta_list.push_back(Rcpp::as<MatrixXd>(randn_draws_i["randn_theta"]));
-    randn_e_list.push_back(Rcpp::as<MatrixXd>(randn_draws_i["randn_e"]));
-    s_list.push_back(Rcpp::as<VectorXd>(s_vectors[i]));
+    s_list.push_back(Rcpp::as<VectorXd>(model_matrix_i["s"]));
+
+    int e_rows = UtEta_list[i].rows();
+    int p = UtEta_list[i].cols();
+    int b = UtW_list[i].cols();
+    MatrixXd r_theta = randn_theta_vec.segment(randn_theta_index,b*p);
+    Map<MatrixXd> randn_theta(r_theta.data(),b,p);
+    randn_theta_list.push_back(randn_theta);
+    randn_theta_index += b*p;
+    MatrixXd r_e = randn_e_vec.segment(randn_e_index,e_rows*p);
+    Map<MatrixXd> randn_e(r_e.data(),e_rows,p);
+    randn_e_list.push_back(randn_e);
+    randn_e_index += e_rows*p;
   }
 
   int n_traits = UtEta_list[0].cols();
   int b = randn_theta_list[0].rows()*n_traits;
 
   MatrixXd coefs(b,n);
+  MatrixXd Y_fitted(n,n_traits);
 
-  sampleColumn sampler(UtEta_list, UtW_list,randn_theta_list,randn_e_list,s_list,h2s,tot_Eta_prec,prior_mean,prior_prec,n_traits,coefs);
+  sampleColumn sampler(UtEta_list, UtW_list,randn_theta_list,randn_e_list,s_list,h2s,tot_Eta_prec,prior_mean,prior_prec,n_traits,coefs,Y_fitted);
   RcppParallel::parallelFor(0,n,sampler,grainSize);
 
-  return(coefs);
+  return(Rcpp::List::create(
+      Rcpp::Named("coefs") = coefs,
+      Rcpp::Named("Y_fitted") = Y_fitted));
 }
 
 

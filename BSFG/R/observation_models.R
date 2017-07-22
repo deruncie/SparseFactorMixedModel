@@ -135,6 +135,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
         list(
           X = model.matrix(Terms,data = observations[x,]),
           y = Y[x,,drop=FALSE],
+          s = rep(length(x)),
           position = x
         )
       })
@@ -155,7 +156,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       resid_Eta_prec = matrix(1,1,p)
       resid_Y_prec = matrix(rep(1,n_traits),nr=1)  # only a single precision parameter for the data_model?
     } else{
-      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
+      Eta_mean = as.matrix(X %*% B) + F %*% t(Lambda) + as.matrix(Z %*% U_R)
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
       if(!exists('resid_Y_prec')) resid_Y_prec = matrix(rep(1,n_traits),nr=1)
     }
@@ -164,32 +165,22 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     Eta_mean = sweep(Eta_mean,2,sqrt(var_Eta),'*')
     resid_Eta_prec[] = resid_Eta_prec / var_Eta
 
-    randn_draws = lapply(1:n,function(i) {
-      list(
-        randn_theta = matrix(rnorm(p),p_trait),
-        randn_e = matrix(rnorm(length(model_matrices[[i]]$y)),ncol = n_traits)
-      )
-    })
-    s_vectors = lapply(1:n,function(i) rep(1,nrow(model_matrices[[i]]$X)))
-    Eta = sample_coefs_set_c(model_matrices,randn_draws,s_vectors,matrix(0,n,n_traits),
-                             matrix(resid_Y_prec,n,n_traits,byrow=T),as.matrix(t(Eta_mean)),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
-    Eta = t(Eta)
+    randn_theta = rnorm(n*p)
+    # randn_e = rnorm(sapply(model_matrices,function(x) length(x$y)))
+    randn_e = rnorm(n*n_traits)
+
+    result = sample_coefs_set_c(model_matrices,randn_theta,randn_e,matrix(0,n,n_traits),
+                            matrix(resid_Y_prec,n,n_traits,byrow=T),t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
+    Eta = t(result$coefs)
     colnames(Eta) = Eta_col_names
     rownames(Eta) = Eta_row_names
 
-    if(!exists('ncores')) ncores = 1
-    convert_Matrix = is( model_matrices[[1]]$X,'Matrix')
-    Y_fitted = do.call(rbind,parallel::mclapply(1:n,function(i) {
-      y_fitted = model_matrices[[i]]$X %*% matrix(Eta[i,],ncol=n_traits)
-      if(convert_Matrix) y_fitted = matrix(y_fitted@x,ncol=n_traits)
-      y_fitted
-    },mc.cores = ncores))
-    Y_fitted = Y_fitted[order(do.call(c,lapply(model_matrices,function(x) x$position))),,drop=FALSE]
-
-    Y_tilde = Y - Y_fitted
-
     # un-scale Eta
     Eta = sweep(Eta,2,sqrt(var_Eta),'/')
+
+    Y_fitted = result$Y_fitted[order(do.call(c,lapply(model_matrices,function(x) x$position))),,drop=FALSE]
+
+    Y_tilde = Y - Y_fitted
 
     resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape + 0.5*nrow(Y_tilde), rate = resid_Y_prec_rate + 0.5*colSums(Y_tilde^2)),nr=1)
 
