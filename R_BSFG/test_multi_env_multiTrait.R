@@ -12,22 +12,36 @@ geno_1 = geno_base + 0.5*rnorm(nG)
 geno_2 = geno_base + 0.5*rnorm(nG)
 data$y = rnorm(nrow(data)) + (data$Env == unique(data$Env)[1])*geno_1[data$Geno] + (data$Env == unique(data$Env)[2])*geno_2[data$Geno]
 data$ID = paste(data$Geno,data$Rep,data$Env)
+d = c()
+for(i in 1:2){
+  di = data
+  di$Gene = i
+  di$y = di$y + rnorm(nrow(di))
+  d = rbind(d,di)
+}
+data = d
+data$Gene = factor(data$Gene)
 
-data2 = dcast(data,y+Geno+Rep+ID~Env)
+data2 = dcast(data,Geno+Rep+ID~Env+Gene,value.var = 'y')
 
 
 
-library(lme4)
-lme1 = lmer(y~Env + (0+Env|Geno),data)
-as.data.frame(VarCorr(lme1))
+# library(lme4)
+# lme1 = lmer(y~Env:Gene + (0+Env:Gene|Geno),data)
+# as.data.frame(VarCorr(lme1))
 
 library(MCMCglmm)
+n_trait = length(unique(data$Env:data$Gene))
 
 # mcmc1 = MCMCglmm(y ~ Env,data=data,random = ~us(Env):Geno,rcov = ~us(Env):units,prior = list(G = list(G1=list(V=diag(1,2),nu=3)),R = list(V=diag(1,2),nu=3)))
 # summary(mcmc1)
 #
-# mcmc2 = MCMCglmm(y ~ Env,data=data,random = ~us(Env):Geno,rcov = ~idh(Env):units,prior = list(G = list(G1=list(V=diag(1,2),nu=3)),R = list(V=diag(1,2),nu=3)))
-# summary(mcmc2)
+mcmc2 = MCMCglmm(y ~ Gene:Env,data=data,random = ~us(Env:Gene):Geno,rcov = ~idh(Env:Gene):units,
+                 prior = list(G = list(G1=list(V=diag(1,n_trait),nu=n_trait+2)),R = list(V=diag(1,n_trait),nu=n_trait+1)))
+summary(mcmc2)
+i = c(matrix(1:n_trait,nc=nE,byrow=T))
+Gcor = cov2cor(matrix(colMeans(mcmc2$VCV[,1:n_trait^2]),n_trait))[i,i]
+image(Matrix(Gcor))
 
 mcmc3 = MCMCglmm(cbind(A,B)~trait,data=data2,random = ~us(trait):Geno,rcov = ~us(trait):units,prior = list(G = list(G1=list(V=diag(1,2),nu=3)),R = list(V=diag(1,2),nu=3)),family = rep('gaussian',2))
 summary(mcmc3)
@@ -43,7 +57,7 @@ run_parameters = BSFG_control(
   # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = FALSE,
-  h2_divisions = 10,
+  h2_divisions = 100,
   h2_step_size = 0.3,
   burn = 100,
   k_init = 2
@@ -69,7 +83,7 @@ priors = BSFG_priors(
   )
 )
 
-Y = data2[,c('A','B')]
+Y = data2[,-c(1:3)]
 BSFG_state = BSFG_init(Y, model=~1+(1|Geno), data2,
                        run_parameters=run_parameters,
                        priors=priors)
@@ -103,6 +117,8 @@ BSFG_state$Posterior = reload_Posterior(BSFG_state)
 
 Gs = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2[1,]) %*% t(Lambda) + diag(resid_h2[1,]/tot_Eta_prec[1,]))
 get_posterior_mean(Gs)
+image(Matrix(cov2cor(get_posterior_mean(Gs))))
+effectiveSize(Gs[,,1])
 
 Rs = get_posterior_FUN(BSFG_state,Lambda %*% diag(1-F_h2[1,]) %*% t(Lambda) + diag((1-resid_h2[1,])/tot_Eta_prec[1,]))
 get_posterior_mean(Rs)
@@ -121,11 +137,22 @@ Gs2 = get_posterior_FUN(BSFG_state,resid_h2[1,]/tot_Eta_prec[1,])
 
 
 
+run_parameters = BSFG_control(
+  sampler = 'fast_BSFG',
+  # sampler = 'general_BSFG',
+  scale_Y = FALSE,
+  simulation = FALSE,
+  h2_divisions = 10,
+  h2_step_size = 0.3,
+  burn = 100,
+  k_init = 15
+)
+
 ####
 observation_setup = list(
   observation_model = regression_model,
   observations = data,
-  individual_model = y~0+Env,
+  individual_model = y~0+Gene:Env,
   resid_Y_prec_shape = 2,
   resid_Y_prec_rate = 1
 )

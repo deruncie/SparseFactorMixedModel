@@ -135,7 +135,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
         list(
           X = model.matrix(Terms,data = observations[x,]),
           y = Y[x,,drop=FALSE],
-          s = rep(length(x)),
+          s = rep(1,length(x)),
           position = x
         )
       })
@@ -166,11 +166,13 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     resid_Eta_prec[] = resid_Eta_prec / var_Eta
 
     randn_theta = rnorm(n*p)
-    # randn_e = rnorm(sapply(model_matrices,function(x) length(x$y)))
-    randn_e = rnorm(n*n_traits)
+    # randn_e = rnorm(sum(sapply(model_matrices,function(x) length(x$y))))
+    # randn_e = rnorm(n*n_traits)
+    randn_e = rnorm(length(Y))
 
     result = sample_coefs_set_c(model_matrices,randn_theta,randn_e,matrix(0,n,n_traits),
-                            matrix(resid_Y_prec,n,n_traits,byrow=T),t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
+                                matrix(resid_Y_prec,n,n_traits,byrow=T),t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
+
     Eta = t(result$coefs)
     colnames(Eta) = Eta_col_names
     rownames(Eta) = Eta_row_names
@@ -178,7 +180,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     # un-scale Eta
     Eta = sweep(Eta,2,sqrt(var_Eta),'/')
 
-    Y_fitted = result$Y_fitted[order(do.call(c,lapply(model_matrices,function(x) x$position))),,drop=FALSE]
+    Y_fitted = result$Y_fitted
 
     Y_tilde = Y - Y_fitted
 
