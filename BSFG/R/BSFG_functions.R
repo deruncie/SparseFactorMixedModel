@@ -114,6 +114,7 @@ reorder_factors = function(BSFG_state){
 
   current_state = BSFG_state$current_state
 
+  # reorder factors based on var(Lambda) * var(F)
   Lambda = current_state$Lambda
   F = current_state$F
 
@@ -123,7 +124,7 @@ reorder_factors = function(BSFG_state){
 
   reorder_params = c('Lambda','Lambda_prec','Plam',
                      'delta','tauh',
-                     'F','B_F','U_F','F_h2','U_F_prec','F_e_prec','tot_F_prec'
+                     'F','B_F','U_F','F_h2','F_e_prec','tot_F_prec', 'B_F_prec'
   )
 
   # reorder currrent state
@@ -145,6 +146,24 @@ reorder_factors = function(BSFG_state){
 
   BSFG_state$Posterior = Posterior
 
+  return(BSFG_state)
+}
+
+
+rescale_factors_F = function(BSFG_state){
+  # rescale factors based on F
+  BSFG_state$current_state = within(BSFG_state$current_state,{
+    F_sizes = colMeans(F^2)
+    F = sweep(F,2,sqrt(F_sizes),'/')
+    B_F = sweep(B_F,2,sqrt(F_sizes),'/')
+    U_F = sweep(U_F,2,sqrt(F_sizes),'/')
+    B_F_prec = sweep(B_F_prec,2,F_sizes,'*')
+    Lambda = sweep(Lambda,2,sqrt(F_sizes),'*')
+    delta_factor = c(F_sizes[1],exp(diff(log(F_sizes))))
+    delta[] = delta / delta_factor
+    tauh[] = cumprod(delta)
+    Plam[] = sweep(Lambda_prec,2,tauh,'*')
+  })
   return(BSFG_state)
 }
 

@@ -8,8 +8,8 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
   Ut = t(invert_aI_bZKZ$U)
   s = invert_aI_bZKZ$s
 
-	current_state_names = names(current_state)
-	current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {
+  current_state_names = names(current_state)
+  current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {
 		k = ncol(Lambda)
 
 		XB = X %*% B
@@ -30,7 +30,13 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		tot_Eta_prec[] = rgamma(p,shape = tot_Eta_prec_shape + n/2,rate = tot_Eta_prec_rate + 0.5*scores)
 
 		if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
-		resid_h2_index = sample_h2s_discrete_fast(UtEta_tilde, tot_Eta_prec, h2_priors_resids,s,grainSize)
+		if(is.null(h2_step_size)) {
+		  resid_h2_index = sample_h2s_discrete_fast(UtEta_tilde, tot_Eta_prec, h2_priors_resids,s,grainSize)
+		} else{
+		  r_draws = runif(p)
+		  state_draws = runif(p)
+		  resid_h2_index = sample_h2s_discrete_MH_fast_c(UtEta_tilde,tot_Eta_prec,h2_priors_resids,resid_h2_index,h2s_matrix,s,r_draws,state_draws,h2_step_size,grainSize)+1
+		}
 		resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
 
 		randn = matrix(rnorm(ncol(Z)*p),ncol(Z))
@@ -43,35 +49,32 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		# marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
 
 		if(b_F > 0){
-		  prior_mean = matrix(0,b_F,k)
-		  prior_prec = B_F_prec * tot_F_prec[rep(1,b_F),]  # prior for B_F includes tot_F_prec
-		  if(b_F > 100){
-		    n_sets = ceiling(b_F/100)
-		    sets = gl(n_sets,b_F/n_sets)
-		    for(set in unique(sets)){
-		      index = sets==set
-		      if(sum(!index) > 0){
-		        X_F_set = X_F[,index,drop=FALSE]
-		        F_tilde = F - as.matrix(X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE])
-		      } else{
-		        X_F_set = X_F
-		        F_tilde = F
-		      }
-		      randn_theta = matrix(rnorm(ncol(X_F_set)*k),ncol(X_F_set))
-		      randn_e = matrix(rnorm(n*k),n)
-		      # recover()
-		      B_F[index,] = sample_coefs_parallel_sparse_c_Eigen(Ut,F_tilde,X_F_set,
-		                                                  F_h2, tot_F_prec,s,
-		                                                  prior_mean[index,],
-		                                                  prior_prec[index,],
-		                                                  randn_theta,randn_e,
-		                                                  grainSize)
-		    }
-		  } else{
-		    randn_theta = matrix(rnorm(b_F*k),b_F)
-		    randn_e = matrix(rnorm(n*k),n)
-		    B_F = sample_coefs_parallel_sparse_c_Eigen(Ut,F,X_F,F_h2, tot_F_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+		  # non-QTL fixed effects
+		  X_F1 = X_F
+		  b_F1 = ncol(X_F1)
+		  F_tilde = F
+		  if(length(QTL_columns_factors) > 0) {
+		    X_F1 = X_F[,-QTL_columns_factors,drop=FALSE]
+		    b_F1 = ncol(X_F1)
+		    F_tilde = F - as.matrix(QTL_factors_Z %*% QTL_factors_X %*% B_F[-c(1:b_F1),,drop=FALSE])
 		  }
+		  prior_mean = matrix(0,b_F1,k)
+		  prior_prec = B_F_prec[1:b_F1,,drop=FALSE] * tot_F_prec[rep(1,b_F1),,drop=FALSE]  # prior for B_F includes tot_F_prec
+		  randn_theta = matrix(rnorm(b_F1*k),b_F1)
+		  randn_e = matrix(rnorm(n*k),n)
+		  B_F[1:b_F1,] = sample_coefs_parallel_sparse_c_Eigen(Ut,F_tilde,X_F1,F_h2, tot_F_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+
+		  # QTL fixed effects
+		  if(length(QTL_columns_factors) > 0){
+		    F_tilde = F - as.matrix(X_F1 %*% B_F[1:b_F1,,drop=FALSE])
+  		  b_F_QTL = ncol(QTL_factors_X)
+  		  prior_mean = matrix(0,b_F_QTL,k)
+  		  prior_prec = B_F_prec[QTL_columns_factors,] * tot_F_prec[rep(1,b_F_QTL),]  # prior for B_F includes tot_F_prec
+  		  randn_theta = matrix(rnorm(b_F_QTL*k),b_F_QTL)
+  		  randn_e = matrix(rnorm(n*k),n)
+  		  B_F[QTL_columns_factors,] = sample_coefs_hierarchical_parallel_sparse_c_Eigen(Ut,F_tilde,QTL_factors_Z,QTL_factors_X,F_h2, tot_F_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+		  }
+
 		  XFBF = X_F %*% B_F
 		  if(inherits(XFBF,'Matrix')) XFBF = as.matrix(XFBF)
 		  F_tilde = F - XFBF # not sparse.
@@ -85,14 +88,20 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 
 		scores = tot_prec_scores_c(UtF_tilde,F_h2,s)
 		if(b_F > 0) {
-		  scores = scores + colSums((B_F^2*B_F_prec)[!X_F_zero_variance,])   # add this if tot_F_prec part of the prior for B_F
+		  scores = scores + colSums((B_F^2*B_F_prec)[!X_F_zero_variance,,drop=FALSE])   # add this if tot_F_prec part of the prior for B_F
 		}
 		tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2 + sum(!X_F_zero_variance)/2,rate = tot_F_prec_rate + scores/2)
 		# tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2,rate = tot_F_prec_rate + scores/2)
 		# tot_F_prec[] = 1
 
 		if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
-		F_h2_index = sample_h2s_discrete_fast(UtF_tilde, tot_F_prec, h2_priors_factors,s,grainSize)
+		if(is.null(h2_step_size)) {
+		  F_h2_index = sample_h2s_discrete_fast(UtF_tilde, tot_F_prec, h2_priors_factors,s,grainSize)
+		} else{
+		  r_draws = runif(k)
+		  state_draws = runif(k)
+		  F_h2_index = sample_h2s_discrete_MH_fast_c(UtF_tilde,tot_F_prec,h2_priors_factors,F_h2_index,h2s_matrix,s,r_draws,state_draws,h2_step_size,grainSize)+1
+		}
 		F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
     randn = matrix(rnorm(ncol(Z)*k),ncol(Z))

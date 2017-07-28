@@ -49,7 +49,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
                         ) {
 
   all_args = lapply(formals(),function(x) eval(x)[1])
-  passed_args = as.list(match.call())[-1]
+  passed_args = lapply(as.list(match.call())[-1],eval)
   all_args[names(passed_args)] = passed_args
   return(all_args)
 }
@@ -280,16 +280,29 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	if(all(X[,1] == 1)) {
 	  resid_intercept = TRUE
 	}
-	if(!is.null(QTL_resid)){
-	  if(is.data.frame(QTL_resid)) QTL_resid = as.matrix(QTL_resid)
-	  same_fixed_model = FALSE
-	  QTL_columns_resid = ncol(X) + 1:ncol(QTL_resid)
-	  X = cbind(X, QTL_resid) # add in QTL_resid if provided.
-	}
 	b = ncol(X)
 	X = as(X,'dgCMatrix')
-
 	if(any(is.na(X))) stop('Missing values in X_resid')
+
+	QTL_resid_Z = QTL_resid_X = NULL
+	if(!is.null(QTL_resid)){
+	  if(class(QTL_resid) == 'list'){
+	    QTL_terms = mkReTrms(findbars(QTL_resid$model),data,drop.unused.levels = FALSE)
+	    QTL_resid_Z = as(t(QTL_terms$Zt),'dgCMatrix')
+	    if(!all(colnames(QTL_factors_Z) %in% rownames(QTL_resid$X))) stop(sprintf('Missing %s from QTL_resid$X',names(QTL_terms$cnms)[1]))
+	    QTL_resid_X = as(QTL_resid$X[colnames(QTL_factors_Z),],'dgCMatrix')
+	  } else{
+	    if(nrow(QTL_resid) != nrow(data)) stop(sprintf('QTL_resid has wrong number of rows. Should be %d',nrow(data)))
+	    QTL_resid_Z = as(diag(1,nrow(data)),'dgCMatrix')
+	    if(is.data.frame(QTL_resid)) QTL_resid = as.matrix(QTL_resid)
+	    QTL_resid_X = as(QTL_resid,'dgCMatrix')
+	  }
+	  same_fixed_model = FALSE
+	  if(any(is.na(QTL_resid_X))) stop('Missing values in QTL_resid_X')
+	  QTL_columns_resid = b+1:ncol(QTL_resid_X)
+	  X = cbind(X,QTL_resid_Z %*% QTL_resid_X)
+	  b = ncol(X)
+	}
 
   # for F
 	QTL_columns_factors = NULL
@@ -300,17 +313,33 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  cat(sprintf('dropping column(s) %s to make X_factor full rank\n',paste(linear_combos$remove,sep=',')))
 	  X_F = X_F[,-linear_combos$remove]
 	}
-	if(!is.null(QTL_factors)){
-	  if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
-	  QTL_columns_factors = ncol(X_F) + 1:ncol(QTL_factors)
-	  X_F = cbind(X_F,QTL_factors)
-	  same_fixed_model = FALSE
-	}
-	# X_F = sweep(X_F,2,colMeans(X_F),'-') #
 	b_F = ncol(X_F)
 	X_F_zero_variance = apply(X_F,2,var) == 0
 	X_F = as(X_F,'dgCMatrix')
 	if(any(is.na(X_F))) stop('Missing values in X_F')
+
+
+	QTL_factors_Z = QTL_factors_X = NULL
+	if(!is.null(QTL_factors)){
+	  if(class(QTL_factors) == 'list'){
+	    QTL_terms = mkReTrms(findbars(QTL_factors$model),data,drop.unused.levels = FALSE)
+	    QTL_factors_Z = as(t(QTL_terms$Zt),'dgCMatrix')
+	    if(!all(colnames(QTL_factors_Z) %in% rownames(QTL_factors$X))) stop(sprintf('Missing %s from QTL_factors$X',names(QTL_terms$cnms)[1]))
+	    QTL_factors_X = as(QTL_factors$X[colnames(QTL_factors_Z),],'dgCMatrix')
+	  } else{
+	    if(nrow(QTL_factors) != nrow(data)) stop(sprintf('QTL_factors has wrong number of rows. Should be %d',nrow(data)))
+	    QTL_factors_Z = as(diag(1,nrow(data)),'dgCMatrix')
+	    if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
+	    QTL_factors_X = as(QTL_factors,'dgCMatrix')
+	  }
+	  same_fixed_model = FALSE
+	  if(any(is.na(QTL_factors_X))) stop('Missing values in QTL_factors_X')
+	  QTL_columns_factors = b_F+1:ncol(QTL_factors_X)
+	  X_F = cbind(X_F,QTL_factors_Z %*% QTL_factors_X)
+	  b_F = ncol(X_F)
+	  X_F_zero_variance = apply(X_F,2,var) == 0
+	  X_F = as(X_F,'dgCMatrix')
+	}
 
 
 	# -------- cis genotypes ---------- #
@@ -487,6 +516,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  cis_genotypes = cis_genotypes,
 	  QTL_columns_resid = QTL_columns_resid,
 	  QTL_columns_factors = QTL_columns_factors,
+	  QTL_resid_Z = QTL_resid_Z,
+	  QTL_resid_X = QTL_resid_X,
+	  QTL_factors_Z = QTL_factors_Z,
+	  QTL_factors_X = QTL_factors_X,
 	  data       = data
 	)
 

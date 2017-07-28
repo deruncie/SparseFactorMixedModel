@@ -463,31 +463,6 @@ MatrixXd log_p_h2s_fast(
     int grainSize)
 {
 
-  struct sampleColumn : public Worker {
-    MatrixXd std_scores_b2;
-    VectorXd discrete_priors;
-    VectorXd s;
-    MatrixXd &log_ps;
-
-    sampleColumn(MatrixXd std_scores_b2,
-                 VectorXd discrete_priors,
-                 VectorXd s,
-                 MatrixXd &log_ps):
-      std_scores_b2(std_scores_b2), discrete_priors(discrete_priors), s(s), log_ps(log_ps) {}
-
-    void operator()(std::size_t begin, std::size_t end) {
-      int n = std_scores_b2.rows();
-      int b = discrete_priors.size();
-      for(std::size_t i = begin; i < end; i++){
-        double h2 = double(i)/b;
-        VectorXd s2s = h2*s.array() + (1.0-h2);
-        MatrixXd std_scores2 = -0.5 * std_scores_b2 * s2s.cwiseInverse().asDiagonal();
-        double det = -n/2 * log(2.0*M_PI) - 0.5*s2s.array().log().sum();
-        log_ps.row(i) = std_scores2.rowwise().sum().array() + det + log(discrete_priors[i]);
-      }
-    }
-  };
-
   int b = discrete_priors.size();
   int p = UtEta.cols();
 
@@ -496,10 +471,134 @@ MatrixXd log_p_h2s_fast(
   MatrixXd std_scores_b = tot_Eta_prec.cwiseSqrt().asDiagonal() * UtEta.transpose();
   MatrixXd std_scores_b2 = std_scores_b.cwiseProduct(std_scores_b);
 
-  sampleColumn sampler(std_scores_b2,discrete_priors,s, log_ps);
+  struct sampleColumn : public Worker {
+    MatrixXd std_scores_b2;
+    VectorXd discrete_priors;
+    VectorXd tot_Eta_prec;
+    VectorXd s;
+    MatrixXd &log_ps;
+
+    sampleColumn(MatrixXd std_scores_b2,
+                 VectorXd discrete_priors,
+                 VectorXd tot_Eta_prec,
+                 VectorXd s,
+                 MatrixXd &log_ps):
+      std_scores_b2(std_scores_b2), discrete_priors(discrete_priors), tot_Eta_prec(tot_Eta_prec),s(s), log_ps(log_ps) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      int n = std_scores_b2.cols();
+      int b = discrete_priors.size();
+      for(std::size_t i = begin; i < end; i++){
+        double h2 = double(i)/b;
+        VectorXd s2s = h2*s.array() + (1.0-h2);
+        MatrixXd std_scores2 = -0.5 * std_scores_b2 * s2s.cwiseInverse().asDiagonal();
+        double det = -n/2 * log(2.0*M_PI) - 0.5*s2s.array().log().sum();
+        log_ps.row(i) = std_scores2.rowwise().sum().array() + det + log(discrete_priors[i]) + n/2*tot_Eta_prec.array().log();
+      }
+    }
+  };
+
+  sampleColumn sampler(std_scores_b2,discrete_priors,tot_Eta_prec,s,log_ps);
   RcppParallel::parallelFor(0,b,sampler,grainSize);
   return(log_ps);
 }
+
+double log_prob_h2_fast_c(
+    ArrayXd Uty,
+    ArrayXd s,
+    double h2,
+    int n,
+    double tot_Eta_prec,
+    double discrete_prior
+){
+  ArrayXd s2s = h2*s + (1.0-h2);
+  double score2 = (Uty.pow(2)/s2s).sum() * tot_Eta_prec;
+  double log_det_Sigma = s2s.log().sum();
+
+  double log_p = -n/2.0 * log(2*M_PI) - 0.5*(log_det_Sigma - n*log(tot_Eta_prec)) - 0.5 * score2 + log(discrete_prior);
+  return log_p;
+}
+
+
+// [[Rcpp::export()]]
+VectorXi sample_h2s_discrete_MH_fast_c(
+    Map<MatrixXd> UtEta,
+    Map<VectorXd> tot_Eta_prec,
+    Map<VectorXd> discrete_priors,
+    VectorXi h2_index,
+    Map<MatrixXd> h2s_matrix,
+    Map<VectorXd> s,
+    Map<VectorXd> r_draws,
+    Map<VectorXd> state_draws,
+    double step_size,
+    int grainSize
+){
+
+  int p = UtEta.cols();
+
+  struct sampleColumn : public RcppParallel::Worker {
+    const MatrixXd UtEta;
+    const MatrixXd h2s_matrix;
+    const VectorXd s;
+    const VectorXd tot_Eta_prec;
+    const VectorXd discrete_priors;
+    const VectorXd r_draws;
+    const VectorXd state_draws;
+    const VectorXi h2_index;
+    const double step_size;
+    VectorXi &new_index;
+
+    sampleColumn(const MatrixXd UtEta,
+                 const MatrixXd h2s_matrix,
+                 const VectorXd s,
+                 const VectorXd tot_Eta_prec,
+                 const VectorXd discrete_priors,
+                 const VectorXd r_draws,
+                 const VectorXd state_draws,
+                 const VectorXi h2_index,
+                 const double step_size,
+                 VectorXi &new_index):
+
+      UtEta(UtEta), h2s_matrix(h2s_matrix),s(s),
+      tot_Eta_prec(tot_Eta_prec),  discrete_priors(discrete_priors),
+      r_draws(r_draws),state_draws(state_draws),h2_index(h2_index),step_size(step_size),new_index(new_index) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      int n = UtEta.rows();
+      for(std::size_t j = begin; j < end; j++){
+        int old_state = h2_index[j] - 1;
+        double old_h2 = h2s_matrix.coeffRef(0,old_state);
+        double old_log_p = log_prob_h2_fast_c(UtEta.col(j),s,old_h2,n,tot_Eta_prec[j],discrete_priors[old_state]);
+
+        VectorXd candidate_new_states = find_candidate_states(h2s_matrix,step_size,old_state);
+        int r = state_draws[j] * (candidate_new_states.size());
+        int proposed_state = candidate_new_states[r];
+
+        double new_h2 = h2s_matrix.coeffRef(0,proposed_state);
+        double new_log_p = log_prob_h2_fast_c(UtEta.col(j),s,new_h2,n,tot_Eta_prec[j],discrete_priors[proposed_state]);
+
+        VectorXd candidate_states_from_new_state = find_candidate_states(h2s_matrix,step_size,proposed_state);
+
+        double forward_prob = 1.0 / candidate_new_states.size();
+        double back_prob = 1.0 / candidate_states_from_new_state.size();
+
+        double log_MH_ratio = new_log_p - old_log_p + log(forward_prob) - log(back_prob);
+
+        if(log(r_draws[j]) < log_MH_ratio) {
+          new_index[j] = proposed_state;
+        } else {
+          new_index[j] = old_state;
+        }
+      }
+    }
+  };
+  VectorXi new_index(p);
+
+  sampleColumn sampler(UtEta,h2s_matrix,s,tot_Eta_prec,discrete_priors,r_draws,state_draws,h2_index,step_size,new_index);
+  RcppParallel::parallelFor(0,p,sampler,grainSize);
+  return new_index;
+}
+
 
 // -------------------------- //
 // -------------------------- //

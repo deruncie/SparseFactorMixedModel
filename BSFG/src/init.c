@@ -14,6 +14,7 @@ extern SEXP BSFG_find_candidate_states(SEXP, SEXP, SEXP);
 extern SEXP BSFG_log_p_h2s(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_log_p_h2s_fast(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_cis_coefs_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen_group(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_coefs_set_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -21,6 +22,7 @@ extern SEXP BSFG_sample_delta_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, 
 extern SEXP BSFG_sample_factors_scores_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_h2s(SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_h2s_discrete_MH_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_h2s_discrete_MH_fast_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_fixedEffects_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_fixedEffects_cis_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_single_diagK_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -40,6 +42,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"BSFG_log_p_h2s",                                    (DL_FUNC) &BSFG_log_p_h2s,                                     5},
     {"BSFG_log_p_h2s_fast",                               (DL_FUNC) &BSFG_log_p_h2s_fast,                                5},
     {"BSFG_sample_coefs_parallel_sparse_c_Eigen",         (DL_FUNC) &BSFG_sample_coefs_parallel_sparse_c_Eigen,         11},
+    {"BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen", (DL_FUNC) &BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen, 12},
     {"BSFG_sample_cis_coefs_parallel_sparse_c_Eigen",     (DL_FUNC) &BSFG_sample_cis_coefs_parallel_sparse_c_Eigen,     14},
     {"BSFG_sample_coefs_parallel_sparse_c_Eigen_group",   (DL_FUNC) &BSFG_sample_coefs_parallel_sparse_c_Eigen_group,   13},
     {"BSFG_sample_coefs_set_c",                           (DL_FUNC) &BSFG_sample_coefs_set_c,                            9},
@@ -47,6 +50,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"BSFG_sample_factors_scores_sparse_c_Eigen",         (DL_FUNC) &BSFG_sample_factors_scores_sparse_c_Eigen,          6},
     {"BSFG_sample_h2s",                                   (DL_FUNC) &BSFG_sample_h2s,                                    3},
     {"BSFG_sample_h2s_discrete_MH_c",                     (DL_FUNC) &BSFG_sample_h2s_discrete_MH_c,                     10},
+    {"BSFG_sample_h2s_discrete_MH_fast_c",                (DL_FUNC) &BSFG_sample_h2s_discrete_MH_fast_c,                10},
     {"BSFG_sample_MME_fixedEffects_c",                    (DL_FUNC) &BSFG_sample_MME_fixedEffects_c,                    10},
     {"BSFG_sample_MME_fixedEffects_cis_c",                (DL_FUNC) &BSFG_sample_MME_fixedEffects_cis_c,                13},
     {"BSFG_sample_MME_single_diagK_c",                    (DL_FUNC) &BSFG_sample_MME_single_diagK_c,                     8},

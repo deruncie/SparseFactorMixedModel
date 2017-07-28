@@ -149,7 +149,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     traits = colnames(model_matrices[[1]]$y)
     Eta_col_names = paste(rep(traits,each = p_trait),rep(colnames(model_matrices[[1]]$X),length(traits)),sep='::')
     Eta_row_names = data$ID
-    if(!exists('var_Eta')) var_Eta = rep(1,p)
+    if(!'var_Eta' %in% ls()) var_Eta = rep(1,p)
 
     if(length(current_state) == 0){
       Eta_mean = matrix(0,n,p)

@@ -16,3 +16,5 @@ typedef Eigen::Map<SpMat> MSpMat;
 
 using namespace Rcpp;
 using namespace Eigen;
+
+VectorXd find_candidate_states(MatrixXd, double, int);
