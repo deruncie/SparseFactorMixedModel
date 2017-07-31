@@ -398,8 +398,8 @@ List sample_coefs_set_c(
   RcppParallel::parallelFor(0,n,sampler,grainSize);
 
   return(Rcpp::List::create(
-      Rcpp::Named("coefs") = coefs,
-      Rcpp::Named("Y_fitted") = Y_fitted));
+      _("coefs") = coefs,
+      _("Y_fitted") = Y_fitted));
 }
 
 

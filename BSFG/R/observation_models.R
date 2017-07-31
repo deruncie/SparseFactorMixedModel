@@ -117,9 +117,9 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
 
   observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
 
-    if(!exists('Y')) Y = NULL
+    if(!'Y' %in% ls()) Y = NULL
 
-    if(!exists('model_matrices')){
+    if(!'model_matrices' %in% ls()){
       if(!'ID' %in% colnames(data)) stop('ID column required in data')
       if(!length(unique(data$ID)) == nrow(data)) stop('duplicate IDs in data')
       lm1 = lm(individual_model,observations)
@@ -130,8 +130,9 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       Y = as.matrix(observations[,traits,drop=FALSE])
       Terms = delete.response(terms(mf))
 
+      id_index = tapply(1:nrow(observations),observations$ID,function(x) x)
       model_matrices = lapply(data$ID,function(id) {
-        x = which(observations$ID == id)
+        x = id_index[[id]]
         list(
           X = model.matrix(Terms,data = observations[x,]),
           y = Y[x,,drop=FALSE],
@@ -158,7 +159,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     } else{
       Eta_mean = as.matrix(X %*% B) + F %*% t(Lambda) + as.matrix(Z %*% U_R)
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
-      if(!exists('resid_Y_prec')) resid_Y_prec = matrix(rep(1,n_traits),nr=1)
+      if(!'resid_Y_prec' %in% ls()) resid_Y_prec = matrix(rep(1,n_traits),nr=1)
     }
 
     # re-scale Eta_mean and resid_Eta_prec
