@@ -717,11 +717,11 @@ initialize_variables = function(BSFG_state,...){
     rownames(U_R) = colnames(Z)
 
     # Fixed effects
-    B = matrix(rnorm(b*p), ncol = p)
+    B = 0*matrix(rnorm(b*p), ncol = p)
     colnames(B) = traitnames
 
     # Factor fixed effects
-    B_F = matrix(rnorm(b_F * k),b_F,k)
+    B_F = 0*matrix(rnorm(b_F * k),b_F,k)
 
     # cis effects
     cis_effects = matrix(rnorm(cis_effects_index[length(cis_effects_index)]-1,0,1),nrow=1)
