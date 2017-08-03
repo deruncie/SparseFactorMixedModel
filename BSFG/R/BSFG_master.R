@@ -664,11 +664,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	prec_B_F = matrix(tau_B_F,nrow = b_F, ncol = k)
 
 	# Fixed effects
-	B = matrix(rnorm(b*p), ncol = p) / sqrt(prec_B)
+	B = matrix(0, ncol = p)
 	colnames(B) = traitnames
 
 	# Factor fixed effects
-	B_F = matrix(rnorm(b_F * k),b_F,k) / sqrt(prec_B_F)
+	B_F = matrix(0,b_F,k)
 
 
 	# cis effects
