@@ -1,7 +1,21 @@
 // #include <math.h>
 // #include <iostream>
 // #include "BSFG_types.h"
-// #include<Eigen/SparseCholesky>
+// // #include<Eigen/SparseCholesky>
+//
+// // [[Rcpp::export()]]
+// MatrixXd add_Sp_Mat(SpMat X1,Map<MatrixXd> X2){
+//   return(X1+X2);
+// }
+// // [[Rcpp::export()]]
+// SpMat add_Sp_Sp(SpMat X1,SpMat X2){
+//   return(X1+X2);
+// }
+// // [[Rcpp::export()]]
+// MatrixXd to_Mat(SpMat X1){
+//   return(X1.toDense());
+// }
+
 //
 //
 //

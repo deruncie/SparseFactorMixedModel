@@ -37,8 +37,8 @@ VectorXd sample_coefs_single(
   VectorXd theta_tilda;
   if(b < n) {
     MatrixXd C = RinvSqUtW.transpose() * RinvSqUtW;
-    C.diagonal() = C.diagonal() + prior_prec;
-    theta_tilda = C.householderQr().solve(WtURinvy);
+    C.diagonal() += prior_prec;
+    theta_tilda = C.llt().solve(WtURinvy);
   } else{
     MatrixXd VAi = UtW * prior_prec.cwiseInverse().asDiagonal();
     MatrixXd inner = VAi*UtW.transpose();
@@ -46,7 +46,7 @@ VectorXd sample_coefs_single(
       inner(i,i) += (h2 * s(i) + (1.0-h2)) / tot_Eta_prec;
     }
     VectorXd VAiWtURinvy = VAi * WtURinvy;
-    VectorXd outerWtURinvy = VAi.transpose() * inner.householderQr().solve(VAiWtURinvy);
+    VectorXd outerWtURinvy = VAi.transpose() * inner.llt().solve(VAiWtURinvy);
     theta_tilda = WtURinvy.array() / prior_prec.array();
     theta_tilda -= outerWtURinvy;
   }

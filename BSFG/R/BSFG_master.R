@@ -231,11 +231,14 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
       VY = rep(1,p_Y)
     }
     observation_model = missing_data_model
+    Y_missing = as(is.na(Y),'lgTMatrix')# un-compressed logical sparse matrix
     observation_model_parameters = list(
       Y = Y,
       Mean_Y = Mean_Y,
       VY = VY,
-      Y_missing = as(is.na(Y),'lgTMatrix')  # un-compressed logical sparse matrix
+      Y_missing = Y_missing,
+      n_missing = sum(Y_missing),
+      missing_indices = which(Y_missing)
     )
   }
 

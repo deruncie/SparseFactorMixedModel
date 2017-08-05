@@ -38,7 +38,7 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
       randn_theta = matrix(rnorm(rows*p),rows)
       randn_e = matrix(rnorm(n*p),n)
       randn_cis = rnorm(cis_effects_index[length(cis_effects_index)]-1)
-      result = sample_cis_coefs_parallel_sparse_c_Eigen(Ut,Eta,as.matrix(Design),cis_genotypes,resid_h2,tot_Eta_prec,s,prior_mean,prior_prec,
+      result = sample_cis_coefs_parallel_sparse_c_Eigen(Ut,Eta,toDense(Design),cis_genotypes,resid_h2,tot_Eta_prec,s,prior_mean,prior_prec,
                                                         randn_theta,randn_e,randn_cis,cis_effects_index-1,1)
       if(b > 0){
         B[] = result[[1]][1:b,,drop=FALSE]

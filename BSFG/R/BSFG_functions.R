@@ -582,3 +582,16 @@ get_posterior_HPDinterval = function(X,FUN = NULL,prob = 0.95,...){
   if(length(dims) == 2) result = t(HPDinterval(mcmc(X),prob=prob))
   result
 }
+
+
+#' Converts dense Matrix to "matrix" faster!
+#'
+#' @param X a ddenseMatrix
+#'
+#' @return a matrix
+#' @export
+#'
+#' @examples
+toDense = function(X) {
+  matrix(X@x,nrow(X))
+}

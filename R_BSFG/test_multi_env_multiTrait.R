@@ -16,7 +16,7 @@ data$y = rnorm(nrow(data)) + (data$Env == unique(data$Env)[1])*geno_1[data$Geno]
 data$ID = paste(data$Geno,data$Rep,data$Env)
 ids = rnorm(1:nrow(data))
 d = c()
-for(i in 1:50){
+for(i in 1:10){
   di = data
   di$Gene = i
   di$y = di$y + ids+rnorm(nrow(di))
@@ -72,7 +72,7 @@ run_parameters = BSFG_control(
   simulation = FALSE,
   h2_divisions = 100,
   h2_step_size = .3,
-  burn = 100,
+  burn = 000,
   k_init = min(n_trait,10)
 )
 
@@ -103,7 +103,7 @@ BSFG_state = BSFG_init(Y, model=~1+(1|Geno), data2,
 
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
-n_samples = 100;
+n_samples = 1000;
 for(i  in 1:20) {
   if(i == 10){
     BSFG_state = reorder_factors(BSFG_state)

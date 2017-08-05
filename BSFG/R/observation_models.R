@@ -31,7 +31,6 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
 
   observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
     Eta = Y
-    n_missing = sum(Y_missing)
     Eta_mean = matrix(0,0,0)
     if(n_missing > 0){
       n = nrow(Y)
@@ -40,14 +39,13 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
         Eta_mean = matrix(0,n,p)
         resids = rnorm(n_missing)
       } else{
-        Eta_mean = XB + F %*% t(Lambda) + Z %*% U_R
+        Eta_mean = XB + F %*% t(Lambda) + toDense(Z %*% U_R)
         resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
         resids = rnorm(n_missing,0,sqrt(1/resid_Eta_prec[Y_missing@j+1]))  # sample resids from normal distribution with appropriate variance
       }
-      missing_indices = which(Y_missing)
       Eta[missing_indices] = Eta_mean[missing_indices] + resids
     }
-    return(list(Eta = as.matrix(Eta),Eta_mean = as.matrix(Eta_mean)))
+    return(list(Eta = Eta,Eta_mean = Eta_mean))
   })
   return(list(state = observation_model_state,
               posteriorSample_params = c(),

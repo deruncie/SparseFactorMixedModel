@@ -13,7 +13,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		k = ncol(Lambda)
 
 		XB = X %*% B
-		if(inherits(XB,'Matrix')) XB = as.matrix(XB)
+		if(inherits(XB,'Matrix')) XB = toDense(XB)
 		if(!is.null(cis_genotypes)){
 		  for(j in 1:p){
 		    cis_X_j = cis_genotypes[[j]]
@@ -25,7 +25,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		#conditioning on W, B, F, Lambda, marginalizing over U_R
 
 		Eta_tilde = Eta - XB - F %*% t(Lambda)
-		UtEta_tilde = as.matrix(Ut %*% Eta_tilde)
+		UtEta_tilde = toDense(Ut %*% Eta_tilde)
 		scores = tot_prec_scores_c(UtEta_tilde,resid_h2,s)
 		tot_Eta_prec[] = rgamma(p,shape = tot_Eta_prec_shape + n/2,rate = tot_Eta_prec_rate + 0.5*scores)
 
@@ -56,7 +56,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		  if(length(QTL_columns_factors) > 0) {
 		    X_F1 = X_F[,-QTL_columns_factors,drop=FALSE]
 		    b_F1 = ncol(X_F1)
-		    F_tilde = F - as.matrix(QTL_factors_Z %*% QTL_factors_X %*% B_F[-c(1:b_F1),,drop=FALSE])
+		    F_tilde = F - toDense(QTL_factors_Z %*% QTL_factors_X %*% B_F[-c(1:b_F1),,drop=FALSE])
 		  }
 		  prior_mean = matrix(0,b_F1,k)
 		  prior_prec = B_F_prec[1:b_F1,,drop=FALSE] * tot_F_prec[rep(1,b_F1),,drop=FALSE]  # prior for B_F includes tot_F_prec
@@ -66,7 +66,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 
 		  # QTL fixed effects
 		  if(length(QTL_columns_factors) > 0){
-		    F_tilde = F - as.matrix(X_F1 %*% B_F[1:b_F1,,drop=FALSE])
+		    F_tilde = F - toDense(X_F1 %*% B_F[1:b_F1,,drop=FALSE])
   		  b_F_QTL = ncol(QTL_factors_X)
   		  prior_mean = matrix(0,b_F_QTL,k)
   		  prior_prec = B_F_prec[QTL_columns_factors,] * tot_F_prec[rep(1,b_F_QTL),]  # prior for B_F includes tot_F_prec
@@ -76,7 +76,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 		  }
 
 		  XFBF = X_F %*% B_F
-		  if(inherits(XFBF,'Matrix')) XFBF = as.matrix(XFBF)
+		  if(inherits(XFBF,'Matrix')) XFBF = toDense(XFBF)
 		  F_tilde = F - XFBF # not sparse.
 		} else{
 		  F_tilde = F
@@ -84,7 +84,7 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 
 	 # -----Sample F_h2 and tot_F_prec, U_F -------------------- #
 		#conditioning on F, U_F
-		UtF_tilde = as.matrix(Ut %*% F_tilde)
+		UtF_tilde = toDense(Ut %*% F_tilde)
 
 		scores = tot_prec_scores_c(UtF_tilde,F_h2,s)
 		if(b_F > 0) {
@@ -109,9 +109,9 @@ sample_latent_traits.fast_BSFG = function(BSFG_state,grainSize,...) {
 
 	 # -----Sample F----------------------- #
 		#conditioning on B, U_F,U_R,W,Lambda, F_h2
-		Eta_tilde = Eta - XB - as.matrix(Z %*% U_R)
+		Eta_tilde = Eta - XB - toDense(Z %*% U_R)
 		F_e_prec = tot_F_prec / (1-F_h2)
-		prior_mean = as.matrix(Z %*% U_F)
+		prior_mean = toDense(Z %*% U_F)
 		if(b_F > 0) {
 		  prior_mean = prior_mean + XFBF
 		}
