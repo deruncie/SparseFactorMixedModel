@@ -80,7 +80,7 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     tot_F_prec[] = rgamma(k,shape = tot_F_prec_shape + n/2+ sum(!X_F_zero_variance)/2, rate = tot_F_prec_rate + 0.5*scores)
     # tot_F_prec[] = 1
 
-       if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
+    if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
     if(is.null(h2_step_size)) {
       F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys,h2_priors_factors,grainSize)
     } else{

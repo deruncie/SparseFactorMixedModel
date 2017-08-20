@@ -630,7 +630,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  run_variables  = run_variables,
 	  setup          = setup
 	)
-	class(BSFG_state) = append(class(BSFG_state),c('BSFG_state',run_parameters$sampler))
+	class(BSFG_state) = append(c(run_parameters$sampler,'BSFG_state'),class(BSFG_state))
+	if(is(BSFG_state,'fast_BSFG') && 'Y_missing' %in% names(run_parameters$observation_model_parameters) && sum(Y_missing > 0)) {
+	  class(BSFG_state) = append('fast_missing_BSFG',class(BSFG_state))
+	}
 
 	# ----------------------------- #
 	# --- Initialize BSFG_state --- #
