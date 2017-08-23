@@ -694,3 +694,367 @@ MatrixXd sample_factors_scores_sparse_c_Eigen(
   return Ft.transpose();
 }
 
+
+
+
+// -------------------------- //
+// ------missing data model funcitons ------- //
+// -------------------------- //
+
+// [[Rcpp::export()]]
+MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen2(
+    Map<MatrixXd> Eta,
+    Map<MatrixXd> W,
+    Map<VectorXd> h2,
+    Map<VectorXd> tot_Eta_prec,
+    Map<MatrixXd> prior_mean,
+    Map<MatrixXd> prior_prec,
+    Map<MatrixXd> randn_theta,
+    Map<VectorXd> randn_e,
+    Rcpp::List invert_aI_bZKZ,
+    VectorXi Y_obs_index,
+    int grainSize){
+
+  // Sample regression coefficients
+  // columns of matrices are independent
+  // each column conditional posterior is a MVN due to conjugacy
+
+  int p = Eta.cols();
+  int b = W.cols();
+  MatrixXd coefs(b,p);
+
+  std::vector<MSpMat> Ut_s;
+  std::vector<VectorXd> s_s;
+  std::vector<VectorXi> Y_obs;
+  std::vector<MatrixXd> UtW_s;
+  for(int i = 0; i < invert_aI_bZKZ.length(); i++){
+    Rcpp::List invert_aI_bZKZ_i = Rcpp::as<Rcpp::List>(invert_aI_bZKZ[i]);
+    Ut_s.push_back(as<MSpMat>(invert_aI_bZKZ_i["Ut"]));
+    s_s.push_back(as<VectorXd>(invert_aI_bZKZ_i["s"]));
+    Y_obs.push_back(as<VectorXi>(invert_aI_bZKZ_i["Y_obs"]));
+    MatrixXd UtW(Y_obs[i].size(),b);
+    for(int j = 0; j < Y_obs[i].size(); j++) {
+      UtW.row(j) = W.row(Y_obs[i][j]-1);
+    }
+    UtW = Ut_s[i] * UtW;
+    UtW_s.push_back(UtW);
+  }
+
+  std::vector<VectorXd> randn_e_list;
+  int index = 0;
+  for(int i = 0; i < Eta.cols(); i++){
+    int n_obs = Y_obs[Y_obs_index[i]-1].size();
+    randn_e_list.push_back(randn_e.segment(index,n_obs));
+    index += n_obs;
+  }
+
+  struct sampleColumn : public RcppParallel::Worker {
+    MatrixXd Eta;
+    MatrixXd prior_mean, prior_prec, randn_theta;
+    VectorXd h2, tot_Eta_prec;
+    std::vector<MSpMat> Ut_s;
+    std::vector<VectorXd> s_s;
+    std::vector<VectorXi> Y_obs;
+    std::vector<MatrixXd> UtW_s;
+    std::vector<VectorXd> randn_e_list;
+    VectorXi Y_obs_index;
+    int b;
+    MatrixXd &coefs;
+
+    sampleColumn(MatrixXd Eta, MatrixXd prior_mean, MatrixXd prior_prec, VectorXd h2, VectorXd tot_Eta_prec,
+                 MatrixXd randn_theta,
+                 std::vector<MSpMat> Ut_s, std::vector<VectorXd> s_s, std::vector<VectorXi> Y_obs, std::vector<MatrixXd> UtW_s,
+                 std::vector<VectorXd> randn_e_list,
+                 VectorXi Y_obs_index, int b,
+                 MatrixXd &coefs) :
+      Eta(Eta), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta),
+      h2(h2), tot_Eta_prec(tot_Eta_prec),
+      Ut_s(Ut_s), s_s(s_s), Y_obs(Y_obs), UtW_s(UtW_s),
+      randn_e_list(randn_e_list),
+      Y_obs_index(Y_obs_index), b(b),
+      coefs(coefs) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      for(std::size_t j = begin; j < end; j++){
+        VectorXi Y_obs_j = Y_obs[Y_obs_index[j]-1];
+        int n_obs = Y_obs_j.size();
+        VectorXd UtEta_j(n_obs);
+        for(int i = 0; i < n_obs; i++){
+          UtEta_j[i] = Eta.coeffRef(Y_obs_j[i]-1,j);
+        }
+        UtEta_j = Ut_s[Y_obs_index[j]-1] * UtEta_j;
+
+        coefs.col(j) = sample_coefs_single(UtEta_j, UtW_s[Y_obs_index[j]-1], prior_mean.col(j), prior_prec.col(j), h2(j),
+                  tot_Eta_prec(j), randn_theta.col(j),randn_e_list[j],s_s[Y_obs_index[j]-1],b,n_obs);
+      }
+    }
+  };
+
+  sampleColumn sampler(Eta, prior_mean, prior_prec, h2, tot_Eta_prec, randn_theta,Ut_s, s_s, Y_obs, UtW_s,randn_e_list,
+                       Y_obs_index, b, coefs);
+  RcppParallel::parallelFor(0,p,sampler,grainSize);
+
+  return(coefs);
+}
+
+
+// [[Rcpp::export()]]
+VectorXd tot_prec_scores_missing_c (
+    Map<MatrixXd> Eta,
+    Map<VectorXd> h2,
+    Rcpp::List invert_aI_bZKZ,
+    VectorXi Y_obs_index
+) {
+
+  int p = Eta.cols();
+
+  std::vector<MSpMat> Ut_s;
+  std::vector<VectorXd> s_s;
+  std::vector<VectorXi> Y_obs;
+  for(int i = 0; i < invert_aI_bZKZ.length(); i++){
+    Rcpp::List invert_aI_bZKZ_i = Rcpp::as<Rcpp::List>(invert_aI_bZKZ[i]);
+    Ut_s.push_back(as<MSpMat>(invert_aI_bZKZ_i["Ut"]));
+    s_s.push_back(as<VectorXd>(invert_aI_bZKZ_i["s"]));
+    Y_obs.push_back(as<VectorXi>(invert_aI_bZKZ_i["Y_obs"]));
+  }
+
+  VectorXd scores(p);
+
+  for(int j = 0; j < p; j++){
+    ArrayXd s = s_s[Y_obs_index[j]-1];
+    VectorXi Y_obs_j = Y_obs[Y_obs_index[j]-1];
+    int n_obs = Y_obs_j.size();
+    VectorXd UtEta_j(n_obs);
+    for(int i = 0; i < n_obs; i++){
+      UtEta_j[i] = Eta.coeffRef(Y_obs_j[i]-1,j);
+    }
+    UtEta_j = Ut_s[Y_obs_index[j]-1] * UtEta_j;
+    ArrayXd Sigma_sqrt = sqrt(h2(j) * s + (1.0 - h2(j)));
+    VectorXd SiUtEta_j = UtEta_j.array() / Sigma_sqrt;
+    scores(j) = SiUtEta_j.dot(SiUtEta_j);
+  }
+  return scores;
+}
+
+// [[Rcpp::export()]]
+MatrixXd log_p_h2s_fast_missing(
+    Map<MatrixXd> Eta,
+    Map<VectorXd> tot_Eta_prec,
+    Map<VectorXd> discrete_priors,
+    Rcpp::List invert_aI_bZKZ,
+    VectorXi Y_obs_index,
+    int grainSize)
+{
+
+  int b = discrete_priors.size();
+  int p = Eta.cols();
+
+  std::vector<MSpMat> Ut_s;
+  std::vector<VectorXd> s_s;
+  std::vector<VectorXi> Y_obs;
+  for(int i = 0; i < invert_aI_bZKZ.length(); i++){
+    Rcpp::List invert_aI_bZKZ_i = Rcpp::as<Rcpp::List>(invert_aI_bZKZ[i]);
+    Ut_s.push_back(as<MSpMat>(invert_aI_bZKZ_i["Ut"]));
+    s_s.push_back(as<VectorXd>(invert_aI_bZKZ_i["s"]));
+    Y_obs.push_back(as<VectorXi>(invert_aI_bZKZ_i["Y_obs"]));
+  }
+
+  MatrixXd log_ps(b,p);
+
+  std::vector<VectorXd> std_scores_b2;
+  for(int j = 0; j < p; j++) {
+    VectorXi Y_obs_j = Y_obs[Y_obs_index[j]-1];
+    int n_obs = Y_obs_j.size();
+    VectorXd Eta_std_j(n_obs);
+    for(int i = 0; i < n_obs; i++){
+      Eta_std_j[i] = Eta.coeffRef(Y_obs_j[i]-1,j);
+    }
+    VectorXd UtEta_std_j = Ut_s[Y_obs_index[j]-1] * Eta_std_j * sqrt(tot_Eta_prec[j]);
+    std_scores_b2.push_back(UtEta_std_j.cwiseProduct(UtEta_std_j));
+  }
+
+
+  struct sampleColumn : public Worker {
+    std::vector<VectorXd> std_scores_b2;
+    VectorXd discrete_priors;
+    VectorXd tot_Eta_prec;
+    std::vector<MSpMat> Ut_s;
+    std::vector<VectorXd> s_s;
+    std::vector<VectorXi> Y_obs;
+    VectorXi Y_obs_index;
+    MatrixXd &log_ps;
+
+    sampleColumn(std::vector<VectorXd> std_scores_b2,
+                 VectorXd discrete_priors,
+                 VectorXd tot_Eta_prec,
+                 std::vector<MSpMat> Ut_s,
+                 std::vector<VectorXd> s_s,
+                 std::vector<VectorXi> Y_obs,
+                 VectorXi Y_obs_index,
+                 MatrixXd &log_ps):
+      std_scores_b2(std_scores_b2), discrete_priors(discrete_priors), tot_Eta_prec(tot_Eta_prec),Ut_s(Ut_s), s_s(s_s), Y_obs(Y_obs),Y_obs_index(Y_obs_index), log_ps(log_ps) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      int b = discrete_priors.size();
+      int p = std_scores_b2.size();
+      for(std::size_t i = begin; i < end; i++){
+        double h2 = double(i)/b;
+        for(int j = 0; j < p; j++) {
+          int index = Y_obs_index[j] - 1;
+          int n_obs = Y_obs[index].size();
+          VectorXd s2s = h2*s_s[index].array() + (1.0-h2);
+          VectorXd std_scores_b2_j = -0.5 * std_scores_b2[j].cwiseProduct(s2s.cwiseInverse());
+          double det = -n_obs/2 * log(2.0*M_PI) - 0.5*s2s.array().log().sum();
+          log_ps.coeffRef(i,j) = std_scores_b2_j.sum() + det + log(discrete_priors[i]) + n_obs/2*log(tot_Eta_prec[j]);
+        }
+      }
+    }
+  };
+
+  sampleColumn sampler(std_scores_b2,discrete_priors,tot_Eta_prec,Ut_s,s_s,Y_obs,Y_obs_index,log_ps);
+  RcppParallel::parallelFor(0,b,sampler,grainSize);
+  return(log_ps);
+}
+
+
+// [[Rcpp::export()]]
+MatrixXd sample_randomEffects_parallel_sparse_missing_c_Eigen (
+    Map<MatrixXd> Eta,
+    Map<ArrayXd> tot_prec,
+    Map<ArrayXd> h2,
+    List invert_aZZt_Kinv,
+    VectorXi Y_obs_index,
+    Map<ArrayXXd> randn_draws,
+    int grainSize) {
+  //samples genetic effects on factors (F_a) conditional on the factor scores F:
+  // F_i = F_{a_i} + E_i, E_i~N(0,s2*(1-h2)*I) for each latent trait i
+  // U_i = zeros(r,1) if h2_i = 0
+  // it is assumed that s2 = 1 because this scaling factor is absorbed in
+  // Lambda
+  // invert_aZZt_Kinv has parameters to diagonalize a*Z*Z' + b*K for fast
+  // inversion:
+
+  ArrayXd a_prec = tot_prec / h2;
+  ArrayXd e_prec = tot_prec / (1.0-h2);
+
+  std::vector<MSpMat> U_s;
+  std::vector<MSpMat> ZUt_s;
+  std::vector<VectorXd> s1_s;
+  std::vector<VectorXd> s2_s;
+  std::vector<VectorXi> Y_obs;
+  for(int i = 0; i < invert_aZZt_Kinv.length(); i++){
+    Rcpp::List invert_aZZt_Kinv_i = Rcpp::as<Rcpp::List>(invert_aZZt_Kinv[i]);
+    U_s.push_back(as<MSpMat>(invert_aZZt_Kinv_i["U"]));
+    ZUt_s.push_back(as<MSpMat>(invert_aZZt_Kinv_i["ZUt"]));
+    s1_s.push_back(as<VectorXd>(invert_aZZt_Kinv_i["s1"]));
+    s2_s.push_back(as<VectorXd>(invert_aZZt_Kinv_i["s2"]));
+    Y_obs.push_back(as<VectorXi>(invert_aZZt_Kinv_i["Y_obs"]));
+  }
+
+  int p = Eta.cols();
+  int r = randn_draws.rows();
+  MatrixXd b(r,p);
+  for(int j = 0; j < p; j++){
+    VectorXi Y_obs_j = Y_obs[Y_obs_index[j]-1];
+    int n_obs = Y_obs_j.size();
+    VectorXd Eta_j(n_obs);
+    for(int i = 0; i < n_obs; i++){
+      Eta_j[i] = Eta.coeffRef(Y_obs_j[i]-1,j);
+    }
+    b.col(j) = ZUt_s[Y_obs_index[j]-1] * Eta_j * e_prec[j];
+  }
+
+  MatrixXd effects(r,p);
+
+  struct sampleColumn : public Worker {
+    std::vector<MSpMat> U_s;
+    std::vector<VectorXd> s1_s;
+    std::vector<VectorXd> s2_s;
+    VectorXi Y_obs_index;
+    ArrayXd a_prec, e_prec;
+    MatrixXd b;
+    ArrayXXd randn_draws;
+    MatrixXd &effects;
+
+    sampleColumn(std::vector<MSpMat> U_s, std::vector<VectorXd> s1_s, std::vector<VectorXd> s2_s, VectorXi Y_obs_index,
+                 ArrayXd a_prec, ArrayXd e_prec, MatrixXd b, ArrayXXd randn_draws, MatrixXd &effects):
+      U_s(U_s), s1_s(s1_s), s2_s(s2_s), Y_obs_index(Y_obs_index),
+      a_prec(a_prec), e_prec(e_prec), b(b), randn_draws(randn_draws), effects(effects) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      for(std::size_t j = begin; j < end; j++){
+        int index = Y_obs_index[j]-1;
+        ArrayXd d = s2_s[index]*a_prec(j) + s1_s[index]*e_prec(j);
+        ArrayXd mlam = b.col(j).array() / d;
+        effects.col(j) = U_s[index] * (mlam + randn_draws.col(j) / sqrt(d)).matrix();
+      }
+    }
+  };
+
+  sampleColumn sampler(U_s,s1_s,s2_s,Y_obs_index, a_prec, e_prec, b, randn_draws, effects);
+  RcppParallel::parallelFor(0,p,sampler,grainSize);
+
+  return(effects);
+}
+
+
+
+// [[Rcpp::export()]]
+MatrixXd sample_factors_scores_sparse_mising_c_Eigen(
+    Map<MatrixXd> Eta_tilde,
+    Map<MatrixXd> prior_mean,
+    Map<MatrixXd> Lambda,
+    Map<VectorXd> resid_Eta_prec,
+    Map<VectorXd> F_e_prec,
+    Map<MatrixXd> randn_draws,
+    VectorXi Y_row_obs_index,
+    Rcpp::List Y_row_obs_sets
+) {
+  //Sample factor scores given factor loadings (F_a), factor residual variances (F_e_prec) and
+  //phenotype residuals
+
+  int k = randn_draws.rows();
+  int n = randn_draws.cols();
+
+  MatrixXd Ft(k,n);
+  MatrixXd Lmsg = resid_Eta_prec.asDiagonal() * Lambda;
+
+  std::vector<VectorXi> obs_sets;
+  std::vector<MatrixXd> R_s;
+  std::vector<MatrixXd> Lmsg_s;
+  for(int i = 0; i < Y_row_obs_sets.length(); i++){
+    VectorXi obs_set_i = as<VectorXi>(Y_row_obs_sets[i]);
+    obs_sets.push_back(obs_set_i);
+    int n_traits = obs_set_i.size();
+    MatrixXd Lmsg_i(n_traits,k);
+    MatrixXd Lambda_i(n_traits,k);
+    for(int j = 0; j < n_traits; j++){
+      int index = obs_set_i[j]-1;
+      Lmsg_i.row(j) = Lmsg.row(index);
+      Lambda_i.row(j) = Lambda.row(index);
+    }
+    Lmsg_s.push_back(Lmsg_i);
+    MatrixXd Sigma = Lambda_i.transpose() * Lmsg_i;
+    Sigma.diagonal() += F_e_prec;
+    Eigen::LLT<MatrixXd> chol_Sigma;
+    chol_Sigma.compute(Sigma);
+    MatrixXd R = chol_Sigma.matrixU();
+    R_s.push_back(R);
+  }
+
+  for(int i = 0; i < n; i++){
+    int index = Y_row_obs_index[i]-1;
+    VectorXi obs_set_i = obs_sets[index];
+    int n_traits = obs_set_i.size();
+    MatrixXd R_i = R_s[index];
+    MatrixXd Lmsg_i = Lmsg_s[index];
+    Eigen::RowVectorXd Eta_i(n_traits);
+    for(int j = 0; j < n_traits; j++){
+      int trait_index = obs_set_i[j]-1;
+      Eta_i[j] = Eta_tilde.coeffRef(i,trait_index);
+    }
+    VectorXd Meta = R_i.transpose().triangularView<Lower>().solve((Eta_i * Lmsg_i + prior_mean.row(i) * F_e_prec.asDiagonal()).transpose());
+    Ft.col(i) = R_i.triangularView<Upper>().solve(Meta + randn_draws.col(i));
+  }
+  return Ft.transpose();
+}

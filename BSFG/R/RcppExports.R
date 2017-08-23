@@ -53,6 +53,26 @@ sample_factors_scores_sparse_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, 
     .Call(BSFG_sample_factors_scores_sparse_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws)
 }
 
+sample_coefs_parallel_sparse_missing_c_Eigen2 <- function(Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, invert_aI_bZKZ, Y_obs_index, grainSize) {
+    .Call(BSFG_sample_coefs_parallel_sparse_missing_c_Eigen2, Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, invert_aI_bZKZ, Y_obs_index, grainSize)
+}
+
+tot_prec_scores_missing_c <- function(Eta, h2, invert_aI_bZKZ, Y_obs_index) {
+    .Call(BSFG_tot_prec_scores_missing_c, Eta, h2, invert_aI_bZKZ, Y_obs_index)
+}
+
+log_p_h2s_fast_missing <- function(Eta, tot_Eta_prec, discrete_priors, invert_aI_bZKZ, Y_obs_index, grainSize) {
+    .Call(BSFG_log_p_h2s_fast_missing, Eta, tot_Eta_prec, discrete_priors, invert_aI_bZKZ, Y_obs_index, grainSize)
+}
+
+sample_randomEffects_parallel_sparse_missing_c_Eigen <- function(Eta, tot_prec, h2, invert_aZZt_Kinv, Y_obs_index, randn_draws, grainSize) {
+    .Call(BSFG_sample_randomEffects_parallel_sparse_missing_c_Eigen, Eta, tot_prec, h2, invert_aZZt_Kinv, Y_obs_index, randn_draws, grainSize)
+}
+
+sample_factors_scores_sparse_mising_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws, Y_row_obs_index, Y_row_obs_sets) {
+    .Call(BSFG_sample_factors_scores_sparse_mising_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws, Y_row_obs_index, Y_row_obs_sets)
+}
+
 sample_MME_single_diagK_c <- function(y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {
     .Call(BSFG_sample_MME_single_diagK_c, y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e)
 }

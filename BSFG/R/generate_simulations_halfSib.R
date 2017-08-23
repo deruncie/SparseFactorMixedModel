@@ -1,4 +1,4 @@
-new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, Ve = 0.2,Vb = 0){
+new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, Ve = 0.2,Vb = 0, numeff = NULL){
   Sire = gl(nSire,nRep)
   K = .25*tcrossprod(Matrix(model.matrix(~0+Sire))) + diag(.75,length(Sire))
   rownames(K) = 1:nrow(K)
@@ -21,7 +21,7 @@ new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, V
   # factor_h2s[2+1:k_G] = runif(k_G)
   k = length(factor_h2s)
   Lambda = matrix(0,p,k)
-  numeff = sample((p/30):(p/4),k,replace=T)
+  if(is.null(numeff)) numeff = sample((p/30):(p/4),k,replace=T)
   for(h in 1:k){
     Lambda[sample(1:p,numeff[h]),h] = rnorm(numeff[h])
   }

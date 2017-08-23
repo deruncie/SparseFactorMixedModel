@@ -15,6 +15,7 @@ typedef Eigen::SparseMatrix<double> SpMat;
 typedef Eigen::Map<SpMat> MSpMat;
 
 using namespace Rcpp;
+using namespace RcppParallel;
 using namespace Eigen;
 
 VectorXd find_candidate_states(MatrixXd, double, int);

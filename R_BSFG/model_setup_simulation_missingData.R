@@ -6,7 +6,8 @@ library(BSFG)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 2
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2)
+nTrait = 20
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=nTrait, b=5, factor_h2s= c(rep(0,5),rep(0.9,5)),Va = 1, Ve = 1,Vb = 0,numeff= rep(nTrait/2,nTrait))
 set.seed(seed)
 load('setup.RData')
 
@@ -28,8 +29,8 @@ X = setup$X
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  # sampler = 'fast_BSFG',
-  sampler = 'fast_missing_BSFG',
+  sampler = 'fast_BSFG',
+  # sampler = 'fast_missing_BSFG',
   # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
@@ -44,7 +45,7 @@ priors = BSFG_priors(
   tot_Y_var = list(V = 0.5,   nu = 10),
   tot_F_var = list(V = 18/20, nu = 20),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-  h2_priors_factors_fun = function(h2s,n) ifelse(h2s == 0,n,n/(n-1)),
+  h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1)),
   Lambda_prior = list(
     sampler = sample_Lambda_prec_ARD,
     Lambda_df = 3,
@@ -93,16 +94,16 @@ priors = BSFG_priors(
 data$ID = sample(1:nrow(data))
 # diag(K) = diag(K) + 1e-6
 Y_full = Y
-nGroup = 5
+nGroup = 2
 for(i in 1:nGroup) {
-  Y[(i+(1:nrow(Y)-1)) %% nGroup != 0,1:(100/nGroup)+(i-1)*(100/nGroup)] = NA
+  Y[(i+(1:nrow(Y)-1)) %% nGroup != 0,1:(nTrait/nGroup)+(i-1)*(nTrait/nGroup)] = NA
 }
 # i = sample(1:500,250)
 # Y[i,1:50] = NA
 # Y[-i,-c(1:50)] = NA
-BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
+# BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
-# BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
                                   run_parameters=run_parameters,
                                   priors=priors,
@@ -114,7 +115,6 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# 
 save(BSFG_state,file="BSFG_state.RData")
 
 BSFG_state = clear_Posterior(BSFG_state)
-
 
 # load('current_state.RData')
 # load('BSFG_state.RData')
@@ -137,13 +137,19 @@ BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
 for(i  in 1:99) {
     if(i %% 10 == 0){
+
+      BSFG_state$Posterior = reload_Posterior(BSFG_state)
+      Eta = get_posterior_mean(BSFG_state,Eta)
+      plot(Eta[is.na(Y)],Y_full[is.na(Y)]);abline(0,1)
+      print(cor(c(Eta[is.na(Y)]),c(Y_full[is.na(Y)])))
+
       BSFG_state = reorder_factors(BSFG_state)
       BSFG_state = clear_Posterior(BSFG_state)
     }
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores = 1)
-    if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
-    if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
+    # if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
+    # if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
       # BSFG_state$current_state = update_k(BSFG_state)

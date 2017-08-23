@@ -48,10 +48,12 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
     return(list(Eta = Eta,Eta_mean = Eta_mean))
   })
   return(list(state = observation_model_state,
-              posteriorSample_params = c(),
-              posteriorMean_params = c('Eta','Eta_mean')
+              posteriorSample_params = c('Eta'),
+              posteriorMean_params = c('Eta_mean')
   ))
 }
+
+
 
 #' Sample Eta given a voom observation model
 #'
