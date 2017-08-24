@@ -114,6 +114,7 @@ reorder_factors = function(BSFG_state){
 
   current_state = BSFG_state$current_state
 
+  # reorder factors based on var(Lambda) * var(F)
   Lambda = current_state$Lambda
   F = current_state$F
 
@@ -123,7 +124,7 @@ reorder_factors = function(BSFG_state){
 
   reorder_params = c('Lambda','Lambda_prec','Plam',
                      'delta','tauh',
-                     'F','B_F','U_F','F_h2','U_F_prec','F_e_prec','tot_F_prec'
+                     'F','B_F','U_F','F_h2','F_e_prec','tot_F_prec', 'B_F_prec'
   )
 
   # reorder currrent state
@@ -145,6 +146,24 @@ reorder_factors = function(BSFG_state){
 
   BSFG_state$Posterior = Posterior
 
+  return(BSFG_state)
+}
+
+
+rescale_factors_F = function(BSFG_state){
+  # rescale factors based on F
+  BSFG_state$current_state = within(BSFG_state$current_state,{
+    F_sizes = colMeans(F^2)
+    F = sweep(F,2,sqrt(F_sizes),'/')
+    B_F = sweep(B_F,2,sqrt(F_sizes),'/')
+    U_F = sweep(U_F,2,sqrt(F_sizes),'/')
+    B_F_prec = sweep(B_F_prec,2,F_sizes,'*')
+    Lambda = sweep(Lambda,2,sqrt(F_sizes),'*')
+    delta_factor = c(F_sizes[1],exp(diff(log(F_sizes))))
+    delta[] = delta / delta_factor
+    tauh[] = cumprod(delta)
+    Plam[] = sweep(Lambda_prec,2,tauh,'*')
+  })
   return(BSFG_state)
 }
 
@@ -243,7 +262,7 @@ clear_Posterior = function(BSFG_state) {
   Posterior$total_samples = 0
   Posterior = reset_Posterior(Posterior,BSFG_state)
 
-  if(length(list.files(path = Posterior$folder))>0) system('rm Posterior/*')
+  if(length(list.files(path = Posterior$folder))>0) system(sprintf('rm %s/*',Posterior$folder))
   Posterior$files = c()
 
   BSFG_state$Posterior = Posterior
@@ -272,12 +291,13 @@ save_posterior_chunk = function(BSFG_state){
       saveRDS(samples,file = file_name,compress = FALSE)
     }
   })
+  print(sprintf('%d files',length(grep(file_suffix,list.files(path = folder)))))
   if(length(grep(file_suffix,list.files(path = folder)))>0) {
     Posterior$files = unique(c(Posterior$files,file_suffix))
   }
   Posterior = reset_Posterior(Posterior,BSFG_state)
   BSFG_state$Posterior = Posterior
-  save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
+  saveRDS(Posterior,file = sprintf('%s/Posterior_base.rds',folder))
   return(BSFG_state)
 }
 
@@ -396,11 +416,13 @@ load_posterior_param_old = function(BSFG_state,param,chunks=NULL){
 
 #' Re-loads a full Posterior list with all parameters
 #'
-#' @param Posterior an empty Posterior list (after call to \link{clear_Posterior})
+#' @param BSFG_state a BSFG_state object (with empty Posterior)
 #' @param params list of parameters to load. If NULL, all parameters will be loaded
 #' @return Posterior list, as part of a BSFG_state object
 reload_Posterior = function(BSFG_state,params = NULL){
-  Posterior = BSFG_state$Posterior
+  folder = BSFG_state$Posterior$folder
+  Posterior = readRDS(paste(folder,'Posterior_base.rds',sep='/'))
+  BSFG_state$Posterior = Posterior
   if(is.null(params)) params = c(Posterior$posteriorSample_params,Posterior$posteriorMean_params)
   for(param in params){
     Posterior[[param]] = load_posterior_param(BSFG_state,param)
@@ -452,7 +474,9 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
   extra_terms = terms[terms %in% with(BSFG_state,c(names(current_state),names(data_matrices),names(priors),names(Posterior))) == F]
   extra_env = c()
   for(term in extra_terms){
-    if(term %in% ls(parent.frame(2))) extra_env[[term]] = parent.frame(2)[[term]]
+    if(term %in% ls(parent.frame(2))) {
+      extra_env[[term]] = parent.frame(2)[[term]]
+    }
   }
   if(is.null(samples)) {  # count # available samples for the first term in terms (assuming it is in Posterior)
     term1 = terms[terms %in% BSFG_state$Posterior$posteriorSample_params][1]
@@ -468,13 +492,22 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
     if(is(result,'Matrix')) result = as.matrix(result)
     result
   }
-  sample_1_result = per_sample_fun(1)
+  sample_1_result <- tryCatch(per_sample_fun(1),
+      error = function(e) {
+        message(e)
+        return(NULL)
+      })
+  if(is.null(sample_1_result)) return(NULL)
   dim_1 = dim(sample_1_result) # get the dimension of the returned value
-  if(is.null(dim_1)) dim_1 = length(sample_1_result)
   # calculate value for each sample
   res = do.call(c,mclapply(samples,per_sample_fun,mc.cores = mc.cores))
   # re-formulate into an appropriate array with the first dimension as samples
-  aperm(array(res,dim = c(dim_1,length(samples))),c(3,1,2))
+  if(is.null(dim_1)) {
+    dim_1 = length(sample_1_result)
+    matrix(res,ncol = dim_1,byrow=T)
+  } else {
+    aperm(array(res,dim = c(dim_1,length(samples))),c(3,1,2))
+  }
 }
 
 #' Calculates posterior mean of a function of parameters
@@ -492,6 +525,7 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
 #'
 #' @return posterior mean matrix
 get_posterior_mean = function(X,FUN,bychunk = FALSE,mc.cores = detectCores(),...){
+  result = NULL
   if(!bychunk) {
     if(is(X,'BSFG_state')) {
       BSFG_state = X
@@ -557,4 +591,17 @@ get_posterior_HPDinterval = function(X,FUN = NULL,prob = 0.95,...){
   if(length(dims) == 3) result = aperm(array(apply(X,3,function(x) HPDinterval(mcmc(x),prob=prob)),c(dims[2],2,dims[3])),c(2,1,3))
   if(length(dims) == 2) result = t(HPDinterval(mcmc(X),prob=prob))
   result
+}
+
+
+#' Converts dense Matrix to "matrix" faster!
+#'
+#' @param X a ddenseMatrix
+#'
+#' @return a matrix
+#' @export
+#'
+#' @examples
+toDense = function(X) {
+  matrix(X@x,nrow(X))
 }
