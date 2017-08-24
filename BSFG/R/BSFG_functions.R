@@ -297,7 +297,7 @@ save_posterior_chunk = function(BSFG_state){
   }
   Posterior = reset_Posterior(Posterior,BSFG_state)
   BSFG_state$Posterior = Posterior
-  save(Posterior,file = sprintf('%s/Posterior_base.RData',folder))
+  saveRDS(Posterior,file = sprintf('%s/Posterior_base.rds',folder))
   return(BSFG_state)
 }
 
@@ -416,11 +416,13 @@ load_posterior_param_old = function(BSFG_state,param,chunks=NULL){
 
 #' Re-loads a full Posterior list with all parameters
 #'
-#' @param Posterior an empty Posterior list (after call to \link{clear_Posterior})
+#' @param BSFG_state a BSFG_state object (with empty Posterior)
 #' @param params list of parameters to load. If NULL, all parameters will be loaded
 #' @return Posterior list, as part of a BSFG_state object
 reload_Posterior = function(BSFG_state,params = NULL){
-  Posterior = BSFG_state$Posterior
+  folder = BSFG_state$Posterior$folder
+  Posterior = readRDS(paste(folder,'Posterior_base.rds',sep='/'))
+  BSFG_state$Posterior = Posterior
   if(is.null(params)) params = c(Posterior$posteriorSample_params,Posterior$posteriorMean_params)
   for(param in params){
     Posterior[[param]] = load_posterior_param(BSFG_state,param)
@@ -472,7 +474,9 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
   extra_terms = terms[terms %in% with(BSFG_state,c(names(current_state),names(data_matrices),names(priors),names(Posterior))) == F]
   extra_env = c()
   for(term in extra_terms){
-    if(term %in% ls(parent.frame(2))) extra_env[[term]] = parent.frame(2)[[term]]
+    if(term %in% ls(parent.frame(2))) {
+      extra_env[[term]] = parent.frame(2)[[term]]
+    }
   }
   if(is.null(samples)) {  # count # available samples for the first term in terms (assuming it is in Posterior)
     term1 = terms[terms %in% BSFG_state$Posterior$posteriorSample_params][1]
@@ -488,7 +492,12 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
     if(is(result,'Matrix')) result = as.matrix(result)
     result
   }
-  sample_1_result = per_sample_fun(1)
+  sample_1_result <- tryCatch(per_sample_fun(1),
+      error = function(e) {
+        message(e)
+        return(NULL)
+      })
+  if(is.null(sample_1_result)) return(NULL)
   dim_1 = dim(sample_1_result) # get the dimension of the returned value
   # calculate value for each sample
   res = do.call(c,mclapply(samples,per_sample_fun,mc.cores = mc.cores))
@@ -516,6 +525,7 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
 #'
 #' @return posterior mean matrix
 get_posterior_mean = function(X,FUN,bychunk = FALSE,mc.cores = detectCores(),...){
+  result = NULL
   if(!bychunk) {
     if(is(X,'BSFG_state')) {
       BSFG_state = X

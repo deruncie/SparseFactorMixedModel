@@ -122,6 +122,11 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     if(!'model_matrices' %in% ls()){
       if(!'ID' %in% colnames(data)) stop('ID column required in data')
       if(!length(unique(data$ID)) == nrow(data)) stop('duplicate IDs in data')
+
+      # ensure ID is a character for matching
+      observations$ID = as.character(observations$ID)
+      data$ID = as.character(data$ID)
+
       lm1 = lm(individual_model,observations)
       t2 = delete.response(terms(lm1))
 
