@@ -494,7 +494,7 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
   }
   sample_1_result <- tryCatch(per_sample_fun(1),
       error = function(e) {
-        message(e)
+        message(e,'\n')
         return(NULL)
       })
   if(is.null(sample_1_result)) return(NULL)
