@@ -45,7 +45,7 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
       }
       Eta[missing_indices] = Eta_mean[missing_indices] + resids
     }
-    return(list(Eta = Eta,Eta_mean = Eta_mean))
+    return(list(Eta = Eta,Eta_mean = Eta_mean,Y_missing = Y_missing))
   })
   return(list(state = observation_model_state,
               posteriorSample_params = c('Eta'),
@@ -118,7 +118,6 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
   observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
 
     if(!'Y' %in% ls()) Y = NULL
-
     if(!'model_matrices' %in% ls()){
       if(!'ID' %in% colnames(data)) stop('ID column required in data')
       if(!length(unique(data$ID)) == nrow(data)) stop('duplicate IDs in data')
@@ -138,15 +137,19 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       id_index = tapply(1:nrow(observations),observations$ID,function(x) x)
       model_matrices = lapply(data$ID,function(id) {
         x = id_index[[id]]
+        X = model.matrix(Terms,data = observations[x,])
         list(
-          X = model.matrix(Terms,data = observations[x,]),
+          X = X,
           y = Y[x,,drop=FALSE],
           s = rep(1,length(x)),
-          position = x
+          position = x,
+          missing = colSums(X!=0) == 0
         )
       })
       names(model_matrices) = data$ID
+      Y_missing = t(sapply(model_matrices,function(x) x$missing))
     }
+
 
     n = length(model_matrices)
     n_traits = ncol(model_matrices[[1]]$y) # number of traits
@@ -192,7 +195,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
 
     resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape + 0.5*nrow(Y_tilde), rate = resid_Y_prec_rate + 0.5*colSums(Y_tilde^2)),nr=1)
 
-    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Terms = Terms,var_Eta = var_Eta,Y = Y, Y_fitted=Y_fitted))
+    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Y_missing=Y_missing, Terms = Terms,var_Eta = var_Eta,Y = Y, Y_fitted=Y_fitted))
   })
   return(list(state = observation_model_state,
               posteriorSample_params = c('Y_fitted','Eta','resid_Y_prec'),

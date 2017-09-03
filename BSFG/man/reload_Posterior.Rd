@@ -7,9 +7,9 @@
 reload_Posterior(BSFG_state, params = NULL)
 }
 \arguments{
-\item{params}{list of parameters to load. If NULL, all parameters will be loaded}
+\item{BSFG_state}{a BSFG_state object (with empty Posterior)}
 
-\item{Posterior}{an empty Posterior list (after call to \link{clear_Posterior})}
+\item{params}{list of parameters to load. If NULL, all parameters will be loaded}
 }
 \value{
 Posterior list, as part of a BSFG_state object

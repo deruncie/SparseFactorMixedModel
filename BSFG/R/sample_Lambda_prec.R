@@ -38,6 +38,7 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
 
                          # # -----Update Plam-------------------- #
                          Plam[] = sweep(Lambda_prec,2,tauh,'*')
+                         if('Plam_filter' %in% ls()) Plam[] = Plam * Plam_filter
                        })))
   return(current_state)
 }

@@ -245,6 +245,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   # initialize Eta
   observation_model_state = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
   Eta = observation_model_state$state$Eta
+  if('Y_missing' %in% names(observation_model_state$state)) observation_model_parameters$Y_missing = as(observation_model_state$state$Y_missing,'lgTMatrix')
   n = nrow(data)
   p = ncol(Eta)
   traitnames = colnames(Eta)
@@ -681,7 +682,7 @@ initialize_variables = function(BSFG_state,...){
     #   Prior: Normal distribution for each element.
     #       mu = 0
     #       sd = sqrt(1/Plam)
-    Lambda = matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
+    Lambda = 0*matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
     rownames(Lambda) = traitnames
 
     # residuals
