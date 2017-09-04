@@ -6,7 +6,7 @@ library(BSFG)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 2
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.3,5)),Va = 2, Ve = 2,Vb = 2)
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 2, Ve = 2,Vb = 2)
 set.seed(seed)
 load('setup.RData')
 
@@ -28,8 +28,8 @@ X = setup$X
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  # sampler = 'fast_BSFG',
-  sampler = 'fast_missing_BSFG',
+  sampler = 'fast_BSFG',
+  # sampler = 'fast_missing_BSFG',
   # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
@@ -92,11 +92,11 @@ priors = BSFG_priors(
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
 data$ID = sample(1:nrow(data))
 # diag(K) = diag(K) + 1e-6
-Y_full = Y
-nGroup = 5
-for(i in 1:nGroup) {
-  Y[(i+(1:nrow(Y)-1)) %% nGroup != 0,1:(100/nGroup)+(i-1)*(100/nGroup)] = NA
-}
+# Y_full = Y
+# nGroup = 5
+# for(i in 1:nGroup) {
+#   Y[(i+(1:nrow(Y)-1)) %% nGroup != 0,1:(100/nGroup)+(i-1)*(100/nGroup)] = NA
+# }
 # i = sample(1:500,250)
 # Y[i,1:50] = NA
 # Y[-i,-c(1:50)] = NA
@@ -115,6 +115,7 @@ save(BSFG_state,file="BSFG_state.RData")
 
 BSFG_state = clear_Posterior(BSFG_state)
 
+class(BSFG_state) = c('fast_BSFG_noU',class(BSFG_state))
 
 # load('current_state.RData')
 # load('BSFG_state.RData')
@@ -135,8 +136,8 @@ BSFG_state = clear_Posterior(BSFG_state)
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
-for(i  in 1:99) {
-    if(i %% 10 == 0){
+for(i  in 1:11) {
+    if(i %% 6 == 0){
       BSFG_state = reorder_factors(BSFG_state)
       BSFG_state = clear_Posterior(BSFG_state)
     }

@@ -311,6 +311,37 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_coefMat_uncorrelated_parallel_Eigen
+MatrixXd sample_coefMat_uncorrelated_parallel_Eigen(Map<MatrixXd> Y, Map<MatrixXd> X, Map<MatrixXd> resid_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, Map<MatrixXd> randn_theta, Map<MatrixXd> randn_e, int grainSize);
+RcppExport SEXP BSFG_sample_coefMat_uncorrelated_parallel_Eigen(SEXP YSEXP, SEXP XSEXP, SEXP resid_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type resid_prec(resid_precSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_theta(randn_thetaSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_e(randn_eSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_coefMat_uncorrelated_parallel_Eigen(Y, X, resid_prec, prior_mean, prior_prec, randn_theta, randn_e, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}
+// uncorrelated_prec_mat
+MatrixXd uncorrelated_prec_mat(Map<VectorXd> h2, Map<VectorXd> tot_prec, Map<VectorXd> s);
+RcppExport SEXP BSFG_uncorrelated_prec_mat(SEXP h2SEXP, SEXP tot_precSEXP, SEXP sSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type h2(h2SEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_prec(tot_precSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type s(sSEXP);
+    rcpp_result_gen = Rcpp::wrap(uncorrelated_prec_mat(h2, tot_prec, s));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sample_MME_single_diagK_c
 VectorXd sample_MME_single_diagK_c(Map<VectorXd> y, MSpMat W, Map<VectorXd> prior_mean, Map<VectorXd> prior_prec, MSpMat chol_R, double tot_Eta_prec, Map<VectorXd> randn_theta, Map<VectorXd> randn_e);
 RcppExport SEXP BSFG_sample_MME_single_diagK_c(SEXP ySEXP, SEXP WSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP chol_RSEXP, SEXP tot_Eta_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP) {

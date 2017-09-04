@@ -73,6 +73,14 @@ sample_factors_scores_sparse_mising_c_Eigen <- function(Eta_tilde, prior_mean, L
     .Call(BSFG_sample_factors_scores_sparse_mising_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws, Y_row_obs_index, Y_row_obs_sets)
 }
 
+sample_coefMat_uncorrelated_parallel_Eigen <- function(Y, X, resid_prec, prior_mean, prior_prec, randn_theta, randn_e, grainSize) {
+    .Call(BSFG_sample_coefMat_uncorrelated_parallel_Eigen, Y, X, resid_prec, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
+}
+
+uncorrelated_prec_mat <- function(h2, tot_prec, s) {
+    .Call(BSFG_uncorrelated_prec_mat, h2, tot_prec, s)
+}
+
 sample_MME_single_diagK_c <- function(y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {
     .Call(BSFG_sample_MME_single_diagK_c, y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e)
 }

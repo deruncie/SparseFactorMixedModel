@@ -1,5 +1,6 @@
 library(microbenchmark)
 library(MCMCpack)
+library(Matrix)
 library(BSFG)
 
 
@@ -7,7 +8,7 @@ library(BSFG)
 # # you can repeat the MCMC exactly
 seed = 2
 nTrait = 20
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=nTrait, b=5, factor_h2s= c(rep(0,5),rep(0.9,5)),Va = 1, Ve = 1,Vb = 0,numeff= rep(nTrait/2,nTrait))
+new_halfSib_simulation_2env('Sim_FE_1', nSire=50,nRep=10,p=nTrait, b=5, factor_h2s= c(rep(0,5),rep(0,5)),Va = 1, Ve = 1,Vb = 0,numeff= rep(nTrait/2,nTrait))
 set.seed(seed)
 load('setup.RData')
 
@@ -93,17 +94,17 @@ priors = BSFG_priors(
 # setup$Y[sample(1:prod(dim(setup$Y)),5000)] = NA
 data$ID = sample(1:nrow(data))
 # diag(K) = diag(K) + 1e-6
-Y_full = Y
-nGroup = 2
-for(i in 1:nGroup) {
-  Y[(i+(1:nrow(Y)-1)) %% nGroup != 0,1:(nTrait/nGroup)+(i-1)*(nTrait/nGroup)] = NA
-}
+# Y_full = Y
+# nGroup = 2
+# for(i in 1:nGroup) {
+#   Y[(i+(1:nrow(Y)-1)) %% nGroup != 0,1:(nTrait/nGroup)+(i-1)*(nTrait/nGroup)] = NA
+# }
 # i = sample(1:500,250)
 # Y[i,1:50] = NA
 # Y[-i,-c(1:50)] = NA
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
-BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, #factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
                                   run_parameters=run_parameters,
                                   priors=priors,
@@ -135,13 +136,13 @@ BSFG_state = clear_Posterior(BSFG_state)
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
-for(i  in 1:99) {
+for(i  in 1:39) {
     if(i %% 10 == 0){
 
       BSFG_state$Posterior = reload_Posterior(BSFG_state)
       Eta = get_posterior_mean(BSFG_state,Eta)
-      plot(Eta[is.na(Y)],Y_full[is.na(Y)]);abline(0,1)
-      print(cor(c(Eta[is.na(Y)]),c(Y_full[is.na(Y)])))
+      # plot(Eta[is.na(Y)],Y_full[is.na(Y)]);abline(0,1)
+      # print(cor(c(Eta[is.na(Y)]),c(Y_full[is.na(Y)])))
 
       BSFG_state = reorder_factors(BSFG_state)
       BSFG_state = clear_Posterior(BSFG_state)
@@ -164,6 +165,13 @@ for(i  in 1:99) {
 }
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
+
+P = get_posterior_FUN(BSFG_state,tcrossprod(Lambda))
+Pm = get_posterior_mean(P)
+image(Matrix(abs(Pm - tcrossprod(setup$error_factor_Lambda))))
+trace_plot(P[,2:20,1])
+trace_plot(P[,20+1:20,1])
+
 plot(BSFG_state$Posterior$Eta[is.na(Y)],Y_full[is.na(Y)]);abline(0,1)
 cor(c(BSFG_state$Posterior$Eta[is.na(Y)]),c(Y_full[is.na(Y)]))
 BSFG_state1 = BSFG_state

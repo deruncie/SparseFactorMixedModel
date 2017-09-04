@@ -1058,3 +1058,114 @@ MatrixXd sample_factors_scores_sparse_mising_c_Eigen(
   }
   return Ft.transpose();
 }
+
+
+
+
+/////////////////////
+VectorXd sample_coefs_uncorrelated(
+    VectorXd y,
+    MatrixXd X,
+    VectorXd prior_mean,
+    VectorXd prior_prec,
+    ArrayXd  resid_prec,
+    VectorXd randn_theta,
+    VectorXd randn_e,
+    int b,
+    int n
+) {
+  VectorXd R_sq_diag = resid_prec.sqrt().inverse();
+  VectorXd theta_star = randn_theta.array()/prior_prec.array().sqrt();
+  theta_star += prior_mean;
+  VectorXd e_star = randn_e.array() * R_sq_diag.array();
+  MatrixXd UtW_theta_star = X * theta_star;
+  VectorXd eta_resid = y - UtW_theta_star - e_star;
+  MatrixXd RinvSqUtW = R_sq_diag.cwiseInverse().asDiagonal() * X;
+  VectorXd eta_std = eta_resid.array()/R_sq_diag.array();
+  VectorXd WtURinvy = RinvSqUtW.transpose() * eta_std;
+
+  VectorXd theta_tilda;
+  VectorXd theta_tilda2;
+  if(b < n) {
+    MatrixXd C = RinvSqUtW.transpose() * RinvSqUtW;
+    C.diagonal() += prior_prec;
+    theta_tilda = C.llt().solve(WtURinvy);
+  } else{
+    MatrixXd VAi = X * prior_prec.cwiseInverse().asDiagonal();
+    MatrixXd inner = VAi*X.transpose();
+    inner.diagonal() += R_sq_diag.cwiseProduct(R_sq_diag);
+    VectorXd VAiWtURinvy = VAi * WtURinvy;
+    VectorXd outerWtURinvy = VAi.transpose() * inner.ldlt().solve(VAiWtURinvy);
+    theta_tilda2 = WtURinvy.array() / prior_prec.array();
+    theta_tilda2 -= outerWtURinvy;
+  }
+
+  VectorXd coefs = theta_tilda + theta_star;
+  return coefs;
+}
+
+// [[Rcpp::export()]]
+MatrixXd sample_coefMat_uncorrelated_parallel_Eigen(
+    Map<MatrixXd> Y,
+    Map<MatrixXd> X,
+    Map<MatrixXd> resid_prec,
+    Map<MatrixXd> prior_mean,
+    Map<MatrixXd> prior_prec,
+    Map<MatrixXd> randn_theta,
+    Map<MatrixXd> randn_e,
+    int grainSize){
+
+  // Sample regression coefficients
+  // columns of matrices are independent
+  // each column conditional posterior is a MVN due to conjugacy
+
+  int p = Y.cols();
+  int b = X.cols();
+  int n = X.rows();
+
+  MatrixXd coefs(b,p);
+
+  struct sampleColumn : public Worker {
+    MatrixXd X, Y;
+    MatrixXd resid_prec, prior_mean, prior_prec, randn_theta, randn_e;
+    int b,n;
+    MatrixXd &coefs;
+
+    sampleColumn(MatrixXd X, MatrixXd Y, MatrixXd resid_prec, MatrixXd prior_mean, MatrixXd prior_prec,
+                 MatrixXd randn_theta, MatrixXd randn_e,
+                 int b, int n,
+                 MatrixXd &coefs) :
+      X(X), Y(Y), resid_prec(resid_prec), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
+      b(b), n(n),
+      coefs(coefs) {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      for(std::size_t j = begin; j < end; j++){
+        coefs.col(j) = sample_coefs_uncorrelated(Y.col(j), X, prior_mean.col(j), prior_prec.col(j), resid_prec.col(j),
+                  randn_theta.col(j),randn_e.col(j),b,n);
+      }
+    }
+  };
+
+  sampleColumn sampler(X, Y, resid_prec, prior_mean, prior_prec, randn_theta,randn_e, b, n, coefs);
+  RcppParallel::parallelFor(0,p,sampler,grainSize);
+
+  return(coefs);
+}
+
+
+// [[Rcpp::export()]]
+MatrixXd uncorrelated_prec_mat(
+    Map<VectorXd> h2,
+    Map<VectorXd> tot_prec,
+    Map<VectorXd> s
+){
+  int n = s.size();
+  int p = h2.size();
+
+  MatrixXd Prec = MatrixXd::Constant(n,p,1);
+  Prec.rowwise() -= h2.transpose();
+  Prec += s*h2.transpose();
+  Prec = Prec.cwiseInverse() * tot_prec.asDiagonal();
+  return(Prec);
+}
