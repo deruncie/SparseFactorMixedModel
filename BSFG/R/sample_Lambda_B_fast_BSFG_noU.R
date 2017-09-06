@@ -23,22 +23,30 @@ sample_Lambda_B.fast_BSFG_noU = function(BSFG_state,grainSize,...) {
       prior_prec = t(Plam)
     }
     if(is.null(cis_genotypes)){
+      # recover()
       randn_theta = matrix(rnorm(rows*p),rows)
       randn_e = matrix(rnorm(n*p),n)
       # UtE = toDense(Ut %*% Eta)
       # UtD = toDense(Ut %*% Design)
       # microbenchmark(
-      #   {
-      coefs = sample_coefs_parallel_sparse_c_Eigen( Ut,Eta,Design,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+        # {
+          coefs = sample_coefs_parallel_sparse_c_Eigen( Ut,Eta,Design,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      #     coefs2 = sample_coefs_parallel_sparse_c_Eigen2( Ut,Eta,Design,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      # )
         # },
       # {
       # },{
         # h2_mat = resid_h2[rep(1,n),]
         # R_var = (h2_mat*s + 1-h2_mat) / tot_Eta_prec[rep(1,n),]
       # coefs2 = sample_coefs_parallel_sparse_c_Eigen2( Ut,Eta,Design,R_var, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
-      # },{
+      #   },{
+      #     UtE = toDense(Ut %*% Eta)
+      #     UtD = toDense(Ut %*% Design)
+      #     coefs2 = sample_coefs_parallel_sparse_c_Eigen2(UtE,UtD,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      #   },{
       # R_prec = uncorrelated_prec_mat(resid_h2,tot_Eta_prec,s)
-      # coefs3 = sample_coefs_parallel_sparse_c_Eigen3( (Ut %*% Eta),(Ut %*% Design),R_prec, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      # # coefs3 = sample_coefs_parallel_sparse_c_Eigen3( (Ut %*% Eta),(Ut %*% Design),R_prec, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      # coefs3 = sample_coefMat_uncorrelated_parallel_Eigen(UtE,UtD,R_prec, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
       # })
     # )
       # coefs = rbind(B,t(Lambda))

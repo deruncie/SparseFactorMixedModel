@@ -115,7 +115,7 @@ save(BSFG_state,file="BSFG_state.RData")
 
 BSFG_state = clear_Posterior(BSFG_state)
 
-class(BSFG_state) = c('fast_BSFG_noU',class(BSFG_state))
+# class(BSFG_state) = c('fast_BSFG_noU',class(BSFG_state))
 
 # load('current_state.RData')
 # load('BSFG_state.RData')

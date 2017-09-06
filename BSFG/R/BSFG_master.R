@@ -682,7 +682,7 @@ initialize_variables = function(BSFG_state,...){
     #   Prior: Normal distribution for each element.
     #       mu = 0
     #       sd = sqrt(1/Plam)
-    Lambda = 0*matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
+    Lambda = matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
     rownames(Lambda) = traitnames
 
     # residuals
@@ -768,13 +768,13 @@ initialize_variables = function(BSFG_state,...){
     return(current_state)
   })
 
-  # Initialize Eta
-  observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)$state
-  BSFG_state$current_state[names(observation_model_state)] = observation_model_state
-
   # Initialize parameters for Lambda_prior and B_prior (may be model-specific)
   BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state)
   BSFG_state$current_state = BSFG_state$priors$B_prior$sampler(BSFG_state)
+
+  # Initialize Eta
+  observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)$state
+  BSFG_state$current_state[names(observation_model_state)] = observation_model_state
 
   return(BSFG_state)
 }
