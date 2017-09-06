@@ -75,7 +75,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"BSFG_tot_prec_scores_missing_c",                            (DL_FUNC) &BSFG_tot_prec_scores_missing_c,                             4},
     {"BSFG_tot_prec_scores_withX_c",                              (DL_FUNC) &BSFG_tot_prec_scores_withX_c,                               5},
     {"BSFG_uncorrelated_prec_mat",                                (DL_FUNC) &BSFG_uncorrelated_prec_mat,                                 3},
-    {"_rcpp_module_boot_Pre_calculations",                        (DL_FUNC) &_rcpp_module_boot_Pre_calculations,                 0},
+    {"_rcpp_module_boot_Pre_calculations",                        (DL_FUNC) &_rcpp_module_boot_Pre_calculations,                         0},
     {NULL, NULL, 0}
 };
 
