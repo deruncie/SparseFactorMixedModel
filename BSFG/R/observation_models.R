@@ -116,7 +116,6 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
   data_matrices = BSFG_state$data_matrices
 
   observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
-
     if(!'Y' %in% ls()) Y = NULL
     if(!'model_matrices' %in% ls()){
       if(!'ID' %in% colnames(data)) stop('ID column required in data')

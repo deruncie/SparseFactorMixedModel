@@ -32,7 +32,6 @@ VectorXd sample_coefs_uncorrelated(
   VectorXd WtURinvy = RinvSqUtW.transpose() * eta_std;
 
   VectorXd theta_tilda;
-  VectorXd theta_tilda2;
   if(b < n) {
     MatrixXd C = RinvSqUtW.transpose() * RinvSqUtW;
     C.diagonal() += prior_prec;
@@ -43,8 +42,8 @@ VectorXd sample_coefs_uncorrelated(
     inner.diagonal() += R_sq_diag.cwiseProduct(R_sq_diag);
     VectorXd VAiWtURinvy = VAi * WtURinvy;
     VectorXd outerWtURinvy = VAi.transpose() * inner.ldlt().solve(VAiWtURinvy);
-    theta_tilda2 = WtURinvy.array() / prior_prec.array();
-    theta_tilda2 -= outerWtURinvy;
+    theta_tilda = WtURinvy.array() / prior_prec.array();
+    theta_tilda -= outerWtURinvy;
   }
 
   VectorXd coefs = theta_tilda + theta_star;
@@ -379,7 +378,8 @@ List sample_coefs_set_c(
         int b = randn_theta_list[j].rows();
         int n_obs = randn_e_list[j].rows();
         for(int t = 0; t < n_traits; t++) {
-          VectorXd resid_prec = tot_Eta_prec(j,t) * (h2s(j,t) * s_list[j].array() + (1.0-h2s(j,t))).inverse();
+          VectorXd s = s_list[j];
+          VectorXd resid_prec = tot_Eta_prec(j,t) * (h2s(j,t) * s.array() + (1.0-h2s(j,t))).inverse();
           coefs.block(t*b,j,b,1) = sample_coefs_uncorrelated(UtEta_list[j].col(t), UtW_list[j], prior_mean.block(t*b,j,b,1),
                       prior_prec.block(t*b,j,b,1), resid_prec, randn_theta_list[j].col(t),randn_e_list[j].col(t),b,n_obs);
         }
@@ -783,7 +783,8 @@ MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen2(
         }
         UtEta_j = Ut_s[Y_obs_index[j]-1] * UtEta_j;
 
-        VectorXd resid_prec = tot_Eta_prec(j) * (h2(j) * s_s[Y_obs_index[j]-1].array() + (1.0-h2(j))).inverse();
+        VectorXd s = s_s[Y_obs_index[j]-1];
+        VectorXd resid_prec = tot_Eta_prec(j) * (h2(j) * s.array() + (1.0-h2(j))).inverse();
         coefs.col(j) = sample_coefs_uncorrelated(UtEta_j, UtW_s[Y_obs_index[j]-1], prior_mean.col(j), prior_prec.col(j), resid_prec,
                   randn_theta.col(j),randn_e_list[j],b,n_obs);
       }
