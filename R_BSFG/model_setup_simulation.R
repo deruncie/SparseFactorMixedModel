@@ -1,6 +1,7 @@
 library(microbenchmark)
 library(MCMCpack)
 library(BSFG)
+library(Matrix)
 
 
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
@@ -100,7 +101,8 @@ data$ID = sample(1:nrow(data))
 # i = sample(1:500,250)
 # Y[i,1:50] = NA
 # Y[-i,-c(1:50)] = NA
-BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|Sire), data,# factor_model_fixed = ~0,
+# BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
                                   K_mats = list(animal = K),

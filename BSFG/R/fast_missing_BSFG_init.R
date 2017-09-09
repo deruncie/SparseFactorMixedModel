@@ -38,15 +38,17 @@ initialize_BSFG.fast_missing_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_
     unique_Y_col_obs = unique(c(list(1:nrow(Y_missing)),Y_col_obs))
     unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
     Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
-    invert_aI_bZKZ = lapply(unique_Y_col_obs,function(x) {
+    invert_aI_bZKZ = lapply(seq_along(unique_Y_col_obs),function(i) {
+      x = unique_Y_col_obs[[i]]
       if(length(x) == 0){
         stop('Columns of Y have 100% issing data! Please drop these columns.')
       }
       result = svd(ZKZt[x,x])
       return(list(
-        Ut = t(as(Matrix(result$u,sparse=T),'dgCMatrix')),
+        Qt = t(as(Matrix(result$u,sparse=T),'dgCMatrix')),
         s = result$d,
-        Y_obs = x
+        Y_obs = x,
+        Y_cols = which(Y_col_obs_index == i)
       ))
     })
 
@@ -70,19 +72,21 @@ initialize_BSFG.fast_missing_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_
                   X = X,c=c,s=s))
     }
 
-    invert_aZZt_Kinv = lapply(unique_Y_col_obs,function(x) {
+    invert_aZZt_Kinv = lapply(seq_along(unique_Y_col_obs),function(i) {
+      x = unique_Y_col_obs[[i]]
       Z_sub = Z[x,]
       svd_ZZt = svd(crossprod(Z_sub))
       ZZt_sqrt = t(sweep(svd_ZZt$u,2,sqrt(svd_ZZt$d),'*'))
       result = GSVD_R(ZZt_sqrt,as.matrix(chol_Kinv))
-      U = as(drop0(Matrix(t(solve(result$X)),sparse=T),tol = run_parameters$drop0_tol),'dgCMatrix')
+      Q = as(drop0(Matrix(t(solve(result$X)),sparse=T),tol = run_parameters$drop0_tol),'dgCMatrix')
 
       return(list(
-        U = U,
-        ZUt = t(Z_sub %*% U),
+        Q = Q,
+        ZQt = t(Z_sub %*% Q),
         s1 = result$c^2,
         s2 = result$s^2,
-        Y_obs = x
+        Y_obs = x,
+        Y_cols = which(Y_col_obs_index == i)
       ))
     })
   }
@@ -96,6 +100,12 @@ initialize_BSFG.fast_missing_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_
   Y_row_obs_sets = unique(c(list(1:ncol(Y_missing)),Y_row_obs))
   unique_Y_row_obs_sets = lapply(Y_row_obs_sets,paste,collapse='')
   Y_row_obs_index = sapply(Y_row_obs,function(x) which(unique_Y_row_obs_sets == paste(x,collapse='')))
+  Y_row_obs_sets = lapply(seq_along(Y_row_obs_sets),function(i) {
+    list(
+      columns = Y_row_obs_sets[[i]],
+      rows = which(Y_row_obs_index == i)
+    )
+  })
 
   # ----------------------------- #
   # ----Save run parameters------ #

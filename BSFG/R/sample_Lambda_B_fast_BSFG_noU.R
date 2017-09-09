@@ -30,7 +30,9 @@ sample_Lambda_B.fast_BSFG_noU = function(BSFG_state,grainSize,...) {
       # UtD = toDense(Ut %*% Design)
       # microbenchmark(
         # {
-          coefs = sample_coefs_parallel_sparse_c_Eigen( Ut,Eta,Design,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      resid_prec = uncorrelated_prec_mat(resid_h2,tot_Eta_prec,s)
+      coefs = sample_coefs_parallel_sparse_c_Eigen( Ut %**% Eta,Ut %**% Design,resid_prec, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+          # coefs = sample_coefs_parallel_sparse_c_Eigen( Ut,Eta,Design,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
       #     coefs2 = sample_coefs_parallel_sparse_c_Eigen2( Ut,Eta,Design,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
       # )
         # },

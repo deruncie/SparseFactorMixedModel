@@ -46,6 +46,7 @@ sample_latent_traits.fast_BSFG_noU = function(BSFG_state,grainSize,...) {
     # marginalizing over random effects (conditional on F, F_h2, tot_F_prec, prec_B)
 
     if(b_F > 0){
+      resid_F_prec = uncorrelated_prec_mat(F_h2,tot_F_prec,s)
       # non-QTL fixed effects
       X_F1 = X_F
       b_F1 = ncol(X_F1)
@@ -59,7 +60,8 @@ sample_latent_traits.fast_BSFG_noU = function(BSFG_state,grainSize,...) {
       prior_prec = B_F_prec[1:b_F1,,drop=FALSE] * tot_F_prec[rep(1,b_F1),,drop=FALSE]  # prior for B_F includes tot_F_prec
       randn_theta = matrix(rnorm(b_F1*k),b_F1)
       randn_e = matrix(rnorm(n*k),n)
-      B_F[1:b_F1,] = sample_coefs_parallel_sparse_c_Eigen(Ut,F_tilde,X_F1,F_h2, tot_F_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      B_F[1:b_F1,] = sample_coefs_parallel_sparse_c_Eigen( Ut %**% F_tilde,Ut %**% X_F1,resid_F_prec, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      # B_F[1:b_F1,] = sample_coefs_parallel_sparse_c_Eigen(Ut,F_tilde,X_F1,F_h2, tot_F_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
 
       # QTL fixed effects
       if(length(QTL_columns_factors) > 0){

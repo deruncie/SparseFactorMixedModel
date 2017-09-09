@@ -28,7 +28,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
     if(is.null(invert_aI_bZKZ)) {
       result = svd(Z %*% K %*% t(Z))
       invert_aI_bZKZ = list(
-          U = as(Matrix(result$u,sparse=T),'dgCMatrix'),
+          Q = as(Matrix(result$u,sparse=T),'dgCMatrix'),
           s = result$d
       )
     }
@@ -61,7 +61,7 @@ initialize_BSFG.fast_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_mats = N
         result = GSVD_R(ZZt_sqrt,as.matrix(chol_Kinv))
 
         invert_aZZt_Kinv = list(
-            U = as(drop0(Matrix(t(solve(result$X)),sparse=T),tol = run_parameters$drop0_tol),'dgCMatrix'),
+          Q = as(drop0(Matrix(t(solve(result$X)),sparse=T),tol = run_parameters$drop0_tol),'dgCMatrix'),
             # U = t(solve(result$X)),
     			s1 = result$c^2,
     			s2 = result$s^2

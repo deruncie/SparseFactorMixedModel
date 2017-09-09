@@ -174,10 +174,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     resid_Eta_prec[] = resid_Eta_prec / var_Eta
 
     randn_theta = rnorm(n*p)
-    # randn_e = rnorm(sum(sapply(model_matrices,function(x) length(x$y))))
-    # randn_e = rnorm(n*n_traits)
     randn_e = rnorm(length(Y))
-
     result = sample_coefs_set_c(model_matrices,randn_theta,randn_e,matrix(0,n,n_traits),
                                 matrix(resid_Y_prec,n,n_traits,byrow=T),t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
 

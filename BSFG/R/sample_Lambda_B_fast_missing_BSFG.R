@@ -27,17 +27,8 @@ sample_Lambda_B.fast_missing_BSFG = function(BSFG_state,grainSize,...) {
     if(is.null(cis_genotypes)){
       randn_theta = matrix(rnorm(rows*p),rows)
       randn_e = rnorm(sum(!Y_missing))
-      # randn_e2 = matrix(randn_e,n,p)
-      # microbenchmark::microbenchmark(
-      coefs = sample_coefs_parallel_sparse_missing_c_Eigen2( Eta,as.matrix(Design),resid_h2, tot_Eta_prec,prior_mean,prior_prec,
-                                                             randn_theta,randn_e,invert_aI_bZKZ,Y_col_obs_index,grainSize)
-      # ,
-      # coefs2 = sample_coefs_parallel_sparse_c_Eigen( Ut,Eta,Design,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e2,grainSize)
-      # )
-      # coefs = rbind(B,t(Lambda))
-      # groups = seq(1,rows,by=5)
-      # randn_e = matrix(rnorm(n*p*length(groups)),n*length(groups))
-      # coefs=sample_coefs_parallel_sparse_c_Eigen_group( Ut,Eta,Design,coefs,groups,resid_h2, tot_Eta_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      coefs = sample_coefs_parallel_sparse_missing_c_Eigen( Eta,as.matrix(Design),resid_h2, tot_Eta_prec,prior_mean,prior_prec,
+                                                             randn_theta,randn_e,invert_aI_bZKZ,grainSize)
       if(b > 0){
         B[] = coefs[1:b,,drop=FALSE]
       }

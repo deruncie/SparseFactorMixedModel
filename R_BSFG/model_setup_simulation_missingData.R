@@ -30,8 +30,8 @@ X = setup$X
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  sampler = 'fast_BSFG',
-  # sampler = 'fast_missing_BSFG',
+  # sampler = 'fast_BSFG',
+  sampler = 'fast_missing_BSFG',
   # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
