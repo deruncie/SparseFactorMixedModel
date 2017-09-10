@@ -59,6 +59,12 @@ MatrixXd uncorrelated_prec_mat(
   return(Prec);
 }
 
+// // [[Rcpp::export()]]
+MatrixXd rstdnorm_mat(int n,int p) {
+  VectorXd X_vec = as<VectorXd>(rnorm(n*p));
+  Map<MatrixXd> X_mat(X_vec.data(),n,p);
+  return(X_mat);
+}
 
 // -------------------------- //
 // ----- sample coeffients ----- //
@@ -151,8 +157,6 @@ MatrixXd sample_coefs_parallel_sparse_c_Eigen(
     Map<MatrixXd> resid_prec,
     Map<MatrixXd> prior_mean,
     Map<MatrixXd> prior_prec,
-    Map<MatrixXd> randn_theta,
-    Map<MatrixXd> randn_e,
     int grainSize){
 
   // Sample regression coefficients
@@ -162,6 +166,9 @@ MatrixXd sample_coefs_parallel_sparse_c_Eigen(
   int p = Y.cols();
   int b = X.cols();
   int n = X.rows();
+
+  MatrixXd randn_theta = rstdnorm_mat(b,p);
+  MatrixXd randn_e = rstdnorm_mat(n,p);
 
   MatrixXd coefs(b,p);
 
@@ -182,8 +189,6 @@ MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen(
     Map<VectorXd> tot_Eta_prec,
     Map<MatrixXd> prior_mean,
     Map<MatrixXd> prior_prec,
-    Map<MatrixXd> randn_theta,
-    Map<VectorXd> randn_e,
     Rcpp::List invert_aI_bZKZ,
     int grainSize){
 
@@ -193,10 +198,11 @@ MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen(
 
   int p = Eta.cols();
   int b = W.cols();
+
+
   MatrixXd coefs(b,p);
 
   // sample sets of columns with same pattern of missing data as a block
-  int randn_e_index = 0;
   for(int col_set = 0; col_set < invert_aI_bZKZ.length(); col_set++){
     Rcpp::List invert_aI_bZKZ_i = Rcpp::as<Rcpp::List>(invert_aI_bZKZ[col_set]);
     SpMat Qt = as<MSpMat>(invert_aI_bZKZ_i["Qt"]);
@@ -238,16 +244,14 @@ MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen(
     // pull out prior_mean, prior_prec, randn_theta, randn_e for col_set
     MatrixXd prior_mean_set(b,n_cols);
     MatrixXd prior_prec_set(b,n_cols);
-    MatrixXd randn_theta_set(b,n_cols);
-    MatrixXd randn_e_set(n_obs,n_cols);
     for(int j = 0; j < n_cols; j++){
       int col_j = Y_cols[j]-1;
       prior_mean_set.col(j) = prior_mean.col(col_j);
       prior_prec_set.col(j) = prior_prec.col(col_j);
-      randn_theta_set.col(j) = randn_theta.col(col_j);
-      randn_e_set.col(j) = randn_e.segment(randn_e_index,n_obs);
-      randn_e_index += n_obs;
     }
+
+    MatrixXd randn_theta_set = rstdnorm_mat(b,n_cols);
+    MatrixXd randn_e_set = rstdnorm_mat(n_obs,n_cols);
 
     MatrixXd coefs_set(b,n_cols);
 
@@ -268,8 +272,6 @@ MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen(
 // [[Rcpp::export()]]
 MatrixXd sample_coefs_set_c(
     Rcpp::List model_matrices,
-    Map<VectorXd> randn_theta_vec,
-    Map<VectorXd> randn_e_vec,
     Map<MatrixXd> h2s,
     Map<MatrixXd> tot_Eta_prec,
     Map<MatrixXd> prior_mean,
@@ -297,12 +299,10 @@ MatrixXd sample_coefs_set_c(
 
     total_obs += n_obs;
 
-    MatrixXd r_theta = randn_theta_vec.segment(randn_theta_index,b*p);
-    Map<MatrixXd> randn_theta(r_theta.data(),b,p);
+    MatrixXd randn_theta = rstdnorm_mat(b,p);
     randn_theta_list.push_back(randn_theta);
     randn_theta_index += b*p;
-    MatrixXd r_e = randn_e_vec.segment(randn_e_index,n_obs*p);
-    Map<MatrixXd> randn_e(r_e.data(),n_obs,p);
+    MatrixXd randn_e = rstdnorm_mat(n_obs,p);
     randn_e_list.push_back(randn_e);
     randn_e_index += n_obs*p;
   }
@@ -435,9 +435,6 @@ Rcpp::List sample_cis_coefs_parallel_sparse_c_Eigen(
     Map<MatrixXd> resid_prec,
     Map<MatrixXd> prior_mean,
     Map<MatrixXd> prior_prec,
-    Map<MatrixXd> randn_theta,
-    Map<MatrixXd> randn_e,
-    Map<VectorXd> randn_cis,
     Map<VectorXd> cis_effect_index,
     int grainSize){
 
@@ -449,6 +446,10 @@ Rcpp::List sample_cis_coefs_parallel_sparse_c_Eigen(
   int b = X.cols();
   int n = X.rows();
 
+
+  MatrixXd randn_theta = rstdnorm_mat(b,p);
+  MatrixXd randn_e = rstdnorm_mat(n,p);
+
   std::vector<MatrixXd> cis_X;
   int length_cis = 0;
   for(int i = 0; i < p; i++){
@@ -459,6 +460,7 @@ Rcpp::List sample_cis_coefs_parallel_sparse_c_Eigen(
 
   MatrixXd coefs(b,p);
   VectorXd cis_effects(length_cis);
+  VectorXd randn_cis = as<VectorXd>(rnorm(length_cis));
 
   struct sampleColumn : public Worker {
     MatrixXd Y,X;
@@ -568,7 +570,6 @@ MatrixXd sample_randomEffects_parallel_sparse_c_Eigen (
     Map<ArrayXd> tot_prec,
     Map<ArrayXd> h2,
     List invert_aZZt_Kinv,
-    Map<ArrayXXd> randn_draws,
     int grainSize) {
 
   ArrayXd a_prec = tot_prec / h2;
@@ -581,6 +582,8 @@ MatrixXd sample_randomEffects_parallel_sparse_c_Eigen (
   int p = Eta.cols();
   int r = Z.cols();
   SpMat ZQt = (Z*Q).transpose();
+
+  MatrixXd randn_draws = rstdnorm_mat(r,p);
 
   MatrixXd effects(r,p);
 
@@ -603,7 +606,7 @@ MatrixXd sample_randomEffects_parallel_sparse_missing_c_Eigen (
     Map<ArrayXd> tot_prec,
     Map<ArrayXd> h2,
     List invert_aZZt_Kinv,
-    Map<ArrayXXd> randn_draws,
+    int r,
     int grainSize) {
 
   ArrayXd a_prec = tot_prec / h2;
@@ -611,7 +614,8 @@ MatrixXd sample_randomEffects_parallel_sparse_missing_c_Eigen (
 
 
   int p = Eta.cols();
-  int r = randn_draws.rows();
+
+  MatrixXd randn_draws = rstdnorm_mat(r,p);
   MatrixXd U(r,p);
 
   // process sets of columns with identical patterns of missing observations
@@ -682,9 +686,12 @@ MatrixXd sample_factors_scores_sparse_c_Eigen(
     Map<MatrixXd> prior_mean,
     Map<MatrixXd> Lambda,
     Map<VectorXd> resid_Eta_prec,
-    Map<VectorXd> F_e_prec,
-    Map<MatrixXd> randn_draws
+    Map<VectorXd> F_e_prec
 ) {
+  int n = Eta_tilde.rows();
+  int k = Lambda.cols();
+  MatrixXd randn_draws = rstdnorm_mat(n,k);
+
   MatrixXd Lmsg = resid_Eta_prec.asDiagonal() * Lambda;
   MatrixXd Sigma = Lambda.transpose() * Lmsg;
   Sigma.diagonal() += F_e_prec;
@@ -713,19 +720,17 @@ MatrixXd sample_factors_scores_sparse_missing_c_Eigen(
     Map<MatrixXd> Lambda,
     Map<VectorXd> resid_Eta_prec,
     Map<VectorXd> F_e_prec,
-    Map<MatrixXd> randn_draws,
-    Rcpp::List Y_row_obs_sets
+    Rcpp::List Y_row_obs_sets,
+    int grainSize
 ) {
 
-  int k = randn_draws.rows();
-  int n = randn_draws.cols();
+  int n = Eta_tilde.rows();
+  int k = Lambda.cols();
+  MatrixXd randn_draws = rstdnorm_mat(n,k);
 
   MatrixXd Ft(k,n);
   MatrixXd Lmsg = resid_Eta_prec.asDiagonal() * Lambda;
 
-  std::vector<VectorXi> obs_sets;
-  std::vector<MatrixXd> R_s;
-  std::vector<MatrixXd> Lmsg_s;
   for(int row_set = 0; row_set < Y_row_obs_sets.length(); row_set++){
     Rcpp::List Y_row_obs_sets_i = Rcpp::as<Rcpp::List>(Y_row_obs_sets[row_set]);
     VectorXi obs_set_i = as<VectorXi>(Y_row_obs_sets_i["columns"]);
@@ -746,15 +751,57 @@ MatrixXd sample_factors_scores_sparse_missing_c_Eigen(
     chol_Sigma_set.compute(Sigma_set);
     MatrixXd R_set = chol_Sigma_set.matrixU();
 
+    MatrixXd Ft_set(k, n_rows);
+
+    struct sample_F_col_worker : public RcppParallel::Worker {
+      MatrixXd Eta_tilde;
+      VectorXi obs_set_i;
+      VectorXi rows;
+      int n_traits;
+      MatrixXd Lmsg_set;
+      MatrixXd R_set;
+      MatrixXd prior_mean;
+      VectorXd F_e_prec;
+      MatrixXd randn_draws;
+      MatrixXd &Ft_set;
+
+      sample_F_col_worker(
+        MatrixXd Eta_tilde,
+        VectorXi obs_set_i,
+        VectorXi rows,
+        int n_traits,
+        MatrixXd Lmsg_set,
+        MatrixXd R_set,
+        MatrixXd prior_mean,
+        VectorXd F_e_prec,
+        MatrixXd randn_draws,
+        MatrixXd &Ft_set) :
+        Eta_tilde(Eta_tilde), obs_set_i(obs_set_i), rows(rows), n_traits(n_traits), Lmsg_set(Lmsg_set),
+        R_set(R_set), prior_mean(prior_mean), F_e_prec(F_e_prec), randn_draws(randn_draws), Ft_set(Ft_set)  {}
+
+      void operator()(std::size_t begin, std::size_t end) {
+        for(std::size_t i = begin; i < end; i++){    //
+          // for(int i = 0; i < n_rows; i++){
+          int index = rows[i]-1;
+          Eigen::RowVectorXd Eta_i(n_traits);
+          for(int j = 0; j < n_traits; j++){
+            int trait_index = obs_set_i[j]-1;
+            Eta_i[j] = Eta_tilde.coeffRef(index,trait_index);
+          }
+          VectorXd Meta = R_set.transpose().triangularView<Lower>().solve((Eta_i * Lmsg_set + prior_mean.row(index) * F_e_prec.asDiagonal()).transpose());
+          Ft_set.col(i) = R_set.triangularView<Upper>().solve(Meta + randn_draws.row(index).transpose());
+          // VectorXd res = R_set.triangularView<Upper>().solve(Meta + randn_draws.row(index).transpose());
+          // Ft_set.col(i) = res;
+        }
+      }
+    };
+
+    sample_F_col_worker sampler(Eta_tilde,obs_set_i,rows,n_traits,Lmsg_set,R_set,prior_mean,F_e_prec,randn_draws,Ft_set);
+    RcppParallel::parallelFor(0,n_rows,sampler,grainSize);
+
     for(int i = 0; i < n_rows; i++){
       int index = rows[i]-1;
-      Eigen::RowVectorXd Eta_i(n_traits);
-      for(int j = 0; j < n_traits; j++){
-        int trait_index = obs_set_i[j]-1;
-        Eta_i[j] = Eta_tilde.coeffRef(index,trait_index);
-      }
-      VectorXd Meta = R_set.transpose().triangularView<Lower>().solve((Eta_i * Lmsg_set + prior_mean.row(index) * F_e_prec.asDiagonal()).transpose());
-      Ft.col(index) = R_set.triangularView<Upper>().solve(Meta + randn_draws.col(index));
+      Ft.col(index) = Ft_set.col(i);
     }
   }
   return Ft.transpose();
@@ -1013,13 +1060,13 @@ VectorXi sample_h2s_discrete_MH_fast_c(
     VectorXi h2_index,
     Map<MatrixXd> h2s_matrix,
     Map<VectorXd> s,
-    Map<VectorXd> r_draws,
-    Map<VectorXd> state_draws,
     double step_size,
     int grainSize
 ){
 
   int p = QtEta.cols();
+  VectorXd r_draws = as<VectorXd>(runif(p));
+  VectorXd state_draws = as<VectorXd>(runif(p));
 
   VectorXi new_index(p);
 
@@ -1036,14 +1083,14 @@ VectorXi sample_h2s_discrete_MH_fast_missing_c(
     Map<VectorXd> discrete_priors,
     VectorXi h2_index,
     Map<MatrixXd> h2s_matrix,
-    Map<VectorXd> r_draws,
-    Map<VectorXd> state_draws,
     double step_size,
     Rcpp::List invert_aI_bZKZ,
     int grainSize
 ){
 
   int p = Eta.cols();
+  VectorXd r_draws = as<VectorXd>(runif(p));
+  VectorXd state_draws = as<VectorXd>(runif(p));
 
   VectorXi new_index(p);
 

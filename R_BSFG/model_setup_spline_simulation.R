@@ -86,9 +86,9 @@ BSFG_state = with(setup,BSFG_init(observation_setup, model=~X2+(1|animal), data,
                                   posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects','U_R'),
                                   posteriorMean_params = c()
                                   ))
-BSFG_state$current_state$F_h2
-BSFG_state$priors$h2_priors_resids
-BSFG_state$priors$h2_priors_factors
+# BSFG_state$current_state$F_h2
+# BSFG_state$priors$h2_priors_resids
+# BSFG_state$priors$h2_priors_factors
 
 save(BSFG_state,file="BSFG_state.RData")
 

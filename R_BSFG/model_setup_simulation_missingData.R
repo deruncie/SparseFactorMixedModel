@@ -8,7 +8,7 @@ library(BSFG)
 # # you can repeat the MCMC exactly
 seed = 2
 nTrait = 20
-new_halfSib_simulation_2env('Sim_FE_1', nSire=50,nRep=10,p=nTrait, b=5, factor_h2s= c(rep(0,5),rep(0,5)),Va = 1, Ve = 1,Vb = 0,numeff= rep(nTrait/2,nTrait))
+new_halfSib_simulation_2env('Sim_FE_1', nSire=50,nRep=10,p=nTrait, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 1, Ve = 1,Vb = 0,numeff= rep(nTrait/2,nTrait))
 set.seed(seed)
 load('setup.RData')
 

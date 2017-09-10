@@ -25,40 +25,40 @@ uncorrelated_prec_mat <- function(h2, tot_prec, s) {
     .Call(BSFG_uncorrelated_prec_mat, h2, tot_prec, s)
 }
 
-sample_coefs_parallel_sparse_c_Eigen <- function(Y, X, resid_prec, prior_mean, prior_prec, randn_theta, randn_e, grainSize) {
-    .Call(BSFG_sample_coefs_parallel_sparse_c_Eigen, Y, X, resid_prec, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
+sample_coefs_parallel_sparse_c_Eigen <- function(Y, X, resid_prec, prior_mean, prior_prec, grainSize) {
+    .Call(BSFG_sample_coefs_parallel_sparse_c_Eigen, Y, X, resid_prec, prior_mean, prior_prec, grainSize)
 }
 
-sample_coefs_parallel_sparse_missing_c_Eigen <- function(Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, invert_aI_bZKZ, grainSize) {
-    .Call(BSFG_sample_coefs_parallel_sparse_missing_c_Eigen, Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, randn_theta, randn_e, invert_aI_bZKZ, grainSize)
+sample_coefs_parallel_sparse_missing_c_Eigen <- function(Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, invert_aI_bZKZ, grainSize) {
+    .Call(BSFG_sample_coefs_parallel_sparse_missing_c_Eigen, Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, invert_aI_bZKZ, grainSize)
 }
 
-sample_coefs_set_c <- function(model_matrices, randn_theta_vec, randn_e_vec, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize) {
-    .Call(BSFG_sample_coefs_set_c, model_matrices, randn_theta_vec, randn_e_vec, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize)
+sample_coefs_set_c <- function(model_matrices, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize) {
+    .Call(BSFG_sample_coefs_set_c, model_matrices, h2s, tot_Eta_prec, prior_mean, prior_prec, n, grainSize)
 }
 
 get_fitted_set_c <- function(model_matrices, coefs, grainSize) {
     .Call(BSFG_get_fitted_set_c, model_matrices, coefs, grainSize)
 }
 
-sample_cis_coefs_parallel_sparse_c_Eigen <- function(Y, X, cis_genotypes, resid_prec, prior_mean, prior_prec, randn_theta, randn_e, randn_cis, cis_effect_index, grainSize) {
-    .Call(BSFG_sample_cis_coefs_parallel_sparse_c_Eigen, Y, X, cis_genotypes, resid_prec, prior_mean, prior_prec, randn_theta, randn_e, randn_cis, cis_effect_index, grainSize)
+sample_cis_coefs_parallel_sparse_c_Eigen <- function(Y, X, cis_genotypes, resid_prec, prior_mean, prior_prec, cis_effect_index, grainSize) {
+    .Call(BSFG_sample_cis_coefs_parallel_sparse_c_Eigen, Y, X, cis_genotypes, resid_prec, prior_mean, prior_prec, cis_effect_index, grainSize)
 }
 
-sample_randomEffects_parallel_sparse_c_Eigen <- function(Eta, Z, tot_prec, h2, invert_aZZt_Kinv, randn_draws, grainSize) {
-    .Call(BSFG_sample_randomEffects_parallel_sparse_c_Eigen, Eta, Z, tot_prec, h2, invert_aZZt_Kinv, randn_draws, grainSize)
+sample_randomEffects_parallel_sparse_c_Eigen <- function(Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize) {
+    .Call(BSFG_sample_randomEffects_parallel_sparse_c_Eigen, Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize)
 }
 
-sample_randomEffects_parallel_sparse_missing_c_Eigen <- function(Eta, tot_prec, h2, invert_aZZt_Kinv, randn_draws, grainSize) {
-    .Call(BSFG_sample_randomEffects_parallel_sparse_missing_c_Eigen, Eta, tot_prec, h2, invert_aZZt_Kinv, randn_draws, grainSize)
+sample_randomEffects_parallel_sparse_missing_c_Eigen <- function(Eta, tot_prec, h2, invert_aZZt_Kinv, r, grainSize) {
+    .Call(BSFG_sample_randomEffects_parallel_sparse_missing_c_Eigen, Eta, tot_prec, h2, invert_aZZt_Kinv, r, grainSize)
 }
 
-sample_factors_scores_sparse_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws) {
-    .Call(BSFG_sample_factors_scores_sparse_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws)
+sample_factors_scores_sparse_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec) {
+    .Call(BSFG_sample_factors_scores_sparse_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec)
 }
 
-sample_factors_scores_sparse_missing_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws, Y_row_obs_sets) {
-    .Call(BSFG_sample_factors_scores_sparse_missing_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, randn_draws, Y_row_obs_sets)
+sample_factors_scores_sparse_missing_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, Y_row_obs_sets, grainSize) {
+    .Call(BSFG_sample_factors_scores_sparse_missing_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, Y_row_obs_sets, grainSize)
 }
 
 tot_prec_scores_c <- function(Y, resid_prec) {
@@ -77,12 +77,12 @@ log_p_h2s_fast_missing <- function(Eta, tot_Eta_prec, discrete_priors, invert_aI
     .Call(BSFG_log_p_h2s_fast_missing, Eta, tot_Eta_prec, discrete_priors, invert_aI_bZKZ, grainSize)
 }
 
-sample_h2s_discrete_MH_fast_c <- function(QtEta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, s, r_draws, state_draws, step_size, grainSize) {
-    .Call(BSFG_sample_h2s_discrete_MH_fast_c, QtEta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, s, r_draws, state_draws, step_size, grainSize)
+sample_h2s_discrete_MH_fast_c <- function(QtEta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, s, step_size, grainSize) {
+    .Call(BSFG_sample_h2s_discrete_MH_fast_c, QtEta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, s, step_size, grainSize)
 }
 
-sample_h2s_discrete_MH_fast_missing_c <- function(Eta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, r_draws, state_draws, step_size, invert_aI_bZKZ, grainSize) {
-    .Call(BSFG_sample_h2s_discrete_MH_fast_missing_c, Eta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, r_draws, state_draws, step_size, invert_aI_bZKZ, grainSize)
+sample_h2s_discrete_MH_fast_missing_c <- function(Eta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, step_size, invert_aI_bZKZ, grainSize) {
+    .Call(BSFG_sample_h2s_discrete_MH_fast_missing_c, Eta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, step_size, invert_aI_bZKZ, grainSize)
 }
 
 sample_MME_single_diagK_c <- function(y, W, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {
@@ -113,8 +113,8 @@ log_p_h2s <- function(Y, tot_Eta_prec, Sigma_Choleskys, discrete_priors, grainSi
     .Call(BSFG_log_p_h2s, Y, tot_Eta_prec, Sigma_Choleskys, discrete_priors, grainSize)
 }
 
-sample_h2s <- function(log_ps, rs, grainSize) {
-    .Call(BSFG_sample_h2s, log_ps, rs, grainSize)
+sample_h2s <- function(log_ps, grainSize) {
+    .Call(BSFG_sample_h2s, log_ps, grainSize)
 }
 
 sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, state_draws, step_size, grainSize) {

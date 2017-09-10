@@ -35,7 +35,7 @@ run_parameters = BSFG_control(
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 200,
-  h2_step_size = NULL,
+  h2_step_size = .3,
   burn = 100
 )
 
@@ -45,7 +45,7 @@ priors = BSFG_priors(
   tot_Y_var = list(V = 0.5,   nu = 10),
   tot_F_var = list(V = 18/20, nu = 20),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-  h2_priors_factors_fun = function(h2s,n) ifelse(h2s == 0,n,n/(n-1)),
+  h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1)),
   Lambda_prior = list(
     sampler = sample_Lambda_prec_ARD,
     Lambda_df = 3,
@@ -101,8 +101,8 @@ data$ID = sample(1:nrow(data))
 # i = sample(1:500,250)
 # Y[i,1:50] = NA
 # Y[-i,-c(1:50)] = NA
-BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|Sire), data,# factor_model_fixed = ~0,
-# BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
+# BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|Sire), data,# factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
@@ -138,7 +138,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
-for(i  in 1:11) {
+for(i  in 1:110) {
     if(i %% 6 == 0){
       BSFG_state = reorder_factors(BSFG_state)
       BSFG_state = clear_Posterior(BSFG_state)

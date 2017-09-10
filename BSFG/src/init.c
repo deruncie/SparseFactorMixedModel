@@ -16,24 +16,24 @@ extern SEXP BSFG_log_p_h2s(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_log_p_h2s_fast(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_log_p_h2s_fast_missing(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_rgig_multiple(SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_cis_coefs_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_cis_coefs_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_coefs_parallel_sparse_missing_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_coefs_set_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_coefs_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_coefs_parallel_sparse_missing_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_coefs_set_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_delta_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_factors_scores_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_factors_scores_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_factors_scores_sparse_missing_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_h2s(SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_h2s(SEXP, SEXP);
 extern SEXP BSFG_sample_h2s_discrete_MH_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_h2s_discrete_MH_fast_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_h2s_discrete_MH_fast_missing_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_h2s_discrete_MH_fast_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_h2s_discrete_MH_fast_missing_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_fixedEffects_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_fixedEffects_cis_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_single_diagK_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_single_diagR(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_MME_ZKZts_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP BSFG_sample_randomEffects_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP BSFG_sample_randomEffects_parallel_sparse_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_sample_randomEffects_parallel_sparse_missing_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP BSFG_SxD(SEXP, SEXP);
 extern SEXP BSFG_SxS(SEXP, SEXP);
@@ -52,24 +52,24 @@ static const R_CallMethodDef CallEntries[] = {
     {"BSFG_log_p_h2s_fast",                                       (DL_FUNC) &BSFG_log_p_h2s_fast,                                        5},
     {"BSFG_log_p_h2s_fast_missing",                               (DL_FUNC) &BSFG_log_p_h2s_fast_missing,                                5},
     {"BSFG_rgig_multiple",                                        (DL_FUNC) &BSFG_rgig_multiple,                                         4},
-    {"BSFG_sample_cis_coefs_parallel_sparse_c_Eigen",             (DL_FUNC) &BSFG_sample_cis_coefs_parallel_sparse_c_Eigen,             11},
+    {"BSFG_sample_cis_coefs_parallel_sparse_c_Eigen",             (DL_FUNC) &BSFG_sample_cis_coefs_parallel_sparse_c_Eigen,              8},
     {"BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen",    (DL_FUNC) &BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen,    12},
-    {"BSFG_sample_coefs_parallel_sparse_c_Eigen",                 (DL_FUNC) &BSFG_sample_coefs_parallel_sparse_c_Eigen,                  8},
-    {"BSFG_sample_coefs_parallel_sparse_missing_c_Eigen",         (DL_FUNC) &BSFG_sample_coefs_parallel_sparse_missing_c_Eigen,         10},
-    {"BSFG_sample_coefs_set_c",                                   (DL_FUNC) &BSFG_sample_coefs_set_c,                                    9},
+    {"BSFG_sample_coefs_parallel_sparse_c_Eigen",                 (DL_FUNC) &BSFG_sample_coefs_parallel_sparse_c_Eigen,                  6},
+    {"BSFG_sample_coefs_parallel_sparse_missing_c_Eigen",         (DL_FUNC) &BSFG_sample_coefs_parallel_sparse_missing_c_Eigen,          8},
+    {"BSFG_sample_coefs_set_c",                                   (DL_FUNC) &BSFG_sample_coefs_set_c,                                    7},
     {"BSFG_sample_delta_c_Eigen",                                 (DL_FUNC) &BSFG_sample_delta_c_Eigen,                                  6},
-    {"BSFG_sample_factors_scores_sparse_c_Eigen",                 (DL_FUNC) &BSFG_sample_factors_scores_sparse_c_Eigen,                  6},
+    {"BSFG_sample_factors_scores_sparse_c_Eigen",                 (DL_FUNC) &BSFG_sample_factors_scores_sparse_c_Eigen,                  5},
     {"BSFG_sample_factors_scores_sparse_missing_c_Eigen",         (DL_FUNC) &BSFG_sample_factors_scores_sparse_missing_c_Eigen,          7},
-    {"BSFG_sample_h2s",                                           (DL_FUNC) &BSFG_sample_h2s,                                            3},
+    {"BSFG_sample_h2s",                                           (DL_FUNC) &BSFG_sample_h2s,                                            2},
     {"BSFG_sample_h2s_discrete_MH_c",                             (DL_FUNC) &BSFG_sample_h2s_discrete_MH_c,                             10},
-    {"BSFG_sample_h2s_discrete_MH_fast_c",                        (DL_FUNC) &BSFG_sample_h2s_discrete_MH_fast_c,                        10},
-    {"BSFG_sample_h2s_discrete_MH_fast_missing_c",                (DL_FUNC) &BSFG_sample_h2s_discrete_MH_fast_missing_c,                10},
+    {"BSFG_sample_h2s_discrete_MH_fast_c",                        (DL_FUNC) &BSFG_sample_h2s_discrete_MH_fast_c,                         8},
+    {"BSFG_sample_h2s_discrete_MH_fast_missing_c",                (DL_FUNC) &BSFG_sample_h2s_discrete_MH_fast_missing_c,                 8},
     {"BSFG_sample_MME_fixedEffects_c",                            (DL_FUNC) &BSFG_sample_MME_fixedEffects_c,                            10},
     {"BSFG_sample_MME_fixedEffects_cis_c",                        (DL_FUNC) &BSFG_sample_MME_fixedEffects_cis_c,                        13},
     {"BSFG_sample_MME_single_diagK_c",                            (DL_FUNC) &BSFG_sample_MME_single_diagK_c,                             8},
     {"BSFG_sample_MME_single_diagR",                              (DL_FUNC) &BSFG_sample_MME_single_diagR,                               8},
     {"BSFG_sample_MME_ZKZts_c",                                   (DL_FUNC) &BSFG_sample_MME_ZKZts_c,                                    9},
-    {"BSFG_sample_randomEffects_parallel_sparse_c_Eigen",         (DL_FUNC) &BSFG_sample_randomEffects_parallel_sparse_c_Eigen,          7},
+    {"BSFG_sample_randomEffects_parallel_sparse_c_Eigen",         (DL_FUNC) &BSFG_sample_randomEffects_parallel_sparse_c_Eigen,          6},
     {"BSFG_sample_randomEffects_parallel_sparse_missing_c_Eigen", (DL_FUNC) &BSFG_sample_randomEffects_parallel_sparse_missing_c_Eigen,  6},
     {"BSFG_SxD",                                                  (DL_FUNC) &BSFG_SxD,                                                   2},
     {"BSFG_SxS",                                                  (DL_FUNC) &BSFG_SxS,                                                   2},

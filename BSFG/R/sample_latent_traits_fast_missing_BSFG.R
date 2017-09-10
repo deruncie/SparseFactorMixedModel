@@ -14,7 +14,6 @@ sample_latent_traits.fast_missing_BSFG = function(BSFG_state,grainSize,...) {
 
   current_state_names = names(current_state)
   current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {
-    recover()
     k = ncol(Lambda)
 
     XB = X %**% B
@@ -35,17 +34,13 @@ sample_latent_traits.fast_missing_BSFG = function(BSFG_state,grainSize,...) {
     if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
     if(is.null(h2_step_size)) {
       log_ps = log_p_h2s_fast_missing(Eta_tilde, tot_Eta_prec, h2_priors_resids,invert_aI_bZKZ,grainSize)
-      rs = runif(p)
-      resid_h2_index = sample_h2s(log_ps,rs,grainSize)
+      resid_h2_index = sample_h2s(log_ps,grainSize)
     } else{
-      r_draws = runif(p)
-      state_draws = runif(p)
-      resid_h2_index = sample_h2s_discrete_MH_fast_missing_c(Eta_tilde,tot_Eta_prec,h2_priors_resids,resid_h2_index,h2s_matrix,r_draws,state_draws,h2_step_size,invert_aI_bZKZ,grainSize)+1
+      resid_h2_index = sample_h2s_discrete_MH_fast_missing_c(Eta_tilde,tot_Eta_prec,h2_priors_resids,resid_h2_index,h2s_matrix,h2_step_size,invert_aI_bZKZ,grainSize)+1
     }
     resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
 
-    randn = matrix(rnorm(ncol(Z)*p),ncol(Z))
-    U_R[] = sample_randomEffects_parallel_sparse_missing_c_Eigen(Eta_tilde,tot_Eta_prec,resid_h2,invert_aZZt_Kinv,randn,grainSize)
+    U_R[] = sample_randomEffects_parallel_sparse_missing_c_Eigen(Eta_tilde,tot_Eta_prec,resid_h2,invert_aZZt_Kinv,ncol(Z),grainSize)
 
     resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
 
@@ -66,9 +61,7 @@ sample_latent_traits.fast_missing_BSFG = function(BSFG_state,grainSize,...) {
       }
       prior_mean = matrix(0,b_F1,k)
       prior_prec = B_F_prec[1:b_F1,,drop=FALSE] * tot_F_prec[rep(1,b_F1),,drop=FALSE]  # prior for B_F includes tot_F_prec
-      randn_theta = matrix(rnorm(b_F1*k),b_F1)
-      randn_e = matrix(rnorm(n*k),n)
-      B_F[1:b_F1,] = sample_coefs_parallel_sparse_c_Eigen( Qt %**% F_tilde,Qt %**% X_F1,resid_F_prec, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      B_F[1:b_F1,] = sample_coefs_parallel_sparse_c_Eigen( Qt %**% F_tilde,Qt %**% X_F1,resid_F_prec, prior_mean,prior_prec,grainSize)
 
       # QTL fixed effects
       if(length(QTL_columns_factors) > 0){
@@ -101,27 +94,24 @@ sample_latent_traits.fast_missing_BSFG = function(BSFG_state,grainSize,...) {
 
     if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
     if(is.null(h2_step_size)) {
-      F_h2_index = sample_h2s_discrete_fast(QtF_tilde, tot_F_prec, h2_priors_factors,s,grainSize)
+      log_ps = log_p_h2s_fast(QtF_tilde, tot_F_prec, h2_priors_factors,s,grainSize)
+      F_h2_index = sample_h2s(log_ps,grainSize)
     } else{
-      r_draws = runif(k)
-      state_draws = runif(k)
-      F_h2_index = sample_h2s_discrete_MH_fast_c(QtF_tilde,tot_F_prec,h2_priors_factors,F_h2_index,h2s_matrix,s,r_draws,state_draws,h2_step_size,grainSize)+1
+      F_h2_index = sample_h2s_discrete_MH_fast_c(QtF_tilde,tot_F_prec,h2_priors_factors,F_h2_index,h2s_matrix,s,h2_step_size,grainSize)+1
     }
     F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    randn = matrix(rnorm(ncol(Z)*k),ncol(Z))
-    U_F[] = sample_randomEffects_parallel_sparse_c_Eigen(F_tilde, Z, tot_F_prec, F_h2, invert_aZZt_Kinv[[1]], randn,grainSize)
+    U_F[] = sample_randomEffects_parallel_sparse_c_Eigen(F_tilde, Z, tot_F_prec, F_h2, invert_aZZt_Kinv[[1]], grainSize)
 
     # -----Sample F----------------------- #
     #conditioning on B, U_F,U_R,W,Lambda, F_h2
-    Eta_tilde = Eta - XB - toDense(Z %*% U_R)
+    Eta_tilde = Eta - XB - Z %**% U_R
     F_e_prec = tot_F_prec / (1-F_h2)
-    prior_mean = toDense(Z %*% U_F)
+    prior_mean = Z %**% U_F
     if(b_F > 0) {
       prior_mean = prior_mean + XFBF
     }
-    randn = matrix(rnorm(n*k),k,n)
-    F = sample_factors_scores_sparse_missing_c_Eigen( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec,randn,Y_row_obs_sets)
+    F[] = sample_factors_scores_sparse_missing_c_Eigen( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec,Y_row_obs_sets,grainSize)
   }))
   current_state = current_state[current_state_names]
 

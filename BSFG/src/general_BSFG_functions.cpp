@@ -450,26 +450,32 @@ MatrixXd log_p_h2s(
 
 
 // [[Rcpp::export()]]
-Rcpp::IntegerVector sample_h2s(
+VectorXi sample_h2s(
     Map<ArrayXXd> log_ps,
-    Map<VectorXd> rs,
     int grainSize
 )
 {
 
-  struct sampleColumn : public Worker {
+  int p = log_ps.cols();
+  VectorXd rs = as<VectorXd>(runif(p));
+
+  VectorXi h2s_index(p);
+
+
+  struct sampleColumn : public RcppParallel::Worker {
     ArrayXXd log_ps;
     VectorXd rs;
-    RVector<int> h2s_index;
+    VectorXi &h2s_index;
 
     sampleColumn(ArrayXXd log_ps,
                  VectorXd rs,
-                 Rcpp::IntegerVector h2s_index):
+                 VectorXi &h2s_index):
       log_ps(log_ps), rs(rs), h2s_index(h2s_index) {}
 
     void operator()(std::size_t begin, std::size_t end) {
       int b = log_ps.rows();
       for(std::size_t j = begin; j < end; j++){
+        // for(int j = 0; j < p; j++){
         double max_col = log_ps.col(j).maxCoeff();
         double norm_factor = max_col + log((log_ps.col(j) - max_col).exp().sum());
         VectorXd ps_j = (log_ps.col(j) - norm_factor).exp();
@@ -484,10 +490,6 @@ Rcpp::IntegerVector sample_h2s(
       }
     }
   };
-  int p = log_ps.cols();
-
-  Rcpp::IntegerVector h2s_index(p);
-
   sampleColumn sampler(log_ps,rs,h2s_index);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
 

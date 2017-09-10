@@ -173,19 +173,16 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     Eta_mean = sweep(Eta_mean,2,sqrt(var_Eta),'*')
     resid_Eta_prec[] = resid_Eta_prec / var_Eta
 
-    randn_theta = rnorm(n*p)
-    randn_e = rnorm(length(Y))
-    result = sample_coefs_set_c(model_matrices,randn_theta,randn_e,matrix(0,n,n_traits),
+    coefs = sample_coefs_set_c(model_matrices,matrix(0,n,n_traits),
                                 matrix(resid_Y_prec,n,n_traits,byrow=T),t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
 
-    Eta = t(result$coefs)
+    Y_fitted = get_fitted_set_c(model_matrices,coefs,1)
+    Eta = t(coefs)
     colnames(Eta) = Eta_col_names
     rownames(Eta) = Eta_row_names
 
     # un-scale Eta
     Eta = sweep(Eta,2,sqrt(var_Eta),'/')
-
-    Y_fitted = result$Y_fitted
 
     Y_tilde = Y - Y_fitted
 

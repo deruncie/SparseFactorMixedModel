@@ -25,10 +25,8 @@ sample_Lambda_B.fast_missing_BSFG = function(BSFG_state,grainSize,...) {
       prior_prec = t(Plam)
     }
     if(is.null(cis_genotypes)){
-      randn_theta = matrix(rnorm(rows*p),rows)
-      randn_e = rnorm(sum(!Y_missing))
       coefs = sample_coefs_parallel_sparse_missing_c_Eigen( Eta,as.matrix(Design),resid_h2, tot_Eta_prec,prior_mean,prior_prec,
-                                                             randn_theta,randn_e,invert_aI_bZKZ,grainSize)
+                                                             invert_aI_bZKZ,grainSize)
       if(b > 0){
         B[] = coefs[1:b,,drop=FALSE]
       }

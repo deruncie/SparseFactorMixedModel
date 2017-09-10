@@ -23,10 +23,8 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
       prior_prec = t(Plam)
     }
     if(is.null(cis_genotypes)){
-      randn_theta = matrix(rnorm(rows*p),rows)
-      randn_e = matrix(rnorm(n*p),n)
       resid_prec = uncorrelated_prec_mat(resid_h2,tot_Eta_prec,s)
-      coefs = sample_coefs_parallel_sparse_c_Eigen(Qt %**% Eta,Qt %**% Design,resid_prec, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+      coefs = sample_coefs_parallel_sparse_c_Eigen(Qt %**% Eta,Qt %**% Design,resid_prec, prior_mean,prior_prec,grainSize)
       # coefs = rbind(B,t(Lambda))
       # groups = seq(1,rows,by=5)
       # randn_e = matrix(rnorm(n*p*length(groups)),n*length(groups))
@@ -36,11 +34,8 @@ sample_Lambda_B.fast_BSFG = function(BSFG_state,grainSize,...) {
       }
       Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
     } else{
-      randn_theta = matrix(rnorm(rows*p),rows)
-      randn_e = matrix(rnorm(n*p),n)
-      randn_cis = rnorm(cis_effects_index[length(cis_effects_index)]-1)
       result = sample_cis_coefs_parallel_sparse_c_Eigen(Ut,Eta,toDense(Design),cis_genotypes,resid_h2,tot_Eta_prec,s,prior_mean,prior_prec,
-                                                        randn_theta,randn_e,randn_cis,cis_effects_index-1,1)
+                                                        cis_effects_index-1,1)
       if(b > 0){
         B[] = result[[1]][1:b,,drop=FALSE]
       }
