@@ -69,9 +69,7 @@ sample_latent_traits.fast_missing_BSFG = function(BSFG_state,grainSize,...) {
         b_F_QTL = ncol(QTL_factors_X)
         prior_mean = matrix(0,b_F_QTL,k)
         prior_prec = B_F_prec[QTL_columns_factors,] * tot_F_prec[rep(1,b_F_QTL),]  # prior for B_F includes tot_F_prec
-        randn_theta = matrix(rnorm(b_F_QTL*k),b_F_QTL)
-        randn_e = matrix(rnorm(n*k),n)
-        B_F[QTL_columns_factors,] = sample_coefs_hierarchical_parallel_sparse_c_Eigen(Qt,F_tilde,QTL_factors_Z,QTL_factors_X,F_h2, tot_F_prec,s, prior_mean,prior_prec,randn_theta,randn_e,grainSize)
+        B_F[QTL_columns_factors,] = sample_coefs_hierarchical_parallel_sparse_c_Eigen(Qt,F_tilde,QTL_factors_Z,QTL_factors_X,F_h2, tot_F_prec,s, prior_mean,prior_prec,grainSize)
       }
 
       XFBF = X_F %**% B_F

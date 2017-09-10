@@ -26,11 +26,14 @@ MatrixXd SxS(MSpMat X, MSpMat Y){
 // -------------------------- //
 // ----- Helper functions --- //
 // -------------------------- //
+
+// returns a nxp matrix of precisions with element ij:
+// prec[i,j] = tot_prec[j]*(h2[j]*s[i] + (1-h2[j]))^(-1)
 // [[Rcpp::export()]]
 MatrixXd uncorrelated_prec_mat(
-    VectorXd h2,
-    VectorXd tot_prec,
-    VectorXd s
+    VectorXd h2,        // px1
+    VectorXd tot_prec,  // px1
+    VectorXd s          // nx1
 ){
   int n = s.size();
   int p = h2.size();
@@ -60,7 +63,7 @@ MatrixXd uncorrelated_prec_mat(
 }
 
 // // [[Rcpp::export()]]
-MatrixXd rstdnorm_mat(int n,int p) {
+MatrixXd rstdnorm_mat(int n,int p) {  // returns nxp matrix
   VectorXd X_vec = as<VectorXd>(rnorm(n*p));
   Map<MatrixXd> X_mat(X_vec.data(),n,p);
   return(X_mat);
@@ -78,14 +81,14 @@ MatrixXd rstdnorm_mat(int n,int p) {
 // with e[j] ~ N(0,1/resid_prec[i]), i=1:n
 // Uses sampling method from MCMCglmm, which requires draws b+n draws from N(0,1), which are passed as randn_theta and randn_e
 // If b >= n, inverts the C matrix using Binomial Inverse Theorem
-VectorXd sample_coefs_uncorrelated(
-    VectorXd y,
-    MatrixXd X,
-    VectorXd prior_mean,
-    VectorXd prior_prec,
-    ArrayXd  resid_prec,
-    VectorXd randn_theta,
-    VectorXd randn_e,
+VectorXd sample_coefs_uncorrelated(  // returns bx1
+    VectorXd y,             // nx1
+    MatrixXd X,             // nxb
+    VectorXd prior_mean,    // bx1
+    VectorXd prior_prec,    // bx1
+    ArrayXd  resid_prec,    // nx1
+    VectorXd randn_theta,   // bx1
+    VectorXd randn_e,       // nx1
     int b,
     int n
 ) {
@@ -129,10 +132,16 @@ struct sample_coefs_uncorrelated_worker : public Worker {
   int b,n;
   MatrixXd &coefs;
 
-  sample_coefs_uncorrelated_worker( MatrixXd Y, MatrixXd X,MatrixXd resid_prec,MatrixXd prior_mean, MatrixXd prior_prec,
-                                    MatrixXd randn_theta, MatrixXd randn_e,
+  sample_coefs_uncorrelated_worker( MatrixXd Y,           // nxp
+                                    MatrixXd X,           // nxb
+                                    MatrixXd resid_prec,  // nxp
+                                    MatrixXd prior_mean,  // bxp
+                                    MatrixXd prior_prec,  // bxp
+                                    MatrixXd randn_theta, // bxp
+                                    MatrixXd randn_e,     // nxp
                                     int b, int n,
-                                    MatrixXd &coefs) :
+                                    MatrixXd &coefs       // bxp
+                                    ) :
     Y(Y), X(X), resid_prec(resid_prec), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
     b(b), n(n),
     coefs(coefs) {}
@@ -151,12 +160,12 @@ struct sample_coefs_uncorrelated_worker : public Worker {
 
 // basic version - all regression have same dimensions
 // [[Rcpp::export()]]
-MatrixXd sample_coefs_parallel_sparse_c_Eigen(
-    Map<MatrixXd> Y,
-    Map<MatrixXd> X,
-    Map<MatrixXd> resid_prec,
-    Map<MatrixXd> prior_mean,
-    Map<MatrixXd> prior_prec,
+MatrixXd sample_coefs_parallel_sparse_c_Eigen(  // returns bxp matrix
+    Map<MatrixXd> Y,            // nxp
+    Map<MatrixXd> X,            // nxb
+    Map<MatrixXd> resid_prec,   // nxp
+    Map<MatrixXd> prior_mean,   // bxp
+    Map<MatrixXd> prior_prec,   // bxp
     int grainSize){
 
   // Sample regression coefficients
@@ -182,14 +191,14 @@ MatrixXd sample_coefs_parallel_sparse_c_Eigen(
 // missing data version - sets of columns of Eta have different patterns of missing data
 // each set can be sampled at once using sample_coefs_uncorrelated_worker
 // [[Rcpp::export()]]
-MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen(
-    Map<MatrixXd> Eta,
-    Map<MatrixXd> W,
-    Map<VectorXd> h2,
-    Map<VectorXd> tot_Eta_prec,
-    Map<MatrixXd> prior_mean,
-    Map<MatrixXd> prior_prec,
-    Rcpp::List invert_aI_bZKZ,
+MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen(  // returns bxp matrix
+    Map<MatrixXd> Eta,            // nxp. Columns are uncorrelated. Rows have covariance based on K
+    Map<MatrixXd> W,              // nxb
+    Map<VectorXd> h2,             // px1
+    Map<VectorXd> tot_Eta_prec,   // px1
+    Map<MatrixXd> prior_mean,     // bxp
+    Map<MatrixXd> prior_prec,     // bxp
+    Rcpp::List invert_aI_bZKZ,    // List. Each element contains: Qt (nxn), s (nx1), Y_obs, Y_cols
     int grainSize){
 
   // Sample regression coefficients
@@ -270,12 +279,12 @@ MatrixXd sample_coefs_parallel_sparse_missing_c_Eigen(
 
 
 // [[Rcpp::export()]]
-MatrixXd sample_coefs_set_c(
-    Rcpp::List model_matrices,
-    Map<MatrixXd> h2s,
-    Map<MatrixXd> tot_Eta_prec,
-    Map<MatrixXd> prior_mean,
-    Map<MatrixXd> prior_prec,
+MatrixXd sample_coefs_set_c(    // return nxp matrix
+    Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x b), s (n_i x 1), position (n_i x 1)
+    Map<MatrixXd> h2s,          // nx1
+    Map<MatrixXd> tot_Eta_prec, // px1
+    Map<MatrixXd> prior_mean,   // nxp
+    Map<MatrixXd> prior_prec,   // nxp
     int n,
     int grainSize){
 
@@ -364,9 +373,9 @@ MatrixXd sample_coefs_set_c(
 
 
 // [[Rcpp::export()]]
-MatrixXd get_fitted_set_c(
-    Rcpp::List model_matrices,
-    Map<MatrixXd> coefs,
+MatrixXd get_fitted_set_c(  // returns n_tot x p matrix in same order as data
+    Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x b), s (n_i x 1), position (n_i x 1)
+    Map<MatrixXd> coefs,  // n x p matrix
     int grainSize){
 
   std::vector<MatrixXd> X_list;
@@ -429,13 +438,13 @@ MatrixXd get_fitted_set_c(
 // needs to be tested!
 // [[Rcpp::export()]]
 Rcpp::List sample_cis_coefs_parallel_sparse_c_Eigen(
-    Map<MatrixXd> Y,
-    Map<MatrixXd> X,
-    Rcpp::List cis_genotypes,  // note: must be Qt*cis_X
-    Map<MatrixXd> resid_prec,
-    Map<MatrixXd> prior_mean,
-    Map<MatrixXd> prior_prec,
-    Map<VectorXd> cis_effect_index,
+    Map<MatrixXd> Y,          // nxp
+    Map<MatrixXd> X,          // nxb
+    Rcpp::List cis_genotypes,  // note: each element must be Qt*cis_X n x p_cis_j
+    Map<MatrixXd> resid_prec, // nxp
+    Map<MatrixXd> prior_mean, // bxp
+    Map<MatrixXd> prior_prec, // bxp
+    Map<VectorXd> cis_effect_index, // vector with length = # cis genotypes
     int grainSize){
 
   // Sample regression coefficients
@@ -534,11 +543,16 @@ struct sample_random_effects_worker : public Worker {
   MatrixXd &effects;
 
   sample_random_effects_worker(
-    MatrixXd Eta,SpMat Q, SpMat ZQt,
-    ArrayXd s1, ArrayXd s2,
-    ArrayXd a_prec, ArrayXd e_prec,
-    ArrayXXd randn_draws,
-    MatrixXd &effects) :
+    MatrixXd Eta,         // nxp
+    SpMat Q,              // nxn
+    SpMat ZQt,           // rxn
+    ArrayXd s1,           // rx1
+    ArrayXd s2,           // rx1
+    ArrayXd a_prec,       // px1
+    ArrayXd e_prec,       // px1
+    ArrayXXd randn_draws, // rxp
+    MatrixXd &effects     // rxp
+    ) :
     Eta(Eta), Q(Q), ZQt(ZQt),
     s1(s1), s2(s2),
     a_prec(a_prec), e_prec(e_prec),
@@ -564,12 +578,12 @@ struct sample_random_effects_worker : public Worker {
 // invert_aZZt_Kinv has parameters to diagonalize a*Z*Z' + b*K for fast inversion
 // no missing observations
 // [[Rcpp::export()]]
-MatrixXd sample_randomEffects_parallel_sparse_c_Eigen (
-    Map<MatrixXd> Eta,
-    MSpMat Z,
-    Map<ArrayXd> tot_prec,
-    Map<ArrayXd> h2,
-    List invert_aZZt_Kinv,
+MatrixXd sample_randomEffects_parallel_sparse_c_Eigen (  // returns rxp matrix
+    Map<MatrixXd> Eta,      // nxp
+    MSpMat Z,               // nxr dgCMatrix
+    Map<ArrayXd> tot_prec,  // px1
+    Map<ArrayXd> h2,        // px1
+    List invert_aZZt_Kinv,  // List with elements Q (rxr), s1 (rx1), s2 (rx1)
     int grainSize) {
 
   ArrayXd a_prec = tot_prec / h2;
@@ -601,11 +615,11 @@ MatrixXd sample_randomEffects_parallel_sparse_c_Eigen (
 // invert_aZZt_Kinv has parameters to diagonalize a*Z*Z' + b*K for fast inversion
 // with missing observations; Samples sets of columns with same patterns of missingness
 // [[Rcpp::export()]]
-MatrixXd sample_randomEffects_parallel_sparse_missing_c_Eigen (
-    Map<MatrixXd> Eta,
-    Map<ArrayXd> tot_prec,
-    Map<ArrayXd> h2,
-    List invert_aZZt_Kinv,
+MatrixXd sample_randomEffects_parallel_sparse_missing_c_Eigen (  // returns rxp matrix
+    Map<MatrixXd> Eta,      // nxp
+    Map<ArrayXd> tot_prec,  // px1
+    Map<ArrayXd> h2,        // px1
+    List invert_aZZt_Kinv,  // List with each element containing: Q(r,r), ZQt (r x n_set), s1 (rx1), s2 (rx1), Y_obs, Y_cols
     int r,
     int grainSize) {
 
@@ -681,12 +695,12 @@ MatrixXd sample_randomEffects_parallel_sparse_missing_c_Eigen (
 // E[,j] ~ N(0,1/resid_Eta_prec[,j])
 // Sampling is done separately for each block of rows with the same pattern of missing observations
 // [[Rcpp::export()]]
-MatrixXd sample_factors_scores_sparse_c_Eigen(
-    Map<MatrixXd> Eta_tilde,
-    Map<MatrixXd> prior_mean,
-    Map<MatrixXd> Lambda,
-    Map<VectorXd> resid_Eta_prec,
-    Map<VectorXd> F_e_prec
+MatrixXd sample_factors_scores_sparse_c_Eigen( // returns nxk matrix
+    Map<MatrixXd> Eta_tilde,      // nxp
+    Map<MatrixXd> prior_mean,     // nxk
+    Map<MatrixXd> Lambda,         // nxp
+    Map<VectorXd> resid_Eta_prec, // px1
+    Map<VectorXd> F_e_prec        // kx1
 ) {
   int n = Eta_tilde.rows();
   int k = Lambda.cols();
@@ -714,13 +728,13 @@ MatrixXd sample_factors_scores_sparse_c_Eigen(
 // E[,j] ~ N(0,1/resid_Eta_prec[,j])
 // Sampling is done separately for each block of rows with the same pattern of missing observations
 // [[Rcpp::export()]]
-MatrixXd sample_factors_scores_sparse_missing_c_Eigen(
-    Map<MatrixXd> Eta_tilde,
-    Map<MatrixXd> prior_mean,
-    Map<MatrixXd> Lambda,
-    Map<VectorXd> resid_Eta_prec,
-    Map<VectorXd> F_e_prec,
-    Rcpp::List Y_row_obs_sets,
+MatrixXd sample_factors_scores_sparse_missing_c_Eigen( // returns nxk matrix
+    Map<MatrixXd> Eta_tilde,      // nxp
+    Map<MatrixXd> prior_mean,     // nxk
+    Map<MatrixXd> Lambda,         // pxk
+    Map<VectorXd> resid_Eta_prec, // px1
+    Map<VectorXd> F_e_prec,       // kx1
+    Rcpp::List Y_row_obs_sets,    // List with elements: columns, rows
     int grainSize
 ) {
 
@@ -790,8 +804,6 @@ MatrixXd sample_factors_scores_sparse_missing_c_Eigen(
           }
           VectorXd Meta = R_set.transpose().triangularView<Lower>().solve((Eta_i * Lmsg_set + prior_mean.row(index) * F_e_prec.asDiagonal()).transpose());
           Ft_set.col(i) = R_set.triangularView<Upper>().solve(Meta + randn_draws.row(index).transpose());
-          // VectorXd res = R_set.triangularView<Upper>().solve(Meta + randn_draws.row(index).transpose());
-          // Ft_set.col(i) = res;
         }
       }
     };
@@ -816,8 +828,8 @@ MatrixXd sample_factors_scores_sparse_missing_c_Eigen(
 
 // [[Rcpp::export()]]
 VectorXd tot_prec_scores_c (
-    MatrixXd Y,
-    ArrayXXd resid_prec
+    MatrixXd Y,           // nxp
+    ArrayXXd resid_prec   // nxp
 ) {
 
   int p = Y.cols();
@@ -834,9 +846,9 @@ VectorXd tot_prec_scores_c (
 
 // [[Rcpp::export()]]
 VectorXd tot_prec_scores_missing_c (
-    Map<MatrixXd> Eta,
-    Map<VectorXd> h2,
-    Rcpp::List invert_aI_bZKZ
+    Map<MatrixXd> Eta,          // nxp
+    Map<VectorXd> h2,           // px1
+    Rcpp::List invert_aI_bZKZ   // List with elements: Qt (nxn), s (nx1), Y_obs, Y_cols
 ) {
 
   int p = Eta.cols();
@@ -882,11 +894,12 @@ struct calc_log_ps_fast_worker : public Worker {
   VectorXd s;
   MatrixXd &log_ps;
 
-  calc_log_ps_fast_worker(MatrixXd std_scores_b2,
-                          VectorXd discrete_priors,
-                          VectorXd tot_Eta_prec,
-                          VectorXd s,
-                          MatrixXd &log_ps):
+  calc_log_ps_fast_worker(MatrixXd std_scores_b2,     // pxn
+                          VectorXd discrete_priors,   // n_h2x1
+                          VectorXd tot_Eta_prec,      // px1
+                          VectorXd s,                 // nx1
+                          MatrixXd &log_ps            // n_h2xp
+                            ):
     std_scores_b2(std_scores_b2), discrete_priors(discrete_priors), tot_Eta_prec(tot_Eta_prec),s(s), log_ps(log_ps) {}
 
   void operator()(std::size_t begin, std::size_t end) {
@@ -904,10 +917,10 @@ struct calc_log_ps_fast_worker : public Worker {
 
 // [[Rcpp::export()]]
 MatrixXd log_p_h2s_fast(
-    Map<MatrixXd> QtEta,
-    Map<VectorXd> tot_Eta_prec,
-    Map<VectorXd> discrete_priors,
-    Map<VectorXd> s,
+    Map<MatrixXd> QtEta,            // nxp
+    Map<VectorXd> tot_Eta_prec,     // px1
+    Map<VectorXd> discrete_priors,  // n_h2x1
+    Map<VectorXd> s,                // nx1
     int grainSize)
 {
 
@@ -925,11 +938,11 @@ MatrixXd log_p_h2s_fast(
 }
 
 // [[Rcpp::export()]]
-MatrixXd log_p_h2s_fast_missing(
-    Map<MatrixXd> Eta,
-    Map<VectorXd> tot_Eta_prec,
-    Map<VectorXd> discrete_priors,
-    Rcpp::List invert_aI_bZKZ,
+MatrixXd log_p_h2s_fast_missing( // returns n_h2 x p matrix
+    Map<MatrixXd> Eta,            // nxp
+    Map<VectorXd> tot_Eta_prec,   // px1
+    Map<VectorXd> discrete_priors,  // n_h2x1
+    Rcpp::List invert_aI_bZKZ,    // List with each element containing: Qt (nxn), x(nx1), Y_obs, Y_cols
     int grainSize)
 {
 
@@ -978,13 +991,13 @@ MatrixXd log_p_h2s_fast_missing(
 
 // -- using MH proposal
 
-double log_prob_h2_fast_c(
-    ArrayXd Qty,
-    ArrayXd s,
-    double h2,
-    int n,
-    double tot_Eta_prec,
-    double discrete_prior
+double log_prob_h2_fast_c(  // returns scalar
+    ArrayXd Qty,    // nx1
+    ArrayXd s,      // nx1
+    double h2,      // scalar
+    int n,          // scalar
+    double tot_Eta_prec,  // scalar
+    double discrete_prior   // scalar
 ){
   ArrayXd s2s = h2*s + (1.0-h2);
   double score2 = (Qty.pow(2)/s2s).sum() * tot_Eta_prec;
@@ -995,27 +1008,28 @@ double log_prob_h2_fast_c(
 }
 
 struct sample_h2_MH_fast_worker : public RcppParallel::Worker {
-  const MatrixXd QtEta;
-  const MatrixXd h2s_matrix;
-  const VectorXd s;
-  const VectorXd tot_Eta_prec;
-  const VectorXd discrete_priors;
-  const VectorXd r_draws;
-  const VectorXd state_draws;
-  const VectorXi h2_index;
-  const double step_size;
-  VectorXi &new_index;
+  const MatrixXd QtEta;         // nxp
+  const MatrixXd h2s_matrix;    // n_RE x r_h2
+  const VectorXd s;             // nx1
+  const VectorXd tot_Eta_prec;  // px1
+  const VectorXd discrete_priors; // n_h2x1
+  const VectorXd r_draws;       // px1
+  const VectorXd state_draws;   // px1
+  const VectorXi h2_index;      // px1
+  const double step_size;       // scalar
+  VectorXi &new_index;          // px1
 
-  sample_h2_MH_fast_worker(const MatrixXd QtEta,
-                           const MatrixXd h2s_matrix,
-                           const VectorXd s,
-                           const VectorXd tot_Eta_prec,
-                           const VectorXd discrete_priors,
-                           const VectorXd r_draws,
-                           const VectorXd state_draws,
-                           const VectorXi h2_index,
-                           const double step_size,
-                           VectorXi &new_index):
+  sample_h2_MH_fast_worker(const MatrixXd QtEta,            // nxp
+                           const MatrixXd h2s_matrix,       // n_RE x r_h2
+                           const VectorXd s,                // nx1
+                           const VectorXd tot_Eta_prec,     // px1
+                           const VectorXd discrete_priors,  // n_h2 x 1
+                           const VectorXd r_draws,          // px1
+                           const VectorXd state_draws,      // px1
+                           const VectorXi h2_index,         // px1
+                           const double step_size,          // scalar
+                           VectorXi &new_index              // px1
+                             ):
 
     QtEta(QtEta), h2s_matrix(h2s_matrix),s(s),
     tot_Eta_prec(tot_Eta_prec),  discrete_priors(discrete_priors),
@@ -1053,14 +1067,14 @@ struct sample_h2_MH_fast_worker : public RcppParallel::Worker {
 
 
 // [[Rcpp::export()]]
-VectorXi sample_h2s_discrete_MH_fast_c(
-    Map<MatrixXd> QtEta,
-    Map<VectorXd> tot_Eta_prec,
-    Map<VectorXd> discrete_priors,
-    VectorXi h2_index,
-    Map<MatrixXd> h2s_matrix,
-    Map<VectorXd> s,
-    double step_size,
+VectorXi sample_h2s_discrete_MH_fast_c(     // returns px1 vector
+    Map<MatrixXd> QtEta,          // nxp
+    Map<VectorXd> tot_Eta_prec,   // px1
+    Map<VectorXd> discrete_priors,  // n_h2 x 1
+    VectorXi h2_index,            // px1
+    Map<MatrixXd> h2s_matrix,     // n_RE x n_h2
+    Map<VectorXd> s,              // nx1
+    double step_size,             // scalar
     int grainSize
 ){
 
@@ -1077,14 +1091,14 @@ VectorXi sample_h2s_discrete_MH_fast_c(
 
 
 // [[Rcpp::export()]]
-VectorXi sample_h2s_discrete_MH_fast_missing_c(
-    Map<MatrixXd> Eta,
-    Map<VectorXd> tot_Eta_prec,
-    Map<VectorXd> discrete_priors,
-    VectorXi h2_index,
-    Map<MatrixXd> h2s_matrix,
-    double step_size,
-    Rcpp::List invert_aI_bZKZ,
+VectorXi sample_h2s_discrete_MH_fast_missing_c(     // returns px1 vector
+    Map<MatrixXd> Eta,              // nxp
+    Map<VectorXd> tot_Eta_prec,     // px1
+    Map<VectorXd> discrete_priors,  // n_h2 x 1
+    VectorXi h2_index,              // px1
+    Map<MatrixXd> h2s_matrix,       // n_RE x n_h2
+    double step_size,               // scalar
+    Rcpp::List invert_aI_bZKZ,      // List with each element containing: Qt (nxn), x(nx1), Y_obs, Y_cols
     int grainSize
 ){
 

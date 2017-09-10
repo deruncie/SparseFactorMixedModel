@@ -476,24 +476,20 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_coefs_hierarchical_parallel_sparse_c_Eigen
-MatrixXd sample_coefs_hierarchical_parallel_sparse_c_Eigen(MSpMat Ut, Map<MatrixXd> Eta, MSpMat W, MSpMat X, Map<VectorXd> h2, Map<VectorXd> tot_Eta_prec, Map<VectorXd> s, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, Map<MatrixXd> randn_theta, Map<MatrixXd> randn_e, int grainSize);
-RcppExport SEXP BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen(SEXP UtSEXP, SEXP EtaSEXP, SEXP WSEXP, SEXP XSEXP, SEXP h2SEXP, SEXP tot_Eta_precSEXP, SEXP sSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP, SEXP grainSizeSEXP) {
+MatrixXd sample_coefs_hierarchical_parallel_sparse_c_Eigen(MSpMat Qt, Map<MatrixXd> Eta, MSpMat W, MSpMat X, Map<VectorXd> resid_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int grainSize);
+RcppExport SEXP BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen(SEXP QtSEXP, SEXP EtaSEXP, SEXP WSEXP, SEXP XSEXP, SEXP resid_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< MSpMat >::type Ut(UtSEXP);
+    Rcpp::traits::input_parameter< MSpMat >::type Qt(QtSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type Eta(EtaSEXP);
     Rcpp::traits::input_parameter< MSpMat >::type W(WSEXP);
     Rcpp::traits::input_parameter< MSpMat >::type X(XSEXP);
-    Rcpp::traits::input_parameter< Map<VectorXd> >::type h2(h2SEXP);
-    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
-    Rcpp::traits::input_parameter< Map<VectorXd> >::type s(sSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type resid_prec(resid_precSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_theta(randn_thetaSEXP);
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randn_e(randn_eSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_coefs_hierarchical_parallel_sparse_c_Eigen(Ut, Eta, W, X, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize));
+    rcpp_result_gen = Rcpp::wrap(sample_coefs_hierarchical_parallel_sparse_c_Eigen(Qt, Eta, W, X, resid_prec, prior_mean, prior_prec, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }

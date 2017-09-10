@@ -121,8 +121,8 @@ sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2_index,
     .Call(BSFG_sample_h2s_discrete_MH_c, Y, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, Sigma_Choleskys, r_draws, state_draws, step_size, grainSize)
 }
 
-sample_coefs_hierarchical_parallel_sparse_c_Eigen <- function(Ut, Eta, W, X, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize) {
-    .Call(BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen, Ut, Eta, W, X, h2, tot_Eta_prec, s, prior_mean, prior_prec, randn_theta, randn_e, grainSize)
+sample_coefs_hierarchical_parallel_sparse_c_Eigen <- function(Qt, Eta, W, X, resid_prec, prior_mean, prior_prec, grainSize) {
+    .Call(BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen, Qt, Eta, W, X, resid_prec, prior_mean, prior_prec, grainSize)
 }
 
 sample_delta_c_Eigen <- function(delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws) {
