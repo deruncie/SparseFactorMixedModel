@@ -21,3 +21,5 @@ using namespace Eigen;
 VectorXd find_candidate_states(MatrixXd, double, int);
 MatrixXd uncorrelated_prec_mat(VectorXd,VectorXd,VectorXd);
 MatrixXd rstdnorm_mat(int n,int p);
+MatrixXd SxD(MSpMat X, Map<MatrixXd> Y);
+MatrixXd SxS(MSpMat X, MSpMat Y);
