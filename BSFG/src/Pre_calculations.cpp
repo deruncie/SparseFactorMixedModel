@@ -13,29 +13,29 @@ using namespace Eigen;
 using namespace RcppParallel;
 
 
-// [[Rcpp::export()]]
-VectorXd find_candidate_states(
-    MatrixXd h2s_matrix,
-    double step_size,
-    int old_state
-) {
-  VectorXd dists = (h2s_matrix.colwise() - h2s_matrix.col(old_state)).cwiseAbs().colwise().sum();
-  VectorXd indices(dists.size());
-  int count = 0;
-  for(int i = 0; i < dists.size(); i++){
-    if(dists[i] < step_size & dists[i] > 0) {
-      indices[count] = i;
-      count++;
-    }
-  }
-  if(count == 0) {  // return all indices as candidates
-    for(int i = 0; i < dists.size(); i++){
-      indices[count] = i;
-      count++;
-    }
-  }
-  return indices.head(count);
-}
+// // [[Rcpp::export()]]
+// VectorXd find_candidate_states(
+//     MatrixXd h2s_matrix,
+//     double step_size,
+//     int old_state
+// ) {
+//   VectorXd dists = (h2s_matrix.colwise() - h2s_matrix.col(old_state)).cwiseAbs().colwise().sum();
+//   VectorXd indices(dists.size());
+//   int count = 0;
+//   for(int i = 0; i < dists.size(); i++){
+//     if(dists[i] < step_size & dists[i] > 0) {
+//       indices[count] = i;
+//       count++;
+//     }
+//   }
+//   if(count == 0) {  // return all indices as candidates
+//     for(int i = 0; i < dists.size(); i++){
+//       indices[count] = i;
+//       count++;
+//     }
+//   }
+//   return indices.head(count);
+// }
 
 
 // [[Rcpp::export()]]

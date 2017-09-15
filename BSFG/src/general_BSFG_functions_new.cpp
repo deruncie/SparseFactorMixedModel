@@ -11,7 +11,7 @@ using namespace RcppParallel;
 // ---------- helper functions --------- //
 // -------------------------------------------- //
 
-MatrixXd get_block_matrix(MatrixXd Y, VectorXi Y_obs, VectorXi Y_cols){
+MatrixXd subset_MatrixXd_block(MatrixXd Y, VectorXi Y_obs, VectorXi Y_cols){
   int n_obs = Y_obs.size();
   int n_cols = Y_cols.size();
   MatrixXd Y_set(n_obs,n_cols);
@@ -23,6 +23,78 @@ MatrixXd get_block_matrix(MatrixXd Y, VectorXi Y_obs, VectorXi Y_cols){
     }
   }
   return(Y_set);
+}
+
+VectorXd subset_VectorXd(VectorXd x, VectorXi indices){
+  int n = indices.size();
+  VectorXd out(n);
+  for(int i = 0; i < n; i++){
+    out(i) = x[indices[i]-1];
+  }
+  return(out);
+}
+
+VectorXi subset_VectorXi(VectorXi x, VectorXi indices){
+  int n = indices.size();
+  VectorXi out(n);
+  for(int i = 0; i < n; i++){
+    out(i) = x[indices[i]-1];
+  }
+  return(out);
+}
+
+MatrixXd subset_MatrixXd_cols(MatrixXd Y, VectorXi Y_cols) {
+  int n = Y.rows();
+  int n_cols = Y_cols.size();
+  MatrixXd Y_sub(n,n_cols);
+  for(int j = 0; j < n_cols; j++){
+    Y_sub.col(j) = Y.col(Y_cols[j]-1);
+  }
+  return(Y_sub);
+}
+
+
+MatrixXd subset_MatrixXd_rows(MatrixXd Y, VectorXi Y_rows) {
+  MatrixXd Y_sub = subset_MatrixXd_cols(Y.transpose(),Y_rows).transpose();
+  return(Y_sub);
+  // int p = Y.cols();
+  // int n_rows = Y_rows.size();
+  // MatrixXd Y_sub(n_rows,p);
+  // for(int i = 0; i < n_rows; i++){
+  //   Y_sub.row(i) = Y.row(Y_rows[i]-1);
+  // }
+  // return(Y_sub);
+}
+
+// [[Rcpp::export()]]
+MatrixXd rstdnorm_mat(int n,int p) {  // returns nxp matrix
+  VectorXd X_vec = as<VectorXd>(rnorm(n*p));
+  Map<MatrixXd> X_mat(X_vec.data(),n,p);
+  return(X_mat);
+}
+
+// [[Rcpp::export()]]
+VectorXd find_candidate_states(
+    MatrixXd h2s_matrix,
+    double step_size,
+    int old_state
+) {
+  VectorXd dists = (h2s_matrix.colwise() - h2s_matrix.col(old_state)).cwiseAbs().colwise().sum();
+  VectorXd indices(dists.size());
+  int count = 0;
+  for(int i = 0; i < dists.size(); i++){
+    if(dists[i] < step_size & dists[i] > 0) {
+      indices[count] = i;
+      count++;
+    }
+  }
+  if(count == 0) {  // return all indices as candidates
+    for(int i = 0; i < dists.size(); i++){
+      indices[count] = i;
+      count++;
+    }
+  }
+  return indices.head(count);
 }
 
 // -------------------------------------------- //
@@ -170,7 +242,6 @@ MatrixXd sample_MME_fixedEffects_missing_c(  // returns bxp matrix
     Map<MatrixXd> prior_prec,       // bxp
     int grainSize) {
 
-  int n = X.rows();
   int b = X.cols();
   int p = Y.cols();
 
@@ -187,31 +258,18 @@ MatrixXd sample_MME_fixedEffects_missing_c(  // returns bxp matrix
     int n_cols = Y_cols.size();
 
     // pull out rows of X corresponding to observed individuals
-    MatrixXd X_set(n_obs,b);
-    for(int i = 0; i < n_obs; i++) {
-      X_set.row(i) = X.row(Y_obs[i]-1);
-    }
+    MatrixXd X_set = subset_MatrixXd_rows(X,Y_obs);
 
     // pull out elements of Y corresponding to observed individuals
-    MatrixXd Y_set = get_block_matrix(Y,Y_obs,Y_cols);
+    MatrixXd Y_set = subset_MatrixXd_block(Y,Y_obs,Y_cols);
 
     // pull out prior_mean, prior_prec, randn_theta, randn_e for col_set
-    MatrixXd prior_mean_set(b,n_cols);
-    MatrixXd prior_prec_set(b,n_cols);
-    for(int j = 0; j < n_cols; j++){
-      int col_j = Y_cols[j]-1;
-      prior_mean_set.col(j) = prior_mean.col(col_j);
-      prior_prec_set.col(j) = prior_prec.col(col_j);
-    }
+    MatrixXd prior_mean_set = subset_MatrixXd_cols(prior_mean,Y_cols);
+    MatrixXd prior_prec_set = subset_MatrixXd_cols(prior_prec,Y_cols);
 
     // pull out h2s_index_set and tot_Eta_prec_set
-    VectorXd h2s_index_set(n_cols);
-    VectorXd tot_Eta_prec_set(n_cols);
-    for(int j = 0; j < n_cols; j++){
-      int col_j = Y_cols[j]-1;
-      h2s_index_set[j] = h2s_index[col_j];
-      tot_Eta_prec_set[j] = tot_Eta_prec[col_j];
-    }
+    VectorXi h2s_index_set = subset_VectorXi(h2s_index, Y_cols);
+    VectorXd tot_Eta_prec_set = subset_VectorXd(tot_Eta_prec, Y_cols);
 
     // pull out necessary chol_R matrices for set
     Rcpp::List Sigma_Choleskys_set = Rcpp::as<Rcpp::List>(Sigma_Cholesky_sets[col_set]);
@@ -526,7 +584,6 @@ MatrixXd sample_MME_ZKZts_missing_c (  // returns rxp matrix
     Map<VectorXi> h2s_index,            // px1
     int grainSize) {
 
-  int n = Y.rows();
   int p = Y.cols();
   int r = Z.cols();
 
@@ -544,21 +601,15 @@ MatrixXd sample_MME_ZKZts_missing_c (  // returns rxp matrix
     int n_cols = Y_cols.size();
 
     // pull out elements of Y corresponding to observed individuals
-    MatrixXd Y_set = get_block_matrix(Y,Y_obs,Y_cols);
+    MatrixXd Y_set = subset_MatrixXd_block(Y,Y_obs,Y_cols);
 
     // draw random numbers
     MatrixXd randn_theta_set = rstdnorm_mat(r,n_cols);
     MatrixXd randn_e_set = rstdnorm_mat(n_obs,n_cols);
 
-    VectorXi h2s_index_set(n_cols);
-    VectorXd tot_Eta_prec_set(n_cols);
-    MatrixXd h2s_set(h2s.rows(),n_cols);
-    for(int j = 0; j < n_cols; j++){
-      int col_j = Y_cols[j]-1;
-      h2s_index_set[j] = h2s_index[col_j];
-      tot_Eta_prec_set[j] = tot_Eta_prec[col_j];
-      h2s_set.col(j) = h2s.col(col_j);
-    }
+    VectorXi h2s_index_set = subset_VectorXi(h2s_index, Y_cols);
+    VectorXd tot_Eta_prec_set = subset_VectorXd(tot_Eta_prec, Y_cols);
+    MatrixXd h2s_set = subset_MatrixXd_cols(h2s,Y_cols);
     VectorXd h2_e_set = 1.0 - h2s_set.colwise().sum().array();
     VectorXd pes_set = tot_Eta_prec_set.array() / h2_e_set.array();
 
@@ -662,18 +713,13 @@ VectorXd tot_prec_scores_missing_c (
     VectorXi Y_obs = as<Map<VectorXi>>(Missing_data_map_set["Y_obs"]);
     VectorXi Y_cols = as<Map<VectorXi>>(Missing_data_map_set["Y_cols"]);
 
-    int n_obs = Y_obs.size();
     int n_cols = Y_cols.size();
 
     // pull out elements of Y corresponding to observed individuals
-    MatrixXd Y_set = get_block_matrix(Y,Y_obs,Y_cols);
+    MatrixXd Y_set = subset_MatrixXd_block(Y,Y_obs,Y_cols);
 
-    // pull out h2s_index_set and tot_Eta_prec_set
-    VectorXd h2s_index_set(n_cols);
-    for(int j = 0; j < n_cols; j++){
-      int col_j = Y_cols[j]-1;
-      h2s_index_set[j] = h2s_index[col_j];
-    }
+    // pull out h2s_index_set
+    VectorXi h2s_index_set = subset_VectorXi(h2s_index, Y_cols);
 
     // pull out necessary chol_R matrices for set
     Rcpp::List Sigma_Choleskys_set = Rcpp::as<Rcpp::List>(Sigma_Cholesky_sets[col_set]);
@@ -782,17 +828,12 @@ MatrixXd log_p_h2s_missing(
     VectorXi Y_obs = as<Map<VectorXi>>(Missing_data_map_set["Y_obs"]);
     VectorXi Y_cols = as<Map<VectorXi>>(Missing_data_map_set["Y_cols"]);
 
-    int n_obs = Y_obs.size();
     int n_cols = Y_cols.size();
 
     // pull out elements of Y corresponding to observed individuals
-    MatrixXd Y_set = get_block_matrix(Y,Y_obs,Y_cols);
+    MatrixXd Y_set = subset_MatrixXd_block(Y,Y_obs,Y_cols);
 
-    VectorXd tot_Eta_prec_set(n_cols);
-    for(int j = 0; j < n_cols; j++){
-      int col_j = Y_cols[j]-1;
-      tot_Eta_prec_set[j] = tot_Eta_prec[col_j];
-    }
+    VectorXd tot_Eta_prec_set = subset_VectorXd(tot_Eta_prec, Y_cols);
 
     Rcpp::List Sigma_Choleskys_set = Rcpp::as<Rcpp::List>(Sigma_Cholesky_sets[col_set]);
     std::vector<MSpMat> chol_R_list_set;
@@ -948,7 +989,7 @@ VectorXi sample_h2s_discrete_MH_c(
     Map<MatrixXd> Y,                // nxp
     Map<VectorXd> tot_Eta_prec,     // px1
     Map<VectorXd> discrete_priors,  // n_h2 x 1
-    VectorXi h2_index,              // px1
+    VectorXi h2s_index,              // px1
     Map<MatrixXd> h2s_matrix,       // n_RE x n_h2
     Rcpp::List Sigma_Choleskys,     // List of nxn dgCMatrices, upper-triangular
     double step_size,               // double
@@ -972,7 +1013,7 @@ VectorXi sample_h2s_discrete_MH_c(
   }
 
 
-  sample_h2s_discrete_MH_worker sampler(Y,h2s_matrix,chol_R_list,log_det_Sigmas,tot_Eta_prec,discrete_priors,r_draws,state_draws,h2_index,step_size,new_index);
+  sample_h2s_discrete_MH_worker sampler(Y,h2s_matrix,chol_R_list,log_det_Sigmas,tot_Eta_prec,discrete_priors,r_draws,state_draws,h2s_index,step_size,new_index);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return new_index;
 }
@@ -982,7 +1023,7 @@ VectorXi sample_h2s_discrete_MH_missing_c(
     Map<MatrixXd> Y,                // nxp
     Map<VectorXd> tot_Eta_prec,     // px1
     Map<VectorXd> discrete_priors,  // n_h2 x 1
-    VectorXi h2_index,              // px1
+    VectorXi h2s_index,             // px1
     Map<MatrixXd> h2s_matrix,       // n_RE x n_h2
     Rcpp::List Sigma_Cholesky_sets, // List. Each element contains: List. Each element contains: chol_Sigma:. nxn upper triangular, dgCMatrix, log_det_Sigma
     Rcpp::List Missing_data_map,    // List. Each element containts Y_obs, Y_cols. The length should correspond to the length of Sigma_Choleksy_sets
@@ -1000,19 +1041,13 @@ VectorXi sample_h2s_discrete_MH_missing_c(
     VectorXi Y_obs = as<Map<VectorXi>>(Missing_data_map_set["Y_obs"]);
     VectorXi Y_cols = as<Map<VectorXi>>(Missing_data_map_set["Y_cols"]);
 
-    int n_obs = Y_obs.size();
     int n_cols = Y_cols.size();
 
     // pull out elements of Y corresponding to observed individuals
-    MatrixXd Y_set = get_block_matrix(Y,Y_obs,Y_cols);
+    MatrixXd Y_set = subset_MatrixXd_block(Y,Y_obs,Y_cols);
 
-    VectorXi h2_index_set(n_cols);
-    VectorXd tot_Eta_prec_set(n_cols);
-    for(int j = 0; j < n_cols; j++){
-      int col_j = Y_cols[j]-1;
-      h2_index_set[j] = h2_index[col_j];
-      tot_Eta_prec_set[j] = tot_Eta_prec[col_j];
-    }
+    VectorXi h2s_index_set = subset_VectorXi(h2s_index, Y_cols);
+    VectorXd tot_Eta_prec_set = subset_VectorXd(tot_Eta_prec, Y_cols);
 
     Rcpp::List Sigma_Choleskys_set = Rcpp::as<Rcpp::List>(Sigma_Cholesky_sets[col_set]);
     std::vector<MSpMat> chol_R_list_set;
@@ -1027,7 +1062,7 @@ VectorXi sample_h2s_discrete_MH_missing_c(
     VectorXd state_draws_set = as<VectorXd>(runif(n_cols));
     VectorXi new_index_set(n_cols);
 
-    sample_h2s_discrete_MH_worker sampler(Y_set,h2s_matrix,chol_R_list_set,log_det_Sigmas_set,tot_Eta_prec_set,discrete_priors,r_draws_set,state_draws_set,h2_index_set,step_size,new_index_set);
+    sample_h2s_discrete_MH_worker sampler(Y_set,h2s_matrix,chol_R_list_set,log_det_Sigmas_set,tot_Eta_prec_set,discrete_priors,r_draws_set,state_draws_set,h2s_index_set,step_size,new_index_set);
     RcppParallel::parallelFor(0,n_cols,sampler,grainSize);
 
     // copy new_index_set values into new_index
