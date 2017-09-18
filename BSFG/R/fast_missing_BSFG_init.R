@@ -77,6 +77,7 @@ initialize_BSFG.fast_missing_BSFG = function(BSFG_state, K_mats = NULL, chol_Ki_
       Z_sub = Z[x,]
       svd_ZZt = svd(crossprod(Z_sub))
       ZZt_sqrt = t(sweep(svd_ZZt$u,2,sqrt(svd_ZZt$d),'*'))
+
       result = GSVD_R(ZZt_sqrt,as.matrix(chol_Kinv))
       Q = as(drop0(Matrix(t(solve(result$X)),sparse=T),tol = run_parameters$drop0_tol),'dgCMatrix')
 

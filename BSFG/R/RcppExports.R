@@ -9,6 +9,62 @@ LDLt_notSparse <- function(A) {
     .Call(BSFG_LDLt_notSparse, A)
 }
 
+uncorrelated_prec_mat <- function(h2, tot_prec, s) {
+    .Call(BSFG_uncorrelated_prec_mat, h2, tot_prec, s)
+}
+
+sample_coefs_parallel_sparse_c_Eigen <- function(Y, X, resid_prec, prior_mean, prior_prec, grainSize) {
+    .Call(BSFG_sample_coefs_parallel_sparse_c_Eigen, Y, X, resid_prec, prior_mean, prior_prec, grainSize)
+}
+
+sample_coefs_parallel_sparse_missing_c_Eigen <- function(Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, invert_aI_bZKZ, grainSize) {
+    .Call(BSFG_sample_coefs_parallel_sparse_missing_c_Eigen, Eta, W, h2, tot_Eta_prec, prior_mean, prior_prec, invert_aI_bZKZ, grainSize)
+}
+
+sample_cis_coefs_parallel_sparse_c_Eigen <- function(Y, X, cis_genotypes, resid_prec, prior_mean, prior_prec, cis_effect_index, grainSize) {
+    .Call(BSFG_sample_cis_coefs_parallel_sparse_c_Eigen, Y, X, cis_genotypes, resid_prec, prior_mean, prior_prec, cis_effect_index, grainSize)
+}
+
+sample_randomEffects_parallel_sparse_c_Eigen <- function(Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize) {
+    .Call(BSFG_sample_randomEffects_parallel_sparse_c_Eigen, Eta, Z, tot_prec, h2, invert_aZZt_Kinv, grainSize)
+}
+
+sample_randomEffects_parallel_sparse_missing_c_Eigen <- function(Eta, tot_prec, h2, invert_aZZt_Kinv, r, grainSize) {
+    .Call(BSFG_sample_randomEffects_parallel_sparse_missing_c_Eigen, Eta, tot_prec, h2, invert_aZZt_Kinv, r, grainSize)
+}
+
+sample_factors_scores_sparse_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec) {
+    .Call(BSFG_sample_factors_scores_sparse_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec)
+}
+
+sample_factors_scores_sparse_missing_c_Eigen <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, Y_row_obs_sets, grainSize) {
+    .Call(BSFG_sample_factors_scores_sparse_missing_c_Eigen, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec, Y_row_obs_sets, grainSize)
+}
+
+tot_prec_scores_c <- function(Y, resid_prec) {
+    .Call(BSFG_tot_prec_scores_c, Y, resid_prec)
+}
+
+tot_prec_scores_missing_c <- function(Eta, h2, invert_aI_bZKZ) {
+    .Call(BSFG_tot_prec_scores_missing_c, Eta, h2, invert_aI_bZKZ)
+}
+
+log_p_h2s_fast <- function(QtEta, tot_Eta_prec, discrete_priors, s, grainSize) {
+    .Call(BSFG_log_p_h2s_fast, QtEta, tot_Eta_prec, discrete_priors, s, grainSize)
+}
+
+log_p_h2s_fast_missing <- function(Eta, tot_Eta_prec, discrete_priors, invert_aI_bZKZ, grainSize) {
+    .Call(BSFG_log_p_h2s_fast_missing, Eta, tot_Eta_prec, discrete_priors, invert_aI_bZKZ, grainSize)
+}
+
+sample_h2s_discrete_MH_fast_c <- function(QtEta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, s, step_size, grainSize) {
+    .Call(BSFG_sample_h2s_discrete_MH_fast_c, QtEta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, s, step_size, grainSize)
+}
+
+sample_h2s_discrete_MH_fast_missing_c <- function(Eta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, step_size, invert_aI_bZKZ, grainSize) {
+    .Call(BSFG_sample_h2s_discrete_MH_fast_missing_c, Eta, tot_Eta_prec, discrete_priors, h2_index, h2s_matrix, step_size, invert_aI_bZKZ, grainSize)
+}
+
 SxD <- function(X, Y) {
     .Call(BSFG_SxD, X, Y)
 }
@@ -79,5 +135,17 @@ sample_delta_c_Eigen <- function(delta, tauh, scores, delta_1_rate, delta_2_rate
 
 rgig_multiple <- function(n, lambda, chi, psi) {
     .Call(BSFG_rgig_multiple, n, lambda, chi, psi)
+}
+
+rstdnorm_mat2 <- function(n, p) {
+    .Call(BSFG_rstdnorm_mat2, n, p)
+}
+
+sample_MME_single_diagR2 <- function(y, ZQt, Q, chol_S, pe, randn_theta) {
+    .Call(BSFG_sample_MME_single_diagR2, y, ZQt, Q, chol_S, pe, randn_theta)
+}
+
+sample_MME_ZKZts_c2 <- function(Y, ZQt, Q, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, grainSize) {
+    .Call(BSFG_sample_MME_ZKZts_c2, Y, ZQt, Q, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, grainSize)
 }
 

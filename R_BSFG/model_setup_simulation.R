@@ -29,9 +29,9 @@ X = setup$X
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  # sampler = 'fast_BSFG',
+  sampler = 'fast_BSFG',
   # sampler = 'fast_missing_BSFG',
-  sampler = 'general_BSFG',
+  # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 200,
@@ -134,7 +134,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 
 # Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
 # burn in
-
+class(BSFG_state)[1] = 'general_BSFG'
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
@@ -161,6 +161,10 @@ for(i  in 1:110) {
 }
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
+
+pmG2 = get_posterior_mean(BSFG_state,tcrossprod(sweep(Lambda,2,sqrt(F_h2),'*')) + diag(resid_h2[1,]/tot_Eta_prec[1,]))
+mean((pmG - setup$G)^2)
+
 plot(BSFG_state$Posterior$Eta[is.na(Y)],Y_full[is.na(Y)]);abline(0,1)
 cor(c(BSFG_state$Posterior$Eta[is.na(Y)]),c(Y_full[is.na(Y)]))
 BSFG_state1 = BSFG_state

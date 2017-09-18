@@ -4,6 +4,9 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
   run_parameters = BSFG_state$run_parameters
   run_variables  = BSFG_state$run_variables
   current_state  = BSFG_state$current_state
+  invert_aI_bZKZ = BSFG_state$run_variables$invert_aI_bZKZ
+  Qt = t(invert_aI_bZKZ$Q)
+  s = invert_aI_bZKZ$s
 
   current_state_names = names(current_state)
   current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {
@@ -54,16 +57,17 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
                                                       h2_step_size,
                                                       grainSize)
       }
-
       resid_h2[cols] = h2s_matrix[,resid_h2_index[cols],drop=FALSE]
 
       U_R[,cols] = sample_MME_ZKZts_c(Eta_tilde[rows,cols],
                                     Z[rows,],
                                     tot_Eta_prec[cols],
                                     randomEffect_C_Choleskys_list[[set]],
-                                    resid_h2[cols],
+                                    resid_h2[,cols,drop=FALSE],
                                     resid_h2_index[cols],
                                     grainSize)
+
+      # U_R[] = sample_randomEffects_parallel_sparse_c_Eigen(Eta_tilde, Z, tot_Eta_prec, resid_h2, invert_aZZt_Kinv, grainSize)
     }
 
     resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
@@ -142,12 +146,37 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     }
     F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
+    recover()
     U_F[] = sample_MME_ZKZts_c(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys_list[[1]], F_h2, F_h2_index,grainSize)
+    # U_F[] = sample_randomEffects_parallel_sparse_c_Eigen(F_tilde, Z, tot_F_prec, F_h2, invert_aZZt_Kinv, grainSize)
+
+    chol_C = randomEffect_C_Choleskys_list[[1]][[F_h2_index[1]]]$chol_C
+    C = crossprod(chol_C)*tot_F_prec[1]
+    s = svd(C)
+    ZQt = as(t(Z %*% s$u),'dgCMatrix')
+    Q = as(s$u,'dgCMatrix')
+    chol_S = as(diag(sqrt(s$d)),'dgCMatrix')
+    pe = tot_F_prec[1]/(1-sum(F_h2[,1]))
+    randn_theta = rnorm(ncol(Z))
+    u2 = sample_MME_single_diagR2(F_tilde[,1],ZQt,Q,chol_S,pe,randn_theta)
+    plot(U_F[,1],u2)
+
+
+    svd_ZZt = svd(crossprod(Z))
+    ZZt_sqrt = t(sweep(svd_ZZt$u,2,sqrt(svd_ZZt$d),'*'))
+
+    result = GSVD_R(ZZt_sqrt,chol_K_inv)
+    Q = as(drop0(Matrix(t(solve(result$X)),sparse=T),tol = run_parameters$drop0_tol),'dgCMatrix')
+    ZQt = as(t(Z %*% Q),'dgCMatrix')
+    randomEffect_S_Choleskys = lapply(randomEffect_C_Choleskys_list[[1]],function(x) list(chol_C = as(chol(drop0(crossprod(chol_C %*% Q),tol=1e-10)),'dgCMatrix')))
+
+    u2 = sample_MME_ZKZts_c2(F_tilde,ZQt,Q,tot_F_prec,randomEffect_S_Choleskys,F_h2,F_h2_index,grainSize)
+  plot(u2,U_F);abline(0,1)
 
     # -----Sample F----------------------- #
     #conditioning on B, U_F,U_R,Lambda, F_h2
     Eta_tilde = Eta - XB - Z %**% U_R
-    F_e_prec = tot_F_prec / (1-F_h2)
+    F_e_prec = tot_F_prec / (1-colSums(F_h2))
     prior_mean = Z %**% U_F
     if(b_F > 0) {
       prior_mean = prior_mean + XFBF

@@ -567,8 +567,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     if(n_RE == 1){
       ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
       result = svd(ZKZt)
-      Qt = t(result$u)
-      # K_mats[[1]] = Diagonal(r_RE[1],result$d)
+      Qt = as(t(result$u),'dgCMatrix')
     } else{
       Qt = Diagonal(r_RE[1],1)
     }
@@ -578,15 +577,29 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     QtX_set = Qt %**% X[x,,drop=FALSE]
     QtXF_set = Qt %**% X_F[x,,drop=FALSE]  # This one is only needed for set==1
 
-    Qt_list[[set]] = Qt
-    QtX_list[[set]] = QtX_set
+    Qt_list[[set]]   = Qt
+    QtX_list[[set]]  = QtX_set
     QtXF_list[[set]] = QtXF_set
-    QtZ_list[[set]] = QtZ_set
+    QtZ_list[[set]]  = QtZ_set
 
     ZKZts_set = list()
     for(i in 1:n_RE){
       ZKZts_set[[i]] = as(forceSymmetric(drop0(QtZ_matrices_set[[i]] %*% K_mats[[i]] %*% t(QtZ_matrices_set[[i]]),tol = run_parameters$drop0_tol)),'dgCMatrix')
     }
+
+
+    Sigma_Choleskys_c_list = list()
+    for(i in 1:length(col_groups)){
+      Sigma_Choleskys_c_list[[i]] = new(Sigma_Cholesky_database,ZKZts_set,h2s_matrix[,col_groups[[i]],drop=FALSE],run_parameters$drop0_tol,1)
+      if(verbose) setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
+    }
+    Sigma_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
+      Sigma_Choleskys_c = Sigma_Choleskys_c_list[[j]]
+      lapply(1:length(col_groups[[j]]),function(i) {
+        list(log_det = Sigma_Choleskys_c$get_log_det(i),
+             chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
+      })
+    }))
 
     ZtZ_set = as(forceSymmetric(drop0(crossprod(Z[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
 
@@ -601,19 +614,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
         list(chol_C = randomEffect_C_Choleskys_c$get_chol_Ci(i),
              chol_K_inv = randomEffect_C_Choleskys_c$get_chol_K_inv_i(i)
         )
-      })
-    }))
-
-    Sigma_Choleskys_c_list = list()
-    for(i in 1:length(col_groups)){
-      Sigma_Choleskys_c_list[[i]] = new(Sigma_Cholesky_database,ZKZts_set,h2s_matrix[,col_groups[[i]],drop=FALSE],run_parameters$drop0_tol,1)
-      if(verbose) setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
-    }
-    Sigma_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
-      Sigma_Choleskys_c = Sigma_Choleskys_c_list[[j]]
-      lapply(1:length(col_groups[[j]]),function(i) {
-        list(log_det = Sigma_Choleskys_c$get_log_det(i),
-             chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
       })
     }))
   }
@@ -763,10 +763,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# --- Initialize BSFG_state --- #
 	# ----------------------------- #
 
-	# BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,
-	#                              Sigma_Choleskys = Sigma_Choleskys, randomEffect_C_Choleskys = randomEffect_C_Choleskys,  # in case these are provided
-	#                              invert_aI_bZKZ = invert_aI_bZKZ, invert_aZZt_Kinv = invert_aZZt_Kinv,   # in case these are provided
-	#                              verbose=verbose,ncores=ncores)
+	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,
+	                             Sigma_Choleskys = Sigma_Choleskys, randomEffect_C_Choleskys = randomEffect_C_Choleskys,  # in case these are provided
+	                             invert_aI_bZKZ = invert_aI_bZKZ, invert_aZZt_Kinv = invert_aZZt_Kinv,   # in case these are provided
+	                             verbose=verbose,ncores=ncores)
 
 	BSFG_state = initialize_variables(BSFG_state)
 
