@@ -115,6 +115,19 @@ The first step in fitting a BSFG model. This function setups up the model matric
 fixed and random effect formulas provided, initializes all of model parameters, and then
 pre-calculates a set of matrices and transformations to speed up each iteration of the Gibbs
 sampler.
+
+The model is specified as:
+
+y_i = g(eta_i)
+Eta = rbind(eta_1,...,eta_n) = X*B + F*t(Lambda) + Z*U_R + E_R
+F = X_F * B_F + Z*U_F + E_F
+
+For sampling, we reparameterize as:
+
+Qt*Eta = Qt*X*B + Qt*F*t(Lambda) + Qt*Z*U_R + Qt*E_R
+Qt*F = Qt*X_F * B_F + Qt*Z*U_F + Qt*E_F
+
+We sample the quantities Qt*Eta, Qt*F, B, Lambda, U_R, U_F. We then back-calculate Eta and F.
 }
 \seealso{
 \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'

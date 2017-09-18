@@ -46,7 +46,7 @@ List LDLt_sparse(MSpMat A) {
   MatrixXd P = chol_A.permutationP() * I;
   return(List::create(
       Named("P") = P.sparseView(),
-      Named("L") =  chol_A.matrixL(),
+      Named("L") =chol_A.matrixL(),
       Named("d") = chol_A.vectorD()
   ));
 }
@@ -61,7 +61,7 @@ List LDLt_notSparse(Map<MatrixXd> A) {
   MatrixXd L = chol_A.matrixL();
   return(List::create(
       Named("P") = P.sparseView(),
-      Named("L") =L.sparseView(),
+      Named("L") = L.sparseView(),
       Named("d") = d
   ));
 }

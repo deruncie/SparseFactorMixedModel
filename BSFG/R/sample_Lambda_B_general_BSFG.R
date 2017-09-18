@@ -1,3 +1,8 @@
+# Eta = cbind(X, F) * rbind(t(B),t(Lambda) + Z*U_F + U_E
+# Qt*Eta = cbind(Qt*X,Qt*F) * rbind(t(B),t(Lambda) + Qt*Z*U_F + Qt*U_E
+# note: different Qt for each column
+
+
 sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
@@ -11,7 +16,6 @@ sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
 
     # -----Sample Lambda and B ------------------ #
     #conditioning on W, F, marginalizing over random effects (conditional on resid_h2)
-    Design = cBind(X,F)
     rows = b + k
     prior_mean = matrix(0,rows,p)
     if(b > 0) {
@@ -20,18 +24,31 @@ sample_Lambda_B.general_BSFG = function(BSFG_state,grainSize = 1,...) {
       prior_prec = t(Plam)
     }
     if(is.null(cis_genotypes)){
-      coefs = sample_MME_fixedEffects(Eta,Design,Sigma_Choleskys, resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,grainSize)
-      if(b > 0){
-        B[] = coefs[1:b,,drop=FALSE]
+      for(set in seq_along(Missing_data_map)){
+        cols = Missing_data_map[[set]]$Y_cols
+        rows = Missing_data_map[[set]]$Y_obs
+        coefs = sample_MME_fixedEffects_c(Qt_list[[set]] %**% Eta[rows,cols],
+                                          cbind(QtX_list[[set]], Qt_list[[set]] %**% F[rows,,drop=FALSE]),
+                                          Sigma_Choleskys_list[[set]],
+                                          resid_h2_index[cols],
+                                          tot_Eta_prec[cols],
+                                          prior_mean[,cols],
+                                          prior_prec[,cols],
+                                          grainSize
+                                          )
+        if(b > 0) {
+          B[,cols] = coefs[1:b,,drop=FALSE]
+        }
+        Lambda[cols,] = t(coefs[b + 1:k,,drop=FALSE])
       }
-      Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
     } else{
-      result = sample_MME_fixedEffects_cis(Eta,Design,cis_genotypes,cis_effects_index,Sigma_Choleskys, resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,grainSize)
-      if(b > 0){
-        B[] = result[[1]][1:b,,drop=FALSE]
-      }
-      Lambda[] = t(result[[1]][b+1:k,,drop=FALSE])
-      cis_effects[] = result[[2]]
+      stop('cis effects not implemented yet')
+      # result = sample_MME_fixedEffects_cis(Eta,Design,cis_genotypes,cis_effects_index,Sigma_Choleskys, resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,grainSize)
+      # if(b > 0){
+      #   B[] = result[[1]][1:b,,drop=FALSE]
+      # }
+      # Lambda[] = t(result[[1]][b+1:k,,drop=FALSE])
+      # cis_effects[] = result[[2]]
     }
   }))
   current_state = current_state[current_state_names]

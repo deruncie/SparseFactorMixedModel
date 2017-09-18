@@ -27,6 +27,7 @@ load_simulation_data = function(file = NULL){
 
 
 `%**%` = function(X1,X2){
+  if(is.null(X1)) return(X2)
   if(inherits(X1,'dgCMatrix') && inherits(X2,'matrix')) return(SxD(X1,X2))
   if(inherits(X1,'dgCMatrix') && inherits(X2,'dgCMatrix')) return(SxS(X1,X2))
   if(inherits(X1,'matrix') & inherits(X2,'matrix')) return(X1 %*% X2)

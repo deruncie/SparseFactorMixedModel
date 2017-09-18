@@ -136,6 +136,18 @@ BSFG_priors = function(
 #' pre-calculates a set of matrices and transformations to speed up each iteration of the Gibbs
 #' sampler.
 #'
+#' The model is specified as:
+#'
+#' y_i = g(eta_i)
+#' Eta = rbind(eta_1,...,eta_n) = X*B + F*t(Lambda) + Z*U_R + E_R
+#' F = X_F * B_F + Z*U_F + E_F
+#'
+#' For sampling, we reparameterize as:
+#'
+#' Qt*Eta = Qt*X*B + Qt*F*t(Lambda) + Qt*Z*U_R + Qt*E_R
+#' Qt*F = Qt*X_F * B_F + Qt*Z*U_F + Qt*E_F
+#'
+#' We sample the quantities Qt*Eta, Qt*F, B, Lambda, U_R, U_F. We then back-calculate Eta and F.
 #'
 #' @param Y either a) a n x p matrix of data (n individuals x p traits), or b) a list describing
 #'     the observation_model, data, and associated parameters. This list should contain:
@@ -406,6 +418,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  Z_matrices = c(Z_matrices,Zs_term)
 	}
 	names(Z_matrices) = RE_names
+	n_RE = length(RE_names)
 
 	  # function to ensure that covariance matrices are sparse and symmetric
 	fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
@@ -422,7 +435,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
 	RE_L_matrices = list()
 
-	for(i in 1:length(RE_names)){
+	for(i in 1:n_RE){
 	  re = RE_covs[i]
 	  re_name = RE_names[i]
 	  if(re %in% names(ldl_ks)) {
@@ -484,19 +497,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  # cholesky decompositions (L'L) of each K_inverse matrix
 	chol_Ki_mats = lapply(Ki_mats,chol)
 
-
-	n_RE = length(RE_names)
-
-	if(n_RE > 1 && run_parameters$sampler == 'fast_BSFG'){
-	  cat(sprintf('%d random effects. Using \"general_BSFG\" sampler\n',length(RE_names)))
-	  run_parameters$sampler = 'general_BSFG'
-	}
-
-
-	  # table of possible h2s for each random effect
-	  #   These are percentages of the total residual variance accounted for by each random effect
-	  #   Each column is a set of percentages, the sum of which must be less than 1 (so that Ve is > 0)
-	  # can specify different levels of granularity for each random effect
+	# table of possible h2s for each random effect
+	#   These are percentages of the total residual variance accounted for by each random effect
+	#   Each column is a set of percentages, the sum of which must be less than 1 (so that Ve is > 0)
+	# can specify different levels of granularity for each random effect
 	h2_divisions = run_parameters$h2_divisions
 	if(length(h2_divisions) < n_RE){
 	  if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
@@ -509,6 +513,132 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	colnames(h2s_matrix) = RE_names
 	h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
 	colnames(h2s_matrix) = NULL
+
+
+	# ------------------------------------ #
+	# ----Precalculate ZKZts, chol_Ks ---- #
+	# ------------------------------------ #
+
+	# unless impute_missing == T,
+	# for each set of columns with the same pattern of missing calculate a complete set of ZKZts and chol_Ks
+
+	# first, identify sets of traits with same pattern of missingness
+  Y_col_obs = lapply(1:ncol(Y_missing),function(x) {
+    obs = which(!Y_missing[,x],useNames=F)
+    names(obs) = NULL
+    obs
+  })
+  unique_Y_col_obs = unique(c(list(1:nrow(Y_missing)),Y_col_obs))
+  unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
+  Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
+
+  Missing_data_map = lapply(seq_along(unique_Y_col_obs),function(i) {
+    x = unique_Y_col_obs[[i]]
+    if(length(x) == 0){
+      stop('Columns of Y have 100% missing data! Please drop these columns.')
+    }
+    return(list(
+      Y_obs = x,
+      Y_cols = which(Y_col_obs_index == i)
+    ))
+  })
+
+  # now, for each set of columns, pre-calculate a set of matrices, etc
+  # do calculations in several chunks
+  group_size = 2*detectCores()
+  n_groups = ceiling(ncol(h2s_matrix)/group_size)
+  col_groups = tapply(1:ncol(h2s_matrix),gl(n_groups,group_size,ncol(h2s_matrix)),function(x) x)
+
+  if(verbose) {
+    print(sprintf("Pre-calculating random effect inverse matrices for %d sets of columns and %d sets of random effect weights", length(Missing_data_map), ncol(h2s_matrix)))
+    pb = txtProgressBar(min=0,max = length(Missing_data_map)*  length(col_groups) * 2,style=3)
+  }
+
+  Qt_list = list()
+  QtX_list = list()
+  QtXF_list = list()
+  QtZ_list = list()
+  randomEffect_C_Choleskys_list = list()
+  Sigma_Choleskys_list = list()
+
+  for(set in seq_along(unique_Y_col_obs)){
+    x = unique_Y_col_obs[[set]]
+
+    if(n_RE == 1){
+      ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
+      result = svd(ZKZt)
+      Qt = t(result$u)
+      # K_mats[[1]] = Diagonal(r_RE[1],result$d)
+    } else{
+      Qt = Diagonal(r_RE[1],1)
+    }
+    QtZ_matrices_set = lapply(Z_matrices,function(z) Qt %*% z[x,,drop=FALSE])
+    QtZ_set = do.call(cbind,QtZ_matrices_set[RE_names])
+    QtZ_set = as(QtZ_set,'dgCMatrix')
+    QtX_set = Qt %**% X[x,,drop=FALSE]
+    QtXF_set = Qt %**% X_F[x,,drop=FALSE]  # This one is only needed for set==1
+
+    Qt_list[[set]] = Qt
+    QtX_list[[set]] = QtX_set
+    QtXF_list[[set]] = QtXF_set
+    QtZ_list[[set]] = QtZ_set
+
+    ZKZts_set = list()
+    for(i in 1:n_RE){
+      ZKZts_set[[i]] = as(forceSymmetric(drop0(QtZ_matrices_set[[i]] %*% K_mats[[i]] %*% t(QtZ_matrices_set[[i]]),tol = run_parameters$drop0_tol)),'dgCMatrix')
+    }
+
+    ZtZ_set = as(forceSymmetric(drop0(crossprod(Z[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
+
+    randomEffect_C_Choleskys_c_list = list()
+    for(i in 1:length(col_groups)){
+      randomEffect_C_Choleskys_c_list[[i]] = new(randomEffect_C_Cholesky_database,lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix[,col_groups[[i]],drop=FALSE],ZtZ_set,run_parameters$drop0_tol,1)
+      if(verbose) setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
+    }
+    randomEffect_C_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
+      randomEffect_C_Choleskys_c = randomEffect_C_Choleskys_c_list[[j]]
+      lapply(1:length(col_groups[[j]]),function(i) {
+        list(chol_C = randomEffect_C_Choleskys_c$get_chol_Ci(i),
+             chol_K_inv = randomEffect_C_Choleskys_c$get_chol_K_inv_i(i)
+        )
+      })
+    }))
+
+    Sigma_Choleskys_c_list = list()
+    for(i in 1:length(col_groups)){
+      Sigma_Choleskys_c_list[[i]] = new(Sigma_Cholesky_database,ZKZts_set,h2s_matrix[,col_groups[[i]],drop=FALSE],run_parameters$drop0_tol,1)
+      if(verbose) setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
+    }
+    Sigma_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
+      Sigma_Choleskys_c = Sigma_Choleskys_c_list[[j]]
+      lapply(1:length(col_groups[[j]]),function(i) {
+        list(log_det = Sigma_Choleskys_c$get_log_det(i),
+             chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
+      })
+    }))
+  }
+  if(verbose) close(pb)
+
+
+  run_variables = list(
+    p      = p,
+    n      = n,
+    r_RE   = r_RE,
+    RE_names = RE_names,
+    b      = b,
+    b_F    = b_F,
+    resid_intercept = resid_intercept,
+    same_fixed_model = same_fixed_model,
+    X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
+    cis_effects_index = cis_effects_index,
+    Qt_list    = Qt_list,
+    QtX_list   = QtX_list,
+    QtXF_list  = QtXF_list,
+    QtZ_list   = QtZ_list,
+    Missing_data_map = Missing_data_map,
+    Sigma_Choleskys_list          = Sigma_Choleskys_list,
+    randomEffect_C_Choleskys_list = randomEffect_C_Choleskys_list
+  )
 
 	data_matrices = list(
 	  X          = X,
@@ -525,19 +655,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  QTL_factors_Z = QTL_factors_Z,
 	  QTL_factors_X = QTL_factors_X,
 	  data       = data
-	)
-
-	run_variables = list(
-	  p      = p,
-	  n      = n,
-	  r_RE   = r_RE,
-	  RE_names = RE_names,
-	  b      = b,
-	  b_F    = b_F,
-	  resid_intercept = resid_intercept,
-	  same_fixed_model = same_fixed_model,
-	  X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
-	  cis_effects_index = cis_effects_index
 	)
 
 	run_parameters$observation_model = observation_model
@@ -624,11 +741,17 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# -- create BSFG_state object - #
 	# ----------------------------- #
 
+	RNG = list(
+	  Random.seed = .Random.seed,
+	  RNGkind = RNGkind()
+	)
+
 	BSFG_state = list(
 	  data_matrices  = data_matrices,
 	  priors         = priors,
 	  run_parameters = run_parameters,
 	  run_variables  = run_variables,
+	  RNG            = RNG,
 	  setup          = setup
 	)
 	class(BSFG_state) = append(c(run_parameters$sampler,'BSFG_state'),class(BSFG_state))
@@ -640,10 +763,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# --- Initialize BSFG_state --- #
 	# ----------------------------- #
 
-	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,
-	                             Sigma_Choleskys = Sigma_Choleskys, randomEffect_C_Choleskys = randomEffect_C_Choleskys,  # in case these are provided
-	                             invert_aI_bZKZ = invert_aI_bZKZ, invert_aZZt_Kinv = invert_aZZt_Kinv,   # in case these are provided
-	                             verbose=verbose,ncores=ncores)
+	# BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,
+	#                              Sigma_Choleskys = Sigma_Choleskys, randomEffect_C_Choleskys = randomEffect_C_Choleskys,  # in case these are provided
+	#                              invert_aI_bZKZ = invert_aI_bZKZ, invert_aZZt_Kinv = invert_aZZt_Kinv,   # in case these are provided
+	#                              verbose=verbose,ncores=ncores)
 
 	BSFG_state = initialize_variables(BSFG_state)
 

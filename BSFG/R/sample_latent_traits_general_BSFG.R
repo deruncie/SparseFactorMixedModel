@@ -21,59 +21,101 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
     # -----Sample tot_Eta_prec, resid_h2, U_R ---------------- #
     #conditioning on B, F, Lambda, resid_h2, tot_Eta_prec
     Eta_tilde = Eta - XB - F %*% t(Lambda)
-    scores = tot_prec_scores(Eta_tilde,Sigma_Choleskys,resid_h2_index,1)
-    tot_Eta_prec[] = rgamma(p,shape = tot_Eta_prec_shape + n/2, rate = tot_Eta_prec_rate + 0.5*scores)
+    scores = rep(0,p)
 
-    if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
-    if(is.null(h2_step_size)) {
-      resid_h2_index = sample_h2s_discrete(Eta_tilde,tot_Eta_prec, Sigma_Choleskys, h2_priors_resids,grainSize)
-    } else{
-      resid_h2_index = sample_h2s_discrete_MH(Eta_tilde,tot_Eta_prec, Sigma_Choleskys,h2_priors_resids,h2s_matrix,resid_h2_index,h2_step_size,grainSize)
+    # sample columns of tot_Eta_prec, resid_h2, U_R in sets with the same patterns of missing data
+    for(set in seq_along(Missing_data_map)){
+      cols = Missing_data_map[[set]]$Y_cols
+      rows = Missing_data_map[[set]]$Y_obs
+
+      QtEta_tilde_set = Qt_list[[set]] %**% Eta_tilde[rows,cols]
+      scores[cols] = tot_prec_scores(QtEta_tilde_set,
+                                     Sigma_Choleskys_list[[set]],
+                                     resid_h2_index[cols],
+                                     grainSize
+                                    )
+      tot_Eta_prec[cols] = rgamma(length(cols),shape = tot_Eta_prec_shape + length(rows)/2, rate = tot_Eta_prec_rate + 0.5*scores[cols])
+
+      if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
+      if(is.null(h2_step_size)) {
+        log_ps = log_p_h2s(QtEta_tilde_set,
+                           tot_Eta_prec[cols],
+                           Sigma_Choleskys_list[[set]],
+                           h2_priors_resids,
+                           grainSize)
+        resid_h2_index[cols] = sample_h2s(log_ps,grainSize)
+      } else{
+        resid_h2_index[cols] = sample_h2s_discrete_MH_c(QtEta_tilde_set,
+                                                      tot_Eta_prec[cols],
+                                                      h2_priors_resids,
+                                                      resid_h2_index[cols],
+                                                      h2s_matrix,
+                                                      Sigma_Choleskys_list[[set]],
+                                                      h2_step_size,
+                                                      grainSize)
+      }
+
+      resid_h2[cols] = h2s_matrix[,resid_h2_index[cols],drop=FALSE]
+
+      U_R[,cols] = sample_MME_ZKZts_c(Eta_tilde[rows,cols],
+                                    Z[rows,],
+                                    tot_Eta_prec[cols],
+                                    randomEffect_C_Choleskys_list[[set]],
+                                    resid_h2[cols],
+                                    resid_h2_index[cols],
+                                    grainSize)
     }
-
-    resid_h2[] = h2s_matrix[,resid_h2_index,drop=FALSE]
-
-    U_R[] = sample_MME_ZKZts(Eta_tilde, Z, tot_Eta_prec, randomEffect_C_Choleskys, resid_h2, resid_h2_index,grainSize)
 
     resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
 
     # -----Sample Lambda and B_F ------------------ #
     # F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
     if(b_F > 0){
-      prior_mean = matrix(0,b_F,k)
-      prior_prec = sweep(B_F_prec,2,tot_F_prec,'*')  # prior for B_F includes tot_F_prec
-      if(b_F > 100){
-        n_sets = ceiling(b_F/100)
-        sets = gl(n_sets,b_F/n_sets)
-        for(set in unique(sets)){
-          index = sets==set
-          if(sum(!index) > 0){
-            X_F_set = X_F[,index,drop=FALSE]
-            F_tilde = F - as.matrix(X_F[,!index,drop=FALSE] %*% B_F[!index,,drop=FALSE])
-          } else{
-            X_F_set = X_F
-            F_tilde = F
-          }
-          B_F[index,] = sample_MME_fixedEffects(F_tilde,X_F_set,
-                                                Sigma_Choleskys, F_h2_index, tot_F_prec,
-                                                prior_mean[index,],
-                                                prior_prec[index,],
-                                                grainSize)
-
-        }
+      # non-QTL fixed effects
+      b_F1 = ncol(X_F)
+      if(length(QTL_columns_factors) > 0) {
+        X_F1_cols = seq_len(b_F1)[-QTL_columns_factors]
+        b_F1 = length(X_F1_cols)
+        F_tilde = F - toDense(QTL_factors_Z %*% QTL_factors_X %*% B_F[-c(1:b_F1),,drop=FALSE])
       } else{
-        B_F = sample_MME_fixedEffects(F,X_F,Sigma_Choleskys, F_h2_index, tot_F_prec, prior_mean, prior_prec,grainSize)
+        X_F1_cols = seq_len(b_F1)
+        F_tilde = F
       }
-      XFBF = X_F %*% B_F
-      if(inherits(XFBF,'Matrix')) XFBF = as.matrix(XFBF)
-      F_tilde = F - XFBF
+      prior_mean = matrix(0,b_F1,k)
+      prior_prec = B_F_prec[X_F1_cols,,drop=FALSE] * tot_F_prec[rep(1,b_F1),,drop=FALSE]  # prior for B_F includes tot_F_prec
+      B_F[1:b_F1,] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F_tilde,
+                                             QtXF_list[[1]][,X_F1_cols,drop=FALSE],
+                                             Sigma_Choleskys_list[[1]],
+                                             F_h2_index,
+                                             tot_F_prec,
+                                             prior_mean,
+                                             prior_prec,
+                                             grainSize)
+      # QTL fixed effects
+      if(length(QTL_columns_factors) > 0){
+        stop('QTL_columns_factors not yet implemented')
+        # F_tilde = F - toDense(X_F1 %*% B_F[1:b_F1,,drop=FALSE])
+        # b_F_QTL = ncol(QTL_factors_X)
+        # prior_mean = matrix(0,b_F_QTL,k)
+        # prior_prec = B_F_prec[QTL_columns_factors,] * tot_F_prec[rep(1,b_F_QTL),]  # prior for B_F includes tot_F_prec
+        # B_F[QTL_columns_factors,] = sample_coefs_hierarchical_parallel_sparse_c_Eigen(Qt,F_tilde,QTL_factors_Z,QTL_factors_X,F_h2, tot_F_prec,s, prior_mean,prior_prec,grainSize)
+      }
+
+      XFBF = X_F %**% B_F
+      F_tilde = F - XFBF # not sparse.
     } else{
       F_tilde = F
     }
+
     # -----Sample tot_F_prec, F_h2, U_F ---------------- #
     #conditioning on B, F, Lambda, F_h2, tot_F_prec
 
-    scores = tot_prec_scores(F_tilde,Sigma_Choleskys,F_h2_index,1)
+    Qt_F_tilde = Qt_list[[1]] %**% F_tilde
+
+    scores = tot_prec_scores(Qt_F_tilde,
+                             Sigma_Choleskys_list[[1]],
+                             F_h2_index,
+                             grainSize)
     if(b_F > 0) {
       scores = scores + colSums((B_F^2*B_F_prec)[!X_F_zero_variance,,drop=FALSE])   # add this if tot_F_prec part of the prior for B_F
     }
@@ -82,25 +124,45 @@ sample_latent_traits.general_BSFG = function(BSFG_state,grainSize = 1,...) {
 
     if(!length(h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of h2_priors_factors')
     if(is.null(h2_step_size)) {
-      F_h2_index = sample_h2s_discrete(F_tilde,tot_F_prec, Sigma_Choleskys,h2_priors_factors,grainSize)
+      log_ps = log_p_h2s(Qt_F_tilde,
+                         tot_F_prec,
+                         Sigma_Choleskys_list[[1]],
+                         h2_priors_factors,
+                         grainSize)
+      F_h2_index = sample_h2s(log_ps,grainSize)
     } else{
-      F_h2_index = sample_h2s_discrete_MH(F_tilde,tot_F_prec, Sigma_Choleskys,h2_priors_factors,h2s_matrix,F_h2_index,h2_step_size,grainSize)
+      F_h2_index = sample_h2s_discrete_MH_c(Qt_F_tilde,
+                                          tot_F_prec,
+                                          h2_priors_factors,
+                                          F_h2_index,
+                                          h2s_matrix,
+                                          Sigma_Choleskys_list[[1]],
+                                          h2_step_size,
+                                          grainSize)
     }
-
     F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    U_F[] = sample_MME_ZKZts(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys, F_h2, F_h2_index,grainSize)
+    U_F[] = sample_MME_ZKZts_c(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys_list[[1]], F_h2, F_h2_index,grainSize)
 
     # -----Sample F----------------------- #
     #conditioning on B, U_F,U_R,Lambda, F_h2
-    Eta_tilde = Eta - XB - as.matrix(Z %*% U_R)
-    F_e_prec = tot_F_prec / (1-colSums(F_h2))
-    prior_mean = as.matrix(Z %*% U_F)
+    Eta_tilde = Eta - XB - Z %**% U_R
+    F_e_prec = tot_F_prec / (1-F_h2)
+    prior_mean = Z %**% U_F
     if(b_F > 0) {
       prior_mean = prior_mean + XFBF
     }
-    randn = matrix(rnorm(n*k),n)
-    F[] = sample_factors_scores_sparse_c_Eigen( Eta_tilde, prior_mean,Lambda,resid_Eta_prec,F_e_prec,randn )
+
+    for(set in seq_along(Missing_data_map)){
+      cols = Missing_data_map[[set]]$Y_cols
+      rows = Missing_data_map[[set]]$Y_obs
+
+      F[rows,] = sample_factors_scores_c(Eta_tilde[rows,cols],
+                                         prior_mean[rows,],
+                                         Lambda[cols,],
+                                         resid_Eta_prec[cols],
+                                         F_e_prec)
+    }
 
   }))
   current_state = current_state[current_state_names]
