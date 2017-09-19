@@ -45,11 +45,18 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
                         k_init = 20, h2_divisions = 100, h2_step_size = NULL,
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,thin = 2,
-                        delta_iteractions_factor = 100
+                        delta_iteractions_factor = 100,
+                        ...
                         ) {
 
-  all_args = lapply(formals(),function(x) eval(x)[1])
+  formals_named = formals()
+  formals_named = formals_named[names(formals_named) != '...']
+  all_args = lapply(formals_named,function(x) eval(x)[1])
   passed_args = lapply(as.list(match.call())[-1],eval)
+  if(any(names(passed_args) %in% names(formals_named) == F)){
+    unused_names = names(passed_args)[names(passed_args) %in% names(formals_named) == F]
+    warning(sprintf('No argument(s) named %s',paste(unused_names,sep=', ')))
+  }
   all_args[names(passed_args)] = passed_args
   return(all_args)
 }
@@ -259,7 +266,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   Eta = observation_model_state$state$Eta
   Y_missing = as(observation_model_state$state$Y_missing,'lgTMatrix')
   observation_model_parameters$Y_missing = Y_missing
-  # if('Y_missing' %in% names(observation_model_state$state)) observation_model_parameters$Y_missing = as(observation_model_state$state$Y_missing,'lgTMatrix')
   n = nrow(data)
   p = ncol(Eta)
   traitnames = colnames(Eta)
@@ -521,10 +527,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# ----Precalculate ZKZts, chol_Ks ---- #
 	# ------------------------------------ #
 
-	# unless impute_missing == T,
-	# for each set of columns with the same pattern of missing calculate a complete set of ZKZts and chol_Ks
-
 	# first, identify sets of traits with same pattern of missingness
+
+# ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
   Y_col_obs = lapply(1:ncol(Y_missing),function(x) {
     obs = which(!Y_missing[,x],useNames=F)
     names(obs) = NULL
@@ -547,12 +552,12 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
   # now, for each set of columns, pre-calculate a set of matrices, etc
   # do calculations in several chunks
-  group_size = 2*detectCores()
+  group_size = 2*parallel::detectCores()
   n_groups = ceiling(ncol(h2s_matrix)/group_size)
   col_groups = tapply(1:ncol(h2s_matrix),gl(n_groups,group_size,ncol(h2s_matrix)),function(x) x)
 
   if(verbose) {
-    print(sprintf("Pre-calculating random effect inverse matrices for %d sets of columns and %d sets of random effect weights", length(Missing_data_map), ncol(h2s_matrix)))
+    print(sprintf("Pre-calculating random effect inverse matrices for %d groups of traits and %d sets of random effect weights", length(Missing_data_map), ncol(h2s_matrix)))
     pb = txtProgressBar(min=0,max = length(Missing_data_map)*  length(col_groups) * 2,style=3)
   }
 
