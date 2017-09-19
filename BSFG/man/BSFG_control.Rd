@@ -9,7 +9,7 @@ BSFG_control(sampler = c("fast_BSFG", "general_BSFG"),
   b0 = 1, b1 = 5e-04, epsilon = 0.1, prop = 1, k_init = 20,
   h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
   K_eigen_tol = 1e-10, burn = 100, thin = 2,
-  delta_iteractions_factor = 100, ...)
+  delta_iteractions_factor = 100, impute_missing = TRUE, ...)
 }
 \arguments{
 \item{sampler}{specify the sampler to use. fast_BSFG is often faster, but only allows one random

@@ -164,7 +164,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       resid_Eta_prec = matrix(1,1,p)
       resid_Y_prec = matrix(rep(1,n_traits),nr=1)  # only a single precision parameter for the data_model?
     } else{
-      Eta_mean = as.matrix(X %*% B) + F %*% t(Lambda) + as.matrix(Z %*% U_R)
+      Eta_mean = X %**% B + F %*% t(Lambda) + Z %**% U_R
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
       if(!'resid_Y_prec' %in% ls()) resid_Y_prec = matrix(rep(1,n_traits),nr=1)
     }

@@ -68,13 +68,14 @@ VectorXd sample_MME_single_diagK(  // returns b x 1 vector
   if(randn_e.size() == 0){
     MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);
     VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y);
+    VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
     MatrixXd C = RinvSqX.transpose() * RinvSqX;
     C.diagonal() += prior_prec;
     LLT<MatrixXd> C_llt;
     C_llt.compute(C);
     MatrixXd chol_C = C_llt.matrixU();
 
-    VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy);
+    VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
     b += randn_theta;
     b = chol_C.triangularView<Upper>().solve(b);
     return(b);
@@ -188,48 +189,39 @@ MatrixXd sample_MME_fixedEffects_c(  // returns bxp matrix
 
 
 // [[Rcpp::export()]]
-MatrixXd sample_coefs_set_c(    // return nxp matrix
+MatrixXd sample_coefs_set_c(    // return pxn matrix
     Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x p), position (n_i x 1)
     Map<VectorXd> tot_Y_prec,   // tx1
-    Map<MatrixXd> prior_mean,   // nxp
-    Map<MatrixXd> prior_prec,   // nxp
+    Map<MatrixXd> prior_mean,   // pxn
+    Map<MatrixXd> prior_prec,   // pxn
     int grainSize){
 
   int n = model_matrices.size();
 
   std::vector<MatrixXd> y_list;
   std::vector<MatrixXd> X_list;
-  std::vector<VectorXd> s_list;
   std::vector<MatrixXd> randn_theta_list;
-  int randn_theta_index = 0;
-  int total_obs = 0;
   for(int i = 0; i < n; i++){
     Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
     y_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["y"]));
     X_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));
-    s_list.push_back(Rcpp::as<VectorXd>(model_matrix_i["s"]));
 
-    int p = y_list[i].cols();
-    int n_obs = y_list[i].rows();
+    int t = y_list[i].cols();
     int b = X_list[i].cols();
 
-    total_obs += n_obs;
-
-    MatrixXd randn_theta = rstdnorm_mat(b,p);
+    MatrixXd randn_theta = rstdnorm_mat(b,t);
     randn_theta_list.push_back(randn_theta);
-    randn_theta_index += b*p;
   }
 
   int n_traits = y_list[0].cols();
-  int b = randn_theta_list[0].rows()*n_traits;
+  int p = X_list[0].cols()*n_traits;
 
-  MatrixXd coefs(b,n);
+  MatrixXd coefs(p,n);
 
   struct sampleColumn : public RcppParallel::Worker {
     std::vector<MatrixXd> y_list;
     std::vector<MatrixXd> X_list;
     std::vector<MatrixXd> randn_theta_list;
-    std::vector<VectorXd> s_list;
     VectorXd tot_Y_prec;
     MatrixXd prior_mean,prior_prec;
     int n_traits;
@@ -239,13 +231,12 @@ MatrixXd sample_coefs_set_c(    // return nxp matrix
       std::vector<MatrixXd> y_list,
       std::vector<MatrixXd> X_list,
       std::vector<MatrixXd> randn_theta_list,
-      std::vector<VectorXd> s_list,
       VectorXd tot_Y_prec,
       MatrixXd prior_mean,
       MatrixXd prior_prec,
       int n_traits,
       MatrixXd &coefs) :
-      y_list(y_list), X_list(X_list), randn_theta_list(randn_theta_list),s_list(s_list),
+      y_list(y_list), X_list(X_list), randn_theta_list(randn_theta_list),
       tot_Y_prec(tot_Y_prec),prior_mean(prior_mean), prior_prec(prior_prec),n_traits(n_traits),
       coefs(coefs)
     {}
@@ -254,9 +245,8 @@ MatrixXd sample_coefs_set_c(    // return nxp matrix
       for(std::size_t j = begin; j < end; j++){
         MatrixXd Y = y_list[j];
         MatrixXd X = X_list[j];
-        int b = randn_theta_list[j].rows();
+        int b = X.cols();
         int n_obs = Y.rows();
-        VectorXd s = s_list[j];
         SpMat I = MatrixXd::Identity(n_obs,n_obs).sparseView();
         MatrixXd randn_e = MatrixXd::Zero(0,n_traits);
         for(int t = 0; t < n_traits; t++) {
@@ -271,7 +261,7 @@ MatrixXd sample_coefs_set_c(    // return nxp matrix
   };
 
 
-  sampleColumn sampler(y_list, X_list,randn_theta_list,s_list,tot_Y_prec,prior_mean,prior_prec,n_traits,coefs);
+  sampleColumn sampler(y_list, X_list,randn_theta_list,tot_Y_prec,prior_mean,prior_prec,n_traits,coefs);
   RcppParallel::parallelFor(0,n,sampler,grainSize);
 
   return(coefs);

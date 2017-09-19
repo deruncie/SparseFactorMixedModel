@@ -46,6 +46,7 @@ BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,thin = 2,
                         delta_iteractions_factor = 100,
+                        impute_missing = TRUE,
                         ...
                         ) {
 
@@ -530,25 +531,32 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# first, identify sets of traits with same pattern of missingness
 
 # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
-  Y_col_obs = lapply(1:ncol(Y_missing),function(x) {
-    obs = which(!Y_missing[,x],useNames=F)
-    names(obs) = NULL
-    obs
-  })
-  unique_Y_col_obs = unique(c(list(1:nrow(Y_missing)),Y_col_obs))
-  unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
-  Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
+	if(run_parameters$impute_missing) {
+    Y_col_obs = lapply(1:ncol(Y_missing),function(x) {
+      obs = which(!Y_missing[,x],useNames=F)
+      names(obs) = NULL
+      obs
+    })
+    unique_Y_col_obs = unique(c(list(1:nrow(Y_missing)),Y_col_obs))
+    unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
+    Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
 
-  Missing_data_map = lapply(seq_along(unique_Y_col_obs),function(i) {
-    x = unique_Y_col_obs[[i]]
-    if(length(x) == 0){
-      stop('Columns of Y have 100% missing data! Please drop these columns.')
-    }
-    return(list(
-      Y_obs = x,
-      Y_cols = which(Y_col_obs_index == i)
-    ))
-  })
+    Missing_data_map = lapply(seq_along(unique_Y_col_obs),function(i) {
+      x = unique_Y_col_obs[[i]]
+      if(length(x) == 0){
+        stop('Columns of Y have 100% missing data! Please drop these columns.')
+      }
+      return(list(
+        Y_obs = x,
+        Y_cols = which(Y_col_obs_index == i)
+      ))
+    })
+	} else{
+	  Missing_data_map = list(list(
+	    Y_obs = 1:n,
+	    Y_cols = 1:p
+	  ))
+	}
 
   # now, for each set of columns, pre-calculate a set of matrices, etc
   # do calculations in several chunks
@@ -568,17 +576,18 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   randomEffect_C_Choleskys_list = list()
   Sigma_Choleskys_list = list()
 
-  for(set in seq_along(unique_Y_col_obs)){
-    x = unique_Y_col_obs[[set]]
+  for(set in seq_along(Missing_data_map)){
+    x = Missing_data_map[[set]]$Y_obs
 
     if(n_RE == 1){
       ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
       result = svd(ZKZt)
       Qt = as(t(result$u),'dgCMatrix')
+      QtZ_matrices_set = lapply(Z_matrices,function(z) Qt %*% z[x,,drop=FALSE])
     } else{
-      Qt = Diagonal(r_RE[1],1)
+      Qt = Diagonal(length(x),1)
+      QtZ_matrices_set = lapply(Z_matrices,function(z) z[x,,drop=FALSE])
     }
-    QtZ_matrices_set = lapply(Z_matrices,function(z) Qt %*% z[x,,drop=FALSE])
     QtZ_set = do.call(cbind,QtZ_matrices_set[RE_names])
     QtZ_set = as(QtZ_set,'dgCMatrix')
     QtX_set = Qt %**% X[x,,drop=FALSE]

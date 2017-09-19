@@ -35,7 +35,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                      resid_h2_index[cols],
                                      grainSize
                                     )
-      tot_Eta_prec[cols] = rgamma(length(cols),shape = tot_Eta_prec_shape + length(rows)/2, rate = tot_Eta_prec_rate + 0.5*scores[cols])
+      tot_Eta_prec[cols] = rgamma(length(cols),shape = tot_Eta_prec_shape + length(rows)/2, rate = tot_Eta_prec_rate[cols] + 0.5*scores[cols])
 
       if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
       if(is.null(h2_step_size)) {
@@ -55,7 +55,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                                       h2_step_size,
                                                       grainSize)
       }
-      resid_h2[cols] = h2s_matrix[,resid_h2_index[cols],drop=FALSE]
+      resid_h2[,cols] = h2s_matrix[,resid_h2_index[cols],drop=FALSE]
 
       U_R[,cols] = sample_MME_ZKZts_c(Eta_tilde[rows,cols],
                                     Z[rows,],
@@ -93,8 +93,8 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                              grainSize)
       # QTL fixed effects
       if(length(QTL_columns_factors) > 0){
-        stop('QTL_columns_factors not yet implemented')
-        # F_tilde = F - toDense(X_F1 %*% B_F[1:b_F1,,drop=FALSE])
+        warning('QTL_columns_factors not yet implemented')
+        # F_tilde = F - toDense(X_F[,X_F1_cols] %*% B_F[1:b_F1,,drop=FALSE])
         # b_F_QTL = ncol(QTL_factors_X)
         # prior_mean = matrix(0,b_F_QTL,k)
         # prior_prec = B_F_prec[QTL_columns_factors,] * tot_F_prec[rep(1,b_F_QTL),]  # prior for B_F includes tot_F_prec
