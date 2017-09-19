@@ -257,7 +257,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   # initialize Eta
   observation_model_state = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
   Eta = observation_model_state$state$Eta
-  if('Y_missing' %in% names(observation_model_state$state)) observation_model_parameters$Y_missing = as(observation_model_state$state$Y_missing,'lgTMatrix')
+  Y_missing = as(observation_model_state$state$Y_missing,'lgTMatrix')
+  observation_model_parameters$Y_missing = Y_missing
+  # if('Y_missing' %in% names(observation_model_state$state)) observation_model_parameters$Y_missing = as(observation_model_state$state$Y_missing,'lgTMatrix')
   n = nrow(data)
   p = ncol(Eta)
   traitnames = colnames(Eta)
@@ -754,19 +756,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  RNG            = RNG,
 	  setup          = setup
 	)
-	class(BSFG_state) = append(c(run_parameters$sampler,'BSFG_state'),class(BSFG_state))
-	# if(is(BSFG_state,'fast_BSFG') && 'Y_missing' %in% names(run_parameters$observation_model_parameters) && sum(Y_missing > 0)) {
-	#   class(BSFG_state) = append('fast_missing_BSFG',class(BSFG_state))
-	# }
+	class(BSFG_state) = append('BSFG_state',class(BSFG_state))
 
 	# ----------------------------- #
 	# --- Initialize BSFG_state --- #
 	# ----------------------------- #
-
-	BSFG_state = initialize_BSFG(BSFG_state, K_mats, chol_Ki_mats,
-	                             Sigma_Choleskys = Sigma_Choleskys, randomEffect_C_Choleskys = randomEffect_C_Choleskys,  # in case these are provided
-	                             invert_aI_bZKZ = invert_aI_bZKZ, invert_aZZt_Kinv = invert_aZZt_Kinv,   # in case these are provided
-	                             verbose=verbose,ncores=ncores)
 
 	BSFG_state = initialize_variables(BSFG_state)
 
@@ -902,10 +896,6 @@ initialize_variables = function(BSFG_state,...){
   return(BSFG_state)
 }
 
-
-initialize_BSFG = function(BSFG_state,...){
-  UseMethod("initialize_BSFG",BSFG_state)
-}
 
 #' Print more detailed statistics on current BSFG state
 #'

@@ -25,8 +25,8 @@ setwd(folder)
 
 # initialize priors
 run_parameters = BSFG_control(
-  sampler = 'fast_BSFG',
-  # sampler = 'general_BSFG',
+  # sampler = 'fast_BSFG',
+  sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = FALSE,
   h2_divisions = 20,
@@ -35,20 +35,24 @@ run_parameters = BSFG_control(
 )
 
 priors = list(
-  # fixed_var = list(V = 5e5,   nu = 2.001),
   fixed_var = list(V = 1,     nu = 3),
-  tot_Y_var = list(V = 0.5,   nu = 3),
+  # tot_Y_var = list(V = 0.5,   nu = 3),
+  tot_Y_var = list(V = 0.5,   nu = 10),
   tot_F_var = list(V = 18/20, nu = 20),
-  delta_1   = list(shape = 2.1,  rate = 1/20),
-  delta_2   = list(shape = 3, rate = 1),
-  Lambda_df = 3,
-  B_df      = 3,
-  B_F_df    = 3,
-  # h2_priors_resids_fun = function(h2s) pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-  # h2_priors_factors_fun = function(h2s) ifelse(h2s == 0,run_parameters$h2_divisions,run_parameters$h2_divisions/(run_parameters$h2_divisions-1))
-  h2_priors_resids = 1,
-  h2_priors_factors = 1
-)
+  h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
+  h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1)),
+  Lambda_prior = list(
+    sampler = sample_Lambda_prec_ARD,
+    Lambda_df = 3,
+    delta_1   = list(shape = 2.1,  rate = 1/20),
+    delta_2   = list(shape = 3, rate = 1)
+  ),
+  B_prior = list(
+    sampler = sample_B_prec_ARD,
+    B_df      = 3,
+    B_F_df    = 3
+  )
+  )
 
 
 print('Initializing')
@@ -83,7 +87,7 @@ setup$data$ID = unique(setup$observations$ID)
 # options(error=recover)
 BSFG_state = with(setup,BSFG_init(observation_setup, model=~X2+(1|animal), data, #factor_model_fixed = ~1,
                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
-                                  posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'tau_B','tau_B_F','cis_effects','U_R'),
+                                  posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'B_tau','B_F_tau','cis_effects','U_R'),
                                   posteriorMean_params = c()
                                   ))
 # BSFG_state$current_state$F_h2

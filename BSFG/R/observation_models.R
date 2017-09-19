@@ -173,8 +173,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     Eta_mean = sweep(Eta_mean,2,sqrt(var_Eta),'*')
     resid_Eta_prec[] = resid_Eta_prec / var_Eta
 
-    coefs = sample_coefs_set_c(model_matrices,matrix(0,n,n_traits),
-                                matrix(resid_Y_prec,n,n_traits,byrow=T),t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),n,1)
+    coefs = sample_coefs_set_c(model_matrices,resid_Y_prec, t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),1)
 
     Y_fitted = get_fitted_set_c(model_matrices,coefs,1)
     Eta = t(coefs)

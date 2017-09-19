@@ -91,11 +91,3 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
   )
   return(BSFG_state)
 }
-
-sample_Lambda_B = function(BSFG_state,...){
-  UseMethod("sample_Lambda_B",BSFG_state)
-}
-
-sample_latent_traits = function(BSFG_state,...){
-  UseMethod("sample_latent_traits",BSFG_state)
-}
