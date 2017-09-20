@@ -34,7 +34,7 @@ run_parameters = BSFG_control(
   # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
-  h2_divisions = 200,
+  h2_divisions = 20,
   h2_step_size = .3,
   burn = 100
 )
@@ -134,7 +134,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 
 # Run Gibbs sampler. Run in smallish chunks. Output can be used to re-start chain where it left off.
 # burn in
-class(BSFG_state)[1] = 'general_BSFG'
+# BSFG_state$run_parameters$simulation = FALSE
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;

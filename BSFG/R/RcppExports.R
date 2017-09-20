@@ -25,8 +25,8 @@ find_candidate_states <- function(h2s_matrix, step_size, old_state) {
     .Call(BSFG_find_candidate_states, h2s_matrix, step_size, old_state)
 }
 
-sample_MME_single_diagK <- function(y, X, prior_mean, prior_prec, chol_R, randn_theta, randn_e) {
-    .Call(BSFG_sample_MME_single_diagK, y, X, prior_mean, prior_prec, chol_R, randn_theta, randn_e)
+sample_MME_single_diagK <- function(y, X, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {
+    .Call(BSFG_sample_MME_single_diagK, y, X, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e)
 }
 
 sample_MME_fixedEffects_c <- function(Y, X, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, grainSize) {
@@ -41,8 +41,8 @@ get_fitted_set_c <- function(model_matrices, coefs, grainSize) {
     .Call(BSFG_get_fitted_set_c, model_matrices, coefs, grainSize)
 }
 
-sample_MME_single_diagR <- function(y, Zt, chol_C, pe, randn_theta) {
-    .Call(BSFG_sample_MME_single_diagR, y, Zt, chol_C, pe, randn_theta)
+sample_MME_single_diagR <- function(y, Zt, chol_C, tot_Eta_prec, pe, randn_theta) {
+    .Call(BSFG_sample_MME_single_diagR, y, Zt, chol_C, tot_Eta_prec, pe, randn_theta)
 }
 
 sample_MME_ZKZts_c <- function(Y, Z, tot_Eta_prec, randomEffect_C_Choleskys, h2s, h2s_index, grainSize) {

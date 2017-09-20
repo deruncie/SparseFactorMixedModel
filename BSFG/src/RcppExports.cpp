@@ -79,8 +79,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_MME_single_diagK
-VectorXd sample_MME_single_diagK(VectorXd y, MatrixXd X, VectorXd prior_mean, VectorXd prior_prec, SpMat chol_R, VectorXd randn_theta, VectorXd randn_e);
-RcppExport SEXP BSFG_sample_MME_single_diagK(SEXP ySEXP, SEXP XSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP chol_RSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP) {
+VectorXd sample_MME_single_diagK(VectorXd y, MatrixXd X, VectorXd prior_mean, VectorXd prior_prec, MSpMat chol_R, double tot_Eta_prec, VectorXd randn_theta, VectorXd randn_e);
+RcppExport SEXP BSFG_sample_MME_single_diagK(SEXP ySEXP, SEXP XSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP chol_RSEXP, SEXP tot_Eta_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -88,10 +88,11 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< MatrixXd >::type X(XSEXP);
     Rcpp::traits::input_parameter< VectorXd >::type prior_mean(prior_meanSEXP);
     Rcpp::traits::input_parameter< VectorXd >::type prior_prec(prior_precSEXP);
-    Rcpp::traits::input_parameter< SpMat >::type chol_R(chol_RSEXP);
+    Rcpp::traits::input_parameter< MSpMat >::type chol_R(chol_RSEXP);
+    Rcpp::traits::input_parameter< double >::type tot_Eta_prec(tot_Eta_precSEXP);
     Rcpp::traits::input_parameter< VectorXd >::type randn_theta(randn_thetaSEXP);
     Rcpp::traits::input_parameter< VectorXd >::type randn_e(randn_eSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_MME_single_diagK(y, X, prior_mean, prior_prec, chol_R, randn_theta, randn_e));
+    rcpp_result_gen = Rcpp::wrap(sample_MME_single_diagK(y, X, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -142,17 +143,18 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_MME_single_diagR
-VectorXd sample_MME_single_diagR(VectorXd y, SpMat Zt, SpMat chol_C, double pe, VectorXd randn_theta);
-RcppExport SEXP BSFG_sample_MME_single_diagR(SEXP ySEXP, SEXP ZtSEXP, SEXP chol_CSEXP, SEXP peSEXP, SEXP randn_thetaSEXP) {
+VectorXd sample_MME_single_diagR(VectorXd y, SpMat Zt, MSpMat& chol_C, double tot_Eta_prec, double pe, VectorXd randn_theta);
+RcppExport SEXP BSFG_sample_MME_single_diagR(SEXP ySEXP, SEXP ZtSEXP, SEXP chol_CSEXP, SEXP tot_Eta_precSEXP, SEXP peSEXP, SEXP randn_thetaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< VectorXd >::type y(ySEXP);
     Rcpp::traits::input_parameter< SpMat >::type Zt(ZtSEXP);
-    Rcpp::traits::input_parameter< SpMat >::type chol_C(chol_CSEXP);
+    Rcpp::traits::input_parameter< MSpMat& >::type chol_C(chol_CSEXP);
+    Rcpp::traits::input_parameter< double >::type tot_Eta_prec(tot_Eta_precSEXP);
     Rcpp::traits::input_parameter< double >::type pe(peSEXP);
     Rcpp::traits::input_parameter< VectorXd >::type randn_theta(randn_thetaSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_MME_single_diagR(y, Zt, chol_C, pe, randn_theta));
+    rcpp_result_gen = Rcpp::wrap(sample_MME_single_diagR(y, Zt, chol_C, tot_Eta_prec, pe, randn_theta));
     return rcpp_result_gen;
 END_RCPP
 }

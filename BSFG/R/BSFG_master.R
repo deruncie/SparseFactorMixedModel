@@ -583,11 +583,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
       ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
       result = svd(ZKZt)
       Qt = as(t(result$u),'dgCMatrix')
-      QtZ_matrices_set = lapply(Z_matrices,function(z) Qt %*% z[x,,drop=FALSE])
     } else{
       Qt = Diagonal(length(x),1)
-      QtZ_matrices_set = lapply(Z_matrices,function(z) z[x,,drop=FALSE])
     }
+    QtZ_matrices_set = lapply(Z_matrices,function(z) Qt %*% z[x,,drop=FALSE])
     QtZ_set = do.call(cbind,QtZ_matrices_set[RE_names])
     QtZ_set = as(QtZ_set,'dgCMatrix')
     QtX_set = Qt %**% X[x,,drop=FALSE]
@@ -627,7 +626,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     randomEffect_C_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
       randomEffect_C_Choleskys_c = randomEffect_C_Choleskys_c_list[[j]]
       lapply(1:length(col_groups[[j]]),function(i) {
-        list(chol_C = randomEffect_C_Choleskys_c$get_chol_Ci(i),
+        list(chol_C     = randomEffect_C_Choleskys_c$get_chol_Ci(i),
              chol_K_inv = randomEffect_C_Choleskys_c$get_chol_K_inv_i(i)
         )
       })
