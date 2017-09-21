@@ -4,17 +4,13 @@
 \alias{BSFG_control}
 \title{Set BSFG run parameters}
 \usage{
-BSFG_control(sampler = c("fast_BSFG", "general_BSFG"),
-  Posterior_folder = "Posterior", simulation = c(F, T), scale_Y = c(T, F),
-  b0 = 1, b1 = 5e-04, epsilon = 0.1, prop = 1, k_init = 20,
-  h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
-  K_eigen_tol = 1e-10, burn = 100, thin = 2,
-  delta_iteractions_factor = 100, impute_missing = TRUE, ...)
+BSFG_control(Posterior_folder = "Posterior", simulation = c(F, T),
+  scale_Y = c(T, F), b0 = 1, b1 = 5e-04, epsilon = 0.1, prop = 1,
+  k_init = 20, h2_divisions = 100, h2_step_size = NULL,
+  drop0_tol = 1e-14, K_eigen_tol = 1e-10, burn = 100, thin = 2,
+  delta_iteractions_factor = 100, impute_missing = FALSE, ...)
 }
 \arguments{
-\item{sampler}{specify the sampler to use. fast_BSFG is often faster, but only allows one random
-effect. If more are specified in \code{BSFG_init}, this is switched to general_BSFG.}
-
 \item{Posterior_folder}{path to folder to save posterior samples. Samples of each parameter
 are saved in chuncks to limit memory requirements.}
 
@@ -62,6 +58,8 @@ untransformed.}
 \item{thin}{thinning rate of the MCMC chain}
 
 \item{delta_iteractions_factor}{Number of times to iterate through sample_delta per iteration of the other parameters}
+
+\item{impute_missing}{If FALSE, missing data will be ignored in the sampler. If TRUE, missing data will be imputed during sampling.}
 }
 \description{
 Function to create run_parameters list for initializing BSFG model

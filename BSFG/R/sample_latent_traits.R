@@ -30,7 +30,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       rows = Missing_data_map[[set]]$Y_obs
       if(length(cols) == 0 || length(rows) == 0) next
 
-      QtEta_tilde_set = Qt_list[[set]] %**% Eta_tilde[rows,cols]
+      QtEta_tilde_set = Qt_list[[set]] %**% Eta_tilde[rows,cols,drop=FALSE]
       scores[cols] = tot_prec_scores(QtEta_tilde_set,
                                      Sigma_Choleskys_list[[set]],
                                      resid_h2_index[cols],
@@ -58,7 +58,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       }
       resid_h2[,cols] = h2s_matrix[,resid_h2_index[cols],drop=FALSE]
 
-      U_R[,cols] = sample_MME_ZKZts_c(Eta_tilde[rows,cols],
+      U_R[,cols] = sample_MME_ZKZts_c(Eta_tilde[rows,cols,drop=FALSE],
                                     Z[rows,],
                                     tot_Eta_prec[cols],
                                     randomEffect_C_Choleskys_list[[set]],
@@ -139,9 +139,9 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       rows = Missing_data_map[[set]]$Y_obs
       if(length(cols) == 0 || length(rows) == 0) next
 
-      F[rows,] = sample_factors_scores_c(Eta_tilde[rows,cols],
-                                         prior_mean[rows,],
-                                         Lambda[cols,],
+      F[rows,] = sample_factors_scores_c(Eta_tilde[rows,cols,drop=FALSE],
+                                         prior_mean[rows,,drop=FALSE],
+                                         Lambda[cols,,drop=FALSE],
                                          resid_Eta_prec[cols],
                                          F_e_prec)
     }

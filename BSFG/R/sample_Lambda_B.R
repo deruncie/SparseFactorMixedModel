@@ -24,13 +24,13 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
       if(length(cols) == 0 || length(rows) == 0) next
 
       if(is.null(cis_genotypes)){
-        coefs = sample_MME_fixedEffects_c(Qt_list[[set]] %**% Eta[rows,cols],
+        coefs = sample_MME_fixedEffects_c(Qt_list[[set]] %**% Eta[rows,cols,drop=FALSE],
                                           cbind(QtX_list[[set]], Qt_list[[set]] %**% F[rows,,drop=FALSE]),
                                           Sigma_Choleskys_list[[set]],
                                           resid_h2_index[cols],
                                           tot_Eta_prec[cols],
-                                          prior_mean[,cols],
-                                          prior_prec[,cols],
+                                          prior_mean[,cols,drop=FALSE],
+                                          prior_prec[,cols,drop=FALSE],
                                           grainSize
         )
         if(b > 0) {
@@ -38,14 +38,14 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
         }
         Lambda[cols,] = t(coefs[b + 1:k,,drop=FALSE])
       } else{
-        result = sample_MME_fixedEffects_cis_c(Qt_list[[set]] %**% Eta[rows,cols],
+        result = sample_MME_fixedEffects_cis_c(Qt_list[[set]] %**% Eta[rows,cols,drop=FALSE],
                                                cbind(QtX_list[[set]], Qt_list[[set]] %**% F[rows,,drop=FALSE]),
                                                Qt_cis_genotypes_list[[set]],
                                                Sigma_Choleskys_list[[set]],
                                                resid_h2_index[cols],
                                                tot_Eta_prec[cols],
-                                               prior_mean[,cols],
-                                               prior_prec[,cols],
+                                               prior_mean[,cols,drop=FALSE],
+                                               prior_prec[,cols,drop=FALSE],
                                                cis_effects_index[cols],
                                                sum(n_cis_effects),
                                                grainSize

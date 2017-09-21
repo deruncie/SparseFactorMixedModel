@@ -2,8 +2,6 @@
 #'
 #' Function to create run_parameters list for initializing BSFG model
 #'
-#' @param sampler specify the sampler to use. fast_BSFG is often faster, but only allows one random
-#'   effect. If more are specified in \code{BSFG_init}, this is switched to general_BSFG.
 #' @param Posterior_folder path to folder to save posterior samples. Samples of each parameter
 #'     are saved in chuncks to limit memory requirements.
 #' @param simulation Is this a fit to simulated data? If so, a setup list will be expected providing
@@ -37,16 +35,18 @@
 #' @param burn burnin length of the MCMC chain
 #' @param thin thinning rate of the MCMC chain
 #' @param delta_iteractions_factor Number of times to iterate through sample_delta per iteration of the other parameters
+#' @param impute_missing If FALSE, missing data will be ignored in the sampler. If TRUE, missing data will be imputed during sampling.
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 #'
-BSFG_control = function(sampler = c('fast_BSFG','general_BSFG'),Posterior_folder = 'Posterior',
+BSFG_control = function(
+                        Posterior_folder = "Posterior",
                         simulation = c(F,T),scale_Y = c(T,F),
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100, h2_step_size = NULL,
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,thin = 2,
                         delta_iteractions_factor = 100,
-                        impute_missing = TRUE,
+                        impute_missing = FALSE,
                         ...
                         ) {
 
@@ -533,7 +533,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# first, identify sets of traits with same pattern of missingness
 
 # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
-	if(run_parameters$impute_missing) {
+	if(!run_parameters$impute_missing) {
     Y_col_obs = lapply(1:ncol(Y_missing),function(x) {
       obs = which(!Y_missing[,x],useNames=F)
       names(obs) = NULL
