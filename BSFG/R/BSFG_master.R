@@ -369,9 +369,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
 	# -------- cis genotypes ---------- #
 	if(is.null(cis_genotypes)){
+	  n_cis_effects = NULL
 	  cis_effects_index = NULL
 	} else{
-	  cis_effects_index = c(0,cumsum(sapply(cis_genotypes,ncol)))+1
+	  n_cis_effects = sapply(cis_genotypes,ncol)
+	  cis_effects_index = c(0,cumsum(n_cis_effects))+1
 	}
 
 	# -------- Random effects ---------- #
@@ -573,11 +575,13 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   QtX_list = list()
   QtXF_list = list()
   QtZ_list = list()
+  Qt_cis_genotypes_list = list()
   randomEffect_C_Choleskys_list = list()
   Sigma_Choleskys_list = list()
 
   for(set in seq_along(Missing_data_map)){
     x = Missing_data_map[[set]]$Y_obs
+    cols = Missing_data_map[[set]]$Y_cols
 
     if(n_RE == 1){
       ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
@@ -591,11 +595,13 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     QtZ_set = as(QtZ_set,'dgCMatrix')
     QtX_set = Qt %**% X[x,,drop=FALSE]
     QtXF_set = Qt %**% X_F[x,,drop=FALSE]  # This one is only needed for set==1
+    Qt_cis_genotypes_set = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,])
 
     Qt_list[[set]]   = Qt
     QtX_list[[set]]  = QtX_set
     QtXF_list[[set]] = QtXF_set
     QtZ_list[[set]]  = QtZ_set
+    Qt_cis_genotypes_list[[set]] = Qt_cis_genotypes_set
 
     ZKZts_set = list()
     for(i in 1:n_RE){
@@ -642,15 +648,17 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     RE_names = RE_names,
     b      = b,
     b_F    = b_F,
-    resid_intercept = resid_intercept,
-    same_fixed_model = same_fixed_model,
+    resid_intercept   = resid_intercept,
+    same_fixed_model  = same_fixed_model,
     X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
+    n_cis_effects     = n_cis_effects,
     cis_effects_index = cis_effects_index,
     Qt_list    = Qt_list,
     QtX_list   = QtX_list,
     QtXF_list  = QtXF_list,
     QtZ_list   = QtZ_list,
-    Missing_data_map = Missing_data_map,
+    Qt_cis_genotypes_list = Qt_cis_genotypes_list,
+    Missing_data_map      = Missing_data_map,
     Sigma_Choleskys_list          = Sigma_Choleskys_list,
     randomEffect_C_Choleskys_list = randomEffect_C_Choleskys_list
   )

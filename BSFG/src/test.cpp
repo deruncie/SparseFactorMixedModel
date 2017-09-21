@@ -6,6 +6,164 @@
 // using namespace Eigen;
 // using namespace RcppParallel;
 //
+// // [[Rcpp::export()]]
+// MatrixXd rstdnorm_mat2(int n,int p) {  // returns nxp matrix
+//   VectorXd X_vec = as<VectorXd>(rnorm(n*p));
+//   Map<MatrixXd> X_mat(X_vec.data(),n,p);
+//   return(X_mat);
+// }
+//
+//
+// // [[Rcpp::export()]]
+// VectorXd sample_MME_single_diagK2(  // returns b x 1 vector
+//     VectorXd y,           // nx1
+//     MatrixXd X,           // nxb
+//     VectorXd prior_mean,  // bx1
+//     VectorXd prior_prec,  // bx1
+//     MSpMat chol_R,        // nxn upper triangular Cholesky decomposition of R. Format: dgCMatrix
+//     double tot_Eta_prec, // double
+//     VectorXd randn_theta, // bx1
+//     VectorXd randn_e,      // 0x1 or nx1. 0x1 if b<n
+//     bool chol_R_triangular = true
+// ){
+//   if(randn_e.size() == 0){
+//     MatrixXd C;
+//     VectorXd XtRinvy;
+//     if(chol_R_triangular == true){
+//       MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+//       XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
+//       C = RinvSqX.transpose() * RinvSqX;
+//     } else{
+//       MatrixXd R = (chol_R.transpose() * chol_R) / tot_Eta_prec;
+//       MatrixXd RinvX = R.colPivHouseholderQr().solve(X);
+//       C = X.transpose() * RinvX;
+//       XtRinvy = RinvX.transpose() * y;
+//     }
+//     // Rcout << XtRinvy.transpose() << std::endl;
+//     // Rcout << C.row(0) << std::endl;
+//     VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
+//     C.diagonal() += prior_prec;
+//     LLT<MatrixXd> C_llt;
+//     C_llt.compute(C);
+//     MatrixXd chol_C = C_llt.matrixU();
+//
+//     VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
+//     b += randn_theta;
+//     b = chol_C.triangularView<Upper>().solve(b);
+//     return(b);
+//   } else {
+//     // should check that randn_e.size() == n
+//     VectorXd theta_star = randn_theta.array() / prior_prec.cwiseSqrt().array();
+//     theta_star += prior_mean;
+//     VectorXd e_star = chol_R.transpose() * (randn_e / sqrt(tot_Eta_prec));
+//     MatrixXd X_theta_star = X * theta_star;
+//     VectorXd y_resid = y - X_theta_star - e_star;
+//
+//     MatrixXd R = (chol_R.transpose() * chol_R) / tot_Eta_prec;
+//
+//     VectorXd XtRinvy;
+//     if(chol_R_triangular == true) {
+//       MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+//       XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y_resid * sqrt(tot_Eta_prec));
+//     } else{
+//       XtRinvy = X.transpose() * R.ldlt().solve(y_resid);
+//     }
+//
+//     VectorXd theta_tilda;
+//     MatrixXd VAi = X * prior_prec.cwiseInverse().asDiagonal();
+//     MatrixXd inner = VAi*X.transpose() + R;
+//     VectorXd VAiXtURinvy = VAi * XtRinvy;
+//     VectorXd outerXtURinvy = VAi.transpose() * inner.ldlt().solve(VAiXtURinvy);
+//     theta_tilda = XtRinvy.array() / prior_prec.array();
+//     theta_tilda -= outerXtURinvy;
+//     VectorXd theta = theta_star + theta_tilda;
+//
+//     return(theta);
+//   }
+// }
+//
+// // [[Rcpp::export()]]
+// VectorXd sample_coefs_single_hierarchical(
+//     VectorXd y,         // nx1
+//     MatrixXd ZX,
+//     MatrixXd Z,              // nxr
+//     MatrixXd X,             // nxp
+//     VectorXd prior_mean,    // bx1
+//     VectorXd prior_prec,    // bx1
+//     MSpMat chol_R,
+//     double tot_Eta_prec,
+//     VectorXd randn_theta,   // bx1
+//     VectorXd randn_e       // nx1
+// ) {
+//   if(randn_e.size() == 0){
+//     return(sample_MME_single_diagK2(y,ZX,prior_mean,prior_prec,chol_R,tot_Eta_prec,randn_theta,randn_e));
+//   } else {
+//     // should check that randn_e.size() == n
+//     VectorXd theta_star = randn_theta.array() / prior_prec.cwiseSqrt().array();
+//     theta_star += prior_mean;
+//     VectorXd e_star = chol_R.transpose() * (randn_e / sqrt(tot_Eta_prec));
+//     MatrixXd ZX_theta_star = ZX * theta_star;
+//     VectorXd y_resid = y - ZX_theta_star - e_star;
+//
+//     MatrixXd RinvSqZX = chol_R.transpose().triangularView<Lower>().solve(ZX * sqrt(tot_Eta_prec));
+//     VectorXd XtZtRinvy = RinvSqZX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y_resid * sqrt(tot_Eta_prec));
+//
+//     int r = X.rows();
+//     MatrixXd R = (chol_R.transpose() * chol_R) / tot_Eta_prec;
+//
+//     MatrixXd B = Z.transpose() * R.llt().solve(Z);
+//     SimplicialLLT<SparseMatrix<double> >solver;
+//     // MatrixXd I(r,r);
+//     // I.setIdentity();
+//     // MatrixXd Bi = solver.compute(B).solve(MatrixXd::Identity(r,r));
+//     MatrixXd Bi = B.ldlt().solve(MatrixXd::Identity(r,r));
+//     MatrixXd VAi = X * prior_prec.cwiseInverse().asDiagonal();
+//     MatrixXd inner = VAi * X.transpose() + Bi;
+//     VectorXd VAiXtZtRinvy = VAi * XtZtRinvy;
+//     VectorXd outerXtWtQRinvy = VAi.transpose() * inner.ldlt().solve(VAiXtZtRinvy);
+//     VectorXd theta_tilda = XtZtRinvy.array() / prior_prec.array();
+//     theta_tilda -= outerXtWtQRinvy;
+//     VectorXd coefs = theta_tilda + theta_star;
+//     return(coefs);
+//   }
+// }
+
+
+
+// // [[Rcpp::export()]]
+// void sample_MME_fixedEffects_cis_c2(
+//     Map<MatrixXd> Y,
+//     Map<MatrixXd> X,
+//     Rcpp::List cis_genotypes,
+//     Rcpp::List Sigma_Choleskys,
+//     VectorXi h2s_index,
+//     Map<VectorXd> tot_Eta_prec,
+//     Map<MatrixXd> prior_mean,
+//     Map<MatrixXd> prior_prec,
+//     Map<VectorXd> cis_effect_index,
+//     int total_cis_effects,
+//     int grainSize) {
+//
+//   int p = Y.cols();
+//   int b = X.cols();
+//
+//   std::vector<MSpMat> chol_R_list;
+//   for(int i = 0; i < h2s_index.maxCoeff(); i++){
+//     Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
+//     chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
+//   }
+//
+//   std::vector<MatrixXd> cis_X;
+//   for(int i = 0; i < p; i++){
+//     cis_X.push_back(Rcpp::as<MatrixXd>(cis_genotypes[i]));
+//   }
+//   //
+//   // MatrixXd coefs(b,p);
+//   // VectorXd cis_effects(total_cis_effects);
+//   // MatrixXd randn_theta = rstdnorm_mat2(b,p);
+//   // VectorXd randn_cis   = rstdnorm_mat2(total_cis_effects,1).col(0);
+// }
+//
 // // // [[Rcpp::export]]
 // // SEXP funx() {
 // //   /* creating a pointer to a vector<int> */
@@ -195,7 +353,7 @@
 //     const VectorXd& randn_e      // 0x1 or nx1. 0x1 if b<n
 // ){
 //   if(randn_e.size() == 0){
-//     MatrixXd RinvSqX = chol_Ri * (X * sqrt(tot_Eta_prec));
+//     MatrixXd RinvSqX = chol_Ri * (X * sqrt(tot_Eta_prec)); //
 //     VectorXd XtRinvy = RinvSqX.transpose() * (chol_Ri * y * sqrt(tot_Eta_prec));
 //     VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
 //     MatrixXd C = RinvSqX.transpose() * RinvSqX;

@@ -33,6 +33,10 @@ sample_MME_fixedEffects_c <- function(Y, X, Sigma_Choleskys, h2s_index, tot_Eta_
     .Call(BSFG_sample_MME_fixedEffects_c, Y, X, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, grainSize)
 }
 
+sample_MME_fixedEffects_cis_c <- function(Y, X, cis_genotypes, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, cis_effect_index, total_cis_effects, grainSize) {
+    .Call(BSFG_sample_MME_fixedEffects_cis_c, Y, X, cis_genotypes, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, cis_effect_index, total_cis_effects, grainSize)
+}
+
 sample_coefs_set_c <- function(model_matrices, tot_Y_prec, prior_mean, prior_prec, grainSize) {
     .Call(BSFG_sample_coefs_set_c, model_matrices, tot_Y_prec, prior_mean, prior_prec, grainSize)
 }
@@ -67,10 +71,6 @@ sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2s_index
 
 sample_factors_scores_c <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec) {
     .Call(BSFG_sample_factors_scores_c, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec)
-}
-
-sample_coefs_hierarchical_parallel_sparse_c_Eigen <- function(Qt, Eta, W, X, resid_prec, prior_mean, prior_prec, grainSize) {
-    .Call(BSFG_sample_coefs_hierarchical_parallel_sparse_c_Eigen, Qt, Eta, W, X, resid_prec, prior_mean, prior_prec, grainSize)
 }
 
 sample_delta_c_Eigen <- function(delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws) {

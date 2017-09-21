@@ -18,12 +18,12 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
     } else{ # b == 0
       prior_prec = t(Plam)
     }
-    if(is.null(cis_genotypes)){
-      for(set in seq_along(Missing_data_map)){
-        cols = Missing_data_map[[set]]$Y_cols
-        rows = Missing_data_map[[set]]$Y_obs
-        if(length(cols) == 0 || length(rows) == 0) next
+    for(set in seq_along(Missing_data_map)){
+      cols = Missing_data_map[[set]]$Y_cols
+      rows = Missing_data_map[[set]]$Y_obs
+      if(length(cols) == 0 || length(rows) == 0) next
 
+      if(is.null(cis_genotypes)){
         coefs = sample_MME_fixedEffects_c(Qt_list[[set]] %**% Eta[rows,cols],
                                           cbind(QtX_list[[set]], Qt_list[[set]] %**% F[rows,,drop=FALSE]),
                                           Sigma_Choleskys_list[[set]],
@@ -37,21 +37,27 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
           B[,cols] = coefs[1:b,,drop=FALSE]
         }
         Lambda[cols,] = t(coefs[b + 1:k,,drop=FALSE])
+      } else{
+        result = sample_MME_fixedEffects_cis_c(Qt_list[[set]] %**% Eta[rows,cols],
+                                               cbind(QtX_list[[set]], Qt_list[[set]] %**% F[rows,,drop=FALSE]),
+                                               Qt_cis_genotypes_list[[set]],
+                                               Sigma_Choleskys_list[[set]],
+                                               resid_h2_index[cols],
+                                               tot_Eta_prec[cols],
+                                               prior_mean[,cols],
+                                               prior_prec[,cols],
+                                               cis_effects_index[cols],
+                                               sum(n_cis_effects),
+                                               grainSize
+        )
+        coefs = result[[1]]
+        if(b > 0) {
+          B[,cols] = coefs[1:b,,drop=FALSE]
+        }
+        Lambda[cols,] = t(coefs[b + 1:k,,drop=FALSE])
+        cis_index = do.call(c,lapply(cols,function(x) if(n_cis_effects[x] > 0) cis_effects_index[x] + 1:n_cis_effects[x]-1))
+        cis_effects[cis_index] = result[[2]][cis_index]
       }
-      # resid_prec = uncorrelated_prec_mat(resid_h2,tot_Eta_prec,s)
-      # coefs = sample_coefs_parallel_sparse_c_Eigen(Qt %**% Eta,Qt %**% Design,resid_prec, prior_mean,prior_prec,grainSize)
-      # if(b > 0){
-      #   B[] = coefs[1:b,,drop=FALSE]
-      # }
-      # Lambda[] = t(coefs[b + 1:k,,drop=FALSE])
-    } else{
-      stop('cis effects not implemented yet')
-      # result = sample_MME_fixedEffects_cis(Eta,Design,cis_genotypes,cis_effects_index,Sigma_Choleskys, resid_h2_index, tot_Eta_prec, prior_mean, prior_prec,grainSize)
-      # if(b > 0){
-      #   B[] = result[[1]][1:b,,drop=FALSE]
-      # }
-      # Lambda[] = t(result[[1]][b+1:k,,drop=FALSE])
-      # cis_effects[] = result[[2]]
     }
   }))
   current_state = current_state[current_state_names]

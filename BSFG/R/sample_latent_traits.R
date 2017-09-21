@@ -9,12 +9,13 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
   current_state = with(c(priors,run_parameters, run_variables,data_matrices),within(current_state, {
     k = ncol(Lambda)
 
-    XB = X %*% B
-    if(inherits(XB,'Matrix')) XB = as.matrix(XB)
+    XB = X %**% B
     if(!is.null(cis_genotypes)){
       for(j in 1:p){
-        cis_X_j = cis_genotypes[[j]]
-        XB[,j] = XB[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]:(cis_effects_index[j+1]-1)]
+        if(n_cis_effects[j] > 0){
+          cis_X_j = cis_genotypes[[j]]
+          XB[,j] = XB[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]:(cis_effects_index[j+1]-1)]
+        }
       }
     }
 
@@ -71,36 +72,16 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     # -----Sample Lambda and B_F ------------------ #
     # F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
     if(b_F > 0){
-      # non-QTL fixed effects
-      b_F1 = ncol(X_F)
-      if(length(QTL_columns_factors) > 0) {
-        X_F1_cols = seq_len(b_F1)[-QTL_columns_factors]
-        b_F1 = length(X_F1_cols)
-        F_tilde = F - toDense(QTL_factors_Z %*% QTL_factors_X %*% B_F[-c(1:b_F1),,drop=FALSE])
-      } else{
-        X_F1_cols = seq_len(b_F1)
-        F_tilde = F
-      }
-      prior_mean = matrix(0,b_F1,k)
-      prior_prec = B_F_prec[X_F1_cols,,drop=FALSE] * tot_F_prec[rep(1,b_F1),,drop=FALSE]  # prior for B_F includes tot_F_prec
-      B_F[1:b_F1,] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F_tilde,
-                                             QtXF_list[[1]][,X_F1_cols,drop=FALSE],
-                                             Sigma_Choleskys_list[[1]],
-                                             F_h2_index,
-                                             tot_F_prec,
-                                             prior_mean,
-                                             prior_prec,
-                                             grainSize)
-      # QTL fixed effects
-      if(length(QTL_columns_factors) > 0){
-        warning('QTL_columns_factors not yet implemented')
-        # F_tilde = F - toDense(X_F[,X_F1_cols] %*% B_F[1:b_F1,,drop=FALSE])
-        # b_F_QTL = ncol(QTL_factors_X)
-        # prior_mean = matrix(0,b_F_QTL,k)
-        # prior_prec = B_F_prec[QTL_columns_factors,] * tot_F_prec[rep(1,b_F_QTL),]  # prior for B_F includes tot_F_prec
-        # B_F[QTL_columns_factors,] = sample_coefs_hierarchical_parallel_sparse_c_Eigen(Qt,F_tilde,QTL_factors_Z,QTL_factors_X,F_h2, tot_F_prec,s, prior_mean,prior_prec,grainSize)
-      }
-
+      prior_mean = matrix(0,b_F,k)
+      prior_prec = B_F_prec * tot_F_prec[rep(1,b_F),,drop=FALSE]  # prior for B_F includes tot_F_prec
+      B_F[] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F,
+                                        QtXF_list[[1]],
+                                        Sigma_Choleskys_list[[1]],
+                                        F_h2_index,
+                                        tot_F_prec,
+                                        prior_mean,
+                                        prior_prec,
+                                        grainSize)
       XFBF = X_F %**% B_F
       F_tilde = F - XFBF # not sparse.
     } else{
