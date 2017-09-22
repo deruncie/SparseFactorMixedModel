@@ -338,6 +338,7 @@ load_posterior_param = function(BSFG_state,param,chunks = NULL){
     all_samples = samples / length(param_files)
   } else{
     all_samples = array(0,dim = c(BSFG_state$Posterior$total_samples*length(chunks)/n_files,samples_dim[2:3]))
+    dimnames(all_samples) = dimnames(samples)
     all_samples[1:samples_dim[1],,] = samples
     current_row = samples_dim[1]
     if(current_row == 0) return(c())
