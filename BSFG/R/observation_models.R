@@ -132,15 +132,20 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       traits = all.vars(update(individual_model,'~.0'))
       Y = as.matrix(observations[,traits,drop=FALSE])
       Terms = delete.response(terms(mf))
+      n_terms = ncol(model.matrix(lm1))
 
       id_index = tapply(1:nrow(observations),observations$ID,function(x) x)
       model_matrices = lapply(data$ID,function(id) {
         x = id_index[[id]]
-        X = model.matrix(Terms,data = observations[x,])
+        if(length(x) > 0){
+          X = model.matrix(Terms,data = observations[x,])
+        } else{
+          x = matrix(0,0,0)
+          X = matrix(0,0,n_terms)
+        }
         list(
           X = X,
           y = Y[x,,drop=FALSE],
-          s = rep(1,length(x)),
           position = x,
           missing = colSums(X!=0) == 0
         )
