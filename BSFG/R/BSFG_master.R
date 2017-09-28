@@ -619,7 +619,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
       Sigma_Choleskys_c = Sigma_Choleskys_c_list[[j]]
       lapply(1:length(col_groups[[j]]),function(i) {
         list(log_det = Sigma_Choleskys_c$get_log_det(i),
-             chol_Sigma = Sigma_Choleskys_c$get_chol_Sigma(i))
+             chol_Sigma = drop0(Sigma_Choleskys_c$get_chol_Sigma(i),tol = run_parameters$drop0_tol)
+            )
       })
     }))
 
