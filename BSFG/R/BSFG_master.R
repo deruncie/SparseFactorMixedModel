@@ -270,6 +270,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   n = nrow(data)
   p = ncol(Eta)
   traitnames = colnames(Eta)
+  if(is.null(traitnames)) traitnames = paste('trait',1:ncol(Eta),sep='_')
 
 	# if factor_model_fixed not specified, use fixed effects from model for both
 	if(is.null(factor_model_fixed)) {

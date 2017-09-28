@@ -9,7 +9,7 @@ using namespace Rcpp;
 
 // LDLt_sparse
 List LDLt_sparse(MSpMat A);
-RcppExport SEXP BSFG_LDLt_sparse(SEXP ASEXP) {
+RcppExport SEXP _BSFG_LDLt_sparse(SEXP ASEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -20,7 +20,7 @@ END_RCPP
 }
 // LDLt_notSparse
 List LDLt_notSparse(Map<MatrixXd> A);
-RcppExport SEXP BSFG_LDLt_notSparse(SEXP ASEXP) {
+RcppExport SEXP _BSFG_LDLt_notSparse(SEXP ASEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -31,7 +31,7 @@ END_RCPP
 }
 // SxD
 MatrixXd SxD(MSpMat X, Map<MatrixXd> Y);
-RcppExport SEXP BSFG_SxD(SEXP XSEXP, SEXP YSEXP) {
+RcppExport SEXP _BSFG_SxD(SEXP XSEXP, SEXP YSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -43,7 +43,7 @@ END_RCPP
 }
 // SxS
 MatrixXd SxS(MSpMat X, MSpMat Y);
-RcppExport SEXP BSFG_SxS(SEXP XSEXP, SEXP YSEXP) {
+RcppExport SEXP _BSFG_SxS(SEXP XSEXP, SEXP YSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -55,7 +55,7 @@ END_RCPP
 }
 // rstdnorm_mat
 MatrixXd rstdnorm_mat(int n, int p);
-RcppExport SEXP BSFG_rstdnorm_mat(SEXP nSEXP, SEXP pSEXP) {
+RcppExport SEXP _BSFG_rstdnorm_mat(SEXP nSEXP, SEXP pSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -67,7 +67,7 @@ END_RCPP
 }
 // find_candidate_states
 VectorXd find_candidate_states(MatrixXd h2s_matrix, double step_size, int old_state);
-RcppExport SEXP BSFG_find_candidate_states(SEXP h2s_matrixSEXP, SEXP step_sizeSEXP, SEXP old_stateSEXP) {
+RcppExport SEXP _BSFG_find_candidate_states(SEXP h2s_matrixSEXP, SEXP step_sizeSEXP, SEXP old_stateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -80,7 +80,7 @@ END_RCPP
 }
 // sample_MME_single_diagK
 VectorXd sample_MME_single_diagK(VectorXd y, MatrixXd X, VectorXd prior_mean, VectorXd prior_prec, MSpMat chol_R, double tot_Eta_prec, VectorXd randn_theta, VectorXd randn_e);
-RcppExport SEXP BSFG_sample_MME_single_diagK(SEXP ySEXP, SEXP XSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP chol_RSEXP, SEXP tot_Eta_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP) {
+RcppExport SEXP _BSFG_sample_MME_single_diagK(SEXP ySEXP, SEXP XSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP chol_RSEXP, SEXP tot_Eta_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -98,7 +98,7 @@ END_RCPP
 }
 // sample_MME_fixedEffects_c
 MatrixXd sample_MME_fixedEffects_c(Map<MatrixXd> Y, Map<MatrixXd> X, Rcpp::List Sigma_Choleskys, VectorXi h2s_index, Map<VectorXd> tot_Eta_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int grainSize);
-RcppExport SEXP BSFG_sample_MME_fixedEffects_c(SEXP YSEXP, SEXP XSEXP, SEXP Sigma_CholeskysSEXP, SEXP h2s_indexSEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_sample_MME_fixedEffects_c(SEXP YSEXP, SEXP XSEXP, SEXP Sigma_CholeskysSEXP, SEXP h2s_indexSEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -116,7 +116,7 @@ END_RCPP
 }
 // sample_MME_fixedEffects_cis_c
 Rcpp::List sample_MME_fixedEffects_cis_c(Map<MatrixXd> Y, Map<MatrixXd> X, Rcpp::List cis_genotypes, Rcpp::List Sigma_Choleskys, VectorXi h2s_index, Map<VectorXd> tot_Eta_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, Map<VectorXd> cis_effect_index, int total_cis_effects, int grainSize);
-RcppExport SEXP BSFG_sample_MME_fixedEffects_cis_c(SEXP YSEXP, SEXP XSEXP, SEXP cis_genotypesSEXP, SEXP Sigma_CholeskysSEXP, SEXP h2s_indexSEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP cis_effect_indexSEXP, SEXP total_cis_effectsSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_sample_MME_fixedEffects_cis_c(SEXP YSEXP, SEXP XSEXP, SEXP cis_genotypesSEXP, SEXP Sigma_CholeskysSEXP, SEXP h2s_indexSEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP cis_effect_indexSEXP, SEXP total_cis_effectsSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -137,7 +137,7 @@ END_RCPP
 }
 // sample_coefs_set_c
 MatrixXd sample_coefs_set_c(Rcpp::List model_matrices, Map<VectorXd> tot_Y_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int grainSize);
-RcppExport SEXP BSFG_sample_coefs_set_c(SEXP model_matricesSEXP, SEXP tot_Y_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_sample_coefs_set_c(SEXP model_matricesSEXP, SEXP tot_Y_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -152,7 +152,7 @@ END_RCPP
 }
 // get_fitted_set_c
 MatrixXd get_fitted_set_c(Rcpp::List model_matrices, Map<MatrixXd> coefs, int grainSize);
-RcppExport SEXP BSFG_get_fitted_set_c(SEXP model_matricesSEXP, SEXP coefsSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_get_fitted_set_c(SEXP model_matricesSEXP, SEXP coefsSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -165,7 +165,7 @@ END_RCPP
 }
 // sample_MME_single_diagR
 VectorXd sample_MME_single_diagR(VectorXd y, SpMat Zt, MSpMat& chol_C, double tot_Eta_prec, double pe, VectorXd randn_theta);
-RcppExport SEXP BSFG_sample_MME_single_diagR(SEXP ySEXP, SEXP ZtSEXP, SEXP chol_CSEXP, SEXP tot_Eta_precSEXP, SEXP peSEXP, SEXP randn_thetaSEXP) {
+RcppExport SEXP _BSFG_sample_MME_single_diagR(SEXP ySEXP, SEXP ZtSEXP, SEXP chol_CSEXP, SEXP tot_Eta_precSEXP, SEXP peSEXP, SEXP randn_thetaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -181,7 +181,7 @@ END_RCPP
 }
 // sample_MME_ZKZts_c
 MatrixXd sample_MME_ZKZts_c(Map<MatrixXd> Y, MSpMat Z, Map<VectorXd> tot_Eta_prec, Rcpp::List randomEffect_C_Choleskys, Map<MatrixXd> h2s, VectorXi h2s_index, int grainSize);
-RcppExport SEXP BSFG_sample_MME_ZKZts_c(SEXP YSEXP, SEXP ZSEXP, SEXP tot_Eta_precSEXP, SEXP randomEffect_C_CholeskysSEXP, SEXP h2sSEXP, SEXP h2s_indexSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_sample_MME_ZKZts_c(SEXP YSEXP, SEXP ZSEXP, SEXP tot_Eta_precSEXP, SEXP randomEffect_C_CholeskysSEXP, SEXP h2sSEXP, SEXP h2s_indexSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -198,7 +198,7 @@ END_RCPP
 }
 // tot_prec_scores
 VectorXd tot_prec_scores(Map<MatrixXd> Y, Rcpp::List Sigma_Choleskys, VectorXi h2s_index, int grainSize);
-RcppExport SEXP BSFG_tot_prec_scores(SEXP YSEXP, SEXP Sigma_CholeskysSEXP, SEXP h2s_indexSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_tot_prec_scores(SEXP YSEXP, SEXP Sigma_CholeskysSEXP, SEXP h2s_indexSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -212,7 +212,7 @@ END_RCPP
 }
 // log_p_h2s
 MatrixXd log_p_h2s(Map<MatrixXd> Y, Map<VectorXd> tot_Eta_prec, Rcpp::List Sigma_Choleskys, Map<VectorXd> discrete_priors, int grainSize);
-RcppExport SEXP BSFG_log_p_h2s(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP Sigma_CholeskysSEXP, SEXP discrete_priorsSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_log_p_h2s(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP Sigma_CholeskysSEXP, SEXP discrete_priorsSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -227,7 +227,7 @@ END_RCPP
 }
 // sample_h2s
 VectorXi sample_h2s(Map<ArrayXXd> log_ps, int grainSize);
-RcppExport SEXP BSFG_sample_h2s(SEXP log_psSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_sample_h2s(SEXP log_psSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -239,7 +239,7 @@ END_RCPP
 }
 // sample_h2s_discrete_MH_c
 VectorXi sample_h2s_discrete_MH_c(Map<MatrixXd> Y, Map<VectorXd> tot_Eta_prec, Map<VectorXd> discrete_priors, VectorXi h2s_index, Map<MatrixXd> h2s_matrix, Rcpp::List Sigma_Choleskys, double step_size, int grainSize);
-RcppExport SEXP BSFG_sample_h2s_discrete_MH_c(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP discrete_priorsSEXP, SEXP h2s_indexSEXP, SEXP h2s_matrixSEXP, SEXP Sigma_CholeskysSEXP, SEXP step_sizeSEXP, SEXP grainSizeSEXP) {
+RcppExport SEXP _BSFG_sample_h2s_discrete_MH_c(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP discrete_priorsSEXP, SEXP h2s_indexSEXP, SEXP h2s_matrixSEXP, SEXP Sigma_CholeskysSEXP, SEXP step_sizeSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -257,7 +257,7 @@ END_RCPP
 }
 // sample_factors_scores_c
 MatrixXd sample_factors_scores_c(Map<MatrixXd> Eta_tilde, Map<MatrixXd> prior_mean, Map<MatrixXd> Lambda, Map<VectorXd> resid_Eta_prec, Map<VectorXd> F_e_prec);
-RcppExport SEXP BSFG_sample_factors_scores_c(SEXP Eta_tildeSEXP, SEXP prior_meanSEXP, SEXP LambdaSEXP, SEXP resid_Eta_precSEXP, SEXP F_e_precSEXP) {
+RcppExport SEXP _BSFG_sample_factors_scores_c(SEXP Eta_tildeSEXP, SEXP prior_meanSEXP, SEXP LambdaSEXP, SEXP resid_Eta_precSEXP, SEXP F_e_precSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -272,7 +272,7 @@ END_RCPP
 }
 // sample_delta_c_Eigen
 VectorXd sample_delta_c_Eigen(VectorXd delta, VectorXd tauh, Map<VectorXd> scores, double delta_1_rate, double delta_2_rate, Map<MatrixXd> randg_draws);
-RcppExport SEXP BSFG_sample_delta_c_Eigen(SEXP deltaSEXP, SEXP tauhSEXP, SEXP scoresSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_rateSEXP, SEXP randg_drawsSEXP) {
+RcppExport SEXP _BSFG_sample_delta_c_Eigen(SEXP deltaSEXP, SEXP tauhSEXP, SEXP scoresSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_rateSEXP, SEXP randg_drawsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -288,7 +288,7 @@ END_RCPP
 }
 // rgig_multiple
 NumericVector rgig_multiple(int n, NumericVector lambda, NumericVector chi, NumericVector psi);
-RcppExport SEXP BSFG_rgig_multiple(SEXP nSEXP, SEXP lambdaSEXP, SEXP chiSEXP, SEXP psiSEXP) {
+RcppExport SEXP _BSFG_rgig_multiple(SEXP nSEXP, SEXP lambdaSEXP, SEXP chiSEXP, SEXP psiSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
