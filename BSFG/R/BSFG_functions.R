@@ -515,10 +515,13 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
   # re-formulate into an appropriate array with the first dimension as samples
   if(is.null(dim_1)) {
     dim_1 = length(sample_1_result)
-    matrix(res,ncol = dim_1,byrow=T)
+    res = matrix(res,ncol = dim_1,byrow=T)
+    colnames(res) = names(sample_1_result)
   } else {
-    aperm(array(res,dim = c(dim_1,length(samples))),c(3,1,2))
+    res = aperm(array(res,dim = c(dim_1,length(samples))),c(3,1,2))
+    dimnames(res)[2:3] = dimnames(sample_1_result)
   }
+  res
 }
 
 #' Calculates posterior mean of a function of parameters
@@ -543,8 +546,14 @@ get_posterior_mean = function(X,FUN,bychunk = FALSE,mc.cores = detectCores(),...
       FUN = match.call()$FUN
       X = do.call(get_posterior_FUN,list(BSFG_state=BSFG_state,FUN=FUN,mc.cores=mc.cores))
     }
-    if(length(dim(X)) == 3) result = matrix(colMeans(matrix(X,nr = dim(X)[1])),nr = dim(X)[2])
-    if(length(dim(X)) == 2) result = colMeans(X)
+    if(length(dim(X)) == 3) {
+      result = matrix(colMeans(matrix(X,nr = dim(X)[1])),nr = dim(X)[2])
+      dimnames(result) = dimnames(X)[-1]
+    }
+    if(length(dim(X)) == 2) {
+      result = colMeans(X)
+      names(result) = colnames(X)
+    }
   } else{
     if(!is(X,'BSFG_state')) stop('Provide a BSFG_state object as "X"')
     BSFG_state = X
