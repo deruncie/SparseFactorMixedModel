@@ -14,4 +14,5 @@ sourceCpp*
 *.out
 *.toc
 *plots.pdf
+*plots_temp.pdf
 Manuscript*

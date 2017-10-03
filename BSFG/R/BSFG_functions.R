@@ -447,7 +447,7 @@ reload_Posterior = function(BSFG_state,params = NULL){
 # parameters in listed in \code{terms}, and only if they have posterior samples (not posterior means)
 make_current_state = function(Posterior,sample,terms){
   sample_terms = terms[terms %in% Posterior$posteriorSample_params]
-  current_state = lapply(sample_terms,function(x) array(Posterior[[x]][sample,,],dim = dim(Posterior[[x]])[-1]))
+  current_state = lapply(sample_terms,function(x) array(Posterior[[x]][sample,,],dim = dim(Posterior[[x]])[-1],dimnames = dimnames(Posterior[[x]])[-1]))
   names(current_state) = sample_terms
   current_state
 }
