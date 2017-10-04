@@ -402,13 +402,15 @@ MatrixXd get_fitted_set_c(  // returns n_tot x p matrix in same order as data
     int grainSize){
 
   std::vector<MatrixXd> X_list;
-  std::vector<VectorXd> position_list;
+  std::vector<ArrayXi> position_list;
+  std::vector<ArrayXi> nonZero_cols_X;
   int total_obs = 0;
   int n = model_matrices.size();
   for(int i = 0; i < n; i++){
     Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
     X_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));
-    position_list.push_back(Rcpp::as<VectorXd>(model_matrix_i["position"]));
+    position_list.push_back(Rcpp::as<ArrayXi>(model_matrix_i["position"]));
+    nonZero_cols_X.push_back(Rcpp::as<ArrayXi>(model_matrix_i["nonZero_cols_X"])); // list of which columns b_X correspond to in full X matrix
 
     int n_obs = X_list[i].rows();
     total_obs += n_obs;
@@ -422,26 +424,35 @@ MatrixXd get_fitted_set_c(  // returns n_tot x p matrix in same order as data
 
   struct sampleColumn : public RcppParallel::Worker {
     std::vector<MatrixXd> X_list;
-    std::vector<VectorXd> position_list;
+    std::vector<ArrayXi> position_list;
+    std::vector<ArrayXi> nonZero_cols_X;
     int n_traits;
     MatrixXd coefs;
     MatrixXd &Y_fitted;
 
     sampleColumn(
       std::vector<MatrixXd> &X_list,
-      std::vector<VectorXd> &position_list,
+      std::vector<ArrayXi>  &position_list,
+      std::vector<ArrayXi>  &nonZero_cols_X,
       int n_traits,
       MatrixXd coefs,
       MatrixXd &Y_fitted) :
-      X_list(X_list), position_list(position_list),
+      X_list(X_list), position_list(position_list),nonZero_cols_X(nonZero_cols_X),
       n_traits(n_traits),
       coefs(coefs),Y_fitted(Y_fitted)
     {}
 
     void operator()(std::size_t begin, std::size_t end) {
       for(std::size_t j = begin; j < end; j++){
-        int b = X_list[j].cols();
-        Map<MatrixXd> Eta_i(coefs.col(j).data(),b,n_traits);
+        int b_X = X_list[j].cols();
+        int b_tot = coefs.rows() / n_traits;
+        VectorXd coefs_j(b_X * n_traits);
+        for(int t = 0; t < n_traits; t++){
+          for(int k = 0; k < b_X; k++){
+            coefs_j[t*b_X+k] = coefs.coeffRef(t*b_tot+nonZero_cols_X[j][k]-1,j);
+          }
+        }
+        Map<MatrixXd> Eta_i(coefs_j.data(),b_X,n_traits);
         MatrixXd Y_fitted_j = X_list[j] * Eta_i;
         for(int i = 0; i < position_list[j].size(); i++) {
           Y_fitted.row(position_list[j][i]-1) = Y_fitted_j.row(i);
@@ -450,7 +461,7 @@ MatrixXd get_fitted_set_c(  // returns n_tot x p matrix in same order as data
     }
   };
 
-  sampleColumn sampler(X_list,position_list,n_traits,coefs,Y_fitted);
+  sampleColumn sampler(X_list,position_list,nonZero_cols_X,n_traits,coefs,Y_fitted);
   RcppParallel::parallelFor(0,n,sampler,grainSize);
 
   return(Y_fitted);

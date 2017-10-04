@@ -119,7 +119,7 @@ for(i  in 1:70) {
     BSFG_state = save_posterior_chunk(BSFG_state)
     print(BSFG_state)
     plot(BSFG_state)
-    plot(BSFG_state$current_state$Y,BSFG_state$current_state$Y_fitted);abline(0,1)
+    plot(BSFG_state$run_parameters$observation_model_parameters$observation_setup$Y,BSFG_state$current_state$Y_fitted);abline(0,1)
 }
 
 Posterior = reload_Posterior(BSFG_state)
@@ -133,14 +133,14 @@ ggplot(data,aes(x=covariate,y=Y)) + geom_line(aes(group = ID)) + geom_line(aes(y
 ggplot(subset(data,ID %in% c(1,2,21,22)),aes(x=covariate,y=Y)) + geom_ribbon(aes(ymin = Y_fitted_low,ymax = Y_fitted_high,group = ID),alpha = 0.2) + geom_line(aes(group = ID)) + geom_line(aes(y=Y_fitted,group=ID),color ='red')
 
 newx = seq(1,60,length=100)
-new_MM = model.matrix(BSFG_state$current_state$Terms,data.frame(covariate=newx))
+new_MM = model.matrix(BSFG_state$run_parameters$observation_model_parameters$observation_setup$Terms,data.frame(covariate=newx))
 
 
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
 plot(apply(BSFG_state$Posterior$Eta,c(2,3),mean),setup$Eta);abline(0,1)
 # setup$observations$Y_fitted = sapply(1:nrow(setup$observations),function(i) predict(BSFG_state$current_state$coefficients,newx = setup$observations$covariate[i]) %*% BSFG_state$Posterior$Eta[setup$observations$ID[i],])
-setup$observations$Y_fitted = sapply(1:nrow(setup$observations),function(i) model.matrix(BSFG_state$current_state$Terms,data.frame(covariate=setup$observations$covariate[i])) %*% colMeans(BSFG_state$Posterior$Eta[,setup$observations$ID[i],]))
+setup$observations$Y_fitted = sapply(1:nrow(setup$observations),function(i) model.matrix(BSFG_state$run_parameters$observation_model_parameters$observation_setup$Terms,data.frame(covariate=setup$observations$covariate[i])) %*% colMeans(BSFG_state$Posterior$Eta[,setup$observations$ID[i],]))
 with(setup$observations,plot(Y,Y_fitted));abline(0,1)
 plot(c(with(BSFG_state$current_state,U_F %*% t(Lambda))),with(setup,c(as.matrix(U_F %*% t(error_factor_Lambda)))));abline(0,1)
 plot(c(with(BSFG_state$current_state,U_R + U_F %*% t(Lambda))),with(setup,c(as.matrix(U_R + U_F %*% t(error_factor_Lambda)))));abline(0,1)

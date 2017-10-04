@@ -29,7 +29,34 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
-  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+  if(!'observation_setup' %in% names(observation_model_parameters)) {
+    observation_setup = with(c(observation_model_parameters,data_matrices,current_state),{
+      if(scale_Y){
+        Mean_Y = colMeans(Y,na.rm=T)
+        VY = apply(Y,2,var,na.rm=T)
+        Y = sweep(Y,2,Mean_Y,'-')
+        Y = sweep(Y,2,sqrt(VY),'/')
+      } else {
+        p_Y = dim(Y)[2]
+        Mean_Y = rep(0,p_Y)
+        VY = rep(1,p_Y)
+      }
+      Y_missing = as(is.na(Y),'lgTMatrix')# un-compressed logical sparse matrix
+      return(list(
+        n = nrow(Y),
+        p = ncol(Y),
+        traitnames = colnames(Y),
+        Mean_Y = Mean_Y,
+        VY = VY,
+        Y_missing = Y_missing,
+        n_missing = sum(Y_missing),
+        missing_indices = which(Y_missing)
+      ))
+    })
+    return(observation_setup)
+  }
+
+  observation_model_state = with(c(observation_model_parameters,observation_model_parameters$observation_setup,data_matrices,current_state),{
     Eta = Y
     Eta_mean = matrix(0,0,0)
     if(n_missing > 0){
@@ -115,9 +142,8 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
 
-  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
-    if(!'Y' %in% ls()) Y = NULL
-    if(!'model_matrices' %in% ls()){
+  if(!'observation_setup' %in% names(observation_model_parameters)) {
+    observation_setup = with(c(observation_model_parameters,data_matrices,current_state),{
       if(!'ID' %in% colnames(data)) stop('ID column required in data')
       if(!length(unique(data$ID)) == nrow(data)) stop('duplicate IDs in data')
 
@@ -145,7 +171,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
         }
         # keep only columns of X which are non-zero, but record which columns these were of original X.
         nonZero_cols_X = which(colSums(X!=0) > 0)
-        X = X[,nonZero_cols_X,drop=F]
+        X = X[,nonZero_cols_X,drop=FALSE]
         list(
           X = X,
           y = Y[x,,drop=FALSE],
@@ -154,18 +180,34 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
         )
       })
       names(model_matrices) = data$ID
-      Y_missing = t(sapply(model_matrices,function(x) !(seq_len(n_terms) %in% x$nonZero_cols_X)))
-    }
 
-    n = length(model_matrices)
-    n_traits = ncol(model_matrices[[1]]$y) # number of traits
-    p_trait = n_terms  # number of coefficients per trait
-    p = p_trait * n_traits # total number of coefficients
-    traits = colnames(model_matrices[[1]]$y)
-    Eta_col_names = paste(rep(traits,each = p_trait),rep(colnames(mm),length(traits)),sep='::')
-    Eta_row_names = data$ID
+      n = length(model_matrices)
+      n_traits = ncol(model_matrices[[1]]$y) # number of traits
+      p_trait = n_terms  # number of coefficients per trait
+      p = p_trait * n_traits # total number of coefficients
+      traits = colnames(model_matrices[[1]]$y)
+      traitnames = paste(rep(traits,each = p_trait),rep(colnames(mm),length(traits)),sep='::')
+      Eta_row_names = data$ID
+      Y_missing = t(sapply(model_matrices,function(x) rep(!(seq_len(n_terms) %in% x$nonZero_cols_X),n_traits)))
+
+      observation_setup = list(
+        Y = Y,
+        n = length(model_matrices),
+        p = p,
+        Terms = Terms,
+        n_traits = n_traits,
+        traitnames = traitnames,
+        Eta_row_names = Eta_row_names,
+        model_matrices = model_matrices,
+        Y_missing = Y_missing
+      )
+      return(observation_setup)
+    })
+    return(observation_setup)
+  }
+
+  observation_model_state = with(c(observation_model_parameters,observation_model_parameters$observation_setup,data_matrices,current_state),{
     if(!'var_Eta' %in% ls()) var_Eta = rep(1,p)
-
     if(length(current_state) == 0){
       Eta_mean = matrix(0,n,p)
       resid_Eta_prec = matrix(1,1,p)
@@ -173,18 +215,17 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     } else{
       Eta_mean = X %**% B + F %*% t(Lambda) + Z %**% U_R
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
-      if(!'resid_Y_prec' %in% ls()) resid_Y_prec = matrix(rep(1,n_traits),nr=1)
+      if(!'resid_Y_prec' %in% ls()) resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape,rate = resid_Y_prec_rate),nr=1) # only a single precision parameter for the data_model?
     }
 
     # re-scale Eta_mean and resid_Eta_prec
     Eta_mean = sweep(Eta_mean,2,sqrt(var_Eta),'*')
     resid_Eta_prec[] = resid_Eta_prec / var_Eta
-
     coefs = sample_coefs_set_c(model_matrices,resid_Y_prec, t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),1)
 
     Y_fitted = get_fitted_set_c(model_matrices,coefs,1)
     Eta = t(coefs)
-    colnames(Eta) = Eta_col_names
+    colnames(Eta) = traitnames
     rownames(Eta) = Eta_row_names
 
     # un-scale Eta
@@ -194,7 +235,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
 
     resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape + 0.5*nrow(Y_tilde), rate = resid_Y_prec_rate + 0.5*colSums(Y_tilde^2)),nr=1)
 
-    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, model_matrices = model_matrices, Y_missing=Y_missing, Terms = Terms,var_Eta = var_Eta,Y = Y, Y_fitted=Y_fitted))
+    return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, Y_fitted=Y_fitted, Y=Y, var_Eta = var_Eta))
   })
   return(list(state = observation_model_state,
               posteriorSample_params = c('Y_fitted','Eta','resid_Y_prec'),

@@ -240,37 +240,26 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     observation_model_parameters = Y[names(Y) != 'observation_model']
   } else{
     if(!is(Y,'matrix'))	Y = as.matrix(Y)
-    if(run_parameters$scale_Y){
-      Mean_Y = colMeans(Y,na.rm=T)
-      VY = apply(Y,2,var,na.rm=T)
-      Y = sweep(Y,2,Mean_Y,'-')
-      Y = sweep(Y,2,sqrt(VY),'/')
-    } else {
-      p_Y = dim(Y)[2]
-      Mean_Y = rep(0,p_Y)
-      VY = rep(1,p_Y)
-    }
     observation_model = missing_data_model
-    Y_missing = as(is.na(Y),'lgTMatrix')# un-compressed logical sparse matrix
     observation_model_parameters = list(
       Y = Y,
-      Mean_Y = Mean_Y,
-      VY = VY,
-      Y_missing = Y_missing,
-      n_missing = sum(Y_missing),
-      missing_indices = which(Y_missing)
+      scale_Y = run_parameters$scale_Y
     )
   }
 
-  # initialize Eta
-  observation_model_state = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
-  Eta = observation_model_state$state$Eta
-  Y_missing = as(observation_model_state$state$Y_missing,'lgTMatrix')
-  observation_model_parameters$Y_missing = Y_missing
+  # initialize observation_model
+  observation_model_parameters$observation_setup = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
   n = nrow(data)
-  p = ncol(Eta)
-  traitnames = colnames(Eta)
-  if(is.null(traitnames)) traitnames = paste('trait',1:ncol(Eta),sep='_')
+  p = observation_model_parameters$observation_setup$p
+  traitnames = observation_model_parameters$observation_setup$traitnames
+  if(is.null(traitnames)) traitnames = paste('trait',1:p,sep='_')
+  if(is.null(observation_model_parameters$observation_setup$Y_missing)) {
+    observation_model_parameters$observation_setup$Y_missing = matrix(0,n,p)
+  }
+  if(!is(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')){
+    observation_model_parameters$observation_setup$Y_missing = as(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')
+  }
+  Y_missing = observation_model_parameters$observation_setup$Y_missing
 
 	# if factor_model_fixed not specified, use fixed effects from model for both
 	if(is.null(factor_model_fixed)) {
@@ -785,19 +774,17 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# --- Initialize BSFG_state --- #
 	# ----------------------------- #
 
-	BSFG_state = initialize_variables(BSFG_state)
-
-	# ----------------------- #
-	# -Initialize Posterior-- #
-	# ----------------------- #
-	Posterior = list(
-	  posteriorSample_params = unique(c(posteriorSample_params,observation_model_state$posteriorSample_params)),
-	  posteriorMean_params = unique(c(posteriorMean_params,observation_model_state$posteriorMean_params)),
+	BSFG_state$Posterior = list(
+	  posteriorSample_params = posteriorSample_params,
+	  posteriorMean_params = posteriorMean_params,
 	  total_samples = 0,
 	  folder = run_parameters$Posterior_folder,
 	  files = c()
 	)
-	Posterior = reset_Posterior(Posterior,BSFG_state)
+
+	BSFG_state = initialize_variables(BSFG_state)
+
+	Posterior = reset_Posterior(BSFG_state$Posterior,BSFG_state)
 	BSFG_state$Posterior = Posterior
 
 
@@ -913,8 +900,11 @@ initialize_variables = function(BSFG_state,...){
   BSFG_state$current_state = BSFG_state$priors$B_prior$sampler(BSFG_state)
 
   # Initialize Eta
-  observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)$state
-  BSFG_state$current_state[names(observation_model_state)] = observation_model_state
+  observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)
+  BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
+
+  BSFG_state$Posterior$posteriorSample_params = unique(c(BSFG_state$Posterior$posteriorSample_params,observation_model_state$posteriorSample_params))
+  BSFG_state$Posterior$posteriorMean_params = unique(c(BSFG_state$Posterior$posteriorMean_params,observation_model_state$posteriorMean_params))
 
   return(BSFG_state)
 }
