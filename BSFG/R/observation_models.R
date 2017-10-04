@@ -124,15 +124,15 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       # ensure ID is a character for matching
       observations$ID = as.character(observations$ID)
       data$ID = as.character(data$ID)
+      observations = subset(observations,ID %in% data$ID)
 
-      lm1 = lm(individual_model,observations)
-      t2 = delete.response(terms(lm1))
-
-      mf = lm(individual_model,observations,method = 'model.frame')
+      # extract model Terms and Y matrix
+      mf = model.frame(individual_model,observations)
+      mm = model.matrix(individual_model,observations)
       traits = all.vars(update(individual_model,'~.0'))
       Y = as.matrix(observations[,traits,drop=FALSE])
       Terms = delete.response(terms(mf))
-      n_terms = ncol(model.matrix(lm1))
+      n_terms = ncol(mm)
 
       id_index = tapply(1:nrow(observations),observations$ID,function(x) x)
       model_matrices = lapply(data$ID,function(id) {
@@ -143,31 +143,33 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
           x = matrix(0,0,0)
           X = matrix(0,0,n_terms)
         }
+        # keep only columns of X which are non-zero, but record which columns these were of original X.
+        nonZero_cols_X = which(colSums(X!=0) > 0)
+        X = X[,nonZero_cols_X,drop=F]
         list(
           X = X,
           y = Y[x,,drop=FALSE],
           position = x,
-          missing = colSums(X!=0) == 0
+          nonZero_cols_X = nonZero_cols_X
         )
       })
       names(model_matrices) = data$ID
-      Y_missing = t(sapply(model_matrices,function(x) x$missing))
+      Y_missing = t(sapply(model_matrices,function(x) !(seq_len(n_terms) %in% x$nonZero_cols_X)))
     }
-
 
     n = length(model_matrices)
     n_traits = ncol(model_matrices[[1]]$y) # number of traits
-    p_trait = ncol(model_matrices[[1]]$X)  # number of coefficients per trait
+    p_trait = n_terms  # number of coefficients per trait
     p = p_trait * n_traits # total number of coefficients
     traits = colnames(model_matrices[[1]]$y)
-    Eta_col_names = paste(rep(traits,each = p_trait),rep(colnames(model_matrices[[1]]$X),length(traits)),sep='::')
+    Eta_col_names = paste(rep(traits,each = p_trait),rep(colnames(mm),length(traits)),sep='::')
     Eta_row_names = data$ID
     if(!'var_Eta' %in% ls()) var_Eta = rep(1,p)
 
     if(length(current_state) == 0){
       Eta_mean = matrix(0,n,p)
       resid_Eta_prec = matrix(1,1,p)
-      resid_Y_prec = matrix(rep(1,n_traits),nr=1)  # only a single precision parameter for the data_model?
+      resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape,rate = resid_Y_prec_rate),nr=1) # only a single precision parameter for the data_model?
     } else{
       Eta_mean = X %**% B + F %*% t(Lambda) + Z %**% U_R
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
@@ -409,17 +411,23 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
 #'
 #' @examples
 combined_model = function(observation_model_parameters,BSFG_state = list()){
-  n_models = length(observation_model_parameters)
-  if(is.null(names(observation_model_parameters))) names(observation_model_parameters) = 1:n_models
+
+  ## NOTE: Somehow need to pass a subset of the factor model to each sub-model, or maybe calculate Eta_mean once and pass a subset to each model.
+
+  sub_models = observation_model_parameters$sub_models
+  n_models = length(sub_models)
+  if(is.null(names(sub_models))) names(sub_models) = 1:n_models
 
   # run each of the separate observation models
-  results = lapply(names(observation_model_parameters),function(i) {
-    Y = observation_model_parameters[[i]]
+  results = lapply(names(sub_models),function(i) {
+    Y = sub_models[[i]]
     if(!'observation_model' %in% names(Y)) stop(sprintf('observation_model not specified in model %s',i))
     observation_model = Y$observation_model
 
     # adjust model-specific parameter names
-    names(BSFG_state$current_state) = sub(sprintf('.%s',i),'',names(BSFG_state$current_state))
+    if(length(names(BSFG_state$current_state))>0){
+      names(BSFG_state$current_state) = sub(sprintf('.%s',i),'',names(BSFG_state$current_state))
+    }
 
     # run observation_model
     new_state = observation_model(Y[names(Y) != 'observation_model'],BSFG_state)
@@ -432,17 +440,22 @@ combined_model = function(observation_model_parameters,BSFG_state = list()){
     # return new_state
     new_state
   })
-  names(results) = names(observation_model_parameters)
+  names(results) = names(sub_models)
 
   # merge Etas
-  Eta = do.call(cbind,lapply(results,function(x) x$state$Eta))
+  Eta = do.call(cbind,lapply(names(results),function(x) results[[x]]$state[[paste('Eta',x,sep='.')]]))
+
+  # merge Y_missing
+  Y_missing = do.call(cbind,lapply(names(results),function(x) results[[x]]$state[[paste('Y_missing',x,sep='.')]]))
 
   # make combined new_state
-  new_state = do.call(c,lapply(results,function(x) x$state))
+  new_state = do.call('c',lapply(results,function(x) x$state))
+  names(new_state) = do.call('c',lapply(results,function(x) names(x$state)))
   new_state$Eta = Eta
+  new_state$Y_missing = Y_missing
 
-  posteriorSample_params = do.call(c,lapply(results,function(x) x$posteriorSample_params))
-  posteriorMean_params = do.call(c,lapply(results,function(x) x$posteriorMean_params))
+  posteriorSample_params = do.call('c',lapply(results,function(x) x$posteriorSample_params))
+  posteriorMean_params = do.call('c',lapply(results,function(x) x$posteriorMean_params))
 
   return(list(state = new_state,
               posteriorSample_params = posteriorSample_params,

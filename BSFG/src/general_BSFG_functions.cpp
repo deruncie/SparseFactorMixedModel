@@ -292,37 +292,38 @@ Rcpp::List sample_MME_fixedEffects_cis_c(
 
 // [[Rcpp::export()]]
 MatrixXd sample_coefs_set_c(    // return pxn matrix
-    Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x p), position (n_i x 1)
+    Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x p), nonZero_cols_X.
     Map<VectorXd> tot_Y_prec,   // tx1
     Map<MatrixXd> prior_mean,   // pxn
     Map<MatrixXd> prior_prec,   // pxn
     int grainSize){
 
   int n = model_matrices.size();
+  int p = prior_mean.rows();
 
   std::vector<MatrixXd> y_list;
   std::vector<MatrixXd> X_list;
+  std::vector<ArrayXi> nonZero_cols_X;
   std::vector<MatrixXd> randn_theta_list;
   for(int i = 0; i < n; i++){
     Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
-    y_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["y"]));
-    X_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));
+    y_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["y"]));                    // matrix of observations (n_i x t)
+    X_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));                    // design matrix (n_i x b_X), only including columns that are non-zero
+    nonZero_cols_X.push_back(Rcpp::as<ArrayXi>(model_matrix_i["nonZero_cols_X"])); // list of which columns b_X correspond to in full X matrix
 
     int t = y_list[i].cols();
-    int b = X_list[i].cols();
-
-    MatrixXd randn_theta = rstdnorm_mat(b,t);
+    MatrixXd randn_theta = rstdnorm_mat(p/t,t);
     randn_theta_list.push_back(randn_theta);
   }
 
   int n_traits = y_list[0].cols();
-  int p = X_list[0].cols()*n_traits;
 
   MatrixXd coefs(p,n);
 
   struct sampleColumn : public RcppParallel::Worker {
     std::vector<MatrixXd> y_list;
     std::vector<MatrixXd> X_list;
+    std::vector<ArrayXi> nonZero_cols_X;
     std::vector<MatrixXd> randn_theta_list;
     VectorXd tot_Y_prec;
     MatrixXd prior_mean,prior_prec;
@@ -332,13 +333,14 @@ MatrixXd sample_coefs_set_c(    // return pxn matrix
     sampleColumn(
       std::vector<MatrixXd> &y_list,
       std::vector<MatrixXd> &X_list,
+      std::vector<ArrayXi>  &nonZero_cols_X,
       std::vector<MatrixXd> &randn_theta_list,
       VectorXd tot_Y_prec,
       MatrixXd prior_mean,
       MatrixXd prior_prec,
       int n_traits,
       MatrixXd &coefs) :
-      y_list(y_list), X_list(X_list), randn_theta_list(randn_theta_list),
+      y_list(y_list), X_list(X_list), nonZero_cols_X(nonZero_cols_X), randn_theta_list(randn_theta_list),
       tot_Y_prec(tot_Y_prec),prior_mean(prior_mean), prior_prec(prior_prec),n_traits(n_traits),
       coefs(coefs)
     {}
@@ -347,23 +349,47 @@ MatrixXd sample_coefs_set_c(    // return pxn matrix
       for(std::size_t j = begin; j < end; j++){
         MatrixXd Y = y_list[j];
         MatrixXd X = X_list[j];
-        int b = X.cols();
+        int b = randn_theta_list[j].rows();
+        int b_X = X.cols();
         int n_obs = Y.rows();
         SpMat I = MatrixXd::Identity(n_obs,n_obs).sparseView();
         MSpMat chol_R(I.rows(),I.cols(), I.nonZeros(),I.outerIndexPtr(),I.innerIndexPtr(),I.valuePtr());
         MatrixXd randn_e = MatrixXd::Zero(0,n_traits);
         for(int t = 0; t < n_traits; t++) {
-          coefs.block(t*b,j,b,1) = sample_MME_single_diagK(Y.col(t), X,
-                                                           prior_mean.block(t*b,j,b,1), prior_prec.block(t*b,j,b,1),
-                                                           chol_R,tot_Y_prec[t],
-                                                           randn_theta_list[j].col(t),randn_e.col(t));
+          // first assign the result vector to prior_mean + randn/sqrt(prec)
+          // will then replace values with sampled values.
+          VectorXd prior_mean_tj = prior_mean.block(t*b,j,b,1);
+          VectorXd prior_prec_tj = prior_prec.block(t*b,j,b,1);
+          VectorXd randn_theta_tj = randn_theta_list[j].col(t);
+          coefs.block(t*b,j,b,1) = prior_mean_tj.array() + randn_theta_tj.array() / prior_prec_tj.array().sqrt();
+
+          // now, pull out parameters for the coefficients corresponding to the columns of X
+          VectorXd prior_mean_tj_X(b_X);
+          VectorXd prior_prec_tj_X(b_X);
+          VectorXd randn_theta_tj_X(b_X);
+          for(int k = 0; k < b_X; k++){
+            int element = nonZero_cols_X[j][k]-1;
+            prior_mean_tj_X.coeffRef(k) = prior_mean_tj.coeffRef(element);
+            prior_prec_tj_X.coeffRef(k) = prior_prec_tj.coeffRef(element);
+            randn_theta_tj_X.coeffRef(k) = randn_theta_tj.coeffRef(element);
+          }
+          VectorXd coefs_X = sample_MME_single_diagK(Y.col(t), X,
+                                                      prior_mean_tj_X, prior_prec_tj_X,
+                                                      chol_R,tot_Y_prec[t],
+                                                                       randn_theta_tj_X,randn_e.col(t));
+
+          // now replace the values in coef with the corresponding ones in coefs_X
+          for(int k = 0; k < b_X; k++){
+            int element = nonZero_cols_X[j][k]-1;
+            coefs.coeffRef(t*b + element,j) = coefs_X.coeffRef(k);
+          }
         }
       }
     }
   };
 
 
-  sampleColumn sampler(y_list, X_list,randn_theta_list,tot_Y_prec,prior_mean,prior_prec,n_traits,coefs);
+  sampleColumn sampler(y_list, X_list,nonZero_cols_X,randn_theta_list,tot_Y_prec,prior_mean,prior_prec,n_traits,coefs);
   RcppParallel::parallelFor(0,n,sampler,grainSize);
 
   return(coefs);
