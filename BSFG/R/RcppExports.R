@@ -81,3 +81,7 @@ rgig_multiple <- function(n, lambda, chi, psi) {
     .Call(`_BSFG_rgig_multiple`, n, lambda, chi, psi)
 }
 
+sample_MME_fixedEffects_hierarchical_c <- function(Y, Z, X, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, grainSize) {
+    .Call(`_BSFG_sample_MME_fixedEffects_hierarchical_c`, Y, Z, X, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, grainSize)
+}
+

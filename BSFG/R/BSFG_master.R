@@ -305,12 +305,12 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    QTL_terms = mkReTrms(findbars(QTL_resid$model),data,drop.unused.levels = FALSE)
 	    QTL_resid_Z = as(t(QTL_terms$Zt),'dgCMatrix')
 	    if(!all(colnames(QTL_factors_Z) %in% rownames(QTL_resid$X))) stop(sprintf('Missing %s from QTL_resid$X',names(QTL_terms$cnms)[1]))
-	    QTL_resid_X = as(QTL_resid$X[colnames(QTL_factors_Z),],'dgCMatrix')
+	    QTL_resid_X = QTL_resid$X[colnames(QTL_factors_Z),]
 	  } else{
 	    if(nrow(QTL_resid) != nrow(data)) stop(sprintf('QTL_resid has wrong number of rows. Should be %d',nrow(data)))
 	    QTL_resid_Z = as(diag(1,nrow(data)),'dgCMatrix')
 	    if(is.data.frame(QTL_resid)) QTL_resid = as.matrix(QTL_resid)
-	    QTL_resid_X = as(QTL_resid,'dgCMatrix')
+	    QTL_resid_X = QTL_resid
 	  }
 	  same_fixed_model = FALSE
 	  if(any(is.na(QTL_resid_X))) stop('Missing values in QTL_resid_X')
@@ -340,12 +340,12 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    QTL_terms = mkReTrms(findbars(QTL_factors$model),data,drop.unused.levels = FALSE)
 	    QTL_factors_Z = as(t(QTL_terms$Zt),'dgCMatrix')
 	    if(!all(colnames(QTL_factors_Z) %in% rownames(QTL_factors$X))) stop(sprintf('Missing %s from QTL_factors$X',names(QTL_terms$cnms)[1]))
-	    QTL_factors_X = as(QTL_factors$X[colnames(QTL_factors_Z),],'dgCMatrix')
+	    QTL_factors_X = QTL_factors$X[colnames(QTL_factors_Z),]
 	  } else{
 	    if(nrow(QTL_factors) != nrow(data)) stop(sprintf('QTL_factors has wrong number of rows. Should be %d',nrow(data)))
 	    QTL_factors_Z = as(diag(1,nrow(data)),'dgCMatrix')
 	    if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
-	    QTL_factors_X = as(QTL_factors,'dgCMatrix')
+	    QTL_factors_X = QTL_factors
 	  }
 	  same_fixed_model = FALSE
 	  if(any(is.na(QTL_factors_X))) stop('Missing values in QTL_factors_X')
@@ -576,7 +576,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     if(n_RE == 1){
       ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
       result = svd(ZKZt)
-      Qt = as(t(result$u),'dgCMatrix')
+      Qt = drop0(as(t(result$u),'dgCMatrix'),tol = run_parameters$drop0_tol)
     } else{
       Qt = Diagonal(length(x),1)
     }
@@ -631,6 +631,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   }
   if(verbose) close(pb)
 
+  Qt1_QTL_Factors_Z = Qt_list[[1]] %*% QTL_factors_Z  # since QTL_factors_Z only used with complete data, only calculate this for set 1.
+
 
   run_variables = list(
     p      = p,
@@ -649,6 +651,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     QtXF_list  = QtXF_list,
     QtZ_list   = QtZ_list,
     Qt_cis_genotypes_list = Qt_cis_genotypes_list,
+    Qt1_QTL_Factors_Z = Qt1_QTL_Factors_Z,
     Missing_data_map      = Missing_data_map,
     Sigma_Choleskys_list          = Sigma_Choleskys_list,
     randomEffect_C_Choleskys_list = randomEffect_C_Choleskys_list

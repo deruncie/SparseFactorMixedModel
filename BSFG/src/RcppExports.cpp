@@ -300,3 +300,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_MME_fixedEffects_hierarchical_c
+MatrixXd sample_MME_fixedEffects_hierarchical_c(Map<MatrixXd> Y, MSpMat Z, Map<MatrixXd> X, Rcpp::List Sigma_Choleskys, VectorXi h2s_index, Map<VectorXd> tot_Eta_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int grainSize);
+RcppExport SEXP _BSFG_sample_MME_fixedEffects_hierarchical_c(SEXP YSEXP, SEXP ZSEXP, SEXP XSEXP, SEXP Sigma_CholeskysSEXP, SEXP h2s_indexSEXP, SEXP tot_Eta_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< MSpMat >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type Sigma_Choleskys(Sigma_CholeskysSEXP);
+    Rcpp::traits::input_parameter< VectorXi >::type h2s_index(h2s_indexSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_MME_fixedEffects_hierarchical_c(Y, Z, X, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}

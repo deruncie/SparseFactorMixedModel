@@ -74,14 +74,39 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     if(b_F > 0){
       prior_mean = matrix(0,b_F,k)
       prior_prec = B_F_prec * tot_F_prec[rep(1,b_F),,drop=FALSE]  # prior for B_F includes tot_F_prec
-      B_F[] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F,
-                                        QtXF_list[[1]],
-                                        Sigma_Choleskys_list[[1]],
-                                        F_h2_index,
-                                        tot_F_prec,
-                                        prior_mean,
-                                        prior_prec,
-                                        grainSize)
+      if(length(QTL_columns_factors) == 0) {
+        B_F[] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F,
+                                          QtXF_list[[1]],
+                                          Sigma_Choleskys_list[[1]],
+                                          F_h2_index,
+                                          tot_F_prec,
+                                          prior_mean,
+                                          prior_prec,
+                                          grainSize)
+      } else{
+        # break up the sampling: the columns that are unique to each row of data are sampled separately than those that are specific to the random effect levels.
+        # non-QTL columns
+        F_tilde = F - QTL_factors_Z %**% (QTL_factors_X %*% B_F[QTL_columns_factors,])
+        B_F[-QTL_columns_factors,] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F_tilde,
+                                          QtXF_list[[1]][,-QTL_columns_factors,drop=FALSE],
+                                          Sigma_Choleskys_list[[1]],
+                                          F_h2_index,
+                                          tot_F_prec,
+                                          prior_mean[-QTL_columns_factors,,drop=FALSE],
+                                          prior_prec[-QTL_columns_factors,,drop=FALSE],
+                                          grainSize)
+        # QTL columns
+        F_tilde = F - X_F[,-QTL_columns_factors,drop=FALSE] %**% B_F[-QTL_columns_factors,]
+        B_F[QTL_columns_factors,] = sample_MME_fixedEffects_hierarchical_c(Qt_list[[1]] %**% F_tilde,
+                                                               Qt1_QTL_Factors_Z,
+                                                               QTL_factors_X,
+                                                               Sigma_Choleskys_list[[1]],
+                                                               F_h2_index,
+                                                               tot_F_prec,
+                                                               prior_mean[QTL_columns_factors,,drop=FALSE],
+                                                               prior_prec[QTL_columns_factors,,drop=FALSE],
+                                                               grainSize)
+      }
       XFBF = X_F %**% B_F
       F_tilde = F - XFBF # not sparse.
     } else{
