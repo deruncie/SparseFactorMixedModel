@@ -576,9 +576,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     if(n_RE == 1){
       ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
       result = svd(ZKZt)
-      Qt = drop0(as(t(result$u),'dgCMatrix'),tol = run_parameters$drop0_tol)
+      Qt = as(drop0(as(t(result$u),'dgCMatrix'),tol = run_parameters$drop0_tol),'dgCMatrix')
     } else{
-      Qt = Diagonal(length(x),1)
+      Qt = as(diag(1,length(x)),'dgCMatrix')
     }
     QtZ_matrices_set = lapply(Z_matrices,function(z) Qt %*% z[x,,drop=FALSE])
     QtZ_set = do.call(cbind,QtZ_matrices_set[RE_names])
@@ -631,7 +631,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   }
   if(verbose) close(pb)
 
-  Qt1_QTL_Factors_Z = Qt_list[[1]] %*% QTL_factors_Z  # since QTL_factors_Z only used with complete data, only calculate this for set 1.
+  if(!is.null(QTL_factors_Z)){
+    Qt1_QTL_Factors_Z = Qt_list[[1]] %*% QTL_factors_Z  # since QTL_factors_Z only used with complete data, only calculate this for set 1.
+  } else{
+    Qt1_QTL_Factors_Z = NULL
+  }
 
 
   run_variables = list(
