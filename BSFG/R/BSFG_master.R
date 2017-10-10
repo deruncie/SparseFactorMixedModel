@@ -421,6 +421,13 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	names(Z_matrices) = RE_names
 	n_RE = length(RE_names)
 
+	# find RE indices
+	RE_lengths = sapply(Z_matrices,ncol)
+	RE_starts = cumsum(c(0,RE_lengths)[1:n_RE])
+	names(RE_starts) = RE_names
+	RE_indices = lapply(RE_names,function(re) RE_starts[re] + 1:RE_lengths[re])
+	names(RE_indices) = RE_names
+
 	  # function to ensure that covariance matrices are sparse and symmetric
 	fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
 
@@ -471,7 +478,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# Fix Z_matrices based on PSD K's
 	Z = do.call(cbind,Z_matrices[RE_names])
 	Z = as(Z,'dgCMatrix')
-	# The following matrix is used to transform random effects back to the original space had we sampoled from the original (PSD) K.
+	# The following matrix is used to transform random effects back to the original space had we sampled from the original (PSD) K.
 	if(length(RE_names) > 1) {
 	  RE_L = do.call(bdiag,RE_L_matrices[RE_names])
 	} else{
@@ -667,6 +674,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  Z_matrices = Z_matrices,
 	  Z          = Z,
 	  RE_L       = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
+	  RE_indices = RE_indices,
 	  h2s_matrix = h2s_matrix,
 	  cis_genotypes = cis_genotypes,
 	  QTL_columns_resid = QTL_columns_resid,
