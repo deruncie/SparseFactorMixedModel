@@ -292,7 +292,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  cat(sprintf('dropping column(s) %s to make X_resid full rank\n',paste(linear_combos$remove,sep=',')))
 	  X = X[,-linear_combos$remove]
 	}
-	if(all(X[,1] == 1)) {
+	if(ncol(X) > 0 && all(X[,1] == 1)) {
 	  resid_intercept = TRUE
 	}
 	b = ncol(X)

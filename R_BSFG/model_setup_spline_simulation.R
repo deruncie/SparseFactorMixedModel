@@ -11,7 +11,8 @@ library(splines)
 # # you can repeat the MCMC exactly
 seed = 1
 set.seed(seed)
-new_halfSib_spline_simulation('Sim_FE_1', nSire=2,nRep=20,p=4, Time = 1:60, k=4, k_G=4, factor_h2s = rep(0.9,4),resid_h2 = c(.3,.3,0,0))
+p=6
+new_halfSib_spline_simulation('Sim_FE_1', nSire=2,nRep=200,p=p, Time = 1:60, k=4, k_G=4)#, factor_h2s = rep(0.9,4),resid_h2 = c(.3,.3,0,0))
 load('setup.RData')
 
 ggplot(setup$observations,aes(x=covariate,y=Y)) + geom_line(aes(group = ID))
@@ -26,12 +27,12 @@ setwd(folder)
 # initialize priors
 run_parameters = BSFG_control(
   # sampler = 'fast_BSFG',
-  sampler = 'general_BSFG',
+  # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = FALSE,
   h2_divisions = 20,
   h2_step_size = NULL,
-  burn = 100
+  burn = 1000
 )
 
 priors = list(
@@ -77,7 +78,8 @@ observation_setup = list(
   observation_model = regression_model,
   observations = setup$observations,
   # individual_model = Y~ poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=F),
-  individual_model = cbind(A,B,C)~poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=F),
+  # individual_model = cbind(A,B,C)~poly(covariate,4)+bs(covariate,df=5,intercept=T)+bs(covariate,df=20,intercept=T)+bs(covariate,df=40,intercept=F),
+  individual_model = A~0+bs(covariate,df=p,intercept=T),
   resid_Y_prec_shape = 2,
   resid_Y_prec_rate = 1
 )
@@ -86,6 +88,7 @@ observation_setup = list(
 setup$data$ID = unique(setup$observations$ID)
 # options(error=recover)
 BSFG_state = with(setup,BSFG_init(observation_setup, model=~X2+(1|animal), data, #factor_model_fixed = ~1,
+# BSFG_state = with(setup,BSFG_init(Eta, model=~X2+(1|animal), data, #factor_model_fixed = ~1,
                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
                                   posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'B_tau','B_F_tau','cis_effects','U_R'),
                                   posteriorMean_params = c()

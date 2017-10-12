@@ -1,4 +1,5 @@
 new_halfSib_spline_simulation = function(name, nSire,nRep,p, Time, k, k_G, factor_h2s = rep(0.5,k_G),resid_h2 = rep(0.6,p)){
+  # recover()
   require(MCMCglmm)
   require(pedantics)
   # build pedigree
@@ -26,7 +27,8 @@ new_halfSib_spline_simulation = function(name, nSire,nRep,p, Time, k, k_G, facto
   Lambda = Lambda[,order(-diag(t(Lambda) %*% Lambda))]
   cols=1:k
   g_cols = factor_h2s>0
-  Lambda = Lambda[do.call("order", unname(split(-abs(Lambda[,cols[factor_h2s>0]]), col(Lambda[,cols[factor_h2s>0]])))),]
+  # Lambda = Lambda[do.call("order", unname(split(-abs(Lambda[,cols[factor_h2s>0]]), col(Lambda[,cols[factor_h2s>0]])))),]
+  # print(Lambda)
 
   # resid variances
   tot_Y_prec = rep(0.5,p)
@@ -58,11 +60,11 @@ new_halfSib_spline_simulation = function(name, nSire,nRep,p, Time, k, k_G, facto
 
   U_R = t(K_chol) %*% matrix(rnorm(n*p,0,sqrt(resid_h2/tot_Y_prec)),n,p,byrow=T)
 
-  # Eta = X %*% B + F %*% t(Lambda) + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
-  Eta = X %*% B + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
+  Eta = X %*% B + F %*% t(Lambda) + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
+  # Eta = X %*% B + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
 
-  # coefficients = splines::bs(Time,df = p)
-  coefficients = poly(Time,degree = p)
+  coefficients = splines::bs(Time,df = p,intercept = TRUE)
+  # coefficients = poly(Time,degree = p)
   observations = c()
   for(i in 1:nrow(Eta)){
     observations = rbind(observations,data.frame(ID = i, covariate = Time, Y = coefficients %*% Eta[i,]))
