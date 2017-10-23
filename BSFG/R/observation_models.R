@@ -160,27 +160,23 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       Terms = delete.response(terms(mf))
 
       # smooth bs() terms
-      mm_terms = attr(mm,'assign')
-      bs_terms = grep('bs(',attr(Terms,'term.labels'),fixed=T)
-      mm_rot_list = list()
-      for(i in 0:max(attr(mm,'assign'))){
-        U = diag(1,sum(mm_terms==i))
-        colnames(U) = colnames(mm)[mm_terms == i]
-        if(i %in% bs_terms && (!'do_not_penalize_bs' %in% ls() || !do_not_penalize_bs)) {
-          mm_cols = mm_terms == i
-
-          # # construct a differences matrix to smooth the B-spline
-          # lower-diagonal
-          U = matrix(0,sum(mm_cols),sum(mm_cols))
-          diag(U) = 1
-          U[lower.tri(U)] = 1
-
-          colnames(U) = paste0(colnames(mm)[mm_terms == i][1:ncol(U)],'_differences')
+      # identify which columns of mm correspond to bs() coefficients
+      # pull out separate groups of coefficients for each bs() term.
+      # Make lower-triangular rotation matrix for each set of bs() coefficients.
+      mm_cols = colnames(mm)
+      mm_rotation = diag(1,ncol(mm))
+      colnames(mm_rotation) = mm_cols
+      bs_cols = mm_cols[grep('bs(',mm_cols,fixed=T)]
+      if(length(bs_cols) > 0){
+        unique_bs_groups = paste0(unique(sapply(bs_cols,function(x) strsplit(x,'bs(',fixed=TRUE)[[1]][1])),'bs(')
+        for(bs_group in unique_bs_groups){
+          bs_cols = grep(bs_group,mm_cols,fixed=T)
+          D = diag(1,length(bs_cols))
+          D[lower.tri(D)] = 1
+          mm_rotation[bs_cols,bs_cols] = D
+          colnames(mm_rotation)[bs_cols] = paste0(colnames(mm_rotation[bs_cols,bs_cols]),'_differences')
         }
-        mm_rot_list[[i+1]] = U
       }
-      mm_rotation = as.matrix(do.call(bdiag,mm_rot_list))
-      colnames(mm_rotation) = do.call(c,lapply(mm_rot_list,colnames))
       mm = mm %*% mm_rotation
       n_terms = ncol(mm)
 
