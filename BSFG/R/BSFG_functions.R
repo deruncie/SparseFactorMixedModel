@@ -26,6 +26,21 @@ load_simulation_data = function(file = NULL){
 }
 
 
+
+#' Multiply matrices
+#'
+#' Multiplies two matrices. Like %*%, but always returns a base matrix, not a Matrix, even when
+#' one or both of the two matrices are of class matrix.
+#'
+#' Uses RcppEigen when one or both matrices are of class dgCMatrix
+#'
+#' @param X1 matrix-like object
+#' @param X2 matrix-like object
+#'
+#' @return matrix
+#' @export
+#'
+#' @examples
 `%**%` = function(X1,X2){
   if(is.null(X1)) return(X2)
   if(inherits(X1,'dgCMatrix') && inherits(X2,'matrix')) return(SxD(X1,X2))
@@ -34,6 +49,31 @@ load_simulation_data = function(file = NULL){
   return(as.matrix(X1 %*% X2))
 }
 
+
+#' Modification to \code{image()}.
+#'
+#' Like `image,CHMfactor-method`, but with better defaults for correlation matrices especially.
+#'
+#' The default is to have the colors evenly spaced, instead of having the full range <0 and >0.
+#'
+#' @param x
+#' @param zlim
+#' @param breaks
+#' @param colors
+#'
+#' @return
+#' @export
+#'
+#' @examples
+Image = function(x,zlim = c(-1,1),breaks=20,colors = c('blue','white','red'),...){
+  # if zlim not passed and the range of the data is outside of (-1,1), expands zlim range
+  if(missing(zlim) && max(abs(x)) > 1){
+    zlim = c(-1,1)*max(abs(x))
+  }
+  at = seq(zlim[1]-1e-10,zlim[2]+1e-10,length=breaks)
+  colors = colorRampPalette(colors)(breaks)
+  image(Matrix(x),at=at,col.regions=colors,...)
+}
 
 
 #' Checks if factors (columns of Lambda) can be safely dropped

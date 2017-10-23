@@ -30,11 +30,11 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
                          # Lambda_prec[1,] = 1e-10
 
                          # # -----Sample delta, update tauh------ #
+                         scores = 0.5*colSums(Lambda2*Lambda_prec)
                          shapes = c(delta_1_shape + 0.5*p*k,
                                     delta_2_shape + 0.5*p*((k-1):1))
                          times = delta_iteractions_factor
                          randg_draws = matrix(rgamma(times*k,shape = shapes,rate = 1),nr=times,byrow=T)
-                         scores = 0.5*colSums(Lambda2*Lambda_prec)
                          delta[] = sample_delta_c_Eigen( delta,tauh,scores,delta_1_rate,delta_2_rate,randg_draws)
                          tauh[]  = matrix(cumprod(delta),nrow=1)
 

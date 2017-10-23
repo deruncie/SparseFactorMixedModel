@@ -52,7 +52,7 @@ new_halfSib_spline_simulation = function(name, nSire,nRep,p, Time, k, k_G, facto
 
   b = 2
   B_F = matrix(rnorm((b-1)*k),nrow = (b-1),ncol=k)
-  B = rbind(rnorm(p),matrix(0,(b-1),p))
+  B = 10*rbind(rnorm(p),matrix(0,(b-1),p))
 
   U_F = t(K_chol) %*% matrix(rnorm(n*k,0,sqrt(factor_h2s)),n,k,byrow=T)
 
@@ -60,11 +60,11 @@ new_halfSib_spline_simulation = function(name, nSire,nRep,p, Time, k, k_G, facto
 
   U_R = t(K_chol) %*% matrix(rnorm(n*p,0,sqrt(resid_h2/tot_Y_prec)),n,p,byrow=T)
 
-  Eta = X %*% B + F %*% t(Lambda) + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
-  # Eta = X %*% B + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
+  # Eta = X %*% B + F %*% t(Lambda) + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
+  Eta = X %*% B + U_R + matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
 
-  coefficients = splines::bs(Time,df = p,intercept = TRUE)
-  # coefficients = poly(Time,degree = p)
+  # coefficients = splines::bs(Time,df = p,intercept = TRUE)
+  coefficients = poly(Time,degree = p)
   observations = c()
   for(i in 1:nrow(Eta)){
     observations = rbind(observations,data.frame(ID = i, covariate = Time, Y = coefficients %*% Eta[i,]))

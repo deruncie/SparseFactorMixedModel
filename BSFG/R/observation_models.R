@@ -158,13 +158,37 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       traits = all.vars(update(individual_model,'~.0'))
       Y = as.matrix(observations[,traits,drop=FALSE])
       Terms = delete.response(terms(mf))
+
+      # smooth bs() terms
+      mm_terms = attr(mm,'assign')
+      bs_terms = grep('bs(',attr(Terms,'term.labels'),fixed=T)
+      mm_rot_list = list()
+      for(i in 0:max(attr(mm,'assign'))){
+        U = diag(1,sum(mm_terms==i))
+        colnames(U) = colnames(mm)[mm_terms == i]
+        if(i %in% bs_terms && (!'do_not_penalize_bs' %in% ls() || !do_not_penalize_bs)) {
+          mm_cols = mm_terms == i
+
+          # # construct a differences matrix to smooth the B-spline
+          # lower-diagonal
+          U = matrix(0,sum(mm_cols),sum(mm_cols))
+          diag(U) = 1
+          U[lower.tri(U)] = 1
+
+          colnames(U) = paste0(colnames(mm)[mm_terms == i][1:ncol(U)],'_differences')
+        }
+        mm_rot_list[[i+1]] = U
+      }
+      mm_rotation = as.matrix(do.call(bdiag,mm_rot_list))
+      colnames(mm_rotation) = do.call(c,lapply(mm_rot_list,colnames))
+      mm = mm %*% mm_rotation
       n_terms = ncol(mm)
 
       id_index = tapply(1:nrow(observations),observations$ID,function(x) x)
       model_matrices = lapply(data$ID,function(id) {
         x = id_index[[id]]
         if(length(x) > 0){
-          X = model.matrix(Terms,data = observations[x,])
+          X = mm[x,,drop=FALSE]
         } else{
           x = matrix(0,0,0)
           X = matrix(0,0,n_terms)
@@ -199,6 +223,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
         traitnames = traitnames,
         Eta_row_names = Eta_row_names,
         model_matrices = model_matrices,
+        mm_rotation = mm_rotation,
         Y_missing = Y_missing
       )
       return(observation_setup)
