@@ -11,7 +11,7 @@ y = X %*% b + rnorm(length(t),0,.1)
 
 plot(t,y)
 
-Xb = model.matrix(~1+bs(t,df=90,intercept = T))
+Xb = model.matrix(~1+bs(t,df=30,intercept = T))
 bh = coef(lm(y~0+Xb))
 # lines(t,Xb %*% bh,col=2)
 

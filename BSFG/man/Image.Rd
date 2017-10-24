@@ -4,7 +4,7 @@
 \alias{Image}
 \title{Modification to \code{image()}.}
 \usage{
-Image(x, zlim = c(-1, 1), breaks = 20, colors = c("blue", "white", "red"),
+Image(x, zlim = NULL, breaks = 20, colors = c("blue", "white", "red"),
   ...)
 }
 \arguments{

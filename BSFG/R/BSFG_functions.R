@@ -65,10 +65,14 @@ load_simulation_data = function(file = NULL){
 #' @export
 #'
 #' @examples
-Image = function(x,zlim = c(-1,1),breaks=20,colors = c('blue','white','red'),...){
+Image = function(x,zlim = NULL,breaks=20,colors = c('blue','white','red'),...){
   # if zlim not passed and the range of the data is outside of (-1,1), expands zlim range
-  if(missing(zlim) && max(abs(x)) > 1){
-    zlim = c(-1,1)*max(abs(x))
+  if(missing(zlim)){
+    if(all(x>0)) {
+      zlim = c(0,max(x))
+    } else{
+      zlim = c(-1,1)*max(abs(x))
+    }
   }
   at = seq(zlim[1]-1e-10,zlim[2]+1e-10,length=breaks)
   colors = colorRampPalette(colors)(breaks)
