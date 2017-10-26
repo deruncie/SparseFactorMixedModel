@@ -35,7 +35,9 @@ phecol <- 1:nphe(grav)
 out <- scanone(grav, phe=phecol, method="hk")
 
 Y = grav$pheno
-X = do.call(cbind,lapply(grav$geno,function(x) x$prob[,,1]))
+grav <- fill.geno(grav)
+X = do.call(cbind,lapply(grav$geno,function(x) x$data)) - 1
+# X = do.call(cbind,lapply(grav$geno,function(x) x$prob[,,1]))
 Chr = do.call(c,sapply(1:length(grav$geno),function(x) rep(sprintf('Chr%d',x),ncol(grav$geno[[x]]$data))))
 # X = do.call(cbind,lapply(grav$geno,function(x) apply(x$draws,c(1,2),mean)))
 # Chr = do.call(c,sapply(1:length(grav$geno),function(x) rep(sprintf('Chr%d',x),ncol(grav$geno[[x]]$draws))))
@@ -53,20 +55,22 @@ v=matrix(1, n, 1)
 M=diag(n)-v%*%t(v)/n
 K=M%*%K%*%M
 K=K/mean(diag(K))
-
-### Find the Eigenvalue Decomposition of K ###
-evd = EigDecomp(K)
-
-## Truncate the data based on the desired cumulative variance explained ###
-explained_var = cumsum(evd$lambda/sum(evd$lambda))
-q = 1:min(which(explained_var >= 0.99))
-Lambda = diag(sort(evd$lambda,decreasing = TRUE)[q]^(-1)) # Matrix of Eigenvalues
-U = evd$U[,q] # Unitary Matrix of Eigenvectors
-K2 = U %*% Lambda %*% t(U)
+#
+# ### Find the Eigenvalue Decomposition of K ###
+# evd = EigDecomp(K)
+#
+# ## Truncate the data based on the desired cumulative variance explained ###
+# explained_var = cumsum(evd$lambda/sum(evd$lambda))
+# q = 1:min(which(explained_var >= 0.99))
+# Lambda = diag(sort(evd$lambda,decreasing = TRUE)[q]^(-1)) # Matrix of Eigenvalues
+# U = evd$U[,q] # Unitary Matrix of Eigenvectors
+# K2 = U %*% Lambda %*% t(U)
 
 P = InverseMap(t(X),K)
-P1 = InverseMap(t(X),K1)
-P2 = InverseMap(t(X),K2)
+# P1 = InverseMap(t(X),K1)
+# P2 = InverseMap(t(X),K2)
+
+
 
 
 Y = Y - mean(unlist(Y))
@@ -230,7 +234,9 @@ vE = BSFG_state$current_state$var_Eta
 
 boxplot(sweep(BSFG_state$current_state$Eta,2,sqrt(vE),'*') %*% t(mm_rot))
 
-a = sweep(BSFG_state$current_state$Eta,2,sqrt(vE),'*') %*% t(mm_rot)
+a = sweep(BSFG_state$current_state$Eta,2,sqrt(vE),'*') %*%t(spline_X)
+a = sweep(Theta,2,sqrt(vE),'*') %*%t(spline_X)
+# a = BSFG_state$current_state$Eta %*%t(spline_X)
 plot(NA,NA,xlim=c(0,ncol(a)),ylim = range(a))
 b=apply(a[sample(1:nrow(a),10),],1,lines)
 
@@ -238,6 +244,7 @@ Image(sweep(BSFG_state$current_state$Lambda,1,sqrt(vE),'*'))
 Image(mm_rot %*% sweep(BSFG_state$current_state$Lambda,1,sqrt(vE),'*'))
 Image(tcrossprod(sweep(BSFG_state$current_state$Lambda,1,sqrt(vE),'*')))
 Image(tcrossprod(mm_rot %*% sweep(BSFG_state$current_state$Lambda,1,sqrt(vE),'*')))
+Image(tcrossprod(spline_X %*% sweep(BSFG_state$current_state$Lambda,1,sqrt(vE),'*')))
 
 
 Terms = BSFG_state$run_parameters$observation_model_parameters$observation_setup$Terms
@@ -253,14 +260,17 @@ BSFG_state$Posterior = reload_Posterior(BSFG_state)
 Theta_samples = get_posterior_FUN(BSFG_state,U_F%*%t(Lambda)+U_R)
 
 #Get posterior mean of a parameter
-Theta = sweep(get_posterior_mean(Theta_samples),2,sqrt(vE),'*')
+Theta = get_posterior_mean(Theta_samples)
+Theta = with(BSFG_state$current_state,U_F%*%t(Lambda)+U_R)
+Theta = sweep(Theta,2,sqrt(vE),'*')
 
 ### Get Implied Posterior for Beta ###
 Beta_samples = get_posterior_FUN(BSFG_state,P%*%(U_F%*%t(Lambda)+U_R))
 
 ### Get Posterior Mean for Beta ###
 Beta = P%*%Theta; rownames(Beta) = colnames(X)
-
+observations$Y = c(t(X %*% Beta %*% t(spline_X)))
+ggplot(observations,aes(x=Time,y=Y,group=ID)) + geom_line()
 
 pm_F = apply(Posterior$F,c(2,3),mean)
 grav_eta$pheno = pm_F

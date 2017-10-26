@@ -165,7 +165,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       # Make lower-triangular rotation matrix for each set of bs() coefficients.
       mm_cols = colnames(mm)
       mm_rotation = diag(1,ncol(mm))
-      colnames(mm_rotation) = mm_cols
+      rownames(mm_rotation) = colnames(mm_rotation) = mm_cols
       bs_col_sets = rep(0,ncol(mm))  # vector identifying sets of bs coefficients
       if((!'do_not_penalize_bs' %in% ls()) || !do_not_penalize_bs) {
         bs_cols = mm_cols[grep('bs(',mm_cols,fixed=T)]
@@ -215,7 +215,11 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       p_trait = n_terms  # number of coefficients per trait
       p = p_trait * n_traits # total number of coefficients
       traits = colnames(model_matrices[[1]]$y)
-      traitnames = paste(rep(traits,each = p_trait),rep(colnames(mm),length(traits)),sep='::')
+      if(length(traits) > 1) {
+        traitnames = paste(rep(traits,each = p_trait),rep(colnames(mm),length(traits)),sep='::')
+      } else{
+        traitnames = colnames(mm)
+      }
       Eta_row_names = data$ID
       Y_missing = t(sapply(model_matrices,function(x) rep(!(seq_len(n_terms) %in% x$nonZero_cols_X),n_traits)))
 
