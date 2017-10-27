@@ -36,6 +36,9 @@
 #' @param thin thinning rate of the MCMC chain
 #' @param delta_iteractions_factor Number of times to iterate through sample_delta per iteration of the other parameters
 #' @param impute_missing If FALSE, missing data will be ignored in the sampler. If TRUE, missing data will be imputed during sampling.
+#' @param svd_K If TRUE, and a 1-random effect model is specified, the the diagonalization of ZKZt is accomplished using this algorithm:
+#'     https://math.stackexchange.com/questions/67231/singular-value-decomposition-of-product-of-matrices which doesn't require forming ZKTt.
+#'     If FALSE, the SVD of ZKZt is calculated directly. TRUE is generally faster if the same genomes are repeated several times.
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 #'
 BSFG_control = function(
@@ -47,6 +50,7 @@ BSFG_control = function(
                         burn = 100,thin = 2,
                         delta_iteractions_factor = 100,
                         impute_missing = FALSE,
+                        svd_K = TRUE,
                         ...
                         ) {
 
@@ -576,14 +580,32 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   randomEffect_C_Choleskys_list = list()
   Sigma_Choleskys_list = list()
 
+  if(n_RE == 1 && run_parameters$svd_K){
+    svd_K1 = svd(K_mats[[1]])
+  }
+
   for(set in seq_along(Missing_data_map)){
     x = Missing_data_map[[set]]$Y_obs
     cols = Missing_data_map[[set]]$Y_cols
 
     if(n_RE == 1){
-      ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
-      result = svd(ZKZt)
-      Qt = as(drop0(as(t(result$u),'dgCMatrix'),tol = run_parameters$drop0_tol),'dgCMatrix')
+      if(run_parameters$svd_K) {
+        # a faster way of taking the SVD of ZKZt, particularly if ncol(Z) < nrow(Z). Probably no benefit if ncol(K) > nrow(Z)
+        print('alt Qt')
+        qr_ZU = qr(Z[x,,drop=FALSE] %*% svd_K1$u)
+        R_ZU = drop0(qr.R(qr_ZU,complete=F),tol=run_parameters$drop0_tol)
+        Q_ZU = drop0(qr.Q(qr_ZU,complete=T),tol=run_parameters$drop0_tol)
+        RKRt = R_ZU %*% diag(svd_K1$d) %*% t(R_ZU)
+        svd_RKRt = svd(RKRt)
+        RKRt_U = svd_RKRt$u
+        if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
+        Qt = t(Q_ZU %*% RKRt_U)
+      } else{
+        ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
+        result = svd(ZKZt)
+        Qt = t(result$u)
+      }
+      Qt = as(drop0(as(Qt,'dgCMatrix'),tol = run_parameters$drop0_tol),'dgCMatrix')
     } else{
       Qt = as(diag(1,length(x)),'dgCMatrix')
     }
