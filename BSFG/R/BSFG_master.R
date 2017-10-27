@@ -580,7 +580,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   randomEffect_C_Choleskys_list = list()
   Sigma_Choleskys_list = list()
 
-  if(n_RE == 1 && run_parameters$svd_K){
+  if(n_RE == 1 && run_parameters$svd_K == TRUE){
     svd_K1 = svd(K_mats[[1]])
   }
 
@@ -589,9 +589,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     cols = Missing_data_map[[set]]$Y_cols
 
     if(n_RE == 1){
-      if(run_parameters$svd_K) {
+      if(run_parameters$svd_K == TRUE) {
         # a faster way of taking the SVD of ZKZt, particularly if ncol(Z) < nrow(Z). Probably no benefit if ncol(K) > nrow(Z)
-        print('alt Qt')
         qr_ZU = qr(Z[x,,drop=FALSE] %*% svd_K1$u)
         R_ZU = drop0(qr.R(qr_ZU,complete=F),tol=run_parameters$drop0_tol)
         Q_ZU = drop0(qr.Q(qr_ZU,complete=T),tol=run_parameters$drop0_tol)
