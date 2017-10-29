@@ -66,7 +66,7 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
         Eta_mean = matrix(0,n,p)
         resids = rnorm(n_missing)
       } else{
-        Eta_mean = XB + F %*% t(Lambda) + toDense(Z %*% U_R)
+        Eta_mean = XB + F %*% t(Lambda) + toDense(ZL %*% U_R)
         resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
         resids = rnorm(n_missing,0,sqrt(1/resid_Eta_prec[Y_missing@j+1]))  # sample resids from normal distribution with appropriate variance
       }
@@ -106,7 +106,7 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
     if(length(current_state) > 0){
       n = nrow(Y)
       p = ncol(Y)
-      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
+      Eta_mean = X %*% B + F %*% t(Lambda) + ZL %*% U_R
       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
       prec = sweep(prec_Y,2,resid_Eta_prec,'+')
       # Y_std = Y * prec_Y. This is calculated once in the initialization.
@@ -248,7 +248,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       resid_Eta_prec = matrix(1,1,p)
       resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape,rate = resid_Y_prec_rate),nr=1) # only a single precision parameter for the data_model?
     } else{
-      Eta_mean = X %**% B + F %*% t(Lambda) + Z %**% U_R
+      Eta_mean = X %**% B + F %*% t(Lambda) + ZL %**% U_R
       resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
       if(!'resid_Y_prec' %in% ls()) resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape,rate = resid_Y_prec_rate),nr=1) # only a single precision parameter for the data_model?
     }
@@ -305,7 +305,7 @@ cis_eQTL_model = function(observation_model_parameters,BSFG_state = list()){
     if(!exists('Eta')) {
       Eta_mean = matrix(0,n,p)
     } else{
-      Eta_mean = XB + F %*% t(Lambda) + Z %*% U_R
+      Eta_mean = XB + F %*% t(Lambda) + ZL %*% U_R
     }
     if(!exists('tot_Eta_prec')) {
       resid_Eta_prec = matrix(1,1,p)
@@ -406,7 +406,7 @@ bs_binomial_model = function(observation_model_parameters,BSFG_state = list()){
     Eta_mean = matrix(0,n,p)
     resid_Eta_prec = matrix(1e-10,1,p)
   } else{
-    Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
+    Eta_mean = X %*% B + F %*% t(Lambda) + ZL %*% U_R
     resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
   }
 
@@ -451,7 +451,7 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
       resid = sweep(matrix(rnorm(n*p),n,p),2,sqrt(prec),'/')
     } else{
       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-      Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% E_a
+      Eta_mean = X %*% B + F %*% t(Lambda) + ZL %*% E_a
 
       Eta_mean_std = sweep(Eta_mean,2,resid_Eta_prec,'*')
       sum_Y_prec = Z_Y %*% resid_Y_prec
@@ -589,7 +589,7 @@ combined_model = function(observation_model_parameters,BSFG_state = list()){
 #       resid_Eta_prec = matrix(0,1,p)
 #       resid_Y_prec = matrix(rep(1,p),dimnames = list(NULL,colnames(Y)))  # only a single precision parameter for the data_model?
 #     } else{
-#       Eta_mean = X %*% B + F %*% t(Lambda) + Z %*% U_R
+#       Eta_mean = X %*% B + F %*% t(Lambda) + ZL %*% U_R
 #       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
 #       if(!exists(resid_Y_prec)) resid_Y_prec = matrix(rep(1,p),dimnames = list(NULL,colnames(Y)))
 #     }

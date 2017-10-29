@@ -124,8 +124,10 @@ F = X_F * B_F + Z*U_F + E_F
 
 For sampling, we reparameterize as:
 
-Qt*Eta = Qt*X*B + Qt*F*t(Lambda) + Qt*Z*U_R + Qt*E_R
-Qt*F = Qt*X_F * B_F + Qt*Z*U_F + Qt*E_F
+Qt*Eta = Qt*X*B + Qt*F*t(Lambda) + Qt*ZL*U_R + Qt*E_R
+Qt*F = Qt*X_F * B_F + Qt*ZL*U_F + Qt*E_F
+
+where LTL = K and ZL = Z*L
 
 We sample the quantities Qt*Eta, Qt*F, B, Lambda, U_R, U_F. We then back-calculate Eta and F.
 }

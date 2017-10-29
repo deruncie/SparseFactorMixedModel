@@ -59,7 +59,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       resid_h2[,cols] = h2s_matrix[,resid_h2_index[cols],drop=FALSE]
 
       U_R[,cols] = sample_MME_ZKZts_c(Eta_tilde[rows,cols,drop=FALSE],
-                                    Z[rows,],
+                                    ZL[rows,],
                                     tot_Eta_prec[cols],
                                     randomEffect_C_Choleskys_list[[set]],
                                     resid_h2[,cols,drop=FALSE],
@@ -150,13 +150,13 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     }
     F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    U_F[] = sample_MME_ZKZts_c(F_tilde[rows,,drop=FALSE], Z[rows,,drop=FALSE], tot_F_prec, randomEffect_C_Choleskys_list[[1]], F_h2, F_h2_index,grainSize)
+    U_F[] = sample_MME_ZKZts_c(F_tilde[rows,,drop=FALSE], ZL[rows,,drop=FALSE], tot_F_prec, randomEffect_C_Choleskys_list[[1]], F_h2, F_h2_index,grainSize)
 
     # -----Sample F----------------------- #
     #conditioning on B, U_F,U_R,Lambda, F_h2
-    Eta_tilde = Eta - XB - Z %**% U_R
+    Eta_tilde = Eta - XB - ZL %**% U_R
     F_e_prec = tot_F_prec / (1-colSums(F_h2))
-    prior_mean = Z %**% U_F
+    prior_mean = ZL %**% U_F
     if(b_F > 0) {
       prior_mean = prior_mean + XFBF
     }

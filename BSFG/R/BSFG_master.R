@@ -156,8 +156,10 @@ BSFG_priors = function(
 #'
 #' For sampling, we reparameterize as:
 #'
-#' Qt*Eta = Qt*X*B + Qt*F*t(Lambda) + Qt*Z*U_R + Qt*E_R
-#' Qt*F = Qt*X_F * B_F + Qt*Z*U_F + Qt*E_F
+#' Qt*Eta = Qt*X*B + Qt*F*t(Lambda) + Qt*ZL*U_R + Qt*E_R
+#' Qt*F = Qt*X_F * B_F + Qt*ZL*U_F + Qt*E_F
+#'
+#' where LTL = K and ZL = Z*L
 #'
 #' We sample the quantities Qt*Eta, Qt*F, B, Lambda, U_R, U_F. We then back-calculate Eta and F.
 #'
@@ -426,6 +428,10 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	names(Z_matrices) = RE_names
 	n_RE = length(RE_names)
 
+	# form Z
+	Z = do.call(cbind,Z_matrices[RE_names])
+	Z = as(Z,'dgCMatrix')
+
 	# find RE indices
 	RE_lengths = sapply(Z_matrices,ncol)
 	RE_starts = cumsum(c(0,RE_lengths)[1:n_RE])
@@ -447,6 +453,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	})
 
 	RE_L_matrices = list()
+	ZL_matrices = list()
 
 	for(i in 1:n_RE){
 	  re = RE_covs[i]
@@ -477,19 +484,19 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  }
 	  K_mats[[re_name]] = fix_K(K)
 	  RE_L_matrices[[re_name]] = L
-	  Z_matrices[[re_name]] = Z_matrices[[re_name]] %*% L
+	  ZL_matrices[[re_name]] = Z_matrices[[re_name]] %*% L
 	}
 	K_mats = K_mats[RE_names]
-	# Fix Z_matrices based on PSD K's
-	Z = do.call(cbind,Z_matrices[RE_names])
-	Z = as(Z,'dgCMatrix')
+	# Construct ZL based on PSD K's
+	ZL = do.call(cbind,ZL_matrices[RE_names])
+	ZL = as(ZL,'dgCMatrix')
 	# The following matrix is used to transform random effects back to the original space had we sampled from the original (PSD) K.
 	if(length(RE_names) > 1) {
 	  RE_L = do.call(bdiag,RE_L_matrices[RE_names])
 	} else{
 	  RE_L = RE_L_matrices[[1]]
 	}
-	r_RE = sapply(Z_matrices,function(x) ncol(x))  # re-calculate
+	r_RE = sapply(ZL_matrices,function(x) ncol(x))  # re-calculate
 
 	  # construct K_inverse matrices for each random effect
 	if(is.null(K_inv_mats)) K_inv_mats = list()
@@ -576,7 +583,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   Qt_list = list()
   QtX_list = list()
   QtXF_list = list()
-  QtZ_list = list()
+  QtZL_list = list()
   Qt_cis_genotypes_list = list()
   randomEffect_C_Choleskys_list = list()
   Sigma_Choleskys_list = list()
@@ -591,8 +598,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
     if(n_RE == 1){
       if(run_parameters$svd_K == TRUE) {
-        # a faster way of taking the SVD of ZKZt, particularly if ncol(Z) < nrow(Z). Probably no benefit if ncol(K) > nrow(Z)
-        qr_ZU = qr(Z[x,,drop=FALSE] %*% svd_K1$u)
+        # a faster way of taking the SVD of ZLKZLt, particularly if ncol(ZL) < nrow(ZL). Probably no benefit if ncol(K) > nrow(ZL)
+        qr_ZU = qr(ZL[x,,drop=FALSE] %*% svd_K1$u)
         R_ZU = drop0(qr.R(qr_ZU,complete=F),tol=run_parameters$drop0_tol)
         Q_ZU = drop0(qr.Q(qr_ZU,complete=T),tol=run_parameters$drop0_tol)
         RKRt = R_ZU %*% diag(svd_K1$d) %*% t(R_ZU)
@@ -601,7 +608,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
         if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
         Qt = t(Q_ZU %*% RKRt_U)
       } else{
-        ZKZt = Z[x,,drop=FALSE] %*% K_mats[[1]] %*% t(Z[x,,drop=FALSE])
+        ZKZt = ZL[x,,drop=FALSE] %*% K_mats[[1]] %*% t(ZL[x,,drop=FALSE])
         result = svd(ZKZt)
         Qt = t(result$u)
       }
@@ -609,9 +616,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     } else{
       Qt = as(diag(1,length(x)),'dgCMatrix')
     }
-    QtZ_matrices_set = lapply(Z_matrices,function(z) Qt %*% z[x,,drop=FALSE])
-    QtZ_set = do.call(cbind,QtZ_matrices_set[RE_names])
-    QtZ_set = as(QtZ_set,'dgCMatrix')
+    QtZL_matrices_set = lapply(ZL_matrices,function(ZL) Qt %*% ZL[x,,drop=FALSE])
+    QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
+    QtZL_set = as(QtZL_set,'dgCMatrix')
     QtX_set = Qt %**% X[x,,drop=FALSE]
     QtXF_set = Qt %**% X_F[x,,drop=FALSE]  # This one is only needed for set==1
     Qt_cis_genotypes_set = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,])
@@ -619,12 +626,12 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     Qt_list[[set]]   = Qt
     QtX_list[[set]]  = QtX_set
     QtXF_list[[set]] = QtXF_set
-    QtZ_list[[set]]  = QtZ_set
+    QtZL_list[[set]]  = QtZL_set
     Qt_cis_genotypes_list[[set]] = Qt_cis_genotypes_set
 
     ZKZts_set = list()
     for(i in 1:n_RE){
-      ZKZts_set[[i]] = as(forceSymmetric(drop0(QtZ_matrices_set[[i]] %*% K_mats[[i]] %*% t(QtZ_matrices_set[[i]]),tol = run_parameters$drop0_tol)),'dgCMatrix')
+      ZKZts_set[[i]] = as(forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% K_mats[[i]] %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol)),'dgCMatrix')
     }
 
 
@@ -642,7 +649,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
       })
     }))
 
-    ZtZ_set = as(forceSymmetric(drop0(crossprod(Z[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
+    ZtZ_set = as(forceSymmetric(drop0(crossprod(ZL[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
 
     randomEffect_C_Choleskys_c_list = list()
     for(i in 1:length(col_groups)){
@@ -682,7 +689,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     Qt_list    = Qt_list,
     QtX_list   = QtX_list,
     QtXF_list  = QtXF_list,
-    QtZ_list   = QtZ_list,
+    QtZL_list   = QtZL_list,
     Qt_cis_genotypes_list = Qt_cis_genotypes_list,
     Qt1_QTL_Factors_Z = Qt1_QTL_Factors_Z,
     Missing_data_map      = Missing_data_map,
@@ -691,13 +698,15 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   )
 
 	data_matrices = list(
-	  X          = X,
-	  X_F        = X_F,
-	  Z_matrices = Z_matrices,
-	  Z          = Z,
-	  RE_L       = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
-	  RE_indices = RE_indices,
-	  h2s_matrix = h2s_matrix,
+	  X           = X,
+	  X_F         = X_F,
+	  Z_matrices  = Z_matrices,
+	  Z           = Z,
+	  ZL_matrices = ZL_matrices,
+	  ZL          = ZL,
+	  RE_L        = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
+	  RE_indices  = RE_indices,
+	  h2s_matrix  = h2s_matrix,
 	  cis_genotypes = cis_genotypes,
 	  QTL_columns_resid = QTL_columns_resid,
 	  QTL_columns_factors = QTL_columns_factors,
@@ -885,7 +894,7 @@ initialize_variables = function(BSFG_state,...){
       matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Eta_prec)),ncol = p, byrow = T)
     }))
     colnames(U_R) = traitnames
-    rownames(U_R) = colnames(Z)
+    rownames(U_R) = colnames(ZL)
 
     # Fixed effects
     B = 0*matrix(rnorm(b*p), ncol = p)
@@ -901,11 +910,11 @@ initialize_variables = function(BSFG_state,...){
 
     F = X_F %*% B_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
     for(effect in RE_names) {
-      F = F + Z_matrices[[effect]] %*% U_F[[effect]]
+      F = F + ZL_matrices[[effect]] %*% U_F[[effect]]
     }
     F = as.matrix(F)
     U_F = do.call(rbind,U_F)
-    rownames(U_F) = colnames(Z)
+    rownames(U_F) = colnames(ZL)
 
     # ----------------------- #
     # ---Save initial values- #
@@ -956,7 +965,7 @@ summary.BSFG_state = function(BSFG_state){
   with(BSFG_state,{
     cat(
       c(sprintf('\n BSFG_state object for data of size %d x %d \n',nrow(data_matrices$Y),ncol(data_matrices$Y))),
-      c(sprintf('Model dimensions: fixed = %d, random = %d \n',ncol(data_matrices$X),ncol(data_matrices$Z))),
+      c(sprintf('Model dimensions: fixed = %d, random = %d \n',ncol(data_matrices$X),ncol(data_matrices$ZL))),
       c(sprintf('Sampler: %s \n',run_parameters$sampler)),
       c(sprintf('Current iteration: %d, Posterior_samples: %d \n',current_state$nrun,Posterior$total_samples)),
       c(sprintf('Current factor dimension: %d factors \n',ncol(current_state$Lambda))),
