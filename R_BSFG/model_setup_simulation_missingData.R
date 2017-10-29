@@ -101,6 +101,7 @@ data$ID = sample(1:nrow(data))
 # Y[-i,-c(1:50)] = NA
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
+run_parameters$svd_K = FALSE
 BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, #factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
                                   run_parameters=run_parameters,
@@ -162,6 +163,7 @@ for(i  in 1:39) {
 }
 
 BSFG_state$Posterior = reload_Posterior(BSFG_state)
+G2 = get_posterior_mean(BSFG_state,Lambda %*% diag(F_h2[1,]) %*% t(Lambda) + diag(resid_h2[1,]/tot_Eta_prec[1,]))
 
 P = get_posterior_FUN(BSFG_state,tcrossprod(Lambda))
 Pm = get_posterior_mean(P)

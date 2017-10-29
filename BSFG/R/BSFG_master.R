@@ -244,6 +244,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     observation_model_parameters = Y[names(Y) != 'observation_model']
   } else{
     if(!is(Y,'matrix'))	Y = as.matrix(Y)
+    if(nrow(Y) != nrow(data)) stop('Y and data have different numbers of rows')
     observation_model = missing_data_model
     observation_model_parameters = list(
       Y = Y,
@@ -532,15 +533,15 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# ------------------------------------ #
 
 	# first, identify sets of traits with same pattern of missingness
-
-# ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
+  # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
 	if(!run_parameters$impute_missing) {
     Y_col_obs = lapply(1:ncol(Y_missing),function(x) {
       obs = which(!Y_missing[,x],useNames=F)
       names(obs) = NULL
       obs
     })
-    unique_Y_col_obs = unique(c(list(1:nrow(Y_missing)),Y_col_obs))
+    non_missing_rows = unname(which(rowSums(!Y_missing)>0))
+    unique_Y_col_obs = unique(c(list(non_missing_rows),Y_col_obs))
     unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
     Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
 

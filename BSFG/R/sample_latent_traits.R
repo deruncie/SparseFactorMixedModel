@@ -71,11 +71,13 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
 
     # -----Sample Lambda and B_F ------------------ #
     # F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
+    # only use rows in Missing_data_map[[1]]. These are all the rows with non-missing data
+    rows = Missing_data_map[[set]]$Y_obs
     if(b_F > 0){
       prior_mean = matrix(0,b_F,k)
       prior_prec = B_F_prec * tot_F_prec[rep(1,b_F),,drop=FALSE]  # prior for B_F includes tot_F_prec
       if(length(QTL_columns_factors) == 0) {
-        B_F[] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F,
+        B_F[] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F[rows,,drop=FALSE],
                                           QtXF_list[[1]],
                                           Sigma_Choleskys_list[[1]],
                                           F_h2_index,
@@ -87,7 +89,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
         # break up the sampling: the columns that are unique to each row of data are sampled separately than those that are specific to the random effect levels.
         # non-QTL columns
         F_tilde = F - QTL_factors_Z %**% (QTL_factors_X %*% B_F[QTL_columns_factors,])
-        B_F[-QTL_columns_factors,] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F_tilde,
+        B_F[-QTL_columns_factors,] = sample_MME_fixedEffects_c(Qt_list[[1]] %**% F_tilde[rows,,drop=FALSE],
                                           QtXF_list[[1]][,-QTL_columns_factors,drop=FALSE],
                                           Sigma_Choleskys_list[[1]],
                                           F_h2_index,
@@ -97,8 +99,8 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                           grainSize)
         # QTL columns
         F_tilde = F - X_F[,-QTL_columns_factors,drop=FALSE] %**% B_F[-QTL_columns_factors,]
-        B_F[QTL_columns_factors,] = sample_MME_fixedEffects_hierarchical_c(Qt_list[[1]] %**% F_tilde,
-                                                               Qt1_QTL_Factors_Z,
+        B_F[QTL_columns_factors,] = sample_MME_fixedEffects_hierarchical_c(Qt_list[[1]] %**% F_tilde[rows,,drop=FALSE],
+                                                               Qt1_QTL_Factors_Z,  # only includes rows of Qt1
                                                                QTL_factors_X,
                                                                Sigma_Choleskys_list[[1]],
                                                                F_h2_index,
@@ -116,7 +118,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     # -----Sample tot_F_prec, F_h2, U_F ---------------- #
     #conditioning on B, F, Lambda, F_h2, tot_F_prec
 
-    Qt_F_tilde = Qt_list[[1]] %**% F_tilde
+    Qt_F_tilde = Qt_list[[1]] %**% F_tilde[rows,,drop=FALSE]
 
     scores = tot_prec_scores(Qt_F_tilde,
                              Sigma_Choleskys_list[[1]],
@@ -148,7 +150,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     }
     F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    U_F[] = sample_MME_ZKZts_c(F_tilde, Z, tot_F_prec, randomEffect_C_Choleskys_list[[1]], F_h2, F_h2_index,grainSize)
+    U_F[] = sample_MME_ZKZts_c(F_tilde[rows,,drop=FALSE], Z[rows,,drop=FALSE], tot_F_prec, randomEffect_C_Choleskys_list[[1]], F_h2, F_h2_index,grainSize)
 
     # -----Sample F----------------------- #
     #conditioning on B, U_F,U_R,Lambda, F_h2
@@ -169,6 +171,11 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                          Lambda[cols,,drop=FALSE],
                                          resid_Eta_prec[cols],
                                          F_e_prec)
+    }
+    # sample rows with no observed data. Note: would be better to drop these individuals completely.
+    extra_rows = (1:nrow(F))[-Missing_data_map[[1]]$Y_obs]
+    if(length(extra_rows)>0){
+      F[extra_rows,] = prior_mean[extra_rows,,drop=FALSE] + sweep(rstdnorm_mat(length(extra_rows),k),2,sqrt(F_e_prec[1,]),'/')
     }
 
   }))
