@@ -13,10 +13,12 @@ using namespace RcppParallel;
 // functions to speed up sparse multiplication and conversion to dense matrices
 // [[Rcpp::export()]]
 MatrixXd SxD(MSpMat X, Map<MatrixXd> Y){
+  if(X.cols() != Y.rows()) stop("X and Y have wrong dimensions for multiplying");
   return(X * Y);
 }
 // [[Rcpp::export()]]
 MatrixXd SxS(MSpMat X, MSpMat Y){
+  if(X.cols() != Y.rows()) stop("X and Y have wrong dimensions for multiplying");
   return(X * Y);
 }
 

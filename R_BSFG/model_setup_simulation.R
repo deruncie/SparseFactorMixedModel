@@ -29,9 +29,6 @@ X = setup$X
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  sampler = 'fast_BSFG',
-  # sampler = 'fast_missing_BSFG',
-  # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
@@ -109,6 +106,7 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# 
                                   run_parameters=run_parameters,
                                   priors=priors,
                                   setup = setup)
+
 # BSFG_state$current_state$F_h2
 # BSFG_state$priors$h2_priors_resids
 # BSFG_state$priors$h2_priors_factors

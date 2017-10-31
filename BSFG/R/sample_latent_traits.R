@@ -72,7 +72,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     # -----Sample Lambda and B_F ------------------ #
     # F, marginalizing over random effects (conditional on F_h2, tot_F_prec)
     # only use rows in Missing_data_map[[1]]. These are all the rows with non-missing data
-    rows = Missing_data_map[[set]]$Y_obs
+    rows = Missing_data_map[[1]]$Y_obs
     if(b_F > 0){
       prior_mean = matrix(0,b_F,k)
       prior_prec = B_F_prec * tot_F_prec[rep(1,b_F),,drop=FALSE]  # prior for B_F includes tot_F_prec

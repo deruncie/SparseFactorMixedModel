@@ -68,7 +68,7 @@ load_simulation_data = function(file = NULL){
 Image = function(x,zlim = NULL,breaks=20,colors = c('blue','white','red'),colorkey = TRUE,...){
   # if zlim not passed and the range of the data is outside of (-1,1), expands zlim range
   if(missing(zlim)){
-    if(all(na.omit(x)>0)) {
+    if(all(x[!is.na(x)]>0)) {
       zlim = c(0,max(x,na.rm=T))
     } else{
       zlim = c(-1,1)*max(abs(x),na.rm=T)
