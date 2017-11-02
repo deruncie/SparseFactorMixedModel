@@ -1,4 +1,5 @@
 exportPattern("^[[:alpha:]]+")
+export("%**%")
 import(methods,Rcpp)
 importFrom(Rcpp, evalCpp)
 importFrom(RcppParallel, RcppParallelLibs)

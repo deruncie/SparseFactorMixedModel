@@ -29,7 +29,7 @@ load_simulation_data = function(file = NULL){
 
 #' Multiply matrices
 #'
-#' Multiplies two matrices. Like %*%, but always returns a base matrix, not a Matrix, even when
+#' Multiplies two matrices. Like \code{%*%}, but always returns a base matrix, not a Matrix, even when
 #' one or both of the two matrices are of class matrix.
 #'
 #' Uses RcppEigen when one or both matrices are of class dgCMatrix
@@ -65,7 +65,19 @@ load_simulation_data = function(file = NULL){
 #' @export
 #'
 #' @examples
-Image = function(x,zlim = NULL,breaks=20,colors = c('blue','white','red'),colorkey = TRUE,...){
+Image = function(X,dimnames=TRUE,...) {
+  require(ggplot2)
+  X = as.matrix(X)
+  if(!dimnames) rownames(X) <- colnames(X) <- NULL
+  if(length(unique(rownames(X))) < nrow(X)) rownames(X) <- NULL
+  if(length(unique(colnames(X))) < ncol(X)) colnames(X) <- NULL
+
+  X_tall = reshape2::melt(X)
+  X_tall = subset(X_tall,value != 0)  # make it sparse again
+  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile() + xlab('') + ylab('') + scale_fill_gradient2(na.value = "grey90",...) + scale_y_reverse() + theme_minimal()
+  print(p)
+}
+Image2=function(x,zlim = NULL,breaks=20,colors = c('blue','white','red'),colorkey = TRUE,aspect=NULL,...){
   # if zlim not passed and the range of the data is outside of (-1,1), expands zlim range
   if(missing(zlim)){
     if(all(x[!is.na(x)]>0)) {
@@ -75,11 +87,14 @@ Image = function(x,zlim = NULL,breaks=20,colors = c('blue','white','red'),colork
     }
   }
   zlim[is.na(zlim)] = 0
+  if(missing(aspect)){
+    if(ncol(x) > (2*nrow(x))) aspect = 1/1.5
+    if(nrow(x) > (2*ncol(x))) aspect = 1.5
+  }
   at = seq(zlim[1]-1e-10,zlim[2]+1e-10,length=breaks)
   colors = colorRampPalette(colors)(breaks)
-  image(Matrix(x),at=at,col.regions=colors,colorkey=colorkey,...)
+  image(Matrix(x),at=at,col.regions=colors,colorkey=colorkey,aspect=aspect,...)
 }
-
 
 #' Checks if factors (columns of Lambda) can be safely dropped
 #'

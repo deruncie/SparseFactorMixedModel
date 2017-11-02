@@ -14,10 +14,6 @@ X1 \%**\% X2
 \value{
 matrix
 }
-\description{
-Multiplies two matrices. Like %*%, but always returns a base matrix, not a Matrix, even when
-one or both of the two matrices are of class matrix.
-}
 \details{
 Uses RcppEigen when one or both matrices are of class dgCMatrix
 }

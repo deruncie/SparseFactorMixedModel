@@ -4,8 +4,7 @@
 \alias{Image}
 \title{Modification to \code{image()}.}
 \usage{
-Image(x, zlim = NULL, breaks = 20, colors = c("blue", "white", "red"),
-  colorkey = TRUE, ...)
+Image(X, dimnames = TRUE, ...)
 }
 \arguments{
 \item{colors}{}
