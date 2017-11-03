@@ -59,7 +59,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       resid_h2[,cols] = h2s_matrix[,resid_h2_index[cols],drop=FALSE]
 
       U_R[,cols] = sample_MME_ZKZts_c(Eta_tilde[rows,cols,drop=FALSE],
-                                    ZL[rows,],
+                                    ZL[rows,,drop=FALSE],
                                     tot_Eta_prec[cols],
                                     randomEffect_C_Choleskys_list[[set]],
                                     resid_h2[,cols,drop=FALSE],
@@ -161,22 +161,24 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       prior_mean = prior_mean + XFBF
     }
 
-    for(set in seq_along(Missing_data_map)){
-      cols = Missing_data_map[[set]]$Y_cols
-      rows = Missing_data_map[[set]]$Y_obs
-      if(length(cols) == 0 || length(rows) == 0) next
-
-      F[rows,] = sample_factors_scores_c(Eta_tilde[rows,cols,drop=FALSE],
-                                         prior_mean[rows,,drop=FALSE],
-                                         Lambda[cols,,drop=FALSE],
-                                         resid_Eta_prec[cols],
-                                         F_e_prec)
+    for(set in seq_along(Missing_row_data_map)){
+      cols = Missing_row_data_map[[set]]$Y_cols
+      rows = Missing_row_data_map[[set]]$Y_obs
+      if(length(cols) > 0) {
+        F[rows,] = sample_factors_scores_c(Eta_tilde[rows,cols,drop=FALSE],
+                                           prior_mean[rows,,drop=FALSE],
+                                           Lambda[cols,,drop=FALSE],
+                                           resid_Eta_prec[cols],
+                                           F_e_prec)
+      } else{
+        F[rows,] = prior_mean[rows,,drop=FALSE] + sweep(rstdnorm_mat(length(rows),k),2,sqrt(F_e_prec[1,]),'/')
+      }
     }
-    # sample rows with no observed data. Note: would be better to drop these individuals completely.
-    extra_rows = (1:nrow(F))[-Missing_data_map[[1]]$Y_obs]
-    if(length(extra_rows)>0){
-      F[extra_rows,] = prior_mean[extra_rows,,drop=FALSE] + sweep(rstdnorm_mat(length(extra_rows),k),2,sqrt(F_e_prec[1,]),'/')
-    }
+    # # sample rows with no observed data. Note: would be better to drop these individuals completely.
+    # extra_rows = (1:nrow(F))[-Missing_data_map[[1]]$Y_obs]
+    # if(length(extra_rows)>0){
+    #   F[extra_rows,] = prior_mean[extra_rows,,drop=FALSE] + sweep(rstdnorm_mat(length(extra_rows),k),2,sqrt(F_e_prec[1,]),'/')
+    # }
 
   }))
   current_state = current_state[current_state_names]

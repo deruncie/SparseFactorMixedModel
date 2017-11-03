@@ -542,6 +542,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# first, identify sets of traits with same pattern of missingness
   # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
 	if(!run_parameters$impute_missing) {
+	  # columns with same patterns of missing data
     Y_col_obs = lapply(1:ncol(Y_missing),function(x) {
       obs = which(!Y_missing[,x],useNames=F)
       names(obs) = NULL
@@ -562,8 +563,31 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
         Y_cols = which(Y_col_obs_index == i)
       ))
     })
+
+    # rows with same patterns of missing data
+    Y_row_obs = lapply(1:nrow(Y_missing),function(x) {
+      obs = which(!Y_missing[x,],useNames=F)
+      names(obs) = NULL
+      obs
+    })
+    non_missing_cols = unname(which(colSums(!Y_missing)>0))
+    unique_Y_row_obs = unique(c(list(non_missing_cols),Y_row_obs))
+    unique_Y_row_obs_str = lapply(unique_Y_row_obs,paste,collapse='')
+    Y_row_obs_index = sapply(Y_row_obs,function(x) which(unique_Y_row_obs_str == paste(x,collapse='')))
+
+    Missing_row_data_map = lapply(seq_along(unique_Y_row_obs),function(i) {
+      x = unique_Y_row_obs[[i]]
+      return(list(
+        Y_cols = x,
+        Y_obs = which(Y_row_obs_index == i)
+      ))
+    })
 	} else{
 	  Missing_data_map = list(list(
+	    Y_obs = 1:n,
+	    Y_cols = 1:p
+	  ))
+	  Missing_row_data_map = list(list(
 	    Y_obs = 1:n,
 	    Y_cols = 1:p
 	  ))
@@ -621,7 +645,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     QtZL_set = as(QtZL_set,'dgCMatrix')
     QtX_set = Qt %**% X[x,,drop=FALSE]
     QtXF_set = Qt %**% X_F[x,,drop=FALSE]  # This one is only needed for set==1
-    Qt_cis_genotypes_set = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,])
+    Qt_cis_genotypes_set = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
 
     Qt_list[[set]]   = Qt
     QtX_list[[set]]  = QtX_set
@@ -693,6 +717,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     Qt_cis_genotypes_list = Qt_cis_genotypes_list,
     Qt1_QTL_Factors_Z = Qt1_QTL_Factors_Z,
     Missing_data_map      = Missing_data_map,
+    Missing_row_data_map  = Missing_row_data_map,
     Sigma_Choleskys_list          = Sigma_Choleskys_list,
     randomEffect_C_Choleskys_list = randomEffect_C_Choleskys_list
   )

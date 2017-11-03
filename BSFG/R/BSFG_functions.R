@@ -74,7 +74,11 @@ Image = function(X,dimnames=TRUE,...) {
 
   X_tall = reshape2::melt(X)
   X_tall = subset(X_tall,value != 0)  # make it sparse again
-  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile() + xlab('') + ylab('') + scale_fill_gradient2(na.value = "grey90",...) + scale_y_reverse() + theme_minimal()
+  if(!is.null(colnames(X))) X_tall$Var1 = factor(X_tall$Var1)
+  if(!is.null(rownames(X))) X_tall$Var2 = factor(X_tall$Var2)
+  X_tall$value = as.numeric(X_tall$value)
+  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile() + xlab('') + ylab('') + scale_fill_gradient2(na.value = "grey90",...) + theme_minimal()
+  if(is.numeric(X_tall$Var1)) p <- p + scale_y_reverse()
   print(p)
 }
 Image2=function(x,zlim = NULL,breaks=20,colors = c('blue','white','red'),colorkey = TRUE,aspect=NULL,...){
