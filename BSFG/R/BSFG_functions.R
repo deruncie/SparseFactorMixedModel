@@ -68,17 +68,20 @@ load_simulation_data = function(file = NULL){
 Image = function(X,dimnames=TRUE,...) {
   require(ggplot2)
   X = as.matrix(X)
+  X[] = as.numeric(X)
   if(!dimnames) rownames(X) <- colnames(X) <- NULL
   if(length(unique(rownames(X))) < nrow(X)) rownames(X) <- NULL
   if(length(unique(colnames(X))) < ncol(X)) colnames(X) <- NULL
 
   X_tall = reshape2::melt(X)
-  X_tall = subset(X_tall,value != 0)  # make it sparse again
-  if(!is.null(colnames(X))) X_tall$Var1 = factor(X_tall$Var1)
-  if(!is.null(rownames(X))) X_tall$Var2 = factor(X_tall$Var2)
+  if(!is.null(colnames(X))) X_tall$Var2 = factor(X_tall$Var2)
+  if(!is.null(rownames(X))) X_tall$Var1 = factor(X_tall$Var1,levels = rev(unique(X_tall$Var1)))
   X_tall$value = as.numeric(X_tall$value)
-  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile() + xlab('') + ylab('') + scale_fill_gradient2(na.value = "grey90",...) + theme_minimal()
-  if(is.numeric(X_tall$Var1)) p <- p + scale_y_reverse()
+  X_tall = X_tall[X_tall$value != 0,,drop=FALSE] # make it sparse again
+  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile(alpha = 0.8) + xlab('') + ylab('') + theme_minimal() + expand_limits(fill=0)
+  if(is.numeric(X_tall$Var2)) p <- p + xlim(0,ncol(X))
+  if(is.numeric(X_tall$Var1)) p <- p + ylim(nrow(X),0)
+  if(length(unique(X_tall$value))>2) p <- p + scale_fill_gradient2(na.value = "grey90",...)
   print(p)
 }
 Image2=function(x,zlim = NULL,breaks=20,colors = c('blue','white','red'),colorkey = TRUE,aspect=NULL,...){
