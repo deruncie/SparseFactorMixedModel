@@ -21,6 +21,14 @@ setwd(folder)
 print('Initializing')
 load('../setup.RData')
 
+reduce_cols = sample(1:ncol(setup$Y),ncol(setup$Y)/2)
+setup$Y[,reduce_cols] = setup$Y[,reduce_cols] / 10
+setup$G[,reduce_cols] = setup$G[,reduce_cols] / 10
+setup$G[reduce_cols,] = setup$G[reduce_cols,] / 10
+setup$R[,reduce_cols] = setup$R[,reduce_cols] / 10
+setup$R[reduce_cols,] = setup$R[reduce_cols,] / 10
+setup$error_factor_Lambda[reduce_cols,] = setup$error_factor_Lambda[reduce_cols,]/10
+
 Y = setup$Y
 K = setup$K
 data = setup$data
@@ -29,17 +37,19 @@ X = setup$X
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
+  lambda_propto_Vp = T,
   scale_Y = FALSE,
   simulation = TRUE,
   h2_divisions = 20,
   h2_step_size = .3,
-  burn = 100
+  burn = 100,
+  thin=5
 )
 
 priors = BSFG_priors(
   fixed_var = list(V = 1,     nu = 3),
   # tot_Y_var = list(V = 0.5,   nu = 3),
-  tot_Y_var = list(V = 0.5,   nu = 10),
+  tot_Y_var = list(V = 0.5,   nu = 3),
   tot_F_var = list(V = 18/20, nu = 20),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
   h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1)),
@@ -136,8 +146,8 @@ BSFG_state = clear_Posterior(BSFG_state)
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
-for(i  in 1:110) {
-    if(i %% 6 == 0){
+for(i  in 1:22) {
+    if(i %% 6 == 0 || (i>1 && i < 6)){
       BSFG_state = reorder_factors(BSFG_state)
       BSFG_state = clear_Posterior(BSFG_state)
     }
