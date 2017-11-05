@@ -24,6 +24,9 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
                          }
 
                          Lambda2 = Lambda^2
+                         if(lambda_propto_Vp){
+                           Lambda2 = Lambda2 * tot_Eta_prec[1,]
+                         }
                          Lambda_prec[] = matrix(rgamma(p*k,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = k)
 
                          # # trait one is special?
@@ -40,7 +43,9 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
 
                          # # -----Update Plam-------------------- #
                          Plam[] = sweep(Lambda_prec,2,tauh,'*')
-                         if('Plam_filter' %in% ls()) Plam[] = Plam * Plam_filter
+                         if(lambda_propto_Vp){
+                          Plam[] = Plam * tot_Eta_prec[1,]
+                         }
                        })))
   return(current_state)
 }

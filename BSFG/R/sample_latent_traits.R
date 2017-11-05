@@ -36,7 +36,13 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                      resid_h2_index[cols],
                                      grainSize
                                     )
-      tot_Eta_prec[cols] = rgamma(length(cols),shape = tot_Eta_prec_shape + length(rows)/2, rate = tot_Eta_prec_rate[cols] + 0.5*scores[cols])
+      shape = tot_Eta_prec_shape + length(rows)/2
+      if(lambda_propto_Vp) {
+        # include tot_Eta_prec in prior of Lambda
+        scores[cols] = scores[cols] + rowSums(Lambda[cols,,drop=FALSE]^2*Lambda_prec[cols,,drop=FALSE]*tauh[rep(1,length(cols)),])
+        shape = shape + k/2
+      }
+      tot_Eta_prec[cols] = rgamma(length(cols),shape = shape, rate = tot_Eta_prec_rate[cols] + 0.5*scores[cols])
 
       if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
       if(is.null(h2_step_size)) {
