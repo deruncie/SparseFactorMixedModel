@@ -6,6 +6,154 @@
 // using namespace Eigen;
 // using namespace RcppParallel;
 //
+//
+// // [[Rcpp::export()]]
+// VectorXd sample_MME_single_diagK2(  // returns b x 1 vector
+//     VectorXd y,           // nx1
+//     MatrixXd X,           // nxb
+//     VectorXd prior_mean,  // bx1
+//     VectorXd prior_prec,  // bx1
+//     MSpMat chol_R,        // nxn upper triangular Cholesky decomposition of R. Format: dgCMatrix
+//     double tot_Eta_prec, // double
+//     VectorXd randn_theta, // bx1
+//     VectorXd randn_e      // 0x1 or nx1. 0x1 if b<n
+// ){
+//   if(randn_e.size() == 0){
+//     MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+//     VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
+//     VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
+//     MatrixXd C = RinvSqX.transpose() * RinvSqX;
+//     C.diagonal() += prior_prec;
+//     LLT<MatrixXd> C_llt;
+//     C_llt.compute(C);
+//     MatrixXd chol_C = C_llt.matrixU();
+//
+//     VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
+//     b += randn_theta;
+//     b = chol_C.triangularView<Upper>().solve(b);
+//     return(b);
+//   } else {
+//     // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
+//     MatrixXd Phi = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+//     VectorXd alpha = chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
+//
+//     VectorXd u = randn_theta.array() / prior_prec.cwiseSqrt().array();
+//     u += prior_mean;
+//     VectorXd v = Phi * u + randn_e;
+//     VectorXd alpha_v = alpha-v;
+//
+//     MatrixXd D_PhiT = prior_prec.cwiseInverse().asDiagonal() * Phi.transpose();
+//     MatrixXd cov = Phi * D_PhiT;
+//     cov.diagonal().array() += 1.0;
+//
+//     VectorXd w = cov.ldlt().solve(alpha_v);
+//
+//     VectorXd theta = u + D_PhiT * w;
+//
+//     return(theta);
+//   }
+// }
+//
+//
+// // [[Rcpp::export()]]
+// VectorXd sample_MME_single_diagK2b(  // returns b x 1 vector
+//     VectorXd y,           // nx1
+//     MatrixXd X,           // nxb
+//     VectorXd prior_mean,  // bx1
+//     VectorXd prior_prec,  // bx1
+//     MSpMat inv_chol_Rt,        // nxn upper triangular Cholesky decomposition of R. Format: dgCMatrix
+//     double tot_Eta_prec, // double
+//     VectorXd randn_theta, // bx1
+//     VectorXd randn_e      // 0x1 or nx1. 0x1 if b<n
+// ){
+//   // if(randn_e.size() == 0){
+//   //   MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+//   //   VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
+//   //   VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
+//   //   MatrixXd C = RinvSqX.transpose() * RinvSqX;
+//   //   C.diagonal() += prior_prec;
+//   //   LLT<MatrixXd> C_llt;
+//   //   C_llt.compute(C);
+//   //   MatrixXd chol_C = C_llt.matrixU();
+//   //
+//   //   VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
+//   //   b += randn_theta;
+//   //   b = chol_C.triangularView<Upper>().solve(b);
+//   //   return(b);
+//   // } else {
+//     // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
+//     MatrixXd Phi = inv_chol_Rt * X * sqrt(tot_Eta_prec);
+//     VectorXd alpha = inv_chol_Rt * y * sqrt(tot_Eta_prec);
+//
+//     VectorXd u = randn_theta.array() / prior_prec.cwiseSqrt().array();
+//     u += prior_mean;
+//     VectorXd v = Phi * u + randn_e;
+//     VectorXd alpha_v = alpha-v;
+//
+//     MatrixXd D_PhiT = prior_prec.cwiseInverse().asDiagonal() * Phi.transpose();
+//     MatrixXd cov = Phi * D_PhiT;
+//     cov.diagonal().array() += 1.0;
+//
+//     VectorXd w = cov.ldlt().solve(alpha_v);
+//
+//     VectorXd theta = u + D_PhiT * w;
+//
+//     return(theta);
+//   // }
+// }
+//
+//
+// // [[Rcpp::export()]]
+// VectorXd sample_MME_single_diagK3(  // returns b x 1 vector
+//     VectorXd y,           // nx1
+//     MatrixXd X,           // nxb
+//     VectorXd prior_mean,  // bx1
+//     VectorXd prior_prec,  // bx1
+//     MSpMat chol_R,        // nxn upper triangular Cholesky decomposition of R. Format: dgCMatrix
+//     double tot_Eta_prec, // double
+//     VectorXd randn_theta, // bx1
+//     VectorXd randn_e      // 0x1 or nx1. 0x1 if b<n
+// ){
+//   if(randn_e.size() == 0){
+//     MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+//     VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
+//     VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
+//     MatrixXd C = RinvSqX.transpose() * RinvSqX;
+//     C.diagonal() += prior_prec;
+//     LLT<MatrixXd> C_llt;
+//     C_llt.compute(C);
+//     MatrixXd chol_C = C_llt.matrixU();
+//
+//     VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
+//     b += randn_theta;
+//     b = chol_C.triangularView<Upper>().solve(b);
+//     return(b);
+//   } else {
+//     // should check that randn_e.size() == n
+//     VectorXd theta_star = randn_theta.array() / prior_prec.cwiseSqrt().array();
+//     theta_star += prior_mean;
+//     VectorXd e_star = chol_R.transpose() * (randn_e / sqrt(tot_Eta_prec));
+//     MatrixXd X_theta_star = X * theta_star;
+//     VectorXd y_resid = y - X_theta_star - e_star;
+//
+//     MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+//     VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y_resid * sqrt(tot_Eta_prec));
+//
+//     VectorXd theta_tilda;
+//     MatrixXd VAi = X * prior_prec.cwiseInverse().asDiagonal();
+//     MatrixXd inner = VAi*X.transpose() + (chol_R.transpose() * chol_R) / tot_Eta_prec;
+//     VectorXd VAiXtURinvy = VAi * XtRinvy;
+//     VectorXd outerXtURinvy = VAi.transpose() * inner.ldlt().solve(VAiXtURinvy);
+//     theta_tilda = XtRinvy.array() / prior_prec.array();
+//     theta_tilda -= outerXtURinvy;
+//     VectorXd theta = theta_star + theta_tilda;
+//
+//     return(theta);
+//   }
+// }
+
+
+//
 // // [[Rcpp::export()]]
 // VectorXd cumprod_c(VectorXd x) {
 //   int n = x.size();

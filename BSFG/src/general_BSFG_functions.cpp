@@ -83,24 +83,22 @@ VectorXd sample_MME_single_diagK(  // returns b x 1 vector
     b = chol_C.triangularView<Upper>().solve(b);
     return(b);
   } else {
-    // should check that randn_e.size() == n
-    VectorXd theta_star = randn_theta.array() / prior_prec.cwiseSqrt().array();
-    theta_star += prior_mean;
-    VectorXd e_star = chol_R.transpose() * (randn_e / sqrt(tot_Eta_prec));
-    MatrixXd X_theta_star = X * theta_star;
-    VectorXd y_resid = y - X_theta_star - e_star;
+    // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
+    MatrixXd Phi = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+    VectorXd alpha = chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
 
-    MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
-    VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y_resid * sqrt(tot_Eta_prec));
+    VectorXd u = randn_theta.array() / prior_prec.cwiseSqrt().array();
+    u += prior_mean;
+    VectorXd v = Phi * u + randn_e;
+    VectorXd alpha_v = alpha-v;
 
-    VectorXd theta_tilda;
-    MatrixXd VAi = X * prior_prec.cwiseInverse().asDiagonal();
-    MatrixXd inner = VAi*X.transpose() + (chol_R.transpose() * chol_R) / tot_Eta_prec;
-    VectorXd VAiXtURinvy = VAi * XtRinvy;
-    VectorXd outerXtURinvy = VAi.transpose() * inner.ldlt().solve(VAiXtURinvy);
-    theta_tilda = XtRinvy.array() / prior_prec.array();
-    theta_tilda -= outerXtURinvy;
-    VectorXd theta = theta_star + theta_tilda;
+    MatrixXd D_PhiT = prior_prec.cwiseInverse().asDiagonal() * Phi.transpose();
+    MatrixXd cov = Phi * D_PhiT;
+    cov.diagonal().array() += 1.0;
+
+    VectorXd w = cov.ldlt().solve(alpha_v);
+
+    VectorXd theta = u + D_PhiT * w;
 
     return(theta);
   }
