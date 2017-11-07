@@ -557,9 +557,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
     Missing_data_map = lapply(seq_along(unique_Y_col_obs),function(i) {
       x = unique_Y_col_obs[[i]]
-      if(length(x) == 0){
-        stop('Columns of Y have 100% missing data! Please drop these columns.')
-      }
       return(list(
         Y_obs = x,
         Y_cols = which(Y_col_obs_index == i)
@@ -621,6 +618,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   for(set in seq_along(Missing_data_map)){
     x = Missing_data_map[[set]]$Y_obs
     cols = Missing_data_map[[set]]$Y_cols
+    if(length(x) == 0) next
 
     if(n_RE == 1){
       if(run_parameters$svd_K == TRUE) {

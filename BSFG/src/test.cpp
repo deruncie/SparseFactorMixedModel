@@ -66,21 +66,21 @@
 //     VectorXd randn_theta, // bx1
 //     VectorXd randn_e      // 0x1 or nx1. 0x1 if b<n
 // ){
-//   // if(randn_e.size() == 0){
-//   //   MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
-//   //   VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
-//   //   VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
-//   //   MatrixXd C = RinvSqX.transpose() * RinvSqX;
-//   //   C.diagonal() += prior_prec;
-//   //   LLT<MatrixXd> C_llt;
-//   //   C_llt.compute(C);
-//   //   MatrixXd chol_C = C_llt.matrixU();
-//   //
-//   //   VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
-//   //   b += randn_theta;
-//   //   b = chol_C.triangularView<Upper>().solve(b);
-//   //   return(b);
-//   // } else {
+//   if(randn_e.size() == 0){
+//     MatrixXd RinvSqX = inv_chol_Rt * X * sqrt(tot_Eta_prec);
+//     VectorXd XtRinvy = RinvSqX.transpose() * (inv_chol_Rt * (y * sqrt(tot_Eta_prec)));
+//     VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
+//     MatrixXd C = RinvSqX.transpose() * RinvSqX;
+//     C.diagonal() += prior_prec;
+//     LLT<MatrixXd> C_llt;
+//     C_llt.compute(C);
+//     MatrixXd chol_C = C_llt.matrixU();
+//
+//     VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
+//     b += randn_theta;
+//     b = chol_C.triangularView<Upper>().solve(b);
+//     return(b);
+//   } else {
 //     // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
 //     MatrixXd Phi = inv_chol_Rt * X * sqrt(tot_Eta_prec);
 //     VectorXd alpha = inv_chol_Rt * y * sqrt(tot_Eta_prec);
@@ -99,7 +99,7 @@
 //     VectorXd theta = u + D_PhiT * w;
 //
 //     return(theta);
-//   // }
+//   }
 // }
 //
 //

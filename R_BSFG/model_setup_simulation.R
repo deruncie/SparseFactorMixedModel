@@ -21,13 +21,13 @@ setwd(folder)
 print('Initializing')
 load('../setup.RData')
 
-reduce_cols = sample(1:ncol(setup$Y),ncol(setup$Y)/2)
-setup$Y[,reduce_cols] = setup$Y[,reduce_cols] / 10
-setup$G[,reduce_cols] = setup$G[,reduce_cols] / 10
-setup$G[reduce_cols,] = setup$G[reduce_cols,] / 10
-setup$R[,reduce_cols] = setup$R[,reduce_cols] / 10
-setup$R[reduce_cols,] = setup$R[reduce_cols,] / 10
-setup$error_factor_Lambda[reduce_cols,] = setup$error_factor_Lambda[reduce_cols,]/10
+# reduce_cols = sample(1:ncol(setup$Y),ncol(setup$Y)/2)
+# setup$Y[,reduce_cols] = setup$Y[,reduce_cols] / 10
+# setup$G[,reduce_cols] = setup$G[,reduce_cols] / 10
+# setup$G[reduce_cols,] = setup$G[reduce_cols,] / 10
+# setup$R[,reduce_cols] = setup$R[,reduce_cols] / 10
+# setup$R[reduce_cols,] = setup$R[reduce_cols,] / 10
+# setup$error_factor_Lambda[reduce_cols,] = setup$error_factor_Lambda[reduce_cols,]/10
 
 Y = setup$Y
 K = setup$K
@@ -43,7 +43,7 @@ run_parameters = BSFG_control(
   h2_divisions = 20,
   h2_step_size = .3,
   burn = 100,
-  thin=5
+  thin=100
 )
 
 priors = BSFG_priors(
@@ -109,7 +109,8 @@ data$ID = sample(1:nrow(data))
 # Y[i,1:50] = NA
 # Y[-i,-c(1:50)] = NA
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|Sire), data,# factor_model_fixed = ~0,
-BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
+# BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal) + (1|Sire), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
@@ -145,12 +146,12 @@ BSFG_state = clear_Posterior(BSFG_state)
 # BSFG_state$run_parameters$simulation = FALSE
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
-n_samples = 100;
+n_samples = 1000;
 for(i  in 1:22) {
-    if(i %% 6 == 0 || (i>1 && i < 6)){
-      BSFG_state = reorder_factors(BSFG_state)
-      BSFG_state = clear_Posterior(BSFG_state)
-    }
+    # if(i %% 6 == 0 || (i>1 && i < 6)){
+    #   BSFG_state = reorder_factors(BSFG_state)
+    #   BSFG_state = clear_Posterior(BSFG_state)
+    # }
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores = 1)
     if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])

@@ -74,6 +74,7 @@ Image = function(X,dimnames=TRUE,...) {
   if(length(unique(colnames(X))) < ncol(X)) colnames(X) <- NULL
 
   X_tall = reshape2::melt(X)
+  colnames(X_tall) = c('Var1','Var2','value')
   if(!is.null(colnames(X))) X_tall$Var2 = factor(X_tall$Var2)
   if(!is.null(rownames(X))) X_tall$Var1 = factor(X_tall$Var1,levels = rev(unique(X_tall$Var1)))
   X_tall$value = as.numeric(X_tall$value)
