@@ -5,11 +5,12 @@
 \title{Set BSFG run parameters}
 \usage{
 BSFG_control(Posterior_folder = "Posterior", simulation = c(F, T),
-  scale_Y = c(T, F), lambda_propto_Vp = TRUE, b0 = 1, b1 = 5e-04,
-  epsilon = 0.1, prop = 1, k_init = 20, h2_divisions = 100,
-  h2_step_size = NULL, drop0_tol = 1e-14, K_eigen_tol = 1e-10,
-  burn = 100, thin = 2, delta_iteractions_factor = 100,
-  impute_missing = FALSE, svd_K = TRUE, ...)
+  scale_Y = c(T, F), lambda_propto_Vp = TRUE, cauchy_sigma_tot = TRUE,
+  b0 = 1, b1 = 5e-04, epsilon = 0.1, prop = 1, k_init = 20,
+  h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
+  K_eigen_tol = 1e-10, burn = 100, thin = 2,
+  delta_iteractions_factor = 100, impute_missing = FALSE, svd_K = TRUE,
+  ...)
 }
 \arguments{
 \item{Posterior_folder}{path to folder to save posterior samples. Samples of each parameter
@@ -21,6 +22,8 @@ the true values}
 \item{scale_Y}{Should the Y values be centered and scaled? Recommend, except for simulated data.}
 
 \item{lambda_propto_Vp}{Should the prior for lambda include tot_Eta_prec?}
+
+\item{cauchy_sigma_tot}{Should the prior on sigma_j be half-cauchy?}
 
 \item{b0}{parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011}
 

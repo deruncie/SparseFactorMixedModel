@@ -21,7 +21,7 @@ get_truncated_exp = function(mn,trunc_point,v){
     x[sml] = -log1p(temp[sml])
   }
   x[!sml] = -log(1+tmp[!sml])
-  x = x/m
+  x = x/mn
   return(x)
 }
 
@@ -49,22 +49,22 @@ horseshoe2 = function(y,X,a0,b0,nIter,burn,verbose=F){
 
   XtX = t(X) %*% X
 
-  samples = matrix(0,nIter,p+p+1+1)
+  samples = matrix(0,nIter,p+1+1)
   for(i in (-burn):nIter){
     if(verbose && i %% (nIter/10) == 0) print(i)
     xi_new = exp(rnorm(1,log(xi),.8))
 
     if(p > n) {
-      XDXt = sweep(X,2,eta,'/') %*% t(X)
+      XDXt = XDXt_c(X,1/eta)
       M_new = diag(1,n) + XDXt/xi_new
-      chol_M_new = chol(M_new)
+      chol_M_new = chol_c(M_new)
       log_det_M_new = 2*sum(log(diag(chol_M_new)))
-      scaled_resid2_new = solve(t(chol_M_new),y)^2
+      scaled_resid2_new = forwardSolve_c(chol_M_new,y)^2
 
       M = diag(1,n) + XDXt/xi
-      chol_M = chol(M)
+      chol_M = chol_c(M)
       log_det_M = 2*sum(log(diag(chol_M)))
-      scaled_resid2 = solve(t(chol_M),y)^2
+      scaled_resid2 = forwardSolve_c(chol_M,y)^2
     } else{
       Xty = t(X) %*% y
       inner = XtX
@@ -80,14 +80,15 @@ horseshoe2 = function(y,X,a0,b0,nIter,burn,verbose=F){
       log_det_M = -p*log(xi) + sum(-log(eta)) + determinant(inner,log=T)$modulus
     }
 
-    log_L_new = -1/2*log_det_M_new - (n+a0)/2*log(b0/2 + sum(scaled_resid2_new/2))
+    log_L_new = -1/2*log_det_M_new - (n+a0)/2*log(b0/2 + sum(scaled_resid2_new)/2)
     log_prior_new = -log(sqrt(xi_new)*(1+xi_new))
 
     log_L = -1/2*log_det_M - (n+a0)/2*log(b0/2 + sum(scaled_resid2/2))
     log_prior = -log(sqrt(xi)*(1+xi))
 
-    log_MH_ratio = log_L_new + log_prior_new + log(xi_new) - (log_L + log_prior + log(xi))
+    log_MH_ratio = ((log_L_new + log_prior_new) - (log_L + log_prior)) + (log(xi_new) - log(xi))
 
+    accept = 0
     if(log(runif(1)) < log_MH_ratio){
       xi = xi_new
       scaled_resid2 = scaled_resid2_new
@@ -112,7 +113,7 @@ horseshoe2 = function(y,X,a0,b0,nIter,burn,verbose=F){
     tau2 = 1/xi
     lambda2 = 1/eta
 
-    if(i>0) samples[i,] = c(beta,lambda2,tau2,s2)
+    if(i>0) samples[i,] = c(beta,tau2,s2)
 
   }
   return(samples)
@@ -134,7 +135,7 @@ ard = function(y,X,a0,b0,a1,b1,a2,b2,nIter,burn,verbose=F){
   prior_mean = rep(0,p)
 
 
-  samples = matrix(0,nIter,p+p+1+1)
+  samples = matrix(0,nIter,p+1+1)
   for(i in (-burn):nIter){
     if(verbose && i %% (nIter/10) == 0) print(i)
 
@@ -150,7 +151,7 @@ ard = function(y,X,a0,b0,a1,b1,a2,b2,nIter,burn,verbose=F){
     lambda = rgamma(p,shape = a1+1/2,rate = b1+beta^2*tau)
     tau = rgamma(1,shape = a2+p/2,rate = b2+beta^2*lambda)
 
-    if(i>0) samples[i,] = c(beta,lambda,tau,s2)
+    if(i>0) samples[i,] = c(beta,tau,s2)
 
   }
   return(samples)
@@ -162,7 +163,7 @@ ard = function(y,X,a0,b0,a1,b1,a2,b2,nIter,burn,verbose=F){
 
 
 
-# This doesn't mix as well as Johndrow's horeshoe1 above, but approximatly as well if sample hyperparameters multipel times
+# This doesn't mix as well as Johndrow's horeshoe1 above, but approximatly as well if sample hyperparameters multiple times
 horseshoe1 = function(y,X,a0,b0,nIter,burn,thin=1,verbose = F){
   n = length(y)
   p = ncol(X)
@@ -182,7 +183,7 @@ horseshoe1 = function(y,X,a0,b0,nIter,burn,thin=1,verbose = F){
   chol_R = as(diag(1,n),'dgCMatrix')
   prior_mean = rep(0,p)
 
-  samples = matrix(0,nIter/thin,p+p+1+1)#+p+1
+  samples = matrix(0,nIter/thin,p+1+1)#+p+1
   for(i in (-burn):nIter){
     if(verbose && i %% (nIter/10) == 0) print(i)
 
@@ -193,17 +194,17 @@ horseshoe1 = function(y,X,a0,b0,nIter,burn,thin=1,verbose = F){
     beta = sample_MME_single_diagK(y,X,prior_mean,prior_prec,chol_R,1/s2,randn_theta,randn_e)
 
     resids = y - X %*% beta
-    s2 = 1/rgamma(1,shape = (n+p)/2,rate = sum(resids^2)/2 + sum(beta^2/(lambda2*tau2))/2)
-for(j in 1:10){
-    lambda2 = 1/rgamma(p,shape = 1,rate = 1/nu + beta^2/(2*tau2*s2))
-    tau2 = 1/rgamma(1,shape=(p+1)/2,rate = 1/xi + 1/(2*s2)*sum(beta^2/lambda2))
+    for(j in 1:10){
+      s2 = 1/rgamma(1,shape = (a0+n+p)/2,rate = b0/2+sum(resids^2)/2 + sum(beta^2/(lambda2*tau2))/2)
+      lambda2 = 1/rgamma(p,shape = 1,rate = 1/nu + beta^2/(2*tau2*s2))
+      tau2 = 1/rgamma(1,shape=(p+1)/2,rate = 1/xi + 1/(2*s2)*sum(beta^2/lambda2))
 
-    nu = 1/rgamma(p,shape=1,rate=1 + 1/lambda2)
+      nu = 1/rgamma(p,shape=1,rate=1 + 1/lambda2)
 
-    xi = 1/rgamma(1,shape=1,rate=1+1/tau2)
-}
+      xi = 1/rgamma(1,shape=1,rate=1+1/tau2)
+    }
 
-    if(i>0 && i %% thin == 0) samples[ceiling(i/thin),] = c(beta,lambda2,tau2,s2)#,nu,xi
+    if(i>0 && i %% thin == 0) samples[ceiling(i/thin),] = c(beta,tau2,s2)#,nu,xi
 
   }
   return(samples)

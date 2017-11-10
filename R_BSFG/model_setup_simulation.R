@@ -7,7 +7,7 @@ library(Matrix)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 2
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 2, Ve = 2,Vb = 2)
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 0, Ve = 2e-10,Vb = 2)
 set.seed(seed)
 load('setup.RData')
 
@@ -34,6 +34,9 @@ K = setup$K
 data = setup$data
 X = setup$X
 
+zeros = diag(setup$G) < .01
+Y = Y + sweep(rstdnorm_mat(nrow(Y),ncol(Y)),2,c(0,1)[(zeros)+1],'*')
+
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
@@ -43,7 +46,7 @@ run_parameters = BSFG_control(
   h2_divisions = 20,
   h2_step_size = .3,
   burn = 100,
-  thin=100
+  thin=5
 )
 
 priors = BSFG_priors(
@@ -109,8 +112,8 @@ data$ID = sample(1:nrow(data))
 # Y[i,1:50] = NA
 # Y[-i,-c(1:50)] = NA
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|Sire), data,# factor_model_fixed = ~0,
-# BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
-BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal) + (1|Sire), data,# factor_model_fixed = ~0,
+BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# factor_model_fixed = ~0,
+# BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal) + (1|Sire), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
                                   K_mats = list(animal = K),
@@ -146,16 +149,16 @@ BSFG_state = clear_Posterior(BSFG_state)
 # BSFG_state$run_parameters$simulation = FALSE
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
-n_samples = 1000;
+n_samples = 100;
 for(i  in 1:22) {
-    # if(i %% 6 == 0 || (i>1 && i < 6)){
-    #   BSFG_state = reorder_factors(BSFG_state)
-    #   BSFG_state = clear_Posterior(BSFG_state)
-    # }
+    if(i %% 6 == 0 || (i>1 && i < 6)){
+      BSFG_state = reorder_factors(BSFG_state)
+      BSFG_state = clear_Posterior(BSFG_state)
+    }
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores = 1)
-    if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
-    if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
+    # if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
+    # if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
       # BSFG_state$current_state = update_k(BSFG_state)

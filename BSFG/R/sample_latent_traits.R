@@ -42,7 +42,16 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
         scores[cols] = scores[cols] + rowSums(Lambda[cols,,drop=FALSE]^2*Lambda_prec[cols,,drop=FALSE]*tauh[rep(1,length(cols)),])
         shape = shape + k/2
       }
-      tot_Eta_prec[cols] = rgamma(length(cols),shape = shape, rate = tot_Eta_prec_rate[cols] + 0.5*scores[cols])
+      if(cauchy_sigma_tot){
+        # switch to C+(0,1) on sigma = 1/sqrt(prec)
+        for(i in 1:100){
+          if(!'tot_Eta_prec_zeta' %in% ls()) tot_Eta_prec_zeta = rep(1,p)
+          tot_Eta_prec[cols] = rgamma(length(cols),shape = shape - tot_Eta_prec_shape + 1/2, rate = 1/tot_Eta_prec_zeta[cols] + 0.5*scores[cols])
+          tot_Eta_prec_zeta[cols] = 1/rgamma(length(cols),shape = 1,rate = 1 + tot_Eta_prec[cols])
+        }
+      } else{
+        tot_Eta_prec[cols] = rgamma(length(cols),shape = shape, rate = tot_Eta_prec_rate[cols] + 0.5*scores[cols])
+      }
 
       if(!length(h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of h2_priors_resids')
       if(is.null(h2_step_size)) {
@@ -187,7 +196,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     # }
 
   }))
-  current_state = current_state[current_state_names]
+  # current_state = current_state[current_state_names]
 
   return(current_state)
 }

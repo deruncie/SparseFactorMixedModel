@@ -1,9 +1,9 @@
 library(Matrix)
 library(BSFG)
 library(rbenchmark)
-n = 300
+n = 1000
 p = 2000
-s2 = 4
+s2 = 40
 
 # R = tcrossprod(rstdnorm_mat(n,3)) + diag(1,n)
 R = diag(1,n)
@@ -21,6 +21,14 @@ b = c(rep(4,5),2^((6-6:15)/2),rep(0,p-15))
 
 y = X1 %*% b + rnorm(n,0,sqrt(s2))#t(chol_R) %**% rnorm(n) * sqrt(s2)
 X = X1#.7*X1 + .3*rstdnorm_mat(n,p)
+
+
+p = ncol(X)
+n = nrow(X)
+X = sweep(X,2,colMeans(X),'-')
+b = sample(c(rep(4,5),0*2^((6-6:15)/2),rep(0,p-15)))
+y = X %*% b + rnorm(n,0,sqrt(s2))
+
 # y = y - mean(y)
 #
 #
@@ -57,21 +65,23 @@ X = X1#.7*X1 + .3*rstdnorm_mat(n,p)
 # y = read.csv('y.csv',h=F)[,1]
 # X = as.matrix(read.csv('X.csv',h=F))
 # p = ncol(X)
+res = horseshoe2(y,X,1/2,1/2,2000,00,T)
+plot(colMeans(res[,1:p]));abline(v=which(b>0))
 
-res = horseshoe2(y,X,1/2,1/2,200,100,T)
-plot(colMeans(res[,1:p]))
+res2 = horseshoe1(y,X,1/2,1/2,2000,00,1,T)
+plot(colMeans(res2[,1:p]));abline(v=which(b>0))
 
-res3 = ard(y,X,1,1,3/2,1,1,1,200,100,T)
-plot(colMeans(res3[,1:p]))
-#
-# res2 = blasso(X = X,y = y,T = 1000,thin = 1,case='hs',RJ = F)
-# res2 = bhs(X = X,y=y)
-# plot(colMeans(res2$beta[-c(1:200),]))
-
-res2 = horseshoe1(y,X,1/2,1/2,200,100,1,T)
-plot(colMeans(res2[,1:p]))
+res3 = ard(y,X,1/4,1/4,3/2,1,1,1,2000,100,T)
+plot(colMeans(res3[,1:p]));abline(v=which(b>0))
 
 hist(res[,ncol(res)]);abline(v=s2)
 hist(res2[,ncol(res2)]);abline(v=s2)
 hist(res3[,ncol(res3)]);abline(v=s2)
 
+posterior_plot(res[,1:p])
+posterior_plot(res2[,1:p])
+posterior_plot(res3[,1:p])
+#
+# res2 = blasso(X = X,y = y,T = 1000,thin = 1,case='hs',RJ = F)
+# res2 = bhs(X = X,y=y)
+# plot(colMeans(res2$beta[-c(1:200),]))

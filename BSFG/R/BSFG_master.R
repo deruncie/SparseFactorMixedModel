@@ -8,6 +8,7 @@
 #'   the true values
 #' @param scale_Y Should the Y values be centered and scaled? Recommend, except for simulated data.
 #' @param lambda_propto_Vp Should the prior for lambda include tot_Eta_prec?
+#' @param cauchy_sigma_tot Should the prior on sigma_j be half-cauchy?
 #' @param b0 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
 #' @param b1 parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011
 #' @param epsilon parameter of the \code{update_k} function. Smallest \eqn{\lambda_{ij}} that is
@@ -45,7 +46,7 @@
 BSFG_control = function(
                         Posterior_folder = "Posterior",
                         simulation = c(F,T),scale_Y = c(T,F),
-                        lambda_propto_Vp = TRUE,
+                        lambda_propto_Vp = TRUE,cauchy_sigma_tot = TRUE,
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100, h2_step_size = NULL,
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,

@@ -1,10 +1,28 @@
-// #include <math.h>
-// #include <iostream>
-// #include "BSFG_types.h"
-//
-// // [[Rcpp::depends(RcppEigen)]]
-// using namespace Eigen;
-// using namespace RcppParallel;
+#include <math.h>
+#include <iostream>
+#include "BSFG_types.h"
+
+// [[Rcpp::depends(RcppEigen)]]
+using namespace Eigen;
+using namespace RcppParallel;
+
+// [[Rcpp::export()]]
+MatrixXd XDXt_c(Map<MatrixXd> X, Map<VectorXd> d){
+  return(X * d.asDiagonal() * X.transpose());
+}
+
+// [[Rcpp::export()]]
+VectorXd forwardSolve_c(Map<MatrixXd> chol_M, Map<VectorXd> y){
+  return(chol_M.transpose().triangularView<Lower>().solve(y));
+}
+
+// [[Rcpp::export()]]
+MatrixXd chol_c(Map<MatrixXd> C){
+    LLT<MatrixXd> C_llt;
+    C_llt.compute(C);
+    return(C_llt.matrixU());
+}
+
 //
 //
 // // [[Rcpp::export()]]
