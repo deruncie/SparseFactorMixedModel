@@ -322,7 +322,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	non_null_X = which(apply(X,2,var)>0)
 	non_null_XF = which(!X_F_zero_variance)
 	if(length(non_null_X) > 0 && length(non_null_XF) > 0){
-  	cor_X = abs(cor(X[,non_null_X],X_F[,non_null_XF]))
+  	cor_X = abs(cor(X[,non_null_X,drop=FALSE],X_F[,non_null_XF,drop=FALSE]))
   	for(j in 1:nrow(cor_X)){
   	  if(any(cor_X[j,] == 1)){
         fixed_effects_common = cbind(fixed_effects_common,c(non_null_X[j],non_null_XF[which(cor_X[j,] == 1)[1]]))
