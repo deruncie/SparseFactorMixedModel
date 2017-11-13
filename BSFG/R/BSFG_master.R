@@ -370,7 +370,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    } else {
 	      colnames(QTL_resid_X) = rep(colnames(QTL_resid$X),ncol(group_mm))
 	    }
-	    colnames(QTL_resid_X) = paste(colnames(group_mm)[i],colnames(QTL_resid_X),sep='.')
+	    colnames(QTL_resid_X) = paste(rep(colnames(group_mm),each = ncol(QTL_resid$X)),colnames(QTL_resid_X),sep='.')
 	  } else{
 	    if(nrow(QTL_resid) != nrow(data)) stop(sprintf('QTL_resid has wrong number of rows. Should be %d',nrow(data)))
 	    QTL_resid_Z = as(diag(1,nrow(data)),'dgCMatrix')
@@ -408,7 +408,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    } else {
 	      colnames(QTL_factors_X) = rep(colnames(QTL_factors$X),ncol(group_mm))
 	    }
-	    colnames(QTL_factors_X) = paste(colnames(group_mm)[i],colnames(QTL_factors_X),sep='.')
+	    colnames(QTL_factors_X) = paste(rep(colnames(group_mm),each = ncol(QTL_factors$X)),colnames(QTL_factors_X),sep='.')
 	  } else{
 	    if(nrow(QTL_factors) != nrow(data)) stop(sprintf('QTL_factors has wrong number of rows. Should be %d',nrow(data)))
 	    QTL_factors_Z = as(diag(1,nrow(data)),'dgCMatrix')
