@@ -124,8 +124,8 @@ sample_B_prec_combined_ARD = function(BSFG_state,...){
                            tau = rgamma(length(ib),
                                        shape = fixed_resid_prec_shape[ib] + ncol(B2)/2 + ncol(B_F2)/2,
                                        rate = fixed_resid_prec_rate[ib] +
-                                              rowSums((B2[ib,,drop=F] * B_prec[ib,,drop=F]/c(B_tau)[ib]))/2 +
-                                              rowSums(B_F2[ib_F,,drop=F] * B_F_prec[ib_F,,drop=F]/c(B_F_tau)[ib_F])/2)
+                                              rowSums((B2[ib,,drop=FALSE] * B_prec[ib,,drop=FALSE]/c(B_tau)[ib]))/2 +
+                                              rowSums(B_F2[ib_F,,drop=FALSE] * B_F_prec[ib_F,,drop=FALSE]/c(B_F_tau)[ib_F])/2)
                            B_tau[1,ib] = tau
                            B_F_tau[1,ib_F] = tau
                          }
@@ -134,7 +134,7 @@ sample_B_prec_combined_ARD = function(BSFG_state,...){
                            tau = rgamma(length(ib),
                                         shape = fixed_resid_prec_shape[ib] + ncol(B2)/2,
                                         rate = fixed_resid_prec_rate[ib] +
-                                          rowSums((B2[ib,,drop=F] * B_prec[ib,,drop=F]/c(B_tau)[ib]))/2)
+                                          rowSums((B2[ib,,drop=FALSE] * B_prec[ib,,drop=FALSE]/c(B_tau)[ib]))/2)
                            B_tau[1,ib] = tau
 
                          }
@@ -143,7 +143,7 @@ sample_B_prec_combined_ARD = function(BSFG_state,...){
                            tau = rgamma(length(ib),
                                         shape = fixed_resid_prec_shape[ib] + ncol(B_F2)/2,
                                         rate = fixed_resid_prec_rate[ib] +
-                                          rowSums(B_F2[ib,,drop=F] * B_F_prec[ib,,drop=F]/c(B_F_tau)[ib])/2)
+                                          rowSums(B_F2[ib,,drop=FALSE] * B_F_prec[ib,,drop=FALSE]/c(B_F_tau)[ib])/2)
                            B_F_tau[1,ib] = tau
 
                          }
