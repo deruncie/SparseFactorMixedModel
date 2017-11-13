@@ -342,15 +342,35 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	X_F = as(X_F,'dgCMatrix')
 
 	# -------- QTL effects ---------- #
-
 	QTL_resid_Z = QTL_resid_X = NULL
 	b_QTL = 0
 	if(!is.null(QTL_resid)){
 	  if(class(QTL_resid) == 'list'){
-	    QTL_terms = mkReTrms(findbars(QTL_resid$model),data,drop.unused.levels = FALSE)
+	    QTL_model = findbars(QTL_factors$model)
+	    if(length(QTL_model) == 0) stop('no grouping factors found in QTL_factors model')
+	    if(length(QTL_model) > 1)  stop('more than one grouping factor found in QTL_factors model')
+
+	    group_model = as.formula(paste0('~',as.character(QTL_model[[1]][2])))
+	    group_mm = model.matrix(group_model,data)
+
+	    groupIDs = levels(as.factor(data[[as.character(QTL_model[[1]][[3]])]]))
+
+	    QTL_terms = mkReTrms(QTL_model,data,drop.unused.levels = FALSE)
 	    QTL_resid_Z = as(t(QTL_terms$Zt),'dgCMatrix')
-	    if(!all(colnames(QTL_factors_Z) %in% rownames(QTL_resid$X))) stop(sprintf('Missing %s from QTL_resid$X',names(QTL_terms$cnms)[1]))
-	    QTL_resid_X = QTL_resid$X[colnames(QTL_factors_Z),]
+	    QTL_resid_Z = QTL_resid_Z[,c(matrix(1:ncol(QTL_resid_Z),ncol = ncol(group_mm),byrow=T))]
+	    if(!all(colnames(QTL_resid_Z) %in% rownames(QTL_factors$X))) stop(sprintf('Missing %s from QTL_factors$X',names(QTL_terms$cnms)[1]))
+	    if(!all(colnames(group_mm) == QTL_terms$cnms[[1]])) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+	    if(!all(colnames(QTL_resid_Z)[1:length(groupIDs)] == groupIDs)) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+
+	    QTL_resid_X = do.call(bdiag,lapply(1:ncol(group_mm),function(i) QTL_resid$X[groupIDs,]))
+	    QTL_resid_X = as.matrix(QTL_resid_X)
+
+	    if(is.null(colnames(QTL_resid$X))) {
+	      colnames(QTL_resid_X) = rep(paste0('m',1:ncol(QTL_resid$X)),ncol(group_mm))
+	    } else {
+	      colnames(QTL_resid_X) = rep(colnames(QTL_resid$X),ncol(group_mm))
+	    }
+	    colnames(QTL_resid_X) = paste(colnames(group_mm)[i],colnames(QTL_resid_X),sep='.')
 	  } else{
 	    if(nrow(QTL_resid) != nrow(data)) stop(sprintf('QTL_resid has wrong number of rows. Should be %d',nrow(data)))
 	    QTL_resid_Z = as(diag(1,nrow(data)),'dgCMatrix')
@@ -364,10 +384,31 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	b_QTL_F = 0
 	if(!is.null(QTL_factors)){
 	  if(class(QTL_factors) == 'list'){
-	    QTL_terms = mkReTrms(findbars(QTL_factors$model),data,drop.unused.levels = FALSE)
+	    QTL_model = findbars(QTL_factors$model)
+	    if(length(QTL_model) == 0) stop('no grouping factors found in QTL_factors model')
+	    if(length(QTL_model) > 1)  stop('more than one grouping factor found in QTL_factors model')
+
+	    group_model = as.formula(paste0('~',as.character(QTL_model[[1]][2])))
+	    group_mm = model.matrix(group_model,data)
+
+	    groupIDs = levels(as.factor(data[[as.character(QTL_model[[1]][[3]])]]))
+
+	    QTL_terms = mkReTrms(QTL_model,data,drop.unused.levels = FALSE)
 	    QTL_factors_Z = as(t(QTL_terms$Zt),'dgCMatrix')
+	    QTL_factors_Z = QTL_factors_Z[,c(matrix(1:ncol(QTL_factors_Z),ncol = ncol(group_mm),byrow=T))]
 	    if(!all(colnames(QTL_factors_Z) %in% rownames(QTL_factors$X))) stop(sprintf('Missing %s from QTL_factors$X',names(QTL_terms$cnms)[1]))
-	    QTL_factors_X = QTL_factors$X[colnames(QTL_factors_Z),]
+	    if(!all(colnames(group_mm) == QTL_terms$cnms[[1]])) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+	    if(!all(colnames(QTL_factors_Z)[1:length(groupIDs)] %in% groupIDs)) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+
+	    QTL_factors_X = do.call(bdiag,lapply(1:ncol(group_mm),function(i) QTL_factors$X[groupIDs,]))
+	    QTL_factors_X = as.matrix(QTL_factors_X)
+
+	    if(is.null(colnames(QTL_factors$X))) {
+	      colnames(QTL_factors_X) = rep(paste0('m',1:ncol(QTL_factors$X)),ncol(group_mm))
+	    } else {
+	      colnames(QTL_factors_X) = rep(colnames(QTL_factors$X),ncol(group_mm))
+	    }
+	    colnames(QTL_factors_X) = paste(colnames(group_mm)[i],colnames(QTL_factors_X),sep='.')
 	  } else{
 	    if(nrow(QTL_factors) != nrow(data)) stop(sprintf('QTL_factors has wrong number of rows. Should be %d',nrow(data)))
 	    QTL_factors_Z = as(diag(1,nrow(data)),'dgCMatrix')

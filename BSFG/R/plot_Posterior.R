@@ -266,6 +266,44 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
   }
 }
 
+
+summarize_posterior = function(X) {
+  X = coda::mcmc(X)
+  Xdata = data.frame(ID = 1:ncol(X),Mean = colMeans(X),Median = apply(X,2,median))
+  Xi = coda::HPDinterval(X,prob = 0.95)
+  Xdata$low_95 = Xi[,1]
+  Xdata$high_95 = Xi[,2]
+  Xi = coda::HPDinterval(X,prob = 0.8)
+  Xdata$low_80 = Xi[,1]
+  Xdata$high_80 = Xi[,2]
+  return(Xdata)
+}
+posterior_plot = function(X,xlab='',ylab='',colorSig = T,ylim = NULL,colorGroup = NULL) {
+  require(cowplot)
+  Xdata = summarize_posterior(X)
+  if(!is.null(colorGroup)) {
+    Xdata$color = colorGroup
+    if(colorSig) {
+      Xdata$color[sign(Xdata$low_95) == sign(Xdata$high_95)] = 'Significant'
+      Xdata$color = factor(Xdata$color,levels = c('Significant',unique(colorGroup)))
+    }
+  } else{
+    Xdata$color = 'NS'
+    if(colorSig) {
+      Xdata$color[sign(Xdata$low_95) == sign(Xdata$high_95)] = 'Sig'
+    }
+  }
+  if(is.null(ylim)) ylim = range(Xdata[,4:5])
+
+  p = ggplot(Xdata,aes(x=ID)) + geom_hline(yintercept = 0) +
+    xlab(xlab) + ylab(ylab) + ylim(ylim)+
+    geom_segment(aes(xend = ID,y = low_95,yend=high_95,color=color),size=.5) +
+    geom_segment(aes(xend = ID,y = low_80,yend=high_80,color=color),size = .9) +
+    geom_point(aes(y=Median,color = color)) +
+    theme(legend.position = 'none')
+  p
+}
+
 plot_diagnostics_simulation = function(BSFG_state){
   BSFG_state$Posterior = reload_Posterior(BSFG_state)
   plot_current_state_simulation(BSFG_state)
