@@ -170,7 +170,7 @@ sample_B_prec_combined_ARD = function(BSFG_state,...){
                            B_QTL_F2 = B_QTL_F^2 * tot_F_prec[rep(1,b_QTL_F),]
 
                            tau = rgamma(1,
-                                        shape = fixed_factors_QTL_prec_shape[1] + length(B_QTL2)/2 + length(B_QTL2)/2,
+                                        shape = fixed_factors_QTL_prec_shape[1] + length(B_QTL2)/2 + length(B_QTL_F2)/2,
                                         rate = fixed_factors_QTL_prec_rate[1] +
                                                   sum(B_QTL2 * B_QTL_prec/c(B_QTL_tau))/2 +
                                                   sum(B_QTL_F2 * B_QTL_F_prec/c(B_QTL_F_tau))/2)
@@ -179,6 +179,7 @@ sample_B_prec_combined_ARD = function(BSFG_state,...){
 
                            B_QTL_prec[] = matrix(rgamma(b_QTL*p,shape = (B_QTL_df + 1)/2,rate = (B_QTL_df + B_QTL2*c(B_QTL_tau))/2),nr = b_QTL,nc = p)
                            B_QTL_F_prec[] = matrix(rgamma(b_QTL_F*k,shape = (B_QTL_F_df + 1)/2,rate = (B_QTL_F_df + B_QTL_F2*t(B_QTL_F_tau)[,rep(1,k)])/2),nr = b_QTL_F,nc = k)
+                           B_QTL_prec[] = B_QTL_prec * c(B_QTL_tau)
                            B_QTL_F_prec[] = B_QTL_F_prec * t(B_QTL_F_tau)[,rep(1,k)]
                          }
 
