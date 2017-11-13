@@ -75,11 +75,12 @@ Image = function(X,dimnames=TRUE,...) {
 
   X_tall = reshape2::melt(X)
   colnames(X_tall) = c('Var1','Var2','value')
-  if(!is.null(colnames(X))) X_tall$Var2 = factor(X_tall$Var2)
-  if(!is.null(rownames(X))) X_tall$Var1 = factor(X_tall$Var1,levels = rev(unique(X_tall$Var1)))
+  if(!is.null(colnames(X))) X_tall$Var2 = factor(X_tall$Var2,levels = colnames(X))
+  if(!is.null(rownames(X))) X_tall$Var1 = factor(X_tall$Var1,levels = rev(rownames(X)))
   X_tall$value = as.numeric(X_tall$value)
   X_tall = X_tall[X_tall$value != 0,,drop=FALSE] # make it sparse again
-  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile(alpha = 0.8) + xlab('') + ylab('') + theme_minimal() + expand_limits(fill=0)
+  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile(alpha = 0.8) + xlab('') + ylab('') + theme_minimal() + expand_limits(fill=0)+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
   if(is.numeric(X_tall$Var2)) p <- p + xlim(0,ncol(X))
   if(is.numeric(X_tall$Var1)) p <- p + ylim(nrow(X),0)
   if(length(unique(X_tall$value))>2) p <- p + scale_fill_gradient2(na.value = "grey90",...)

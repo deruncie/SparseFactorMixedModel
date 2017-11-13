@@ -287,6 +287,7 @@ plot_diagnostics = function(BSFG_state){
     trace_plot_h2s(load_posterior_param(BSFG_state,'F_h2'))
     trace_plot_Lambda(load_posterior_param(BSFG_state,'Lambda'))
     try({trace_plot_Lambda(load_posterior_param(BSFG_state,'B_F'),main='B_F')},silent=T)
+    try({trace_plot_Lambda(load_posterior_param(BSFG_state,'B_QTL_F'),main='B_QTL_F')},silent=T)
     try({
       B = load_posterior_param(BSFG_state,'B')[,-1,]
       trace_plot_Lambda(B,main='B')},silent=T)
