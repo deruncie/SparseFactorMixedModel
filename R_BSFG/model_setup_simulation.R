@@ -7,7 +7,7 @@ library(Matrix)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 2
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 0, Ve = 2e-10,Vb = 2)
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 2, Ve = 2,Vb = 0)
 set.seed(seed)
 load('setup.RData')
 
@@ -34,15 +34,15 @@ K = setup$K
 data = setup$data
 X = setup$X
 
-zeros = diag(setup$G) < .01
-Y = Y + sweep(rstdnorm_mat(nrow(Y),ncol(Y)),2,c(0,1)[(zeros)+1],'*')
+# zeros = diag(setup$G) < .01
+# Y = Y + sweep(rstdnorm_mat(nrow(Y),ncol(Y)),2,c(0,1)[(zeros)+1],'*')
 
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  lambda_propto_Vp = T,
+  lambda_propto_Vp = T,cauchy_sigma_tot = F,
   scale_Y = FALSE,
-  simulation = TRUE,
+  simulation = F,
   h2_divisions = 20,
   h2_step_size = .3,
   burn = 100,
@@ -50,7 +50,7 @@ run_parameters = BSFG_control(
 )
 
 priors = BSFG_priors(
-  fixed_var = list(V = 1,     nu = 3),
+  fixed_var = list(V = .1,     nu = 3),
   # tot_Y_var = list(V = 0.5,   nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 3),
   tot_F_var = list(V = 18/20, nu = 20),
@@ -75,8 +75,13 @@ priors = BSFG_priors(
   #   delta_1   = list(shape = 2.1,  rate = 1/20),
   #   delta_2   = list(shape = 3, rate = 1)
   # ),
+  # B_prior = list(
+  #   sampler = sample_B_prec_ARD,
+  #   B_df      = 3,
+  #   B_F_df    = 3
+  # )
   B_prior = list(
-    sampler = sample_B_prec_ARD,
+    sampler = sample_B_prec_combined_ARD,
     B_df      = 3,
     B_F_df    = 3
   )

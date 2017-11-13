@@ -85,15 +85,7 @@ sample_MME_fixedEffects_hierarchical_c <- function(Y, Z, X, Sigma_Choleskys, h2s
     .Call(`_BSFG_sample_MME_fixedEffects_hierarchical_c`, Y, Z, X, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, grainSize)
 }
 
-XDXt_c <- function(X, d) {
-    .Call(`_BSFG_XDXt_c`, X, d)
-}
-
-forwardSolve_c <- function(chol_M, y) {
-    .Call(`_BSFG_forwardSolve_c`, chol_M, y)
-}
-
-chol_c <- function(C) {
-    .Call(`_BSFG_chol_c`, C)
+DpS_c <- function(X, Y) {
+    .Call(`_BSFG_DpS_c`, X, Y)
 }
 

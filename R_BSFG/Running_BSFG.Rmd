@@ -99,7 +99,7 @@ priors = BSFG_priors(
 # ---------------------------------------------------------- #
 ```{r}
 BSFG_state = BSFG_init(Y,
-                       model=~Fixed1+(1|animal), # This model has one fixed and one random term.
+                       model=~Fixed1+(1+Fixed1|animal), # This model has one fixed and one random term.
                        #factor_model_fixed = ~0, # we could specify a different fixed effect model for the factors
                        data = data, # the data.frame with information for constructing the model matrices
                        K_mats = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated
@@ -137,6 +137,7 @@ BSFG_state = BSFG_init(Y,
 
 ```{r}
 n_samples = 100;  # how many samples to collect at once?
+BSFG_state$run_parameters$simulation=F
 for(i  in 1:70) {
   print(sprintf('Run %d',i))
   BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)  # run MCMC chain n_samples iterations. grainSize is a paramter for parallelization (smaller = more parallelization)

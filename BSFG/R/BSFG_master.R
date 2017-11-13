@@ -46,7 +46,7 @@
 BSFG_control = function(
                         Posterior_folder = "Posterior",
                         simulation = c(F,T),scale_Y = c(T,F),
-                        lambda_propto_Vp = TRUE,cauchy_sigma_tot = TRUE,
+                        lambda_propto_Vp = TRUE,cauchy_sigma_tot = FALSE,
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
                         k_init = 20, h2_divisions = 100, h2_step_size = NULL,
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
@@ -235,7 +235,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
                      QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
                      Sigma_Choleskys = NULL, randomEffect_C_Choleskys = NULL,
                      invert_aI_bZKZ = NULL, invert_aZZt_Kinv = NULL,
-                     posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','U_R','cis_effects'),
+                     posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'),
                      posteriorMean_params = c(),
                      ncores = detectCores(),setup = NULL,verbose=T) {
 
@@ -271,17 +271,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   }
   Y_missing = observation_model_parameters$observation_setup$Y_missing
 
-	# if factor_model_fixed not specified, use fixed effects from model for both
-	if(is.null(factor_model_fixed)) {
-	  factor_model_fixed = nobars(model)
-	  same_fixed_model = TRUE  # keep track if the factors and residuals have same fixed effects
-	} else{
-	  same_fixed_model = FALSE
-	}
-
-	# check that there are no random effects specifed in factor_model_fixed
-	if(length(findbars(factor_model_fixed))) stop('Do not specify random effects in `factor_model_fixed`. Random effects for factors taken from `model`')
-
 	# check that all terms in models are in data
 	terms = c(all.vars(model),all.vars(factor_model_fixed))
 	if(!all(terms %in% colnames(data))) {
@@ -294,7 +283,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# build X from fixed model
 	  # for Eta
 	resid_intercept = FALSE     # is there an intercept? If so, don't penalize coefficient.
-	QTL_columns_resid = NULL    # indexes of columns of X for QTLs. They get a different penalty
 
 	X = model.matrix(nobars(model),data)
 	linear_combos = caret::findLinearCombos(X)
@@ -306,10 +294,57 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  resid_intercept = TRUE
 	}
 	b = ncol(X)
-	X = as(X,'dgCMatrix')
 	if(any(is.na(X))) stop('Missing values in X_resid')
 
+  # for F
+	# if factor_model_fixed not specified, use fixed effects from model for both
+	if(is.null(factor_model_fixed)) {
+	  factor_model_fixed = nobars(model)
+	}
+
+	# check that there are no random effects specifed in factor_model_fixed
+	if(length(findbars(factor_model_fixed))) stop('Do not specify random effects in `factor_model_fixed`. Random effects for factors taken from `model`')
+
+	X_F = model.matrix(factor_model_fixed,data)
+	linear_combos = caret::findLinearCombos(X_F)
+	if(!is.null(linear_combos$remove)) {
+	  cat(sprintf('dropping column(s) %s to make X_factor full rank\n',paste(linear_combos$remove,sep=',')))
+	  X_F = X_F[,-linear_combos$remove]
+	}
+	X_F = sweep(X_F,2,colMeans(X_F),'-') # note columns are centered, potentially resulting in zero-variance columns
+	b_F = ncol(X_F)
+	X_F_zero_variance = apply(X_F,2,var) == 0
+	X_Fm = X_F
+	if(any(is.na(X_F))) stop('Missing values in X_F')
+
+	# identify fixed effects present in both X and X_F
+	fixed_effects_common = matrix(0,nr=2,nc=0)  # 2 x b_c matrix with row1 indexes of X and row2 corresponding indexes of X_F
+	non_null_X = which(apply(X,2,var)>0)
+	non_null_XF = which(!X_F_zero_variance)
+	if(length(non_null_X) > 0 && length(non_null_XF) > 0){
+  	cor_X = abs(cor(X[,non_null_X],X_F[,non_null_XF]))
+  	for(j in 1:nrow(cor_X)){
+  	  if(any(cor_X[j,] == 1)){
+        fixed_effects_common = cbind(fixed_effects_common,c(non_null_X[j],non_null_XF[which(cor_X[j,] == 1)[1]]))
+      }
+  	}
+	}
+	fixed_effects_only_resid = NULL
+	fixed_effects_only_factors = NULL
+	if(ncol(fixed_effects_common) < ncol(X)){
+	  fixed_effects_only_resid = (1:ncol(X))[-fixed_effects_common[1,]]
+	}
+	if(ncol(fixed_effects_common) < ncol(X_F)){
+	  fixed_effects_only_factors = (1:ncol(X_F))[-fixed_effects_common[2,]]
+	}
+
+	X = as(X,'dgCMatrix')
+	X_F = as(X_F,'dgCMatrix')
+
+	# -------- QTL effects ---------- #
+
 	QTL_resid_Z = QTL_resid_X = NULL
+	b_QTL = 0
 	if(!is.null(QTL_resid)){
 	  if(class(QTL_resid) == 'list'){
 	    QTL_terms = mkReTrms(findbars(QTL_resid$model),data,drop.unused.levels = FALSE)
@@ -322,29 +357,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    if(is.data.frame(QTL_resid)) QTL_resid = as.matrix(QTL_resid)
 	    QTL_resid_X = QTL_resid
 	  }
-	  same_fixed_model = FALSE
-	  if(any(is.na(QTL_resid_X))) stop('Missing values in QTL_resid_X')
-	  QTL_columns_resid = b+1:ncol(QTL_resid_X)
-	  X = cbind(X,QTL_resid_Z %*% QTL_resid_X)
-	  b = ncol(X)
+	  b_QTL = ncol(QTL_resid_X)
 	}
-
-  # for F
-	QTL_columns_factors = NULL
-	  # note columns are centered, potentially resulting in zero-variance columns
-	X_F = model.matrix(factor_model_fixed,data)
-	linear_combos = caret::findLinearCombos(X_F)
-	if(!is.null(linear_combos$remove)) {
-	  cat(sprintf('dropping column(s) %s to make X_factor full rank\n',paste(linear_combos$remove,sep=',')))
-	  X_F = X_F[,-linear_combos$remove]
-	}
-	b_F = ncol(X_F)
-	X_F_zero_variance = apply(X_F,2,var) == 0
-	X_F = as(X_F,'dgCMatrix')
-	if(any(is.na(X_F))) stop('Missing values in X_F')
-
 
 	QTL_factors_Z = QTL_factors_X = NULL
+	b_QTL_F = 0
 	if(!is.null(QTL_factors)){
 	  if(class(QTL_factors) == 'list'){
 	    QTL_terms = mkReTrms(findbars(QTL_factors$model),data,drop.unused.levels = FALSE)
@@ -357,13 +374,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
 	    QTL_factors_X = QTL_factors
 	  }
-	  same_fixed_model = FALSE
-	  if(any(is.na(QTL_factors_X))) stop('Missing values in QTL_factors_X')
-	  QTL_columns_factors = b_F+1:ncol(QTL_factors_X)
-	  X_F = cbind(X_F,QTL_factors_Z %*% QTL_factors_X)
-	  b_F = ncol(X_F)
-	  X_F_zero_variance = apply(X_F,2,var) == 0
-	  X_F = as(X_F,'dgCMatrix')
+	  b_QTL_F = ncol(QTL_factors_X)
 	}
 
 
@@ -606,7 +617,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
   Qt_list = list()
   QtX_list = list()
-  QtXF_list = list()
+  Qt_QTL_resid_Z_list = list()
   QtZL_list = list()
   Qt_cis_genotypes_list = list()
   randomEffect_C_Choleskys_list = list()
@@ -645,12 +656,16 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
     QtZL_set = as(QtZL_set,'dgCMatrix')
     QtX_set = Qt %**% X[x,,drop=FALSE]
-    QtXF_set = Qt %**% X_F[x,,drop=FALSE]  # This one is only needed for set==1
+    if(!is.null(QTL_resid_Z)){
+      Qt_QTL_resid_Z_set = as(drop0(Qt %*% QTL_resid_Z[x,,drop=FALSE],tol=run_parameters$drop0_tol),'dgCMatrix')
+    } else{
+      Qt_QTL_resid_Z_set = NULL
+    }
     Qt_cis_genotypes_set = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
 
     Qt_list[[set]]   = Qt
     QtX_list[[set]]  = QtX_set
-    QtXF_list[[set]] = QtXF_set
+    Qt_QTL_resid_Z_list[[set]] = Qt_QTL_resid_Z_set
     QtZL_list[[set]]  = QtZL_set
     Qt_cis_genotypes_list[[set]] = Qt_cis_genotypes_set
 
@@ -692,8 +707,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   }
   if(verbose) close(pb)
 
+  # Qt matrices for factors are only used with row set 1
+  x = Missing_data_map[[1]]$Y_obs
+  Qt1_XF = Qt_list[[1]] %**% X_F[x,,drop=FALSE]
   if(!is.null(QTL_factors_Z)){
-    Qt1_QTL_Factors_Z = Qt_list[[1]] %*% QTL_factors_Z  # since QTL_factors_Z only used with complete data, only calculate this for set 1.
+    Qt1_QTL_Factors_Z = as(drop0(Qt_list[[1]] %*% QTL_factors_Z[x,,drop=FALSE],tol = run_parameters$drop0_tol),'dgCMatrix')
   } else{
     Qt1_QTL_Factors_Z = NULL
   }
@@ -704,18 +722,23 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     n      = n,
     r_RE   = r_RE,
     RE_names = RE_names,
-    b      = b,
-    b_F    = b_F,
+    b       = b,
+    b_F     = b_F,
+    b_QTL   = b_QTL,
+    b_QTL_F = b_QTL_F,
+    fixed_effects_common = fixed_effects_common,
+    fixed_effects_only_resid = fixed_effects_only_resid,
+    fixed_effects_only_factors = fixed_effects_only_factors,
     resid_intercept   = resid_intercept,
-    same_fixed_model  = same_fixed_model,
     X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
     n_cis_effects     = n_cis_effects,
     cis_effects_index = cis_effects_index,
     Qt_list    = Qt_list,
     QtX_list   = QtX_list,
-    QtXF_list  = QtXF_list,
+    Qt_QTL_resid_Z_list = Qt_QTL_resid_Z_list,
     QtZL_list   = QtZL_list,
     Qt_cis_genotypes_list = Qt_cis_genotypes_list,
+    Qt1_XF  = Qt1_XF,
     Qt1_QTL_Factors_Z = Qt1_QTL_Factors_Z,
     Missing_data_map      = Missing_data_map,
     Missing_row_data_map  = Missing_row_data_map,
@@ -734,8 +757,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  RE_indices  = RE_indices,
 	  h2s_matrix  = h2s_matrix,
 	  cis_genotypes = cis_genotypes,
-	  QTL_columns_resid = QTL_columns_resid,
-	  QTL_columns_factors = QTL_columns_factors,
 	  QTL_resid_Z = QTL_resid_Z,
 	  QTL_resid_X = QTL_resid_X,
 	  QTL_factors_Z = QTL_factors_Z,
@@ -763,25 +784,25 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	if(length(priors$fixed_factors_var$V) == 0){
 	  priors$fixed_factors_var = priors$fixed_resid_var
 	} else if(length(priors$fixed_factors_var$V) == 1){
-	  priors$fixed_factors_var$V = rep(priors$fixed_factors_var$V,b)
-	  priors$fixed_factors_var$nu = rep(priors$fixed_factors_var$nu,b)
+	  priors$fixed_factors_var$V = rep(priors$fixed_factors_var$V,b_F)
+	  priors$fixed_factors_var$nu = rep(priors$fixed_factors_var$nu,b_F)
 	}
 
-	if(length(QTL_columns_resid)>0){
+	if(b_QTL > 0){
 	  if(length(priors$QTL_resid_var$V) == 1) {
-	    priors$QTL_resid_var$V = rep(priors$QTL_resid_var$V,length(QTL_columns_resid))
-	    priors$QTL_resid_var$nu = rep(priors$QTL_resid_var$nu,length(QTL_columns_resid))
+	    priors$QTL_resid_var$V = rep(priors$QTL_resid_var$V,b_QTL)
+	    priors$QTL_resid_var$nu = rep(priors$QTL_resid_var$nu,b_QTL)
 	  }
-	  priors$fixed_resid_var$V[QTL_columns_resid] = priors$QTL_resid_var$V
-	  priors$fixed_resid_var$nu[QTL_columns_resid] = priors$QTL_resid_var$nu
+	  priors$fixed_resid_QTL_prec_rate   = with(priors$QTL_resid_var,V * nu)
+	  priors$fixed_resid_QTL_prec_shape  = with(priors$QTL_resid_var,nu - 1)
 	}
-	if(length(QTL_columns_factors)>0){
+	if(b_QTL_F > 0){
 	  if(length(priors$QTL_factors_var$V) == 1) {
-	    priors$QTL_factors_var$V = rep(priors$QTL_factors_var$V,length(QTL_columns_factors))
-	    priors$QTL_factors_var$nu = rep(priors$QTL_factors_var$nu,length(QTL_columns_factors))
+	    priors$QTL_factors_var$V = rep(priors$QTL_factors_var$V,b_QTL_F)
+	    priors$QTL_factors_var$nu = rep(priors$QTL_factors_var$nu,b_QTL_F)
 	  }
-	  priors$fixed_factors_var$V[QTL_columns_factors] = priors$QTL_factors_var$V
-	  priors$fixed_factors_var$nu[QTL_columns_factors] = priors$QTL_factors_var$nu
+	  priors$fixed_factors_QTL_prec_rate   = with(priors$QTL_factors_var,V * nu)
+	  priors$fixed_factors_QTL_prec_shape  = with(priors$QTL_factors_var,nu - 1)
 	}
 
 	priors$fixed_resid_prec_rate   = with(priors$fixed_resid_var,V * nu)
@@ -798,11 +819,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	priors$tot_Eta_prec_shape  = with(priors$tot_Y_var,nu - 1)
 	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
 	priors$tot_F_prec_shape    = with(priors$tot_F_var,nu - 1)
-	#   # delta: column shrinkage of Lambda
-	# priors$delta_1_rate    = priors$delta_1$rate
-	# priors$delta_1_shape   = priors$delta_1$shape
-	# priors$delta_2_rate    = priors$delta_2$rate
-	# priors$delta_2_shape   = priors$delta_2$shape
 
 	# h2_priors_resids
 	if(exists('h2_priors_resids',priors)) {
@@ -929,10 +945,15 @@ initialize_variables = function(BSFG_state,...){
     # Factor fixed effects
     B_F = 0*matrix(rnorm(b_F * k),b_F,k)
 
+    # QTL effects
+    B_QTL = 0*rstdnorm_mat(b_QTL,p)
+    B_QTL_F = 0*rstdnorm_mat(b_QTL_F,k)
+
     # cis effects
     cis_effects = matrix(rnorm(cis_effects_index[length(cis_effects_index)]-1,0,1),nrow=1)
 
-    XB = as.matrix(X %*% B)
+    XB = X %**% B
+    if(b_QTL > 0) XB = XB + QTL_resid_Z %**% (QTL_resid_X %**% B_QTL)
 
     F = X_F %*% B_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
     for(effect in RE_names) {
@@ -959,6 +980,8 @@ initialize_variables = function(BSFG_state,...){
       U_R            = U_R,
       B              = B,
       B_F            = B_F,
+      B_QTL          = B_QTL,
+      B_QTL_F        = B_QTL_F,
       XB             = XB,
       cis_effects    = cis_effects,
       nrun           = 0,

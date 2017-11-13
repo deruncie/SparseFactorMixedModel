@@ -319,38 +319,15 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// XDXt_c
-MatrixXd XDXt_c(Map<MatrixXd> X, Map<VectorXd> d);
-RcppExport SEXP _BSFG_XDXt_c(SEXP XSEXP, SEXP dSEXP) {
+// DpS_c
+MatrixXd DpS_c(Map<MatrixXd> X, MSpMat Y);
+RcppExport SEXP _BSFG_DpS_c(SEXP XSEXP, SEXP YSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type X(XSEXP);
-    Rcpp::traits::input_parameter< Map<VectorXd> >::type d(dSEXP);
-    rcpp_result_gen = Rcpp::wrap(XDXt_c(X, d));
-    return rcpp_result_gen;
-END_RCPP
-}
-// forwardSolve_c
-VectorXd forwardSolve_c(Map<MatrixXd> chol_M, Map<VectorXd> y);
-RcppExport SEXP _BSFG_forwardSolve_c(SEXP chol_MSEXP, SEXP ySEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type chol_M(chol_MSEXP);
-    Rcpp::traits::input_parameter< Map<VectorXd> >::type y(ySEXP);
-    rcpp_result_gen = Rcpp::wrap(forwardSolve_c(chol_M, y));
-    return rcpp_result_gen;
-END_RCPP
-}
-// chol_c
-MatrixXd chol_c(Map<MatrixXd> C);
-RcppExport SEXP _BSFG_chol_c(SEXP CSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type C(CSEXP);
-    rcpp_result_gen = Rcpp::wrap(chol_c(C));
+    Rcpp::traits::input_parameter< MSpMat >::type Y(YSEXP);
+    rcpp_result_gen = Rcpp::wrap(DpS_c(X, Y));
     return rcpp_result_gen;
 END_RCPP
 }

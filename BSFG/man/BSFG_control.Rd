@@ -5,7 +5,7 @@
 \title{Set BSFG run parameters}
 \usage{
 BSFG_control(Posterior_folder = "Posterior", simulation = c(F, T),
-  scale_Y = c(T, F), lambda_propto_Vp = TRUE, cauchy_sigma_tot = TRUE,
+  scale_Y = c(T, F), lambda_propto_Vp = TRUE, cauchy_sigma_tot = FALSE,
   b0 = 1, b1 = 5e-04, epsilon = 0.1, prop = 1, k_init = 20,
   h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
   K_eigen_tol = 1e-10, burn = 100, thin = 2,

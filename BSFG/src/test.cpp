@@ -5,23 +5,66 @@
 // [[Rcpp::depends(RcppEigen)]]
 using namespace Eigen;
 using namespace RcppParallel;
-
 // [[Rcpp::export()]]
-MatrixXd XDXt_c(Map<MatrixXd> X, Map<VectorXd> d){
-  return(X * d.asDiagonal() * X.transpose());
+MatrixXd DpS_c(Map<MatrixXd> X,MSpMat Y){
+  return(X+Y);
 }
 
-// [[Rcpp::export()]]
-VectorXd forwardSolve_c(Map<MatrixXd> chol_M, Map<VectorXd> y){
-  return(chol_M.transpose().triangularView<Lower>().solve(y));
-}
+//
+// // // [[Rcpp::export()]]
+// // MatrixXd XDXt_c(Map<MatrixXd> X, Map<VectorXd> d){
+// //   return(X * d.asDiagonal() * X.transpose());
+// // }
+// //
+// // // [[Rcpp::export()]]
+// // VectorXd forwardSolve_c(Map<MatrixXd> chol_M, Map<VectorXd> y){
+// //   return(chol_M.transpose().triangularView<Lower>().solve(y));
+// // }
+// //
+// // // [[Rcpp::export()]]
+// // MatrixXd chol_c(Map<MatrixXd> C){
+// //     LLT<MatrixXd> C_llt;
+// //     C_llt.compute(C);
+// //     return(C_llt.matrixU());
+// // }
+// // [[Rcpp::export()]]
+// VectorXd sample_MME_single_hierarchical_diagK2(  // returns b x 1 vector
+//     VectorXd y,           // nx1
+//     MSpMat   Z,           // nxr   // use when r < n < b
+//     MatrixXd X,           // rxb
+//     VectorXd prior_mean,  // bx1
+//     VectorXd prior_prec,  // bx1
+//     MSpMat chol_R,        // nxn upper triangular Cholesky decomposition of R. Format: dgCMatrix
+//     double tot_Eta_prec, // double
+//     VectorXd randn_theta, // bx1
+//     VectorXd randn_e      // 0x1 or nx1. 0x1 if b<n
+// ){
+//   VectorXd theta_star = randn_theta.array() / prior_prec.cwiseSqrt().array();
+//   theta_star += prior_mean;
+//   VectorXd e_star = chol_R.transpose() * (randn_e / sqrt(tot_Eta_prec));
+//   MatrixXd ZX = Z*X;
+//   MatrixXd ZX_theta_star = ZX * theta_star;
+//   VectorXd y_resid = y - ZX_theta_star - e_star;
+//
+//   MatrixXd RinvSqZ = chol_R.transpose().triangularView<Lower>().solve(Z.toDense() * sqrt(tot_Eta_prec));
+//   MatrixXd RinvSqZX = RinvSqZ*X;
+//   VectorXd XtZtRinvy = RinvSqZX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y_resid * sqrt(tot_Eta_prec));
+//
+//   VectorXd theta_tilda;
+//   MatrixXd VAi = X * prior_prec.cwiseInverse().asDiagonal();
+//   MatrixXd I(Z.cols(),Z.cols());
+//   I.setIdentity();
+//   MatrixXd ZtRinvZ = RinvSqZ.transpose()*RinvSqZ;
+//   MatrixXd inner = VAi*X.transpose() + ZtRinvZ.ldlt().solve(I);
+//   VectorXd VAiXtURinvy = VAi * XtZtRinvy;
+//   VectorXd outerXtURinvy = VAi.transpose() * inner.ldlt().solve(VAiXtURinvy);
+//   theta_tilda = XtZtRinvy.array() / prior_prec.array();
+//   theta_tilda -= outerXtURinvy;
+//   VectorXd theta = theta_star + theta_tilda;
+//
+//   return(theta);
+// }
 
-// [[Rcpp::export()]]
-MatrixXd chol_c(Map<MatrixXd> C){
-    LLT<MatrixXd> C_llt;
-    C_llt.compute(C);
-    return(C_llt.matrixU());
-}
 
 //
 //
