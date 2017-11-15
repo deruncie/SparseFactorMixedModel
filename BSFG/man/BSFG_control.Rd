@@ -9,8 +9,7 @@ BSFG_control(Posterior_folder = "Posterior", simulation = c(F, T),
   b0 = 1, b1 = 5e-04, epsilon = 0.1, prop = 1, k_init = 20,
   h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
   K_eigen_tol = 1e-10, burn = 100, thin = 2,
-  delta_iteractions_factor = 100, impute_missing = FALSE, svd_K = TRUE,
-  ...)
+  delta_iteractions_factor = 100, num_NA_groups = Inf, svd_K = TRUE, ...)
 }
 \arguments{
 \item{Posterior_folder}{path to folder to save posterior samples. Samples of each parameter
@@ -65,7 +64,9 @@ untransformed.}
 
 \item{delta_iteractions_factor}{Number of times to iterate through sample_delta per iteration of the other parameters}
 
-\item{impute_missing}{If FALSE, missing data will be ignored in the sampler. If TRUE, missing data will be imputed during sampling.}
+\item{num_NA_groups}{If 0, all NAs will be imputed during sampling. If Inf, all NAs will be marginalized over.
+If in (0,Inf), up to this many groups of columns will be separately sampled.
+The minimum number of NAs in each column not in one of these groups will be imputed.}
 
 \item{svd_K}{If TRUE, and a 1-random effect model is specified, the the diagonalization of ZKZt is accomplished using this algorithm:
 https://math.stackexchange.com/questions/67231/singular-value-decomposition-of-product-of-matrices which doesn't require forming ZKTt.

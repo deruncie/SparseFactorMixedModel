@@ -37,7 +37,9 @@
 #' @param burn burnin length of the MCMC chain
 #' @param thin thinning rate of the MCMC chain
 #' @param delta_iteractions_factor Number of times to iterate through sample_delta per iteration of the other parameters
-#' @param impute_missing If FALSE, missing data will be ignored in the sampler. If TRUE, missing data will be imputed during sampling.
+#' @param num_NA_groups If 0, all NAs will be imputed during sampling. If Inf, all NAs will be marginalized over.
+#'     If in (0,Inf), up to this many groups of columns will be separately sampled.
+#'     The minimum number of NAs in each column not in one of these groups will be imputed.
 #' @param svd_K If TRUE, and a 1-random effect model is specified, the the diagonalization of ZKZt is accomplished using this algorithm:
 #'     https://math.stackexchange.com/questions/67231/singular-value-decomposition-of-product-of-matrices which doesn't require forming ZKTt.
 #'     If FALSE, the SVD of ZKZt is calculated directly. TRUE is generally faster if the same genomes are repeated several times.
@@ -52,7 +54,7 @@ BSFG_control = function(
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,thin = 2,
                         delta_iteractions_factor = 100,
-                        impute_missing = FALSE,
+                        num_NA_groups = Inf,
                         svd_K = TRUE,
                         ...
                         ) {
@@ -596,17 +598,37 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
 	# first, identify sets of traits with same pattern of missingness
   # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
-	if(!run_parameters$impute_missing) {
+	if(run_parameters$num_NA_groups > 0) {
 	  # columns with same patterns of missing data
-    Y_col_obs = lapply(1:ncol(Y_missing),function(x) {
-      obs = which(!Y_missing[,x],useNames=F)
+	  Y_missing_mat = as.matrix(Y_missing)
+    Y_col_obs = lapply(1:ncol(Y_missing_mat),function(x) {
+      obs = which(!Y_missing_mat[,x],useNames=F)
       names(obs) = NULL
       obs
     })
-    non_missing_rows = unname(which(rowSums(!Y_missing)>0))
+    non_missing_rows = unname(which(rowSums(!Y_missing_mat)>0))
     unique_Y_col_obs = unique(c(list(non_missing_rows),Y_col_obs))
     unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
     Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
+
+    if(length(unique_Y_col_obs) > run_parameters$num_NA_groups){
+      col_counts = sort(tapply(Y_col_obs_index,Y_col_obs_index,length),decreasing = T)
+      biggest_cols = as.numeric(names(col_counts))[1:run_parameters$num_NA_groups]
+      biggest_cols = unique(c(1,biggest_cols))
+      unique_Y_col_obs = unique_Y_col_obs[biggest_cols]
+      Y_col_obs_index_new = rep(NA,length(Y_col_obs))
+      for(i in 1:length(Y_col_obs_index)){
+        if(Y_col_obs_index[i] %in% biggest_cols){
+          Y_col_obs_index_new[i] = match(Y_col_obs_index[i],biggest_cols)
+        } else{
+          diffs = sapply(unique_Y_col_obs,function(x) sum(Y_col_obs[[i]] %in% x == F) + sum(x %in% Y_col_obs[[i]] == F))
+          Y_col_obs_index_new[i] = order(diffs)[1]
+          Y_missing_mat[,i] = T
+          Y_missing_mat[unique_Y_col_obs[[Y_col_obs_index_new[i]]],i] = F
+        }
+      }
+      Y_col_obs_index = Y_col_obs_index_new
+    }
 
     Missing_data_map = lapply(seq_along(unique_Y_col_obs),function(i) {
       x = unique_Y_col_obs[[i]]
@@ -617,12 +639,12 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     })
 
     # rows with same patterns of missing data
-    Y_row_obs = lapply(1:nrow(Y_missing),function(x) {
-      obs = which(!Y_missing[x,],useNames=F)
+    Y_row_obs = lapply(1:nrow(Y_missing_mat),function(x) {
+      obs = which(!Y_missing_mat[x,],useNames=F)
       names(obs) = NULL
       obs
     })
-    non_missing_cols = unname(which(colSums(!Y_missing)>0))
+    non_missing_cols = unname(which(colSums(!Y_missing_mat)>0))
     unique_Y_row_obs = unique(c(list(non_missing_cols),Y_row_obs))
     unique_Y_row_obs_str = lapply(unique_Y_row_obs,paste,collapse='')
     Y_row_obs_index = sapply(Y_row_obs,function(x) which(unique_Y_row_obs_str == paste(x,collapse='')))
