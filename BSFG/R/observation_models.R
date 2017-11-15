@@ -34,15 +34,17 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
       if(scale_Y){
         Mean_Y = colMeans(Y,na.rm=T)
         VY = apply(Y,2,var,na.rm=T)
-        Y = sweep(Y,2,Mean_Y,'-')
-        Y = sweep(Y,2,sqrt(VY),'/')
+        Eta = sweep(Y,2,Mean_Y,'-')
+        Eta = sweep(Eta,2,sqrt(VY),'/')
       } else {
+        Eta = Y
         p_Y = dim(Y)[2]
         Mean_Y = rep(0,p_Y)
         VY = rep(1,p_Y)
       }
       Y_missing = as(is.na(Y),'lgTMatrix')# un-compressed logical sparse matrix
       return(list(
+        Eta = Eta,
         n = nrow(Y),
         p = ncol(Y),
         traitnames = colnames(Y),
@@ -57,7 +59,6 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
   }
 
   observation_model_state = with(c(observation_model_parameters,observation_model_parameters$observation_setup,data_matrices,current_state),{
-    Eta = Y
     Eta_mean = matrix(0,0,0)
     if(n_missing > 0){
       n = nrow(Y)
