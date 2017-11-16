@@ -96,7 +96,8 @@ sample_B_prec_combined_ARD = function(BSFG_state,...){
                          B_df   = B_prior$B_df,
                          B_F_df = B_prior$B_F_df,
                          B_QTL_df   = B_prior$B_QTL_df,
-                         B_QTL_F_df = B_prior$B_QTL_F_df
+                         B_QTL_F_df = B_prior$B_QTL_F_df,
+                         separate_QTL_shrinkage = B_prior$separate_QTL_shrinkage
                        ),within(current_state,{
 
                          # initialize variables if needed
@@ -159,28 +160,61 @@ sample_B_prec_combined_ARD = function(BSFG_state,...){
                          B_F_prec[X_F_zero_variance,] = 1e10
 
 
-                         if(b_QTL + b_QTL_F > 0){
-                           if(!exists('B_QTL_tau')){
-                             B_QTL_tau = matrix(1,1,b_QTL)
-                             B_QTL_F_tau = matrix(1,1,b_QTL_F)
-                             B_QTL_prec = matrix(1,b_QTL,p)
-                             B_QTL_F_prec = matrix(1,b_QTL_F,k)
+                         if(is.null(separate_QTL_shrinkage) || separate_QTL_shrinkage == FALSE){
+                           if(b_QTL + b_QTL_F > 0){
+                             if(!exists('B_QTL_tau')){
+                               B_QTL_tau = matrix(1,1,b_QTL)
+                               B_QTL_F_tau = matrix(1,1,b_QTL_F)
+                               B_QTL_prec = matrix(1,b_QTL,p)
+                               B_QTL_F_prec = matrix(1,b_QTL_F,k)
+                             }
+                             B_QTL2 = B_QTL^2
+                             B_QTL_F2 = B_QTL_F^2 * tot_F_prec[rep(1,b_QTL_F),]
+
+                             tau = rgamma(1,
+                                          shape = fixed_factors_QTL_prec_shape[1] + length(B_QTL2)/2 + length(B_QTL_F2)/2,
+                                          rate = fixed_factors_QTL_prec_rate[1] +
+                                                    sum(B_QTL2 * B_QTL_prec/c(B_QTL_tau))/2 +
+                                                    sum(B_QTL_F2 * B_QTL_F_prec/c(B_QTL_F_tau))/2)
+                             B_QTL_tau[] = tau
+                             B_QTL_F_tau[] = tau
+
+                             B_QTL_prec[] = matrix(rgamma(b_QTL*p,shape = (B_QTL_df + 1)/2,rate = (B_QTL_df + B_QTL2*c(B_QTL_tau))/2),nr = b_QTL,nc = p)
+                             B_QTL_F_prec[] = matrix(rgamma(b_QTL_F*k,shape = (B_QTL_F_df + 1)/2,rate = (B_QTL_F_df + B_QTL_F2*t(B_QTL_F_tau)[,rep(1,k)])/2),nr = b_QTL_F,nc = k)
+                             B_QTL_prec[] = B_QTL_prec * c(B_QTL_tau)
+                             B_QTL_F_prec[] = B_QTL_F_prec * t(B_QTL_F_tau)[,rep(1,k)]
                            }
-                           B_QTL2 = B_QTL^2
-                           B_QTL_F2 = B_QTL_F^2 * tot_F_prec[rep(1,b_QTL_F),]
+                         } else {
+                           if(b_QTL > 0){
+                             if(!exists('B_QTL_tau')){
+                               B_QTL_tau = matrix(1,1,p)
+                               B_QTL_prec = matrix(1,b_QTL,p)
+                             }
+                             B_QTL2 = B_QTL^2
+                             tau = rgamma(p,
+                                          shape = fixed_factors_QTL_prec_shape[1] + nrow(B_QTL2)/2,
+                                          rate = fixed_factors_QTL_prec_rate[1] +
+                                                colSums(B_QTL2 * B_QTL_prec/B_QTL_tau[rep(1,b_QTL),])/2)
+                             B_QTL_tau[] = tau
 
-                           tau = rgamma(1,
-                                        shape = fixed_factors_QTL_prec_shape[1] + length(B_QTL2)/2 + length(B_QTL_F2)/2,
-                                        rate = fixed_factors_QTL_prec_rate[1] +
-                                                  sum(B_QTL2 * B_QTL_prec/c(B_QTL_tau))/2 +
-                                                  sum(B_QTL_F2 * B_QTL_F_prec/c(B_QTL_F_tau))/2)
-                           B_QTL_tau[] = tau
-                           B_QTL_F_tau[] = tau
+                             B_QTL_prec[] = matrix(rgamma(b_QTL*p,shape = (B_QTL_df + 1)/2,rate = (B_QTL_df + B_QTL2*B_QTL_tau[rep(1,b_QTL),])/2),nr = b_QTL,nc = p)
+                             B_QTL_prec[] = B_QTL_prec * B_QTL_tau[rep(1,b_QTL),]
+                           }
+                           if(b_QTL_F > 0){
+                             if(!exists('B_QTL_F_tau')){
+                               B_QTL_F_tau = matrix(1,1,k)
+                               B_QTL_F_prec = matrix(1,b_QTL_F,k)
+                             }
+                             B_QTL_F2 = B_QTL_F^2 * tot_F_prec[rep(1,b_QTL_F),]
+                             tau = rgamma(k,
+                                          shape = fixed_factors_QTL_prec_shape[1] + nrow(B_QTL_F2)/2,
+                                          rate = fixed_factors_QTL_prec_rate[1] +
+                                                  colSums(B_QTL_F2 * B_QTL_F_prec/B_QTL_F_tau[rep(1,b_QTL_F),])/2)
+                             B_QTL_F_tau[] = tau
 
-                           B_QTL_prec[] = matrix(rgamma(b_QTL*p,shape = (B_QTL_df + 1)/2,rate = (B_QTL_df + B_QTL2*c(B_QTL_tau))/2),nr = b_QTL,nc = p)
-                           B_QTL_F_prec[] = matrix(rgamma(b_QTL_F*k,shape = (B_QTL_F_df + 1)/2,rate = (B_QTL_F_df + B_QTL_F2*t(B_QTL_F_tau)[,rep(1,k)])/2),nr = b_QTL_F,nc = k)
-                           B_QTL_prec[] = B_QTL_prec * c(B_QTL_tau)
-                           B_QTL_F_prec[] = B_QTL_F_prec * t(B_QTL_F_tau)[,rep(1,k)]
+                             B_QTL_F_prec[] = matrix(rgamma(b_QTL_F*k,shape = (B_QTL_F_df + 1)/2,rate = (B_QTL_F_df + B_QTL_F2*B_QTL_F_tau[rep(1,b_QTL_F),])/2),nr = b_QTL_F,nc = k)
+                             B_QTL_F_prec[] = B_QTL_F_prec * B_QTL_F_tau[rep(1,b_QTL_F),]
+                           }
                          }
 
                        })))
