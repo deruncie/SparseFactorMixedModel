@@ -5,14 +5,16 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
   current_state  = BSFG_state$current_state
 
   current_state = with(c(priors,run_variables,run_parameters),
-                       with(list(
-                         # load priors
-                         Lambda_df     = Lambda_prior$Lambda_df,
-                         delta_1_rate  = Lambda_prior$delta_1$rate,
-                         delta_1_shape = Lambda_prior$delta_1$shape,
-                         delta_2_rate  = Lambda_prior$delta_2$rate,
-                         delta_2_shape = Lambda_prior$delta_2$shape
-                       ),within(current_state,{
+                       with(Lambda_prior,{
+
+                         if(!exists('delta_iteractions_factor')) delta_iteractions_factor = 100
+
+                         delta_1_shape = delta_1$shape
+                         delta_1_rate  = delta_1$rate
+                         delta_2_shape = delta_2$shape
+                         delta_2_rate  = delta_2$rate
+
+                         within(current_state,{
 
                          # initialize variables if needed
                          if(!exists('delta')){
@@ -46,7 +48,8 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
                          if(lambda_propto_Vp){
                           Plam[] = Plam * tot_Eta_prec[1,]
                          }
-                       })))
+                       })
+                }))
   return(current_state)
 }
 

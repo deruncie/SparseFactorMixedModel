@@ -53,7 +53,6 @@ BSFG_control = function(
                         k_init = 20, h2_divisions = 100, h2_step_size = NULL,
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,thin = 2,
-                        delta_iteractions_factor = 100,
                         num_NA_groups = Inf,
                         svd_K = TRUE,
                         ...
@@ -113,26 +112,30 @@ BSFG_control = function(
 #'
 #' @examples
 BSFG_priors = function(
-                        fixed_var = list(V = 1,     nu = 3),
-                        fixed_resid_var = NULL,
-                        fixed_factors_var = NULL,
-                        QTL_resid_var = NULL,
-                        QTL_factors_var = NULL,
                         tot_Y_var = list(V = 0.5,   nu = 3),
                         tot_F_var = list(V = 18/20, nu = 20),
                         h2_priors_resids_fun = function(h2s, n) 1,
                         h2_priors_factors_fun = function(h2s, n) 1,
                         Lambda_prior = list(
-                                            sampler = sample_Lambda_prec_ARD,
-                                            Lambda_df = 3,
-                                            delta_1   = list(shape = 2.1,  rate = 1/20),
-                                            delta_2   = list(shape = 3, rate = 1)
-                          ),
+                          sampler = sample_Lambda_prec_ARD,
+                          Lambda_df = 3,
+                          delta_1   = list(shape = 2,  rate = 1),
+                          delta_2   = list(shape = 3, rate = 1),
+                          delta_iteractions_factor = 100
+                        ),
                         B_prior = list(
-                                        sampler = sample_B_prec_ARD,
-                                        B_df      = 3,
-                                        B_F_df    = 3
-                                        )
+                          sampler = sample_B_prec_ARD,
+                          global   = list(V = 1,nu = 3),
+                          global_F = list(V = 1,nu = 3),
+                          B_df      = 3,
+                          B_F_df    = 3
+                        ),
+                        QTL_prior = list(
+                          sampler = sample_QTL_prec_ARD,
+                          global = list(V = 1,nu = 3),
+                          QTL_df  = 3,
+                          separate_QTL_shrinkage=T
+                        )
 
                     ) {
   all_args = lapply(formals(),function(x) eval(x))
@@ -835,45 +838,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# ----------------------------- #
 	# ----- re-formulate priors --- #
 	# ----------------------------- #
-	if(any(sapply(priors, function(x) {try({return(exists(x$nu) && x$nu <= 2)},silent=T);return(FALSE)}))) stop('priors nu must be > 2')
-	  # fixed effects
-	if(is.null(priors$fixed_resid_var)) priors$fixed_resid_var = priors$fixed_var
-	if(is.null(priors$fixed_factors_var)) priors$fixed_factors_var = priors$fixed_var
-	if(length(priors$fixed_resid_var$V == 1)) {
-	  priors$fixed_resid_var$V = rep(priors$fixed_resid_var$V,b)
-	  priors$fixed_resid_var$nu = rep(priors$fixed_resid_var$nu,b)
-	}
-
-	if(length(priors$fixed_factors_var$V) == 0){
-	  priors$fixed_factors_var = priors$fixed_resid_var
-	} else if(length(priors$fixed_factors_var$V) == 1){
-	  priors$fixed_factors_var$V = rep(priors$fixed_factors_var$V,b_F)
-	  priors$fixed_factors_var$nu = rep(priors$fixed_factors_var$nu,b_F)
-	}
-
-	if(b_QTL > 0){
-	  if(length(priors$QTL_resid_var$V) == 1) {
-	    priors$QTL_resid_var$V = rep(priors$QTL_resid_var$V,b_QTL)
-	    priors$QTL_resid_var$nu = rep(priors$QTL_resid_var$nu,b_QTL)
-	  }
-	  priors$fixed_resid_QTL_prec_rate   = with(priors$QTL_resid_var,V * nu)
-	  priors$fixed_resid_QTL_prec_shape  = with(priors$QTL_resid_var,nu - 1)
-	}
-	if(b_QTL_F > 0){
-	  if(length(priors$QTL_factors_var$V) == 1) {
-	    priors$QTL_factors_var$V = rep(priors$QTL_factors_var$V,b_QTL_F)
-	    priors$QTL_factors_var$nu = rep(priors$QTL_factors_var$nu,b_QTL_F)
-	  }
-	  priors$fixed_factors_QTL_prec_rate   = with(priors$QTL_factors_var,V * nu)
-	  priors$fixed_factors_QTL_prec_shape  = with(priors$QTL_factors_var,nu - 1)
-	}
-
-	priors$fixed_resid_prec_rate   = with(priors$fixed_resid_var,V * nu)
-	priors$fixed_resid_prec_shape  = with(priors$fixed_resid_var,nu - 1)
-	priors$fixed_factors_prec_rate   = with(priors$fixed_factors_var,V * nu)
-	priors$fixed_factors_prec_shape  = with(priors$fixed_factors_var,nu - 1)
-
-	  # total precision
+	# total precision
 	if(length(priors$tot_Y_var$V == 1)) {
 	  priors$tot_Y_var$V = rep(priors$tot_Y_var$V,p)
 	  priors$tot_Y_varnu = rep(priors$tot_Y_var$nu,p)
@@ -1053,9 +1018,10 @@ initialize_variables = function(BSFG_state,...){
     return(current_state)
   })
 
-  # Initialize parameters for Lambda_prior and B_prior (may be model-specific)
+  # Initialize parameters for Lambda_prior, B_prior, and QTL_prior (may be model-specific)
   BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state)
   BSFG_state$current_state = BSFG_state$priors$B_prior$sampler(BSFG_state)
+  BSFG_state$current_state = BSFG_state$priors$QTL_prior$sampler(BSFG_state)
 
   # Initialize Eta
   observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)

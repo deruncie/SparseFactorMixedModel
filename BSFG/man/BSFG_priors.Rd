@@ -4,24 +4,17 @@
 \alias{BSFG_priors}
 \title{Set BSFG priors}
 \usage{
-BSFG_priors(fixed_var = list(V = 1, nu = 3), fixed_resid_var = NULL,
-  fixed_factors_var = NULL, QTL_resid_var = NULL, QTL_factors_var = NULL,
-  tot_Y_var = list(V = 0.5, nu = 3), tot_F_var = list(V = 18/20, nu = 20),
-  h2_priors_resids_fun = function(h2s, n) 1,
+BSFG_priors(tot_Y_var = list(V = 0.5, nu = 3), tot_F_var = list(V = 18/20,
+  nu = 20), h2_priors_resids_fun = function(h2s, n) 1,
   h2_priors_factors_fun = function(h2s, n) 1, Lambda_prior = list(sampler =
-  sample_Lambda_prec_ARD, Lambda_df = 3, delta_1 = list(shape = 2.1, rate =
-  1/20), delta_2 = list(shape = 3, rate = 1)), B_prior = list(sampler =
-  sample_B_prec_ARD, B_df = 3, B_F_df = 3))
+  sample_Lambda_prec_ARD, Lambda_df = 3, delta_1 = list(shape = 2, rate = 1),
+  delta_2 = list(shape = 3, rate = 1), delta_iteractions_factor = 100),
+  B_prior = list(sampler = sample_B_prec_ARD, global = list(V = 1, nu = 3),
+  global_F = list(V = 1, nu = 3), B_df = 3, B_F_df = 3),
+  QTL_prior = list(sampler = sample_QTL_prec_ARD, global = list(V = 1, nu =
+  3), QTL_df = 3, separate_QTL_shrinkage = T))
 }
 \arguments{
-\item{fixed_var}{List of parameters of inverse gamma distribution for fixed effects, specifically:
-\code{V} and \code{nu}, give shape = \code{nu/2} and scale = \code{nu*V/2}, so mean = \code{\frac{V*nu}{nu-2}}
-Will be applied to fixed effects of residuals (\code{B}) and factors (\code{B_F}).}
-
-\item{fixed_resid_var}{If provided, overides \code{fixed_var} for fixed effects of residuals (\code{B}).}
-
-\item{fixed_factors_var}{If provided, overides \code{fixed_var} for fixed effects of factors (\code{B_F}).}
-
 \item{tot_Y_var}{List of parameters of inverse gamma distribution for residual variances. See \code{fixed_var}.}
 
 \item{tot_F_var}{List of parameters of inverse gamma distribution for factor variances. See \code{fixed_var}.
@@ -35,6 +28,14 @@ Alternatively, can be a scalar or vector of (relative) prior values for each val
 discrete prior.}
 
 \item{h2_priors_factors_fun}{see \code{h2_priors_resids_fun}. Same, but for the h2s of the factors.}
+
+\item{fixed_var}{List of parameters of inverse gamma distribution for fixed effects, specifically:
+\code{V} and \code{nu}, give shape = \code{nu/2} and scale = \code{nu*V/2}, so mean = \code{\frac{V*nu}{nu-2}}
+Will be applied to fixed effects of residuals (\code{B}) and factors (\code{B_F}).}
+
+\item{fixed_resid_var}{If provided, overides \code{fixed_var} for fixed effects of residuals (\code{B}).}
+
+\item{fixed_factors_var}{If provided, overides \code{fixed_var} for fixed effects of factors (\code{B_F}).}
 
 \item{delta_1}{List of parameters of inverse gamma distribution for \code{delta_1}. Specifically:
 \code{shape} and \code{rate}. This parameter is the column-shrinkage of the first factor.}
