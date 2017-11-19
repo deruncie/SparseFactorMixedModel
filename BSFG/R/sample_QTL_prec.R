@@ -153,7 +153,7 @@ sample_QTL_prec_horseshoe = function(BSFG_state,...){
                                    B_QTL_F_prec = matrix(1,b_QTL_F,k)
                                  }
                                  B_QTL_F2 = B_QTL_F^2 * tot_F_prec[rep(1,b_QTL_F),]
-                                 B_QTL_F_tau2[] = rgamma(k,
+                                 B_QTL_F_tau2[] = 1/rgamma(k,
                                                         shape = (nrow(B_QTL_F2)+1)/2,
                                                         rate = 1/B_QTL_F_xi +
                                                           colSums(B_QTL_F2 * B_QTL_F_prec*B_QTL_F_tau2[rep(1,b_QTL_F),])/2)
