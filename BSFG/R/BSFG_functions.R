@@ -302,8 +302,8 @@ reset_Posterior = function(Posterior,BSFG_state){
   current_state = BSFG_state$current_state
 
   # re-transform random effects using RE_L
-  current_state$U_F = BSFG_state$data_matrices$RE_L %*% current_state$U_F
-  current_state$U_R = BSFG_state$data_matrices$RE_L %*% current_state$U_R
+  current_state$U_F[] = BSFG_state$data_matrices$RE_L %*% current_state$U_F
+  current_state$U_R[] = BSFG_state$data_matrices$RE_L %*% current_state$U_R
 
   for(param in Posterior$posteriorSample_params){
     Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))

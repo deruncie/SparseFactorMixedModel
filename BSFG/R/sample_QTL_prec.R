@@ -5,7 +5,7 @@ sample_QTL_prec_ARD = function(BSFG_state,...){
 
   current_state = with(c(priors,run_variables),
                        with(QTL_prior,{
-                         if(b_QTL + b_QTL_F == 0) return()
+                         if(b_QTL + b_QTL_F == 0) return(current_state)
 
                          tau_shape = with(global, nu - 1)
                          tau_rate = with(global, V * nu)
@@ -81,7 +81,7 @@ sample_QTL_prec_horseshoe = function(BSFG_state,...){
 
   current_state = with(c(priors,run_variables),
                        with(QTL_prior,{
-                         if(b_QTL + b_QTL_F == 0) return()
+                         if(b_QTL + b_QTL_F == 0) return(current_state)
 
                          within(current_state,{
 
