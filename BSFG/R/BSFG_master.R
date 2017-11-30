@@ -351,9 +351,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	b_QTL = 0
 	if(!is.null(QTL_resid)){
 	  if(class(QTL_resid) == 'list'){
-	    QTL_model = findbars(QTL_factors$model)
-	    if(length(QTL_model) == 0) stop('no grouping factors found in QTL_factors model')
-	    if(length(QTL_model) > 1)  stop('more than one grouping factor found in QTL_factors model')
+	    QTL_model = findbars(QTL_resid$model)
+	    if(length(QTL_model) == 0) stop('no grouping factors found in QTL_resid model')
+	    if(length(QTL_model) > 1)  stop('more than one grouping factor found in QTL_resid model')
 
 	    group_model = as.formula(paste0('~',as.character(QTL_model[[1]][2])))
 	    group_mm = model.matrix(group_model,data)
@@ -363,9 +363,9 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    QTL_terms = mkReTrms(QTL_model,data,drop.unused.levels = FALSE)
 	    QTL_resid_Z = as(t(QTL_terms$Zt),'dgCMatrix')
 	    QTL_resid_Z = QTL_resid_Z[,c(matrix(1:ncol(QTL_resid_Z),ncol = ncol(group_mm),byrow=T))]
-	    if(!all(colnames(QTL_resid_Z) %in% rownames(QTL_factors$X))) stop(sprintf('Missing %s from QTL_factors$X',names(QTL_terms$cnms)[1]))
-	    if(!all(colnames(group_mm) == QTL_terms$cnms[[1]])) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
-	    if(!all(colnames(QTL_resid_Z)[1:length(groupIDs)] == groupIDs)) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+	    if(!all(colnames(QTL_resid_Z) %in% rownames(QTL_resid$X))) stop(sprintf('Missing %s from QTL_resid$X',names(QTL_terms$cnms)[1]))
+	    if(!all(colnames(group_mm) == QTL_terms$cnms[[1]])) stop("QTL_resid model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+	    if(!all(colnames(QTL_resid_Z)[1:length(groupIDs)] == groupIDs)) stop("QTL_resid model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
 
 	    QTL_resid_X = do.call(bdiag,lapply(1:ncol(group_mm),function(i) QTL_resid$X[groupIDs,]))
 	    QTL_resid_X = as.matrix(QTL_resid_X)

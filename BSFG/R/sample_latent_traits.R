@@ -27,6 +27,10 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                      grainSize
                                     )
       shape = tot_Eta_prec_shape + length(rows)/2
+      if(b_QTL > 0) {
+        shape = shape + b_QTL/2
+        scores[cols] = scores[cols] + colSums(B_QTL[,cols,drop=FALSE]^2 * B_QTL_prec[,cols,drop=FALSE])
+      }
       if(lambda_propto_Vp) {
         # include tot_Eta_prec in prior of Lambda
         scores[cols] = scores[cols] + rowSums(Lambda[cols,,drop=FALSE]^2*Lambda_prec[cols,,drop=FALSE]*tauh[rep(1,length(cols)),])
@@ -83,7 +87,6 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     rows = Missing_data_map[[1]]$Y_obs
     F_tilde = F
     if(b_F > 0){
-      F_tilde = F
       if(b_QTL_F > 0){
         F_tilde = F_tilde - QTL_factors_Z %**% (QTL_factors_X %*% B_QTL_F)
       }
@@ -102,7 +105,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     }
     if(b_QTL_F > 0){
       prior_mean = matrix(0,b_QTL_F,k)
-      prior_prec = B_QTL_F_prec * tot_F_prec[rep(1,b_QTL_F),,drop=FALSE]  # prior for B_F includes tot_F_prec
+      prior_prec = B_QTL_F_prec * tot_F_prec[rep(1,b_QTL_F),,drop=FALSE]  # prior for B_QTL_F includes tot_F_prec
       B_QTL_F[] = sample_MME_fixedEffects_hierarchical_c(Qt_list[[1]] %**% F_tilde[rows,,drop=FALSE],
                                                        Qt1_QTL_Factors_Z,  # only includes rows of Qt1
                                                        QTL_factors_X,

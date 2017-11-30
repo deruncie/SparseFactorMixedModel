@@ -20,7 +20,7 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
     }
     Eta_tilde = Eta
     if(b_QTL > 0){
-      Eta_tilde = Eta_tilde - QTL_resid_Z %**% (QTL_resid_X %*% B_QTL)
+      Eta_tilde = Eta - QTL_resid_Z %**% (QTL_resid_X %*% B_QTL)
     }
     for(set in seq_along(Missing_data_map)){
       cols = Missing_data_map[[set]]$Y_cols
@@ -78,21 +78,22 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
     if(b_QTL > 0){
       Eta_tilde = Eta - XB - F %**% t(Lambda)
       prior_mean = matrix(0,b_QTL,p)
-      prior_prec = B_QTL_prec
+      prior_prec = B_QTL_prec * tot_Eta_prec[rep(1,b_QTL),,drop=FALSE]  # prior for B_QTL includes tot_Eta_prec
+
       for(set in seq_along(Missing_data_map)){
         cols = Missing_data_map[[set]]$Y_cols
         rows = Missing_data_map[[set]]$Y_obs
         if(length(cols) == 0 || length(rows) == 0) next
 
         B_QTL[,cols] = sample_MME_fixedEffects_hierarchical_c(Qt_list[[set]] %**% Eta_tilde[rows,cols,drop=FALSE],
-                                                              Qt_QTL_resid_Z_list[[set]],  # only includes rows of Qt1
-                                                              QTL_resid_X,
-                                                              Sigma_Choleskys_list[[set]],
-                                                              resid_h2_index[cols],
-                                                              tot_Eta_prec[cols],
-                                                              prior_mean[,cols,drop=FALSE],
-                                                              prior_prec[,cols,drop=FALSE],
-                                                              grainSize)
+                                                             Qt_QTL_resid_Z_list[[set]],
+                                                             QTL_resid_X,
+                                                             Sigma_Choleskys_list[[set]],
+                                                             resid_h2_index[cols],
+                                                             tot_Eta_prec[cols],
+                                                             prior_mean[,cols,drop=FALSE],
+                                                             prior_prec[,cols,drop=FALSE],
+                                                             grainSize)
       }
       XB = XB + QTL_resid_Z %**% (QTL_resid_X %*% B_QTL)
     }

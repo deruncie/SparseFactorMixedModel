@@ -77,29 +77,30 @@ VectorXd sample_MME_single_hierarchical_diagK(  // returns b x 1 vector
     VectorXd randn_theta, // bx1
     VectorXd randn_e      // 0x1 or nx1. 0x1 if b<n
 ){
-  VectorXd theta_star = randn_theta.array() / prior_prec.cwiseSqrt().array();
-  theta_star += prior_mean;
-  VectorXd e_star = chol_R.transpose() * (randn_e / sqrt(tot_Eta_prec));
-  MatrixXd ZX = Z*X;
-  MatrixXd ZX_theta_star = ZX * theta_star;
-  VectorXd y_resid = y - ZX_theta_star - e_star;
+  // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
+  // Phi = sqrt(tot_Eta_prec) * chol_R_invT * Z * X
+  // Phi = U * X = Vt * X
+  MatrixXd U = chol_R.transpose().triangularView<Lower>().solve(Z.toDense() * sqrt(tot_Eta_prec));
+  MatrixXd Phi = U * X;
+  MatrixXd V = U.transpose();
+  VectorXd alpha = chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
 
-  MatrixXd RinvSqZ = chol_R.transpose().triangularView<Lower>().solve(Z.toDense() * sqrt(tot_Eta_prec));
-  MatrixXd RinvSqZX = RinvSqZ*X;
-  VectorXd XtZtRinvy = RinvSqZX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y_resid * sqrt(tot_Eta_prec));
+  VectorXd u = randn_theta.array() / prior_prec.cwiseSqrt().array();
+  u += prior_mean;
+  VectorXd v = Phi * u + randn_e;
+  VectorXd alpha_v = alpha-v;
 
-  VectorXd theta_tilda;
-  MatrixXd VAi = X * prior_prec.cwiseInverse().asDiagonal();
-  MatrixXd I(Z.cols(),Z.cols());
-  I.setIdentity();
-  MatrixXd ZtRinvZ = RinvSqZ.transpose()*RinvSqZ;
-  MatrixXd inner = VAi*X.transpose() + ZtRinvZ.ldlt().solve(I);
-  VectorXd VAiXtURinvy = VAi * XtZtRinvy;
-  VectorXd outerXtURinvy = VAi.transpose() * inner.ldlt().solve(VAiXtURinvy);
-  theta_tilda = XtZtRinvy.array() / prior_prec.array();
-  theta_tilda -= outerXtURinvy;
-  VectorXd theta = theta_star + theta_tilda;
 
+  MatrixXd D_XT = prior_prec.cwiseInverse().asDiagonal() * X.transpose();
+  MatrixXd B = X * D_XT;
+  MatrixXd I = MatrixXd::Identity(B.rows(),B.cols());
+  MatrixXd Binv = B.ldlt().solve(I);
+
+  MatrixXd inner = Binv + V*U;
+
+  VectorXd w = alpha_v - U*inner.ldlt().solve(V * alpha_v);
+
+  VectorXd theta = u + D_XT * (V * w);
   return(theta);
 }
 

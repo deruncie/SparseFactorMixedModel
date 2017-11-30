@@ -12,7 +12,7 @@ sample_QTL_prec_ARD = function(BSFG_state,...){
 
                          within(current_state,{
 
-                           B_QTL2 = B_QTL^2
+                           B_QTL2 = B_QTL^2 * tot_Eta_prec[rep(1,b_QTL),]
                            B_QTL_F2 = B_QTL_F^2 * tot_F_prec[rep(1,b_QTL_F),]
 
                            if(is.null(separate_QTL_shrinkage) || separate_QTL_shrinkage == FALSE){
@@ -84,7 +84,7 @@ sample_QTL_prec_horseshoe = function(BSFG_state,...){
 
                          within(current_state,{
 
-                           if(b_QTL > 0)   B_QTL2 = B_QTL^2
+                           if(b_QTL > 0)   B_QTL2 = B_QTL^2 * tot_Eta_prec[rep(1,b_QTL),]
                            if(b_QTL_F > 0) B_QTL_F2 = B_QTL_F^2 * tot_F_prec[rep(1,b_QTL_F),]
 
                            if(!exists('cauchy_iteractions_factor')) cauchy_iteractions_factor = 1
@@ -131,17 +131,19 @@ sample_QTL_prec_horseshoe = function(BSFG_state,...){
                                    B_QTL_nu = matrix(1,b_QTL,p)
                                    B_QTL_prec = matrix(1,b_QTL,p)
                                  }
-                                 B_QTL_tau2[] = 1/rgamma(p,
-                                                        shape = (b_QTL+1)/2,
-                                                        rate = 1/B_QTL_xi +
-                                                          colSums(B_QTL2 * B_QTL_prec*B_QTL_tau2[rep(1,b_QTL),])/2)
+                                 if(any(B_QTL != 0)) {
+                                   B_QTL_tau2[] = 1/rgamma(p,
+                                                          shape = (b_QTL+1)/2,
+                                                          rate = 1/B_QTL_xi +
+                                                            colSums(B_QTL2 * B_QTL_prec*B_QTL_tau2[rep(1,b_QTL),])/2)
 
-                                 B_QTL_xi[]  = 1/rgamma(p,shape = 1,rate = 1+1/B_QTL_tau2)
+                                   B_QTL_xi[]  = 1/rgamma(p,shape = 1,rate = 1+1/B_QTL_tau2)
 
-                                 B_QTL_prec[] = matrix(rgamma(b_QTL*p,shape = 1,rate = 1/B_QTL_nu + B_QTL2 / (2*B_QTL_tau2)[rep(1,b_QTL),]),nr = b_QTL,nc = p)
-                                 B_QTL_nu[] = matrix(1/rgamma(b_QTL*p,shape = 1,rate = 1 + B_QTL_prec[]),nr = b_QTL,nc = p)
+                                   B_QTL_prec[] = matrix(rgamma(b_QTL*p,shape = 1,rate = 1/B_QTL_nu + B_QTL2 / (2*B_QTL_tau2)[rep(1,b_QTL),]),nr = b_QTL,nc = p)
+                                   B_QTL_nu[] = matrix(1/rgamma(b_QTL*p,shape = 1,rate = 1 + B_QTL_prec),nr = b_QTL,nc = p)
 
-                                 B_QTL_prec[] = B_QTL_prec / B_QTL_tau2[rep(1,b_QTL),]
+                                   B_QTL_prec[] = B_QTL_prec / B_QTL_tau2[rep(1,b_QTL),]
+                                 }
                                }
                                if(b_QTL_F > 0){
                                  if(!exists('B_QTL_F_tau2')){
@@ -149,33 +151,22 @@ sample_QTL_prec_horseshoe = function(BSFG_state,...){
                                    B_QTL_F_tau2 = matrix(1,1,k)
                                    B_QTL_F_nu = matrix(1,b_QTL_F,k)
                                    B_QTL_F_prec = matrix(1,b_QTL_F,k)
-                                   # B_QTL_lambda2 = matrix(1,b_QTL_F,k)
                                  }
-                                 if(B_QTL_F[1] != 0) {
-                                 B_QTL_F_tau2[] = 1/rgamma(k,
-                                                        shape = (b_QTL_F+1)/2,
-                                                        rate = 1/B_QTL_F_xi +
-                                                          colSums(B_QTL_F2 * B_QTL_F_prec * B_QTL_F_tau2[rep(1,b_QTL_F),])/2)
-                                 B_QTL_F_xi[]  = 1/rgamma(k,shape = 1,rate = 1+1/B_QTL_F_tau2)
+                                 if(any(B_QTL_F != 0)) {
+                                   B_QTL_F_tau2[] = 1/rgamma(k,
+                                                          shape = (b_QTL_F+1)/2,
+                                                          rate = 1/B_QTL_F_xi +
+                                                            colSums(B_QTL_F2 * B_QTL_F_prec * B_QTL_F_tau2[rep(1,b_QTL_F),])/2)
+                                   B_QTL_F_xi[]  = 1/rgamma(k,shape = 1,rate = 1+1/B_QTL_F_tau2)
 
-                                 B_QTL_F_prec[] = matrix(rgamma(b_QTL_F*k,shape = 1,rate = 1/B_QTL_F_nu + B_QTL_F2 / (2*B_QTL_F_tau2)[rep(1,b_QTL_F),]),nr = b_QTL_F,nc = k)
-                                 B_QTL_F_nu[] = matrix(1/rgamma(b_QTL_F*k,shape = 1,rate = 1 + B_QTL_F_prec),nr = b_QTL_F,nc = k)
+                                   B_QTL_F_prec[] = matrix(rgamma(b_QTL_F*k,shape = 1,rate = 1/B_QTL_F_nu + B_QTL_F2 / (2*B_QTL_F_tau2)[rep(1,b_QTL_F),]),nr = b_QTL_F,nc = k)
+                                   B_QTL_F_nu[] = matrix(1/rgamma(b_QTL_F*k,shape = 1,rate = 1 + B_QTL_F_prec),nr = b_QTL_F,nc = k)
 
-                                 B_QTL_F_prec[] = B_QTL_F_prec / B_QTL_F_tau2[rep(1,b_QTL_F),]
-
-                                 # B_QTL_F_tau2[] = 1/rgamma(k,
-                                 #                           shape = (b_QTL_F+1)/2,
-                                 #                           rate = 1/B_QTL_F_xi +
-                                 #                             colSums(B_QTL_F2 / B_QTL_lambda2)/2)
-                                 # B_QTL_F_xi[]  = 1/rgamma(k,shape = 1,rate = 1+1/B_QTL_F_tau2)
-                                 #
-                                 # B_QTL_lambda2[] = matrix(1/rgamma(b_QTL_F*k,shape = 1,rate = 1/B_QTL_F_nu + B_QTL_F2 / (2*B_QTL_F_tau2[rep(1,b_QTL_F),])),nr = b_QTL_F,nc = k)
-                                 # B_QTL_F_nu[] = matrix(1/rgamma(b_QTL_F*k,shape = 1,rate = 1 + 1/B_QTL_lambda2),nr = b_QTL_F,nc = k)
+                                   B_QTL_F_prec[] = B_QTL_F_prec / B_QTL_F_tau2[rep(1,b_QTL_F),]
                                  }
                                }
                              }
                            }
-                           # B_QTL_F_prec[] = 1 / (B_QTL_lambda2 * B_QTL_F_tau2[rep(1,b_QTL_F),])
                          })
                        }))
   return(current_state)
