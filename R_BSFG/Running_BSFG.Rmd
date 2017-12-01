@@ -71,18 +71,18 @@ run_parameters = BSFG_control(
 # ---------------------------------------------------------- #
 ```{r}
 priors = BSFG_priors(
-  fixed_var = list(V = 1,     nu = 3),       # Prior variance of fixed effects (see specification in MCMCglmm)
-  # tot_Y_var = list(V = 0.5,   nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 5),      # Prior variance of trait residuals after accounting for fixed effects and factors
   tot_F_var = list(V = 18/20, nu = 20),     # Prior variance of factor traits. This is included to improve MCMC mixing, but can be turned off by setting nu very large
   Lambda_prior = list(      # prior for factor loadings
     sampler = sample_Lambda_prec_ARD,
-    Lambda_df = 1,
-    delta_1   = list(shape = 2.1,  rate = 1/20),
+    Lambda_df = 3,
+    delta_1   = list(shape = 2,  rate = 1),
     delta_2   = list(shape = 3, rate = 1)
   ),
   B_prior = list(           # prior for fixed effects. Supersedes fixed_var above.
     sampler = sample_B_prec_ARD,  # class of priors. ARD is default
+    global   = list(V = 1,nu = 3),  # global shrinkage hyperparameters
+    global_F = list(V = 1,nu = 3), # global shrinkage hyperparameters for factors
     B_df      = 3,          # degrees of freedom of t-distribution for residual fixed effects
     B_F_df    = 2           # degrees of freedom of t-distribution for factor fixed effects
   ),
@@ -99,7 +99,7 @@ priors = BSFG_priors(
 # ---------------------------------------------------------- #
 ```{r}
 BSFG_state = BSFG_init(Y,
-                       model=~Fixed1+(1+Fixed1|animal), # This model has one fixed and one random term.
+                       model=~Fixed1+(1+Fixed1|animal), # This model has one fixed and two random terms. The random terms are NOT correlated
                        #factor_model_fixed = ~0, # we could specify a different fixed effect model for the factors
                        data = data, # the data.frame with information for constructing the model matrices
                        K_mats = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated
@@ -143,7 +143,7 @@ for(i  in 1:70) {
   BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)  # run MCMC chain n_samples iterations. grainSize is a paramter for parallelization (smaller = more parallelization)
 
   # set of commands to run during burn-in period to help chain converge
-  if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
+  if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn || i < 10) {
     BSFG_state = reorder_factors(BSFG_state) # Factor order doesn't "mix" well in the MCMC. We can help it by manually re-ordering from biggest to smallest
     BSFG_state = clear_Posterior(BSFG_state)
     # BSFG_state$current_state = update_k(BSFG_state) # use to drop insignificant factors
@@ -177,7 +177,7 @@ boxplot(BSFG_state$Posterior$F_h2[,1,])
 
 # get posterior distribution on a function of parameters
 # This is how to calculate the G-matrix for random effect #1 (ie animal above.)
-G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2['animal',]) %*% t(Lambda) + resid_h2['animal',]/tot_Eta_prec[1,])
+G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2['animal.(Intercept)',]) %*% t(Lambda) + resid_h2['animal.(Intercept)',]/tot_Eta_prec[1,])
 
 # get posterior mean of a parameter
 G = get_posterior_mean(G_samples)

@@ -80,32 +80,26 @@ BSFG_control = function(
 #'     \code{h2_priors_factors} can be set after calling \code{BSFG_init} and before \code{sample_BSFG}
 #'     if that is easier.
 #'
-#' @param fixed_var List of parameters of inverse gamma distribution for fixed effects, specifically:
+#' @param tot_Y_var List of parameters of inverse gamma distribution for residual variances, specifically:
 #'     \code{V} and \code{nu}, give shape = \code{nu/2} and scale = \code{nu*V/2}, so mean = \code{\frac{V*nu}{nu-2}}
-#'     Will be applied to fixed effects of residuals (\code{B}) and factors (\code{B_F}).
-#' @param fixed_resid_var If provided, overides \code{fixed_var} for fixed effects of residuals (\code{B}).
-#' @param fixed_factors_var If provided, overides \code{fixed_var} for fixed effects of factors (\code{B_F}).
-#' @param tot_Y_var List of parameters of inverse gamma distribution for residual variances. See \code{fixed_var}.
-#' @param tot_F_var List of parameters of inverse gamma distribution for factor variances. See \code{fixed_var}.
+#' @param tot_F_var List of parameters of inverse gamma distribution for factor variances. See \code{tot_Y_var}.
 #'     This parameter provides the parameter extension of Ghosh and Dunson (2009), but is removed
 #'     from all Factor parameters before they are saved in Posterior
-#' @param delta_1 List of parameters of inverse gamma distribution for \code{delta_1}. Specifically:
-#'     \code{shape} and \code{rate}. This parameter is the column-shrinkage of the first factor.
-#' @param delta_2 List of parameters of inverse gamma distribution for \code{delta_2 \dots delta_k}.
-#'     Specifically: \code{shape} and \code{rate}.
-#'     This is provides the additional column-shrinkage of higher-order columns.
-#' @param Lambda_df Degrees of freedom of individual parameter shrinkage of Lambda from implied
-#'     t-distribution
-#' @param B_df Degrees of freedom of individual parameter shrinkage of B from implied
-#'     t-distribution
-#' @param B_F_df Degrees of freedom of individual parameter shrinkage of B_F from implied
-#'     t-distribution
 #' @param h2_priors_resids_fun function for that returns prior probability for a given value of h2
 #'     for each random effect. Should take two argument - a vector \code{h2} values for each random effect,
 #'     and \code{n} - the number of discrete levels of the prior.
 #'     Alternatively, can be a scalar or vector of (relative) prior values for each value of the
 #'     discrete prior.
 #' @param h2_priors_factors_fun see \code{h2_priors_resids_fun}. Same, but for the h2s of the factors.
+#' @param Lambda_prior A list with elements:
+#'     1) \code{sampler}: a function that draws samples of the precision matrix for Lambda. Ex: \code{sample_Lambda_prec_ARD}; 2)
+#'     any other hyperparameters and control parameters for \code{sampler}
+#' @param B_prior A list with elements:
+#'     1) \code{sampler}: a function that draws samples of the precision matrix for B and B_F Ex: \code{sample_B_prec_ARD}; 2)
+#'     any other hyperparameters and control parameters for \code{sampler}
+#' @param QTL_prior A list with elements:
+#'     1) \code{sampler}: a function that draws samples of the precision matrix for B_QTL and B_QTL_F Ex: \code{sample_QTL_prec_horseshoe}; 2)
+#'     any other hyperparameters and control parameters for \code{sampler}
 #'
 #' @return a list with each of the prior components specified above.
 #' @export
@@ -131,10 +125,9 @@ BSFG_priors = function(
                           B_F_df    = 3
                         ),
                         QTL_prior = list(
-                          sampler = sample_QTL_prec_ARD,
-                          global = list(V = 1,nu = 3),
-                          QTL_df  = 3,
-                          separate_QTL_shrinkage=T
+                          sampler = sample_QTL_prec_horseshoe,
+                          separate_QTL_shrinkage=T,
+                          cauchy_iteractions_factor = 10
                         )
 
                     ) {
