@@ -4,6 +4,16 @@ by Daniel Runcie, Sayan Mukhergee
 Reference:
 Runcie, D., & Mukherjee, S. (2013). Dissecting High-Dimensional Phenotypes with Bayesian Sparse Factor Analysis of Genetic Covariance Matrices. Genetics, 194(3), 753–767. http://doi.org/10.1534/genetics.113.151217
 
+This package is free software, you can redistribute it and/or modify it 
+under the terms of the GNU General Public License (GPL-3).
+
+The GNU General Public License does not permit this software to be
+redistributed in proprietary programs.
+
+This library is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
 ### Version history
 
 #### V1.0
