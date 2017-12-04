@@ -45,7 +45,8 @@ load_simulation_data = function(file = NULL){
   if(is.null(X1)) return(X2)
   if(inherits(X1,'dgCMatrix') && inherits(X2,'matrix')) return(SxD(X1,X2))
   if(inherits(X1,'dgCMatrix') && inherits(X2,'dgCMatrix')) return(SxS(X1,X2))
-  if(inherits(X1,'matrix') & inherits(X2,'matrix')) return(X1 %*% X2)
+  if(inherits(X1,'matrix') && inherits(X2,'matrix')) return(X1 %*% X2)
+  if(inherits(X1,'data.frame') || inherits(X2,'data.frame')) return(as.matrix(X1) %**% as.matrix(X2))
   return(as.matrix(X1 %*% X2))
 }
 
