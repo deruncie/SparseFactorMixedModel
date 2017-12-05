@@ -785,25 +785,28 @@ struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
     int n = Y.rows();
     for(std::size_t j = begin; j < end; j++){
       int old_state = h2_index[j] - 1;
-      double old_log_p = log_prob_h2_c(Y.col(j),chol_R_list[old_state],log_det_Sigmas[old_state],n,tot_Eta_prec[j],discrete_priors[old_state]);
-
       VectorXd candidate_new_states = find_candidate_states(h2s_matrix,step_size,old_state);
       int r = state_draws[j] * (candidate_new_states.size());
       int proposed_state = candidate_new_states[r];
 
-      double new_log_p = log_prob_h2_c(Y.col(j),chol_R_list[proposed_state],log_det_Sigmas[proposed_state],n,tot_Eta_prec[j],discrete_priors[proposed_state]);
+      if(discrete_priors[proposed_state] == 0.0) {
+        new_index[j] = old_state;  // don't bother with calculations if prior == 0.0
+      } else{
+        double old_log_p = log_prob_h2_c(Y.col(j),chol_R_list[old_state],log_det_Sigmas[old_state],n,tot_Eta_prec[j],discrete_priors[old_state]);
+        double new_log_p = log_prob_h2_c(Y.col(j),chol_R_list[proposed_state],log_det_Sigmas[proposed_state],n,tot_Eta_prec[j],discrete_priors[proposed_state]);
 
-      VectorXd candidate_states_from_new_state = find_candidate_states(h2s_matrix,step_size,proposed_state);
+        VectorXd candidate_states_from_new_state = find_candidate_states(h2s_matrix,step_size,proposed_state);
 
-      double forward_prob = 1.0 / candidate_new_states.size();
-      double back_prob = 1.0 / candidate_states_from_new_state.size();
+        double forward_prob = 1.0 / candidate_new_states.size();
+        double back_prob = 1.0 / candidate_states_from_new_state.size();
 
-      double log_MH_ratio = new_log_p - old_log_p + log(forward_prob) - log(back_prob);
+        double log_MH_ratio = new_log_p - old_log_p + log(forward_prob) - log(back_prob);
 
-      if(log(r_draws[j]) < log_MH_ratio) {
-        new_index[j] = proposed_state;
-      } else {
-        new_index[j] = old_state;
+        if(log(r_draws[j]) < log_MH_ratio) {
+          new_index[j] = proposed_state;
+        } else {
+          new_index[j] = old_state;
+        }
       }
       new_index[j] += 1;  // convert to 1-based index
     }

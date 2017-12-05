@@ -531,10 +531,11 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    L = Diagonal(nrow(K),1)
 	  } else{
 	    K_mats[[re]] = Diagonal(ncol(Z_matrices[[re_name]]))
-	    rownames(K_mats[[re]]) = levels(data[[re]])
+	    rownames(K_mats[[re]]) = levels(as.factor(data[[re]]))
 	    K = K_mats[[re]]
 	    L = Diagonal(nrow(K),1)
 	  }
+	  rownames(L) = paste(levels(as.factor(data[[re]])),re_name,sep='::')
 	  K_mats[[re_name]] = fix_K(K)
 	  RE_L_matrices[[re_name]] = L
 	  ZL_matrices[[re_name]] = Z_matrices[[re_name]] %*% L
@@ -546,6 +547,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	# The following matrix is used to transform random effects back to the original space had we sampled from the original (PSD) K.
 	if(length(RE_names) > 1) {
 	  RE_L = do.call(bdiag,RE_L_matrices[RE_names])
+	  rownames(RE_L) = do.call(c,lapply(RE_L_matrices,rownames))
 	} else{
 	  RE_L = RE_L_matrices[[1]]
 	}
