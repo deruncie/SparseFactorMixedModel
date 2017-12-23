@@ -592,6 +592,7 @@ BSFG_init2 = function(
   Y_missing = observation_model_parameters$observation_setup$Y_missing
 
 
+  # -------- Random effects ---------- #
 
   # add names to RE_setup if needed
   n_RE = length(RE_setup)
@@ -678,83 +679,9 @@ BSFG_init2 = function(
   # cholesky decompositions (L'L) of each K_inverse matrix
   chol_Ki_mats = lapply(RE_setup,function(re) chol(as.matrix(re$K_inv)))
 
-  #
-  # # construct K matrices for each random effect
-  # # if K is PSD but not PD, find K = LDLt and set K* = D and Z* of ZL
-  # ldl_ks = lapply(K_mats,function(K) {
-  #   res = LDLt_sparse(as(K,'dgCMatrix')) # actually calculates K = PtLDLtP
-  #   if(is.character(validObject(res$L,test=TRUE)[1])) {
-  #     res = LDLt_notSparse(as.matrix(K))  # sparse sometimes fails with non-PD K
-  #   }
-  #   res
-  # })
-  #
-  # RE_L_matrices = list()
-  # ZL_matrices = list()
-  #
-  # for(i in 1:n_RE){
-  #   re = RE_covs[i]
-  #   re_name = RE_names[i]
-  #   if(re %in% names(ldl_ks)) {
-  #     ldl_k = ldl_ks[[re]]
-  #     large_d = ldl_k$d > run_parameters$K_eigen_tol
-  #     r_eff = sum(large_d)
-  #     # if need to use reduced rank model, then use D of K in place of K and merge L into Z
-  #     # otherwise, use original K, set L = Diagonal(1,r)
-  #     if(r_eff < length(ldl_k$d)) {
-  #       K = Diagonal(r_eff,ldl_k$d[large_d])
-  #       L = t(ldl_k$P) %*% ldl_k$L[,large_d]
-  #     } else{
-  #       K = K_mats[[re]]
-  #       L = Diagonal(nrow(K),1)
-  #     }
-  #   } else if(re %in% names(K_inv_mats)){
-  #     K_mats[[re]] = solve(K_inv_mats[[re]])
-  #     rownames(K_mats[[re]]) = rownames(K_inv_mats[[re]])
-  #     K = K_mats[[re]]
-  #     L = Diagonal(nrow(K),1)
-  #   } else{
-  #     K_mats[[re]] = Diagonal(ncol(Z_matrices[[re_name]]))
-  #     rownames(K_mats[[re]]) = levels(as.factor(data[[re]]))
-  #     K = K_mats[[re]]
-  #     L = Diagonal(nrow(K),1)
-  #   }
-  #   rownames(L) = paste(levels(as.factor(data[[re]])),re_name,sep='::')
-  #   K_mats[[re_name]] = fix_K(K)
-  #   RE_L_matrices[[re_name]] = L
-  #   ZL_matrices[[re_name]] = Z_matrices[[re_name]] %*% L
-  # }
-  # K_mats = K_mats[RE_names]
-  # # Construct ZL based on PSD K's
-  # ZL = do.call(cbind,ZL_matrices[RE_names])
-  # ZL = as(ZL,'dgCMatrix')
-  # The following matrix is used to transform random effects back to the original space had we sampled from the original (PSD) K.
-  # if(length(RE_names) > 1) {
-  #   RE_L = do.call(bdiag,RE_L_matrices[RE_names])
-  #   rownames(RE_L) = do.call(c,lapply(RE_L_matrices,rownames))
-  # } else{
-  #   RE_L = RE_L_matrices[[1]]
-  # }
-  # r_RE = sapply(ZL_matrices,function(x) ncol(x))  # re-calculate
 
-  # # construct K_inverse matrices for each random effect
-  # if(is.null(K_inv_mats)) K_inv_mats = list()
-  # Ki_mats = list()
-  # for(i in 1:length(RE_names)){
-  #   re = RE_covs[i]
-  #   re_name = RE_names[i]
-  #   if(re %in% names(K_inv_mats)){
-  #     Ki = K_inv_mats[[re]]
-  #   } else {
-  #     K_inv_mats[[re_name]] = solve(K_mats[[re_name]])
-  #     rownames(K_inv_mats[[re_name]]) = rownames(K_mats[[re_name]])
-  #     Ki = K_inv_mats[[re_name]]
-  #   }
-  #   Ki_mats[[re_name]] = fix_K(Ki)
-  # }
-  # names(Ki_mats) = RE_names
-  # cholesky decompositions (L'L) of each K_inverse matrix
-  # chol_Ki_mats = lapply(Ki_mats,chol)
+
+  # -------- h2s ---------- #
 
   # table of possible h2s for each random effect
   #   These are percentages of the total residual variance accounted for by each random effect
@@ -996,6 +923,7 @@ BSFG_init2 = function(
 	  X_F         = X_F,
 	  Z           = Z,
 	  ZL          = ZL,
+	  RE_setup    = RE_setup,
 	  RE_L        = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
 	  RE_indices  = RE_indices,
 	  h2s_matrix  = h2s_matrix,

@@ -42,7 +42,7 @@ X = setup$X
 run_parameters = BSFG_control(
   lambda_propto_Vp = T,cauchy_sigma_tot = F,
   scale_Y = FALSE,
-  simulation = F,
+  simulation = T,
   h2_divisions = 20,
   h2_step_size = .3,
   burn = 100,
