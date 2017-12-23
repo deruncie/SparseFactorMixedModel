@@ -231,7 +231,6 @@ BSFG_priors = function(
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'
 BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_priors(), run_parameters = BSFG_control(), K_mats = NULL, K_inv_mats = NULL,
                      QTL_resid = NULL, QTL_factors = NULL, cis_genotypes = NULL,
-                     Sigma_Choleskys = NULL, randomEffect_C_Choleskys = NULL,
                      invert_aI_bZKZ = NULL, invert_aZZt_Kinv = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'),
                      posteriorMean_params = c(),
@@ -240,34 +239,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   # ----------------------------- #
   # ---- build model matrices --- #
   # ----------------------------- #
-
-  if(is(Y,'list')){
-    if(!'observation_model' %in% names(Y)) stop('observation_model not specified in Y')
-    observation_model = Y$observation_model
-    observation_model_parameters = Y[names(Y) != 'observation_model']
-  } else{
-    if(!is(Y,'matrix'))	Y = as.matrix(Y)
-    if(nrow(Y) != nrow(data)) stop('Y and data have different numbers of rows')
-    observation_model = missing_data_model
-    observation_model_parameters = list(
-      Y = Y,
-      scale_Y = run_parameters$scale_Y
-    )
-  }
-
-  # initialize observation_model
-  observation_model_parameters$observation_setup = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
-  n = nrow(data)
-  p = observation_model_parameters$observation_setup$p
-  traitnames = observation_model_parameters$observation_setup$traitnames
-  if(is.null(traitnames)) traitnames = paste('trait',1:p,sep='_')
-  if(is.null(observation_model_parameters$observation_setup$Y_missing)) {
-    observation_model_parameters$observation_setup$Y_missing = matrix(0,n,p)
-  }
-  if(!is(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')){
-    observation_model_parameters$observation_setup$Y_missing = as(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')
-  }
-  Y_missing = observation_model_parameters$observation_setup$Y_missing
 
 	# check that all terms in models are in data
 	terms = c(all.vars(model),all.vars(factor_model_fixed))
@@ -280,7 +251,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
 	# build X from fixed model
 	  # for Eta
-	resid_intercept = FALSE     # is there an intercept? If so, don't penalize coefficient.
 
 	X = model.matrix(nobars(model),data)
 	linear_combos = caret::findLinearCombos(X)
@@ -288,10 +258,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  cat(sprintf('dropping column(s) %s to make X_resid full rank\n',paste(linear_combos$remove,sep=',')))
 	  X = X[,-linear_combos$remove]
 	}
-	if(ncol(X) > 0 && all(X[,1] == 1)) {
-	  resid_intercept = TRUE
-	}
-	b = ncol(X)
 	if(any(is.na(X))) stop('Missing values in X_resid')
 
   # for F
@@ -310,34 +276,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  X_F = X_F[,-linear_combos$remove]
 	}
 	X_F = sweep(X_F,2,colMeans(X_F),'-') # note columns are centered, potentially resulting in zero-variance columns
-	b_F = ncol(X_F)
-	X_F_zero_variance = apply(X_F,2,var) == 0
-	X_Fm = X_F
 	if(any(is.na(X_F))) stop('Missing values in X_F')
-
-	# identify fixed effects present in both X and X_F
-	fixed_effects_common = matrix(0,nr=2,nc=0)  # 2 x b_c matrix with row1 indexes of X and row2 corresponding indexes of X_F
-	non_null_X = which(apply(X,2,var)>0)
-	non_null_XF = which(!X_F_zero_variance)
-	if(length(non_null_X) > 0 && length(non_null_XF) > 0){
-  	cor_X = abs(cor(X[,non_null_X,drop=FALSE],X_F[,non_null_XF,drop=FALSE]))
-  	for(j in 1:nrow(cor_X)){
-  	  if(any(cor_X[j,] == 1)){
-        fixed_effects_common = cbind(fixed_effects_common,c(non_null_X[j],non_null_XF[which(cor_X[j,] == 1)[1]]))
-      }
-  	}
-	}
-	fixed_effects_only_resid = NULL
-	fixed_effects_only_factors = NULL
-	if(ncol(fixed_effects_common) < ncol(X)){
-	  fixed_effects_only_resid = (1:ncol(X))[-fixed_effects_common[1,]]
-	}
-	if(ncol(fixed_effects_common) < ncol(X_F)){
-	  fixed_effects_only_factors = (1:ncol(X_F))[-fixed_effects_common[2,]]
-	}
-
-	X = as(X,'dgCMatrix')
-	X_F = as(X_F,'dgCMatrix')
 
 	# -------- QTL effects ---------- #
 	QTL_resid_Z = QTL_resid_X = NULL
@@ -417,15 +356,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	}
 
 
-	# -------- cis genotypes ---------- #
-	if(is.null(cis_genotypes)){
-	  n_cis_effects = NULL
-	  cis_effects_index = NULL
-	} else{
-	  n_cis_effects = sapply(cis_genotypes,ncol)
-	  cis_effects_index = c(0,cumsum(n_cis_effects))+1
-	}
-
 	# -------- Random effects ---------- #
 	# ensure that only K or K_inv provided for each random effect
 	# check that all IDs from data are in rownames of K or K_inv
@@ -460,137 +390,391 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	#  note: correlated random effects are not allowed. Will convert to un-correlated REs
 	RE_terms = mkReTrms(findbars(model),data,drop.unused.levels = FALSE)  # extracts terms and builds Zt matrices
 
-	# construct Z matrices for each Random Effect
-	Z_matrices = list()
-	RE_names = c()
-	RE_covs = c()
+	# construct the RE_setup list
+	  # contains:
+	    # name: name of variance component
+	    # Z: n x r design matrix
+	    # K: r x r PSD covariance matrix
+	    # K_inv: r x r inverse covariance matrix.
+	    # only one of K or K_inv is needed
+	RE_setup = list()
 	for(i in 1:length(RE_terms$cnms)){
 	  term = names(RE_terms$cnms)[i]
 	  n_factors = length(RE_terms$cnms[[i]])  # number of factors for this grouping factor
-	  RE_covs = c(RE_covs,rep(term,n_factors)) # name of covariance for this grouping factor (for K_mats)
-	  if(sum(names(RE_terms$cnms) == term) > 1 || n_factors > 1) {
-	    RE_names = c(RE_names,paste(term,RE_terms$cnms[[i]],sep='.'))  # name of variance component
-	  } else{
-	    RE_names = c(RE_names,term)
+	  K = K_inv = NULL
+	  if(term %in% names(K_mats)){
+	    K = K_mats[[term]]
+	  } else if(term %in% names(K_inv_mats)){
+	    K_inv = K_inv_mats[[term]]
 	  }
-	  combined_Zt = RE_terms$Ztlist[[i]] # combined matrix of Zt matrices for this grouping factor
-	  # split combined matrix into a list of Z matrices (transposed)
+
+	  # extract combined Z matrix
+	  combined_Zt = RE_terms$Ztlist[[i]]
 	  Zs_term = tapply(1:nrow(combined_Zt),gl(n_factors,1,nrow(combined_Zt),labels = RE_terms$cnms[[term]]),function(x) t(combined_Zt[x,]))
-	  Z_matrices = c(Z_matrices,Zs_term)
-	}
-	names(Z_matrices) = RE_names
-	n_RE = length(RE_names)
 
-	# form Z
-	Z = do.call(cbind,Z_matrices[RE_names])
-	Z = as(Z,'dgCMatrix')
+	  # make an entry in RE_setup for each random effect
+	  for(j in 1:n_factors){
+	    # name of variance component
+	    name = term
+	    if(n_factors > 1) name = paste(name,RE_terms$cnms[[i]][[j]],sep='.')
 
-	# find RE indices
-	RE_lengths = sapply(Z_matrices,ncol)
-	RE_starts = cumsum(c(0,RE_lengths)[1:n_RE])
-	names(RE_starts) = RE_names
-	RE_indices = lapply(RE_names,function(re) RE_starts[re] + 1:RE_lengths[re])
-	names(RE_indices) = RE_names
+	    # Z matrix
+	    Z = as(Zs_term[[j]],'dgCMatrix')
 
-	  # function to ensure that covariance matrices are sparse and symmetric
-	fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
-
-	# construct K matrices for each random effect
-	    # if K is PSD, find K = LDLt and set K* = D and Z* of ZL
-	ldl_ks = lapply(K_mats,function(K) {
-	  res = LDLt_sparse(as(K,'dgCMatrix')) # actually calculates K = PtLDLtP
-	  if(is.character(validObject(res$L,test=TRUE)[1])) {
-	    res = LDLt_notSparse(as.matrix(K))  # sparse sometimes fails with non-PD K
+	    RE_setup[[name]] = list(
+	      Z = Z,
+	      K = K,
+	      K_inv = K_inv
+	    )
 	  }
-	  res
-	})
-
-	RE_L_matrices = list()
-	ZL_matrices = list()
-
-	for(i in 1:n_RE){
-	  re = RE_covs[i]
-	  re_name = RE_names[i]
-	  if(re %in% names(ldl_ks)) {
-	    ldl_k = ldl_ks[[re]]
-	    large_d = ldl_k$d > run_parameters$K_eigen_tol
-	    r_eff = sum(large_d)
-	    # if need to use reduced rank model, then use D of K in place of K and merge L into Z
-	    # otherwise, use original K, set L = Diagonal(1,r)
-	    if(r_eff < length(ldl_k$d)) {
-	      K = Diagonal(r_eff,ldl_k$d[large_d])
-	      L = t(ldl_k$P) %*% ldl_k$L[,large_d]
-	    } else{
-	      K = K_mats[[re]]
-	      L = Diagonal(nrow(K),1)
-	    }
-	  } else if(re %in% names(K_inv_mats)){
-	    K_mats[[re]] = solve(K_inv_mats[[re]])
-	    rownames(K_mats[[re]]) = rownames(K_inv_mats[[re]])
-	    K = K_mats[[re]]
-	    L = Diagonal(nrow(K),1)
-	  } else{
-	    K_mats[[re]] = Diagonal(ncol(Z_matrices[[re_name]]))
-	    rownames(K_mats[[re]]) = levels(as.factor(data[[re]]))
-	    K = K_mats[[re]]
-	    L = Diagonal(nrow(K),1)
-	  }
-	  rownames(L) = paste(levels(as.factor(data[[re]])),re_name,sep='::')
-	  K_mats[[re_name]] = fix_K(K)
-	  RE_L_matrices[[re_name]] = L
-	  ZL_matrices[[re_name]] = Z_matrices[[re_name]] %*% L
 	}
-	K_mats = K_mats[RE_names]
-	# Construct ZL based on PSD K's
-	ZL = do.call(cbind,ZL_matrices[RE_names])
-	ZL = as(ZL,'dgCMatrix')
-	# The following matrix is used to transform random effects back to the original space had we sampled from the original (PSD) K.
-	if(length(RE_names) > 1) {
-	  RE_L = do.call(bdiag,RE_L_matrices[RE_names])
-	  rownames(RE_L) = do.call(c,lapply(RE_L_matrices,rownames))
-	} else{
-	  RE_L = RE_L_matrices[[1]]
-	}
-	r_RE = sapply(ZL_matrices,function(x) ncol(x))  # re-calculate
 
-	  # construct K_inverse matrices for each random effect
-	if(is.null(K_inv_mats)) K_inv_mats = list()
-	Ki_mats = list()
-	for(i in 1:length(RE_names)){
-	  re = RE_covs[i]
-	  re_name = RE_names[i]
-	  if(re %in% names(K_inv_mats)){
-	    Ki = K_inv_mats[[re]]
-	  } else {
-	    K_inv_mats[[re_name]] = solve(K_mats[[re_name]])
-	    rownames(K_inv_mats[[re_name]]) = rownames(K_mats[[re_name]])
-	    Ki = K_inv_mats[[re_name]]
-	  }
-	  Ki_mats[[re_name]] = fix_K(Ki)
-	}
-	# names(Ki_mats) = RE_names
-	  # cholesky decompositions (L'L) of each K_inverse matrix
-	chol_Ki_mats = lapply(Ki_mats,chol)
-
-	# table of possible h2s for each random effect
-	#   These are percentages of the total residual variance accounted for by each random effect
-	#   Each column is a set of percentages, the sum of which must be less than 1 (so that Ve is > 0)
-	# can specify different levels of granularity for each random effect
-	h2_divisions = run_parameters$h2_divisions
-	if(length(h2_divisions) < n_RE){
-	  if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
-	  h2_divisions = rep(h2_divisions,n_RE)
-	}
-	if(is.null(names(h2_divisions))) {
-	  names(h2_divisions) = RE_names
-	}
-	h2s_matrix = expand.grid(lapply(RE_names,function(re) seq(0,1,length = h2_divisions[[re]]+1)))
-	colnames(h2s_matrix) = RE_names
-	h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
-	colnames(h2s_matrix) = NULL
+	BSFG_init2(
+	  Y = Y,
+	  X = X,
+	  X_F = X_F,
+	  QTL_resid_Z = QTL_resid_Z,
+	  QTL_resid_X = QTL_resid_X,
+	  QTL_factors_Z = QTL_factors_Z,
+	  QTL_factors_X = QTL_factors_X,
+	  RE_setup = RE_setup,
+	  data = data,
+	  priors = priors,
+	  run_parameters = run_parameters,
+	  cis_genotypes = cis_genotypes,
+	  posteriorSample_params = posteriorSample_params,
+	  posteriorMean_params = posteriorMean_params,
+	  ncores = ncores,setup = setup,verbose=verbose
+	)
+}
 
 
-	# ------------------------------------ #
+BSFG_init2 = function(
+  Y,
+  X = NULL,
+  X_F = NULL,
+  QTL_resid_Z = NULL,
+  QTL_resid_X = NULL,
+  QTL_factors_Z = NULL,
+  QTL_factors_X = NULL,
+  RE_setup,
+  data = NULL,
+  priors = BSFG_priors(),
+  run_parameters = BSFG_control(),
+  cis_genotypes = NULL,
+  posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'),
+  posteriorMean_params = c(),
+  ncores = detectCores(),setup = NULL,verbose=T) {
+
+  # -------- n_RE ---------- #
+
+  n_RE = length(RE_setup)
+  if(n_RE == 0) stop('no random effects provided')
+
+  # -------- find n ---------- #
+
+  n = NULL
+  if(!is.null(X)) n = nrow(X)
+  if(!is.null(X_F)){
+    if(!is.null(n) && nrow(X_F) != n) stop(sprintf('nrow(X_F) != %d',n))
+    n = nrow(X_F)
+  }
+  for(i in 1:length(RE_setup)){
+    if(!'Z' %in% names(RE_setup[[i]])) {
+      if('K' %in% names(RE_setup[[i]])){
+        RE_setup[[i]]$Z = as(diag(1,nrow(RE_setup[[i]]$K)),'dgCMatrix')
+      } else if('K_inv' %in% names(RE_setup[[i]])) {
+        RE_setup[[i]]$Z = as(diag(1,nrow(RE_setup[[i]]$K_inv)),'dgCMatrix')
+      } else{
+        stop('random effect %s needs at least one of (Z, K, K_inv)',names(RE_setup)[i])
+      }
+    }
+    if(!is.null(n) && nrow(RE_setup[[i]]$Z) != n) stop(sprintf('nrow(Z-%s) != %d',names(RE_setup)[i],n))
+    n = nrow(RE_setup[[i]]$Z)
+  }
+
+
+
+  # -------- replace missing matrices ---------- #
+
+  if(is.null(X)) X = matrix(1,n,1)
+  if(is.null(X_F)) X_F = matrix(0,n,0)
+  if(is.null(data)) data = data.frame(ID = 1:n)
+
+
+  # -------- Fixed effects ---------- #
+  b = ncol(X)
+  resid_intercept = ncol(X) > 0 && all(X[,1] == 1)  # if the first column of X is all 1's, don't penalize the prior
+
+  b_F = ncol(X_F)
+  X_F_zero_variance = apply(X_F,2,var) == 0
+
+  # identify fixed effects present in both X and X_F
+  fixed_effects_common = matrix(0,nr=2,nc=0)  # 2 x b_c matrix with row1 indexes of X and row2 corresponding indexes of X_F
+  non_null_X = which(apply(X,2,var)>0)
+  non_null_XF = which(!X_F_zero_variance)
+  if(length(non_null_X) > 0 && length(non_null_XF) > 0){
+    cor_X = abs(cor(X[,non_null_X,drop=FALSE],X_F[,non_null_XF,drop=FALSE]))
+    for(j in 1:nrow(cor_X)){
+      if(any(cor_X[j,] == 1)){
+        fixed_effects_common = cbind(fixed_effects_common,c(non_null_X[j],non_null_XF[which(cor_X[j,] == 1)[1]]))
+      }
+    }
+  }
+  fixed_effects_only_resid = NULL
+  fixed_effects_only_factors = NULL
+  if(ncol(fixed_effects_common) < ncol(X)){
+    fixed_effects_only_resid = (1:ncol(X))[-fixed_effects_common[1,]]
+  }
+  if(ncol(fixed_effects_common) < ncol(X_F)){
+    fixed_effects_only_factors = (1:ncol(X_F))[-fixed_effects_common[2,]]
+  }
+
+  X = as(X,'dgCMatrix')
+  X_F = as(X_F,'dgCMatrix')
+
+
+
+  # -------- QTL effects ---------- #
+
+  b_QTL = ncol(QTL_resid_X)
+  if(is.null(b_QTL)) b_QTL = 0
+  if(b_QTL > 0 && is.null(QTL_resid_Z)) {
+    QTL_resid_Z = as(diag(1,n),'dgCMatrix')
+  }
+
+  b_QTL_F = ncol(QTL_factors_X)
+  if(is.null(b_QTL_F)) b_QTL_F = 0
+  if(b_QTL_F > 0 && is.null(QTL_factors_Z)) {
+    QTL_factors_Z = as(diag(1,n),'dgCMatrix')
+  }
+
+
+
+  # -------- cis genotypes ---------- #
+  if(is.null(cis_genotypes)){
+    n_cis_effects = NULL
+    cis_effects_index = NULL
+  } else{
+    n_cis_effects = sapply(cis_genotypes,ncol)
+    cis_effects_index = c(0,cumsum(n_cis_effects))+1
+  }
+
+
+  # -------- observation model ---------- #
+
+  if(is(Y,'list')){
+    if(!'observation_model' %in% names(Y)) stop('observation_model not specified in Y')
+    observation_model = Y$observation_model
+    observation_model_parameters = Y[names(Y) != 'observation_model']
+  } else{
+    if(!is(Y,'matrix'))	Y = as.matrix(Y)
+    if(nrow(Y) != nrow(data)) stop('Y and data have different numbers of rows')
+    observation_model = missing_data_model
+    observation_model_parameters = list(
+      Y = Y,
+      scale_Y = run_parameters$scale_Y
+    )
+  }
+
+  # initialize observation_model
+  observation_model_parameters$observation_setup = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
+  n = nrow(data)
+  p = observation_model_parameters$observation_setup$p
+  traitnames = observation_model_parameters$observation_setup$traitnames
+  if(is.null(traitnames)) traitnames = paste('trait',1:p,sep='_')
+  if(is.null(observation_model_parameters$observation_setup$Y_missing)) {
+    observation_model_parameters$observation_setup$Y_missing = matrix(0,n,p)
+  }
+  if(!is(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')){
+    observation_model_parameters$observation_setup$Y_missing = as(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')
+  }
+  Y_missing = observation_model_parameters$observation_setup$Y_missing
+
+
+
+  # add names to RE_setup if needed
+  n_RE = length(RE_setup)
+  for(i in 1:n_RE){
+    if(is.null(names(RE_setup)[i])){
+      names(RE_setup)[i] = paste0('RE.',i)
+    }
+  }
+  RE_names = names(RE_setup)
+
+  # combine Z matrices
+  Z = do.call(cbind,lapply(RE_setup,function(x) x$Z))
+  Z = as(Z,'dgCMatrix')
+
+
+  # find RE indices
+  RE_lengths = sapply(RE_setup,function(x) ncol(x$Z))
+  RE_starts = cumsum(c(0,RE_lengths)[1:n_RE])
+  names(RE_starts) = RE_names
+  RE_indices = lapply(RE_names,function(re) RE_starts[re] + 1:RE_lengths[re])
+  names(RE_indices) = RE_names
+
+  # function to ensure that covariance matrices are sparse and symmetric
+  fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
+
+  # function to decompose K as K = PtLDLtP
+  LDL = function(K) {
+    res = LDLt_sparse(as(K,'dgCMatrix')) # actually calculates K = PtLDLtP
+    if(is.character(validObject(res$L,test=TRUE)[1])) {
+      res = LDLt_notSparse(as.matrix(K))  # sparse sometimes fails with non-PD K
+    }
+    res
+  }
+
+  # construct RE_L and ZL for each random effect
+  for(i in 1:length(RE_setup)){
+    re_name = names(RE_setup)[i]
+    RE_setup[[i]] = within(RE_setup[[i]],{
+      if(!'ZL' %in% ls()){
+        if(!is.null(K)){
+          ldl_k = LDL(K)
+          large_d = ldl_k$d > run_parameters$K_eigen_tol
+          r_eff = sum(large_d)
+          # if need to use reduced rank model, then use D of K in place of K and merge L into Z
+          # otherwise, use original K, set L = Diagonal(1,r)
+          if(r_eff < length(ldl_k$d)) {
+            K = as(diag(ldl_k$d[large_d]),'dgCMatrix')
+            K_inv = as(diag(1/ldl_k$d[large_d]),'dgCMatrix')
+            L = t(ldl_k$P) %*% ldl_k$L[,large_d]
+          } else{
+            L = as(diag(1,nrow(K)),'dgCMatrix')
+            K_inv = as(with(ldl_k,t(P) %*% crossprod(diag(1/sqrt(d)) %*% solve(L)) %*% P),'dgCMatrix')
+          }
+          rownames(K_inv) = rownames(K)
+          rm(list=c('ldl_k','large_d','r_eff'))
+        } else if (!is.null(K_inv)){
+          K = solve(K_inv)
+          rownames(K) = rownames(K_inv)
+          L = as(diag(1,nrow(K)),'dgCMatrix')
+        } else{
+          K = as(diag(1,ncol(Z_matrices[[re_name]])),'dgCMatrix')
+          rownames(K) = levels(as.factor(data[[re]]))
+          K_inv = K
+          L = as(diag(1,nrow(K)),'dgCMatrix')
+        }
+        if(is.null(rownames(K))) rownames(K) = 1:nrow(K)
+        rownames(L) = paste(rownames(K),re_name,sep='::')
+        K = fix_K(K)
+        ZL = Z %*% L
+      }
+    })
+  }
+  ZL = do.call(cbind,lapply(RE_setup,function(re) re$ZL))
+  ZL = as(ZL,'dgCMatrix')
+
+  if(length(RE_setup) > 1) {
+    RE_L = do.call(bdiag,lapply(RE_setup,function(re) re$L))
+    rownames(RE_L) = do.call(c,lapply(RE_setup,function(re) rownames(re$L)))
+  } else{
+    RE_L = RE_setup[[1]]$L
+  }
+  r_RE = sapply(RE_setup,function(re) ncol(re$ZL))
+
+  # cholesky decompositions (L'L) of each K_inverse matrix
+  chol_Ki_mats = lapply(RE_setup,function(re) chol(as.matrix(re$K_inv)))
+
+  #
+  # # construct K matrices for each random effect
+  # # if K is PSD but not PD, find K = LDLt and set K* = D and Z* of ZL
+  # ldl_ks = lapply(K_mats,function(K) {
+  #   res = LDLt_sparse(as(K,'dgCMatrix')) # actually calculates K = PtLDLtP
+  #   if(is.character(validObject(res$L,test=TRUE)[1])) {
+  #     res = LDLt_notSparse(as.matrix(K))  # sparse sometimes fails with non-PD K
+  #   }
+  #   res
+  # })
+  #
+  # RE_L_matrices = list()
+  # ZL_matrices = list()
+  #
+  # for(i in 1:n_RE){
+  #   re = RE_covs[i]
+  #   re_name = RE_names[i]
+  #   if(re %in% names(ldl_ks)) {
+  #     ldl_k = ldl_ks[[re]]
+  #     large_d = ldl_k$d > run_parameters$K_eigen_tol
+  #     r_eff = sum(large_d)
+  #     # if need to use reduced rank model, then use D of K in place of K and merge L into Z
+  #     # otherwise, use original K, set L = Diagonal(1,r)
+  #     if(r_eff < length(ldl_k$d)) {
+  #       K = Diagonal(r_eff,ldl_k$d[large_d])
+  #       L = t(ldl_k$P) %*% ldl_k$L[,large_d]
+  #     } else{
+  #       K = K_mats[[re]]
+  #       L = Diagonal(nrow(K),1)
+  #     }
+  #   } else if(re %in% names(K_inv_mats)){
+  #     K_mats[[re]] = solve(K_inv_mats[[re]])
+  #     rownames(K_mats[[re]]) = rownames(K_inv_mats[[re]])
+  #     K = K_mats[[re]]
+  #     L = Diagonal(nrow(K),1)
+  #   } else{
+  #     K_mats[[re]] = Diagonal(ncol(Z_matrices[[re_name]]))
+  #     rownames(K_mats[[re]]) = levels(as.factor(data[[re]]))
+  #     K = K_mats[[re]]
+  #     L = Diagonal(nrow(K),1)
+  #   }
+  #   rownames(L) = paste(levels(as.factor(data[[re]])),re_name,sep='::')
+  #   K_mats[[re_name]] = fix_K(K)
+  #   RE_L_matrices[[re_name]] = L
+  #   ZL_matrices[[re_name]] = Z_matrices[[re_name]] %*% L
+  # }
+  # K_mats = K_mats[RE_names]
+  # # Construct ZL based on PSD K's
+  # ZL = do.call(cbind,ZL_matrices[RE_names])
+  # ZL = as(ZL,'dgCMatrix')
+  # The following matrix is used to transform random effects back to the original space had we sampled from the original (PSD) K.
+  # if(length(RE_names) > 1) {
+  #   RE_L = do.call(bdiag,RE_L_matrices[RE_names])
+  #   rownames(RE_L) = do.call(c,lapply(RE_L_matrices,rownames))
+  # } else{
+  #   RE_L = RE_L_matrices[[1]]
+  # }
+  # r_RE = sapply(ZL_matrices,function(x) ncol(x))  # re-calculate
+
+  # # construct K_inverse matrices for each random effect
+  # if(is.null(K_inv_mats)) K_inv_mats = list()
+  # Ki_mats = list()
+  # for(i in 1:length(RE_names)){
+  #   re = RE_covs[i]
+  #   re_name = RE_names[i]
+  #   if(re %in% names(K_inv_mats)){
+  #     Ki = K_inv_mats[[re]]
+  #   } else {
+  #     K_inv_mats[[re_name]] = solve(K_mats[[re_name]])
+  #     rownames(K_inv_mats[[re_name]]) = rownames(K_mats[[re_name]])
+  #     Ki = K_inv_mats[[re_name]]
+  #   }
+  #   Ki_mats[[re_name]] = fix_K(Ki)
+  # }
+  # names(Ki_mats) = RE_names
+  # cholesky decompositions (L'L) of each K_inverse matrix
+  # chol_Ki_mats = lapply(Ki_mats,chol)
+
+  # table of possible h2s for each random effect
+  #   These are percentages of the total residual variance accounted for by each random effect
+  #   Each column is a set of percentages, the sum of which must be less than 1 (so that Ve is > 0)
+  # can specify different levels of granularity for each random effect
+  h2_divisions = run_parameters$h2_divisions
+  if(length(h2_divisions) < n_RE){
+    if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
+    h2_divisions = rep(h2_divisions,n_RE)
+  }
+  if(is.null(names(h2_divisions))) {
+    names(h2_divisions) = RE_names
+  }
+  h2s_matrix = expand.grid(lapply(RE_names,function(re) seq(0,1,length = h2_divisions[[re]]+1)))
+  colnames(h2s_matrix) = RE_names
+  h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
+  colnames(h2s_matrix) = NULL
+
+
+  # ------------------------------------ #
 	# ----Precalculate ZKZts, chol_Ks ---- #
 	# ------------------------------------ #
 
@@ -667,7 +851,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
   # now, for each set of columns, pre-calculate a set of matrices, etc
   # do calculations in several chunks
-  group_size = 2*parallel::detectCores()
+  group_size = 2*ncores
   n_groups = ceiling(ncol(h2s_matrix)/group_size)
   col_groups = tapply(1:ncol(h2s_matrix),gl(n_groups,group_size,ncol(h2s_matrix)),function(x) x)
 
@@ -685,7 +869,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
   Sigma_Choleskys_list = list()
 
   if(n_RE == 1 && run_parameters$svd_K == TRUE){
-    svd_K1 = svd(K_mats[[1]])
+    svd_K1 = svd(RE_setup[[1]]$K)
   }
 
   for(set in seq_along(Missing_data_map)){
@@ -705,7 +889,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
         if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
         Qt = t(Q_ZU %*% RKRt_U)
       } else{
-        ZKZt = ZL[x,,drop=FALSE] %*% K_mats[[1]] %*% t(ZL[x,,drop=FALSE])
+        ZKZt = ZL[x,,drop=FALSE] %*% RE_setup[[1]]$K %*% t(ZL[x,,drop=FALSE])
         result = svd(ZKZt)
         Qt = t(result$u)
       }
@@ -713,7 +897,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
     } else{
       Qt = as(diag(1,length(x)),'dgCMatrix')
     }
-    QtZL_matrices_set = lapply(ZL_matrices,function(ZL) Qt %*% ZL[x,,drop=FALSE])
+    QtZL_matrices_set = lapply(RE_setup,function(re) Qt %*% re$ZL[x,,drop=FALSE])
     QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
     QtZL_set = as(QtZL_set,'dgCMatrix')
     QtX_set = Qt %**% X[x,,drop=FALSE]
@@ -732,7 +916,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
     ZKZts_set = list()
     for(i in 1:n_RE){
-      ZKZts_set[[i]] = as(forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% K_mats[[i]] %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol)),'dgCMatrix')
+      ZKZts_set[[i]] = as(forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% RE_setup[[i]]$K %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol)),'dgCMatrix')
     }
 
 
@@ -810,9 +994,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	data_matrices = list(
 	  X           = X,
 	  X_F         = X_F,
-	  Z_matrices  = Z_matrices,
 	  Z           = Z,
-	  ZL_matrices = ZL_matrices,
 	  ZL          = ZL,
 	  RE_L        = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
 	  RE_indices  = RE_indices,
@@ -950,14 +1132,10 @@ initialize_variables = function(BSFG_state,...){
     F_h2_index = sample(1:ncol(h2s_matrix),k,replace=T)
     F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    U_F = lapply(RE_names,function(effect){
-      matrix(rnorm(r_RE[effect] * k, 0, sqrt(F_h2[effect,] / tot_F_prec)),ncol = k, byrow = T)
-    })
-    names(U_F) = RE_names
+    U_F = matrix(rnorm(sum(r_RE) * k, 0, sqrt(F_h2[1,] / tot_F_prec)),ncol = k, byrow = T)
+    rownames(U_F) = colnames(ZL)
 
-    U_R = do.call(rbind,lapply(RE_names,function(effect){
-      matrix(rnorm(r_RE[effect] * p, 0, sqrt(resid_h2[effect,] / tot_Eta_prec)),ncol = p, byrow = T)
-    }))
+    U_R = matrix(rnorm(sum(r_RE) * p, 0, sqrt(resid_h2[1,] / tot_Eta_prec)),ncol = p, byrow = T)
     colnames(U_R) = traitnames
     rownames(U_R) = colnames(ZL)
 
@@ -978,13 +1156,8 @@ initialize_variables = function(BSFG_state,...){
     XB = X %**% B
     if(b_QTL > 0) XB = XB + QTL_resid_Z %**% (QTL_resid_X %**% B_QTL)
 
-    F = X_F %*% B_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
-    for(effect in RE_names) {
-      F = F + ZL_matrices[[effect]] %*% U_F[[effect]]
-    }
+    F = X_F %*% B_F + ZL %*% U_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
     F = as.matrix(F)
-    U_F = do.call(rbind,U_F)
-    rownames(U_F) = colnames(ZL)
 
     # ----------------------- #
     # ---Save initial values- #

@@ -90,8 +90,7 @@ run_parameters = BSFG_control(
   thin=10
 )
 
-priors = list(
-  fixed_var = list(V = .1,     nu = 30),
+priors = BSFG_priors(
   # tot_Y_var = list(V = 0.5,   nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 10),
   tot_F_var = list(V = 18/20, nu = 20),
@@ -105,6 +104,8 @@ priors = list(
   ),
   B_prior = list(
     sampler = sample_B_prec_ARD,
+    global   = list(V = 1,nu = 3),
+    global_F = list(V = 1,nu = 3),
     B_df      = 3,
     B_F_df    = 3
   )

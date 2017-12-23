@@ -44,7 +44,7 @@ sample_QTL_prec_ARD = function(BSFG_state,...){
                                  B_QTL_prec = matrix(1,b_QTL,p)
                                }
                                tau = rgamma(p,
-                                            shape = tau_shape + nrow(B_QTL2)/2,
+                                            shape = tau_shape + dim(B_QTL2)[1]/2,
                                             rate = tau_rate +
                                               colSums(B_QTL2 * B_QTL_prec/B_QTL_tau[rep(1,b_QTL),])/2)
                                B_QTL_tau[] = tau
@@ -58,7 +58,7 @@ sample_QTL_prec_ARD = function(BSFG_state,...){
                                  B_QTL_F_prec = matrix(1,b_QTL_F,k)
                                }
                                tau = rgamma(k,
-                                            shape = tau_shape + nrow(B_QTL_F2)/2,
+                                            shape = tau_shape + dim(B_QTL_F2)[1]/2,
                                             rate = tau_rate +
                                               colSums(B_QTL_F2 * B_QTL_F_prec/B_QTL_F_tau[rep(1,b_QTL_F),])/2)
                                B_QTL_F_tau[] = tau

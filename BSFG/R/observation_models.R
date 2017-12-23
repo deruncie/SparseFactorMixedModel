@@ -269,7 +269,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
 
     Y_tilde = Y - Y_fitted
 
-    resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape + 0.5*nrow(Y_tilde), rate = resid_Y_prec_rate + 0.5*colSums(Y_tilde^2)),nr=1)
+    resid_Y_prec = matrix(rgamma(n_traits,shape = resid_Y_prec_shape + 0.5*dim(Y_tilde)[1], rate = resid_Y_prec_rate + 0.5*colSums(Y_tilde^2)),nr=1)
 
     return(list(Eta = Eta, resid_Y_prec = resid_Y_prec, Y_fitted=Y_fitted, Y=Y, var_Eta = var_Eta))
   })

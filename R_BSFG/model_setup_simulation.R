@@ -50,16 +50,14 @@ run_parameters = BSFG_control(
 )
 
 priors = BSFG_priors(
-  fixed_var = list(V = .1,     nu = 3),
-  # tot_Y_var = list(V = 0.5,   nu = 3),
-  tot_Y_var = list(V = 0.5,   nu = 3),
-  tot_F_var = list(V = 18/20, nu = 20),
+  tot_Y_var = list(V = 0.5,   nu = 10),
+  tot_F_var = list(V = 18/20, nu = 20e5),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
   h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1)),
   Lambda_prior = list(
     sampler = sample_Lambda_prec_ARD,
     Lambda_df = 3,
-    delta_1   = list(shape = 2.1,  rate = 1/20),
+    delta_1   = list(shape = 2,  rate = 1),
     delta_2   = list(shape = 3, rate = 1)
   ),
   # Lambda_prior = list(
@@ -81,10 +79,12 @@ priors = BSFG_priors(
   #   B_F_df    = 3
   # )
   B_prior = list(
-    sampler = sample_B_prec_combined_ARD,
+    sampler = sample_B_prec_ARD,
+    global   = list(V = 1,nu = 3),
+    global_F = list(V = 1,nu = 3),
     B_df      = 3,
     B_F_df    = 3
-  )
+  ),
   # B_prior = list(
   #   sampler = sample_B_prec_TPB,
   #   B_A      = .5,

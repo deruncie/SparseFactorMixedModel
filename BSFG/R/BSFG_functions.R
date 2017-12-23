@@ -85,7 +85,8 @@ Image = function(X,dimnames=TRUE,...) {
   if(is.numeric(X_tall$Var2)) p <- p + xlim(0,ncol(X)+1)
   if(is.numeric(X_tall$Var1)) p <- p + ylim(nrow(X)+1,0)
   if(length(unique(X_tall$value))>2) p <- p + scale_fill_gradient2(na.value = "grey90",...)
-  print(p)
+  # print(p)
+  p
 }
 Image2=function(x,zlim = NULL,breaks=20,colors = c('blue','white','red'),colorkey = TRUE,aspect=NULL,...){
   # if zlim not passed and the range of the data is outside of (-1,1), expands zlim range
