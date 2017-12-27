@@ -503,6 +503,10 @@ BSFG_init2 = function(
 
 
   # -------- Fixed effects ---------- #
+
+  X = as.matrix(X)
+  X_F = as.matrix(X_F)
+
   b = ncol(X)
   resid_intercept = ncol(X) > 0 && all(X[,1] == 1)  # if the first column of X is all 1's, don't penalize the prior
 
@@ -597,7 +601,7 @@ BSFG_init2 = function(
   # add names to RE_setup if needed
   n_RE = length(RE_setup)
   for(i in 1:n_RE){
-    if(is.null(names(RE_setup)[i])){
+    if(is.null(names(RE_setup)[i]) || names(RE_setup)[i] == ''){
       names(RE_setup)[i] = paste0('RE.',i)
     }
   }
@@ -632,7 +636,7 @@ BSFG_init2 = function(
     re_name = names(RE_setup)[i]
     RE_setup[[i]] = within(RE_setup[[i]],{
       if(!'ZL' %in% ls()){
-        if(!is.null(K)){
+        if('K' %in% ls() && !is.null(K)){
           ldl_k = LDL(K)
           large_d = ldl_k$d > run_parameters$K_eigen_tol
           r_eff = sum(large_d)
@@ -646,15 +650,17 @@ BSFG_init2 = function(
             L = as(diag(1,nrow(K)),'dgCMatrix')
             K_inv = as(with(ldl_k,t(P) %*% crossprod(diag(1/sqrt(d)) %*% solve(L)) %*% P),'dgCMatrix')
           }
+          if(is.null(rownames(K))) rownames(K) = 1:nrow(K)
           rownames(K_inv) = rownames(K)
           rm(list=c('ldl_k','large_d','r_eff'))
-        } else if (!is.null(K_inv)){
+        } else if ('K_inv' %in% ls() && !is.null(K_inv)){
+          if(is.null(rownames(K_inv))) rownames(K_inv) = 1:nrow(K_inv)
           K = solve(K_inv)
           rownames(K) = rownames(K_inv)
           L = as(diag(1,nrow(K)),'dgCMatrix')
         } else{
-          K = as(diag(1,ncol(Z_matrices[[re_name]])),'dgCMatrix')
-          rownames(K) = levels(as.factor(data[[re]]))
+          K = as(diag(1,ncol(Z)),'dgCMatrix')
+          rownames(K) = colnames(Z)
           K_inv = K
           L = as(diag(1,nrow(K)),'dgCMatrix')
         }

@@ -126,6 +126,16 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# 
                                   priors=priors,
                                   setup = setup)
 
+X = as.matrix(BSFG_state$data_matrices$X)
+X_F = as.matrix(BSFG_state$data_matrices$X_F)
+K = as.matrix(setup$K)
+rownames(K) = colnames(K) = NULL
+RE_setup = list(list(Z = model.matrix(~0+animal,data),K = K),b = list(Z = model.matrix(~0+Sire,data)))
+B2 = BSFG_init2(Y,X=X,X_F=X_F,RE_setup = RE_setup,data=data,
+                run_parameters=run_parameters,
+                priors=priors,
+                setup = setup)
+
 # BSFG_state$current_state$F_h2
 # BSFG_state$priors$h2_priors_resids
 # BSFG_state$priors$h2_priors_factors
