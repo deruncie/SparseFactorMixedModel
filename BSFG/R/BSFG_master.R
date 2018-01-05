@@ -392,7 +392,6 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 
 	# construct the RE_setup list
 	  # contains:
-	    # name: name of variance component
 	    # Z: n x r design matrix
 	    # K: r x r PSD covariance matrix
 	    # K_inv: r x r inverse covariance matrix.

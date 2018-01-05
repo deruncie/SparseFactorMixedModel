@@ -1,0 +1,211 @@
+---
+title: "Intro to BSFG"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Put the title of your vignette here}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+Load the library
+```{r}
+library(BSFG)
+```
+
+## Simulated data
+The following code generates simulated data, and then loads it into the R workspace
+can be skipped if you are loading your own data in a different way
+```{r}
+seed = 1  # for reproducibility
+nSire = 50 # simulation design is a half-sib design: each of nSire fathers has nRep children, each with a different female
+nRep = 10
+nTraits = 100
+nFixedEffects = 2 # fixed effects are effects on the factors
+nFactors = 10
+factor_h2s = c(rep(0,nFactors/2),rep(0.3,nFactors/2))  # factor_h2 is the % of variance in each factor trait that is explained by additive genetic variation.
+# The is after accounting for the fixed effects on the factors
+Va = 2 # residual genetic variance in each of the observed traits after accounting for the factors
+Ve = 2 # residual microenvironmental variance in each of the observed traits after accounting for the factors
+Vb = 2 # magnitude of the fixed effects (just factors)
+set.seed(seed)
+new_halfSib_simulation('Sim_FE_1', nSire=nSire,nRep=nRep,p=nTraits, b=nFixedEffects, factor_h2s= factor_h2s,Va = Va, Ve = Ve,Vb = Vb)
+```
+
+Load the simulated data. Replace with your own data.
+
+```{r}
+load('setup.RData')
+Y = setup$Y
+data = setup$data
+K = setup$K
+```
+
+
+## Set up the parameters
+
+Set the parameters of the BSFG model
+see `?BSFG_control`
+
+```{r}
+run_parameters = BSFG_control(
+  scale_Y = FALSE,   # should the columns of Y be re-scaled to have mean=0 and sd=1?
+  h2_divisions = 20, # Each variance component is allowed to explain between 0% and 100% of the total variation. How many segments should the range [0,100) be divided into for each random effect?
+  h2_step_size = NULL, # if NULL, all possible values of random effects are tried each iteration. If in (0,1), a new candidate set of random effect proportional variances is drawn uniformily with a range of this size
+  burn = 00,  # number of burn in samples before saving posterior samples
+  k_init = 15, # number of factors
+  simulation = TRUE # Are you running against simulated data (ex from a call to new_halfSib_simulation above)? If so, you can provide the setup list and it will make some QC plots
+)
+```
+
+
+Set the prior hyperparameters of the BSFG model
+see `?BSFG_priors`
+```{r}
+priors = BSFG_priors(
+  tot_Y_var = list(V = 0.5,   nu = 5),      # Prior variance of trait residuals after accounting for fixed effects and factors
+  tot_F_var = list(V = 18/20, nu = 20),     # Prior variance of factor traits. This is included to improve MCMC mixing, but can be turned off by setting nu very large
+  Lambda_prior = list(      # prior for factor loadings
+    sampler = sample_Lambda_prec_ARD,
+    Lambda_df = 3,
+    delta_1   = list(shape = 2,  rate = 1),
+    delta_2   = list(shape = 3, rate = 1)
+  ),
+  B_prior = list(           # prior for fixed effects. Supersedes fixed_var above.
+    sampler = sample_B_prec_ARD,  # class of priors. ARD is default
+    global   = list(V = 1,nu = 3),  # global shrinkage hyperparameters
+    global_F = list(V = 1,nu = 3), # global shrinkage hyperparameters for factors
+    B_df      = 3,          # degrees of freedom of t-distribution for residual fixed effects
+    B_F_df    = 2           # degrees of freedom of t-distribution for factor fixed effects
+  ),
+  h2_priors_resids_fun = function(h2s,n)  1,  # Function that returns the prior density for any value of the h2s vector (ie the vector of random effect proportional variances across all random effects. 1 means constant prior. Alternative: pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
+  h2_priors_factors_fun = function(h2s,n) 1 # See above. Another choice is one that gives 50% weight to h2==0: ifelse(h2s == 0,n,n/(n-1))
+)
+```
+
+
+
+## Set up the model object
+
+There are two options: 
+
+1. `BSFG_init`: Specify the model through a model formula similar to `lme4`
+2. `BSFG_init2`: Directly pass the model matrices
+
+### Using `BSFG_init`
+```{r}
+BSFG_state = BSFG_init(Y,
+                       model=~Fixed1+(1+Fixed1|animal), # This model has one fixed and two random terms. The random terms are NOT correlated
+                       #factor_model_fixed = ~0, # we could specify a different fixed effect model for the factors
+                       data = data, # the data.frame with information for constructing the model matrices
+                       K_mats = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated
+                       run_parameters=run_parameters,
+                       priors=priors,
+                       setup = setup  # only if running simulated data. Stores simulated values for comparison
+                       )
+```
+
+
+### Using `BSFG_init2`
+```{r}
+X = X_F = model.matrix(~Fixed1,data)
+# random effect 1: intercept for each animal
+Z = model.matrix(~0+animal,data)
+# ensure that Z is ordered the same as K
+colnames(Z) = sub('animal','',colnames(Z))
+Z = Z[,rownames(K)]
+
+# random effect 2: slope on Fixed1 for each animal
+Z2 = Z * data$Fixed1
+
+# RE_setup list:
+# each (named) element (one per random effect) contains: 
+	    # name: name of variance component
+	    # Z: n x r design matrix
+	    # K: r x r PSD covariance matrix
+	    # K_inv: r x r inverse covariance matrix.
+	    # only one of K or K_inv is needed
+RE_setup = list(`animal.(Intercept)` = list(Z = Z, K = K), animal.Fixed1 = list(Z = Z2, K = K))
+BSFG_state = BSFG_init2(Y = Y, X = X, X_F = X_F,
+                       RE_setup = RE_setup,
+                       data = data, # the data.frame with information for constructing the model matrices
+                       run_parameters=run_parameters,
+                       priors=priors,
+                       setup = setup  # only if running simulated data. Stores simulated values for comparison
+                       )
+                       
+```
+
+
+## Run MCMC
+see `sample_BSFG`
+
+A MCMC chain is a way of fitting parameters from a Bayesian model
+The chain is a sequence of draws from the Posterior distribution of each parameter.
+BSFG uses a Gibbs sampler, which means that we iterate through all of the model's parameters
+and for each parameter draw a new value from it's posterior holding all other parameters constant
+This works, but the individual draws are not independent draws from the joint posterior of all parameters.
+Therefore, to get independent draws, we have to collect many posterior samples, and then save only a portion of them.
+Also, it may take many iterations for the MCMC chain to converge to the central part of the distribution.
+This is the burnin period, and we do not store these values (they are not useful).
+At the end, we have a collection of samples from the posterior distribution of each parameter.
+We can use these samples to characterize each distribution: mean, SD, histogram, HPDinterval, etc.
+
+The way BSFG works is that you ask the program to collect a small number of samples
+And then can assess how the chain is performing (how well it is mixing, is it converged?)
+And then either save the samples as posterior samples, or declare them as burn-in and discard them.
+Then, you can ask for more samples, and repeat until you have enough.
+
+
+```{r}
+n_samples = 100;  # how many samples to collect at once?
+BSFG_state$run_parameters$simulation=F
+for(i  in 1:20) {
+  print(sprintf('Run %d',i))
+  BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)  # run MCMC chain n_samples iterations. grainSize is a paramter for parallelization (smaller = more parallelization)
+
+  # set of commands to run during burn-in period to help chain converge
+  if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn || i < 10) {
+    BSFG_state = reorder_factors(BSFG_state) # Factor order doesn't "mix" well in the MCMC. We can help it by manually re-ordering from biggest to smallest
+    BSFG_state = clear_Posterior(BSFG_state)
+    # BSFG_state$current_state = update_k(BSFG_state) # use to drop insignificant factors
+    BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100) # if you made changes, set a new burn-in period
+    print(BSFG_state$run_parameters$burn)
+  }
+  BSFG_state = save_posterior_chunk(BSFG_state)  # save any accumulated posterior samples in the database to release memory
+  print(BSFG_state) # print status of current chain
+  plot(BSFG_state) # make some diagnostic plots. These are saved in a pdf booklet: diagnostic_plots.pdf
+}
+```
+
+
+## Work with the Posterior samples
+
+```{r}
+# reload the whole database of posterior samples
+BSFG_state$Posterior = reload_Posterior(BSFG_state)
+
+# all parameter names in Posterior
+BSFG_state$Posterior$posteriorSample_params
+BSFG_state$Posterior$posteriorMean_params  # these ones only have the posterior mean saved, not individual posterior samples
+
+# instead, load only a specific parameter
+Lambda = load_posterior_param(BSFG_state,'Lambda')
+
+# boxplots are good ways to visualize Posterior distributions on sets of related parameters
+boxplot(BSFG_state$Posterior$F_h2[,1,])
+
+# get posterior distribution on a function of parameters
+# This is how to calculate the G-matrix for random effect #1 (ie animal above.)
+G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2['animal.(Intercept)',]) %*% t(Lambda) + resid_h2['animal.(Intercept)',]/tot_Eta_prec[1,])
+
+# get posterior mean of a parameter
+G = get_posterior_mean(G_samples)
+
+# get Highest Posterior Density intervals for paramters
+F_h2_HPD = get_posterior_HPDinterval(BSFG_state,F_h2)
+
+boxplot(BSFG_state$Posterior$B[,2,],outline=F);abline(h=0)
+boxplot(BSFG_state$Posterior$B_F[,2,],outline=F);abline(h=0)
+```
+
+
