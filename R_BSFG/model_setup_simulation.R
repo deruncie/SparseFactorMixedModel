@@ -7,7 +7,7 @@ library(Matrix)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 2
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 2, Ve = 2,Vb = 0)
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 2, Ve = 2,Vb = 2)
 set.seed(seed)
 load('setup.RData')
 
@@ -84,7 +84,7 @@ priors = BSFG_priors(
     global_F = list(V = 1,nu = 3),
     B_df      = 3,
     B_F_df    = 3
-  ),
+  )
   # B_prior = list(
   #   sampler = sample_B_prec_TPB,
   #   B_A      = .5,
@@ -126,15 +126,15 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# 
                                   priors=priors,
                                   setup = setup)
 
-X = as.matrix(BSFG_state$data_matrices$X)
-X_F = as.matrix(BSFG_state$data_matrices$X_F)
-K = as.matrix(setup$K)
-rownames(K) = colnames(K) = NULL
-RE_setup = list(list(Z = model.matrix(~0+animal,data),K = K),b = list(Z = model.matrix(~0+Sire,data)))
-B2 = BSFG_init2(Y,X=X,X_F=X_F,RE_setup = RE_setup,data=data,
-                run_parameters=run_parameters,
-                priors=priors,
-                setup = setup)
+# X = BSFG_state$data_matrices$X
+# X_F = BSFG_state$data_matrices$X_F
+# K = as.matrix(setup$K)
+# rownames(K) = colnames(K) = NULL
+# RE_setup = list(list(Z = model.matrix(~0+animal,data),K = K)) #,b = list(Z = model.matrix(~0+Sire,data)
+# BSFG_state = BSFG_init2(Y,X=X,X_F=X_F,RE_setup = RE_setup,data=data,
+#                 run_parameters=run_parameters,
+#                 priors=priors,
+#                 setup = setup)
 
 # BSFG_state$current_state$F_h2
 # BSFG_state$priors$h2_priors_resids

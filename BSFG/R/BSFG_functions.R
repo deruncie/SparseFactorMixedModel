@@ -547,7 +547,7 @@ make_current_state = function(Posterior,sample,terms){
 #'
 #' @return array of n_samples x dim1 x dim2 where dim1 and dim2 are the dimensions of the calculated
 #'     parameter per posterior sample
-get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCores()) {
+get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = 1) {
   FUN = match.call()[[3]]
   if(is(FUN,'character')){
     FUN = parse(text=FUN)
@@ -609,7 +609,7 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = detectCore
 #'     loaded into memory at once. Only necessary terms from Posterior are loaded.
 #'
 #' @return posterior mean matrix
-get_posterior_mean = function(X,FUN,bychunk = FALSE,mc.cores = detectCores(),...){
+get_posterior_mean = function(X,FUN,bychunk = FALSE,mc.cores = 1,...){
   result = NULL
   if(!bychunk) {
     if(is(X,'BSFG_state')) {

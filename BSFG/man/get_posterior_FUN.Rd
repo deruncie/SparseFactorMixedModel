@@ -4,7 +4,7 @@
 \alias{get_posterior_FUN}
 \title{Calculates the posterior mean of a function of parameters}
 \usage{
-get_posterior_FUN(BSFG_state, FUN, samples = NULL, mc.cores = detectCores())
+get_posterior_FUN(BSFG_state, FUN, samples = NULL, mc.cores = 1)
 }
 \arguments{
 \item{BSFG_state}{A BSFG_state object including a re-loaded Posterior list}
