@@ -20,6 +20,8 @@ Imports:
   Matrix,
   lme4,
   parallel,
+  doParallel,
+  foreach,
   abind,
   reshape2,
   compiler,

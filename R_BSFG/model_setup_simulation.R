@@ -171,7 +171,7 @@ for(i  in 1:22) {
       BSFG_state = clear_Posterior(BSFG_state)
     }
     print(sprintf('Run %d',i))
-    BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores = 1)
+    BSFG_state = sample_BSFG(BSFG_state,n_samples)
     # if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
     # if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {

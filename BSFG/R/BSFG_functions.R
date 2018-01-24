@@ -535,9 +535,13 @@ make_current_state = function(Posterior,sample,terms){
 #'    6) calling environment (ex. sapply)
 #'    7) global environment
 #'
-#' The operations will be parallelized by default. This can cause memory issues. Ideally, make sure
-#'     that the current environment doesn't have very large objects. Alternatively, reduce number
-#'     of cores with \code{mc.cores}, as each fork duplicates the memory of the calling environment (I think).
+#' If mc.cores > 1, the operation will be parallelized. To reduce memory requirements,
+#' if mc.cores > 1, a PSOCK cluster is created. This cluster only copyies in data when it
+#' is actually used. The code is written so that only necessary objects are used by this cluster,
+#' not the whole user's environment. Inside this cluster, mclapply is run, which forks the process inside the PSOCK
+#' cluster. Creating the cluster takes some time, so often mc.cores=1 is faster. If the operation
+#' is large and Posterior has many samples, this can still create memory issues, so limiting mc.cores
+#' might still be necessary
 #'
 #' @param BSFG_state A BSFG_state object including a re-loaded Posterior list
 #' @param FUN Operations to be applied to each posterior sample. Write as if this were operating
@@ -564,25 +568,39 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = 1) {
     term1 = terms[terms %in% BSFG_state$Posterior$posteriorSample_params][1]
     samples = 1:dim(BSFG_state$Posterior[[term1]])[1]
   }
+  base_env = with(BSFG_state,c(data_matrices,priors,Posterior[BSFG_state$Posterior$posteriorMean_params],current_state))
+  base_env = c(base_env,extra_env)
+  Posterior = BSFG_state$Posterior
   per_sample_fun = function(sample_index_i) {
     # get current sample of each of the terms in FUN
-    current_sample = make_current_state(BSFG_state$Posterior,sample_index_i,terms)
+    current_sample = make_current_state(Posterior,sample_index_i,terms)
     # evaluate FUN in an environment constructed from current_sample, and BSFG_state, taking current_sample first
-    env = with(BSFG_state,c(current_sample,data_matrices,priors,Posterior[BSFG_state$Posterior$posteriorMean_params],current_state))
-    env = c(env,extra_env)
+    env = c(current_sample,base_env)
     result = eval(FUN,envir = env)
     if(is(result,'Matrix')) result = as.matrix(result)
     result
   }
   sample_1_result <- tryCatch(per_sample_fun(1),
-      error = function(e) {
-        message(e)
-        return(NULL)
-      })
+                              error = function(e) {
+                                message(e)
+                                return(NULL)
+                              })
   if(is.null(sample_1_result)) return(NULL)
   dim_1 = dim(sample_1_result) # get the dimension of the returned value
   # calculate value for each sample
-  res = do.call(c,mclapply(samples,per_sample_fun,mc.cores = mc.cores))
+
+  if(mc.cores == 1) {
+    res = do.call('c',lapply(samples,per_sample_fun))
+  } else{
+    cluster = parallel::makeCluster(1)
+    doParallel::registerDoParallel(cluster)
+    res = foreach::foreach(i=1,.export = c('make_current_state'),.combine = 'c') %dopar% {
+      # This way, we make a new process, and only pass it the data needed for per_sample_fun
+      do.call('c',parallel::mclapply(samples,per_sample_fun,mc.cores = mc.cores))
+    }
+    parallel::stopCluster(cluster)
+    # res = do.call(c,mclapply(samples,per_sample_fun,mc.cores = mc.cores))
+  }
   # re-formulate into an appropriate array with the first dimension as samples
   if(is.null(dim_1)) {
     dim_1 = length(sample_1_result)
@@ -594,6 +612,7 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = 1) {
   }
   res
 }
+
 
 #' Calculates posterior mean of a function of parameters
 #'

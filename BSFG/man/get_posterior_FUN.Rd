@@ -32,7 +32,11 @@ This function will apply the supplied function to each posterior sample of the c
    7) global environment
 }
 \details{
-The operations will be parallelized by default. This can cause memory issues. Ideally, make sure
-    that the current environment doesn't have very large objects. Alternatively, reduce number
-    of cores with \code{mc.cores}, as each fork duplicates the memory of the calling environment (I think).
+If mc.cores > 1, the operation will be parallelized. To reduce memory requirements,
+if mc.cores > 1, a PSOCK cluster is created. This cluster only copyies in data when it
+is actually used. The code is written so that only necessary objects are used by this cluster,
+not the whole user's environment. Inside this cluster, mclapply is run, which forks the process inside the PSOCK
+cluster. Creating the cluster takes some time, so often mc.cores=1 is faster. If the operation
+is large and Posterior has many samples, this can still create memory issues, so limiting mc.cores
+might still be necessary
 }
