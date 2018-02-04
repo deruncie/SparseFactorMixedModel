@@ -4,17 +4,13 @@
 \alias{BSFG_control}
 \title{Set BSFG run parameters}
 \usage{
-BSFG_control(Posterior_folder = "Posterior", simulation = c(F, T),
-  scale_Y = c(T, F), lambda_propto_Vp = TRUE, cauchy_sigma_tot = FALSE,
-  b0 = 1, b1 = 5e-04, epsilon = 0.1, prop = 1, k_init = 20,
-  h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
-  K_eigen_tol = 1e-10, burn = 100, thin = 2, num_NA_groups = Inf,
-  svd_K = TRUE, ...)
+BSFG_control(simulation = c(F, T), scale_Y = c(T, F),
+  lambda_propto_Vp = TRUE, cauchy_sigma_tot = FALSE, b0 = 1, b1 = 5e-04,
+  epsilon = 0.1, prop = 1, k_init = 20, h2_divisions = 100,
+  h2_step_size = NULL, drop0_tol = 1e-14, K_eigen_tol = 1e-10,
+  burn = 100, thin = 2, num_NA_groups = Inf, svd_K = TRUE, ...)
 }
 \arguments{
-\item{Posterior_folder}{path to folder to save posterior samples. Samples of each parameter
-are saved in chuncks to limit memory requirements.}
-
 \item{simulation}{Is this a fit to simulated data? If so, a setup list will be expected providing
 the true values}
 
@@ -69,6 +65,9 @@ The minimum number of NAs in each column not in one of these groups will be impu
 \item{svd_K}{If TRUE, and a 1-random effect model is specified, the the diagonalization of ZKZt is accomplished using this algorithm:
 https://math.stackexchange.com/questions/67231/singular-value-decomposition-of-product-of-matrices which doesn't require forming ZKTt.
 If FALSE, the SVD of ZKZt is calculated directly. TRUE is generally faster if the same genomes are repeated several times.}
+
+\item{Posterior_folder}{path to folder to save posterior samples. Samples of each parameter
+are saved in chuncks to limit memory requirements.}
 
 \item{delta_iteractions_factor}{Number of times to iterate through sample_delta per iteration of the other parameters}
 }

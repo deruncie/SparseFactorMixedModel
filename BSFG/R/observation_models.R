@@ -132,6 +132,7 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
 #'
 #' This function should pre-calculate design matrices for each individual (assuming they are all
 #'     unique). During sampling, should sample regression coefficients \code{Eta} given the factor model state.
+#'     Set up to allow for non iid errors, but currently not implemented.
 #'
 #' @param observation_model_parameters a list including:
 #'     1) \code{observations}, a data.frame with observation-level data including columns \code{ID} and \code{Y}
@@ -257,7 +258,10 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
     # re-scale Eta_mean and resid_Eta_prec
     Eta_mean = sweep(Eta_mean,2,sqrt(var_Eta),'*')
     resid_Eta_prec[] = resid_Eta_prec / var_Eta
-    coefs = sample_coefs_set_c(model_matrices,resid_Y_prec, t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),1)
+    for(i in 1:length(model_matrices)){
+      model_matrices[[i]]$tot_Y_prec = with(model_matrices[[i]],matrix(resid_Y_prec,nr = nrow(y),nc = ncol(y),byrow=T))
+    }
+    coefs = sample_coefs_set_c(model_matrices,t(Eta_mean),matrix(resid_Eta_prec,length(resid_Eta_prec),n),1)
 
     Y_fitted = get_fitted_set_c(model_matrices,coefs,1)
     Eta = t(coefs)

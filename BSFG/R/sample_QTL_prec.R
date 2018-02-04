@@ -74,6 +74,7 @@ sample_QTL_prec_ARD = function(BSFG_state,...){
 
 
 sample_QTL_prec_horseshoe = function(BSFG_state,...){
+  # using algorithm from Makalic and Schmidt (2015)
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables
   current_state  = BSFG_state$current_state
@@ -111,8 +112,8 @@ sample_QTL_prec_horseshoe = function(BSFG_state,...){
                                               )
                                  B_QTL_xi[]  = 1/rgamma(1,shape = 1,rate = 1+1/tau2)
 
-                                 B_QTL_tau2[] = tau
-                                 B_QTL_F_tau2[] = tau
+                                 B_QTL_tau2[] = tau2  # check this!
+                                 B_QTL_F_tau2[] = tau2
 
                                  B_QTL_prec[] = matrix(rgamma(b_QTL*p,shape = 1,rate = 1/B_QTL_nu + B_QTL2/(2*c(B_QTL_tau2))),nr = b_QTL,nc = p)
                                  B_QTL_F_prec[] = matrix(rgamma(b_QTL_F*k,shape = 1,rate = 1/B_QTL_F_nu + B_QTL_F2/(2*c(B_QTL_F_tau2))),nr = b_QTL_F,nc = k)

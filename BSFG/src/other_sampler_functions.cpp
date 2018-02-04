@@ -40,6 +40,87 @@ VectorXd sample_delta_c_Eigen(
 }
 
 
+// [[Rcpp::export()]]
+VectorXd sample_trunc_delta_c_Eigen(
+    VectorXd delta,
+    VectorXd tauh,
+    Map<VectorXd> scores,
+    Map<VectorXd> shapes,
+    double delta_1_rate,
+    double delta_2_rate,
+    Map<MatrixXd> randu_draws
+) {
+  int times = randu_draws.rows();
+  int k = tauh.size();
+  double p,u;
+
+  double rate,delta_old;
+  for(int i = 0; i < times; i++){
+    delta_old = delta(0);
+    rate = delta_1_rate + (1/delta(0)) * tauh.dot(scores);
+    u = randu_draws(i,0); // don't truncate delta(0)
+    delta(0) = R::qgamma(u,shapes(0),1.0/rate,1,0);
+    // tauh = cumprod(delta);
+    tauh *= delta(0)/delta_old;   // replaces re-calculating cumprod
+
+    for(int h = 1; h < k; h++) {
+      delta_old = delta(h);
+      rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(scores.tail(k-h));
+      p = R::pgamma(1,shapes(h),1.0/rate,1,0);  // left-tuncate delta(h) at 1
+      if(p > 0.999) p = 0.999;  // prevent over-flow.
+      u = p + (1.0-p)*randu_draws(i,h);
+      delta(h) = R::qgamma(u,shapes(h),1.0/rate,1,0);
+      // tauh = cumprod(delta);
+      tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
+      // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
+    }
+  }
+  return(delta);
+}
+
+// [[Rcpp::export()]]
+Rcpp::List sample_delta_omega_c_Eigen(
+    VectorXd delta,
+    VectorXd tauh,
+    double omega2,
+    double xi,
+    Map<VectorXd> scores,
+    double delta_1_rate,
+    double delta_2_rate,
+    Map<MatrixXd> randg_draws  // all done with rate = 1;
+) {
+  int times = randg_draws.rows();
+  int k = tauh.size();
+
+  double rate,delta_old;
+  for(int i = 0; i < times; i++){
+
+    rate = 1.0/xi + tauh.dot(scores);
+    omega2 = randg_draws(i,0) / rate;
+
+    rate = 1.0 + 1.0 / omega2;
+    xi = randg_draws(i,1);
+
+    VectorXd std_scores = scores / omega2;
+
+    delta_old = delta(0);
+    rate = delta_1_rate + (1/delta(0)) * tauh.dot(std_scores);
+    delta(0) = randg_draws(i,2) / rate;
+    // tauh = cumprod(delta);
+    tauh *= delta(0)/delta_old;   // replaces re-calculating cumprod
+
+    for(int h = 1; h < k; h++) {
+      delta_old = delta(h);
+      rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(std_scores.tail(k-h));
+      delta(h) = randg_draws(i,2+h) / rate;
+      // tauh = cumprod(delta);
+      tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
+      // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
+    }
+  }
+  return(Rcpp::List::create(omega2,xi,delta));
+}
+
 // -------------------------- //
 // -------------------------- //
 // -------------------------- //

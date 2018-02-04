@@ -46,7 +46,6 @@
 #' @seealso \code{\link{BSFG_init}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}
 #'
 BSFG_control = function(
-                        Posterior_folder = "Posterior",
                         simulation = c(F,T),scale_Y = c(T,F),
                         lambda_propto_Vp = TRUE,cauchy_sigma_tot = FALSE,
                         b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
@@ -234,7 +233,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
                      invert_aI_bZKZ = NULL, invert_aZZt_Kinv = NULL,
                      posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'),
                      posteriorMean_params = c(),
-                     ncores = detectCores(),setup = NULL,verbose=T) {
+                     ncores = detectCores(),setup = NULL,verbose=T, run_ID = 'BSFG_run') {
 
   # ----------------------------- #
   # ---- build model matrices --- #
@@ -443,7 +442,8 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	  cis_genotypes = cis_genotypes,
 	  posteriorSample_params = posteriorSample_params,
 	  posteriorMean_params = posteriorMean_params,
-	  ncores = ncores,setup = setup,verbose=verbose
+	  ncores = ncores,setup = setup,verbose=verbose,
+	  run_ID = run_ID
 	)
 }
 
@@ -463,7 +463,9 @@ BSFG_init2 = function(
   cis_genotypes = NULL,
   posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'),
   posteriorMean_params = c(),
-  ncores = detectCores(),setup = NULL,verbose=T) {
+  ncores = detectCores(),setup = NULL,verbose=T, run_ID = 'BSFG_run') {
+
+  try(dir.create(run_ID),silent=T)
 
   # -------- n_RE ---------- #
 
@@ -527,10 +529,18 @@ BSFG_init2 = function(
   fixed_effects_only_resid = NULL
   fixed_effects_only_factors = NULL
   if(ncol(fixed_effects_common) < ncol(X)){
-    fixed_effects_only_resid = (1:ncol(X))[-fixed_effects_common[1,]]
+    if(ncol(fixed_effects_common) > 0) {
+      fixed_effects_only_resid = (1:ncol(X))[-fixed_effects_common[1,]]
+    } else{
+      fixed_effects_only_resid = (1:ncol(X))
+    }
   }
   if(ncol(fixed_effects_common) < ncol(X_F)){
-    fixed_effects_only_factors = (1:ncol(X_F))[-fixed_effects_common[2,]]
+    if(ncol(fixed_effects_common) > 0) {
+      fixed_effects_only_factors = (1:ncol(X_F))[-fixed_effects_common[2,]]
+    } else{
+      fixed_effects_only_factors = (1:ncol(X_F))
+    }
   }
 
   X = as(X,'dgCMatrix')
@@ -987,6 +997,7 @@ BSFG_init2 = function(
 	)
 
 	BSFG_state = list(
+	  run_ID         = run_ID,
 	  data_matrices  = data_matrices,
 	  priors         = priors,
 	  run_parameters = run_parameters,
@@ -1004,7 +1015,7 @@ BSFG_init2 = function(
 	  posteriorSample_params = posteriorSample_params,
 	  posteriorMean_params = posteriorMean_params,
 	  total_samples = 0,
-	  folder = run_parameters$Posterior_folder,
+	  folder = sprintf('%s/Posterior',run_ID),
 	  files = c()
 	)
 
@@ -1174,7 +1185,8 @@ print.BSFG_state = function(BSFG_state){
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{BSFG_init}},
 #'   \code{\link{print.BSFG_state}}, \code{\link{summary.BSFG_state}}
 plot.BSFG_state = function(BSFG_state,file = 'diagnostics_plots.pdf'){
-  tempfile = 'diagnostics_plots_temp.pdf'
+  file = sprintf('%s/%s',BSFG_state$run_ID,file)
+  tempfile = sprintf('%s.temp',file)
   pdf(tempfile)
   if(BSFG_state$run_parameters$simulation){
     plot_diagnostics_simulation(BSFG_state)

@@ -54,11 +54,17 @@ priors = BSFG_priors(
   tot_F_var = list(V = 18/20, nu = 20e5),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
   h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1)),
+  # Lambda_prior = list(
+  #   sampler = sample_Lambda_prec_ARD,
+  #   Lambda_df = 3,
+  #   delta_1   = list(shape = 2,  rate = 1),
+  #   delta_2   = list(shape = 3, rate = 1)
+  # ),
   Lambda_prior = list(
-    sampler = sample_Lambda_prec_ARD,
+    sampler = sample_Lambda_prec_horseshoe,
     Lambda_df = 3,
-    delta_1   = list(shape = 2,  rate = 1),
-    delta_2   = list(shape = 3, rate = 1)
+    delta_1   = list(shape = 1e6,  rate = 1e6),
+    delta_2   = list(shape = 5, rate = 1)
   ),
   # Lambda_prior = list(
   #   sampler = sample_Lambda_prec_ARD_v2,
@@ -121,10 +127,10 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# 
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal) + (1|Sire), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
-                                  K_mats = list(animal = K),
+                                  # K_mats = list(animal = K),
                                   run_parameters=run_parameters,
                                   priors=priors,
-                                  setup = setup)
+                                  setup = setup,run_ID = 'horseshoe_noK_1')
 
 # X = BSFG_state$data_matrices$X
 # X_F = BSFG_state$data_matrices$X_F
@@ -173,7 +179,7 @@ for(i  in 1:22) {
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples)
     # if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
-    # if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
+    if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
       # BSFG_state$current_state = update_k(BSFG_state)

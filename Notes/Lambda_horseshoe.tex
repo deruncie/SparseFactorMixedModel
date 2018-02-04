@@ -1,0 +1,101 @@
+\documentclass[11pt]{amsart}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{letterpaper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{epstopdf}
+\usepackage{amsmath}
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+\usepackage{bm}
+\newcommand*{\B}[1]{\ifmmode\bm{#1}\else\textbf{#1}\fi}
+
+\title{Brief Article}
+\author{The Author}
+%\date{}                                           % Activate to display a given date or no date
+
+\begin{document}
+
+Following Makalic and Schmidt (2015), the horseshoe model is:
+
+\begin{align*}
+y \mid \B{X},\B{\beta},\sigma^2 &\sim \mbox{N}(\B{X\beta},\sigma^2\B{I}_n), \\
+\beta_j \mid \lambda^2_j, \tau^2, \sigma^2 &\sim \mbox{N}(0,\lambda^2_j \tau^2 \sigma^2), \\
+\sigma^2 &\sim \sigma^{-2}d\sigma^2, \\
+\lambda_j &\sim \mbox{C}^+(0,1), \\
+\tau &\sim \mbox{C}^+(0,1)
+\end{align*}
+
+They re-parameterize for Gibbs sampling as:
+
+\begin{align*}
+y \mid \B{X},\B{\beta},\sigma^2 &\sim \mbox{N}(\B{X\beta},\sigma^2\B{I}_n), \\
+\beta_j \mid \lambda^2_j, \tau^2, \sigma^2 &\sim \mbox{N}(0,\lambda^2_j \tau^2 \sigma^2), \\
+\sigma^2 &\sim \sigma^{-2}d\sigma^2, \\
+\lambda^2_j \mid \nu_j &\sim \mbox{IG}(1/2,1/\nu_j), \\
+\tau^2 \mid \xi &\sim \mbox{IG}(1/2,1/\xi), \\
+\nu_1,\dots,\nu_p,\xi \mid &\sim \mbox{IG}(1/2,1).
+\end{align*}
+
+Where the inverse-Gamma distribution with pdf:
+\begin{align*}
+p(z \mid \alpha,\beta) = \frac{\beta^\alpha}{\Gamma(\alpha)} z^{-\alpha-1} \exp\big(-\frac{\beta}{z}\big)
+\end{align*}
+
+BSFG uses the following model for each column of $\B{Y}$
+
+\begin{align*}
+y \mid \B{F},\B{\lambda}_j,\sigma^2 &\sim \mbox{N}(\B{F}\B{\lambda}_j, \sigma^2_j\B{\Sigma}_j).
+\end{align*}
+
+A horseshoe model for $\B{\lambda}_j$ could be:
+
+\begin{align*}
+\lambda_{kj} \mid \phi^2_{kj}, \tau^2_k, \sigma^2_j &\sim \mbox{N}(0,\phi^2_{kj}\tilde{\omega}^2_k \sigma^2_j), \\
+\sigma^2_j &\sim \mbox{IG}(a,b), \\
+\phi_{kj} &\sim \mbox{C}^+(0,1), \\
+\tilde{\omega}_k = &\sim \mbox{C}^+(0,\tau^{-1/2}_k), \\
+\tau_k &= \prod\limits_{h=1}^k \delta_h, \\
+\delta_h &\sim \mbox{Ga}(a_\delta,b_\delta), h \geq 1, \; \delta_1 = 1.
+\end{align*}
+
+The column-shrinkage is accomplished by $\omega_k$, which is given a half-Cauchy prior with scale parameter stochastically decreasing 
+controlled by the sequence ${\delta_h}$ which is stochastically increasing (could be set so that $\delta_h >= 1$). 
+
+This model maintains the form of the horseshoe for each column of $\B{\Lambda}$, but adds an increasingly strong prior on the number of non-zero entries.
+
+This can be re-parameterized as:
+
+\begin{align*}
+y \mid \B{F},\B{\lambda}_j,\sigma^2 &\sim \mbox{N}(\B{F}\B{\lambda}_j, \sigma^2_j\B{\Sigma}_j), \\
+\lambda_{kj} \mid \phi^2_{kj}, \tau^2_k, \sigma^2_j &\sim \mbox{N}(0,\phi^2_{kj} (\omega^2_k \tau_k^{-1}) \sigma^2_j), \\
+\sigma^2_j &\sim \mbox{IG}(a,b), \\
+\phi^2_{kj} \mid \nu_{kj} &\sim \mbox{IG}(1/2,1/\nu_{kj}), \\
+\omega^2_k \mid \xi_k &\sim \mbox{IG}(1/2,1/\xi_k), \\
+\nu_{kj},\xi_k \mid &\sim \mbox{IG}(1/2,1), \\
+\tau_k &= \prod\limits_{h=1}^k \delta_h, \\
+\delta_h &\sim \mbox{Ga}(a_\delta,b_\delta), h \geq 1, \; \delta_1 = 1.
+\end{align*}
+
+\noindent with $\tilde{\omega}_k = \omega^2_k \tau_k^{-1}$. 
+
+
+I wonder if the half-Cauchy prior on $\tilde{\omega}_k$ is necessary. 
+Another possibility would be to replace $\delta_1$ with $\tilde{\omega}$ (ie fixed over the whole matrix $\B{\Lambda}$, and then just add the $\tau_k$ column-penalty
+on top. I think I'll start with this.
+
+
+\begin{align*}
+y \mid \B{F},\B{\lambda}_j,\sigma^2 &\sim \mbox{N}(\B{F}\B{\lambda}_j, \sigma^2_j\B{\Sigma}_j), \\
+\lambda_{kj} \mid \phi^2_{kj}, \tau^2_k, \sigma^2_j &\sim \mbox{N}(0,\phi^2_{kj} \omega^2 \tau_k^{-1} \sigma^2_j), \\
+\sigma^2_j &\sim \mbox{IG}(a,b), \\
+\phi^2_{kj} \mid \nu_{kj} &\sim \mbox{IG}(1/2,1/\nu_{kj}), \\
+\omega^2 \mid \xi &\sim \mbox{IG}(1/2,1/\xi), \\
+\nu_{kj},\xi \mid &\sim \mbox{IG}(1/2,1), \\
+\tau_k &= \prod\limits_{h=1}^k \delta_h, \\
+\delta_h &\sim \mbox{Ga}(a_\delta,b_\delta), h \geq 1, \; \delta_1 = 1.
+\end{align*}
+
+
+\end{document}  

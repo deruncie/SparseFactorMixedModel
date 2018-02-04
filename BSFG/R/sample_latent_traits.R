@@ -13,6 +13,13 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     #conditioning on B, F, Lambda, resid_h2, tot_Eta_prec
     Eta_tilde = Eta - XB - F %*% t(Lambda)
     scores = rep(0,p)
+    # QtEta_tilde = Qt_list[[1]] %**% Eta_tilde
+    # scores = tot_prec_scores(QtEta_tilde,
+    #                                 Sigma_Choleskys_list[[1]],
+    #                                 resid_h2_index,
+    #                                 grainSize
+    #                                )
+    # tot_Eta_prec[] = rgamma(1,shape = tot_Eta_prec_shape + (n*p)/2, rate = tot_Eta_prec_rate + 0.5*sum(scores))
 
     # sample columns of tot_Eta_prec, resid_h2, U_R in sets with the same patterns of missing data
     for(set in seq_along(Missing_data_map)){
@@ -78,6 +85,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                     resid_h2_index[cols],
                                     grainSize)
     }
+
 
     resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
 

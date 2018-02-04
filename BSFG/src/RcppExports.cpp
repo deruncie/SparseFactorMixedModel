@@ -136,17 +136,16 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_coefs_set_c
-MatrixXd sample_coefs_set_c(Rcpp::List model_matrices, Map<VectorXd> tot_Y_prec, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int grainSize);
-RcppExport SEXP _BSFG_sample_coefs_set_c(SEXP model_matricesSEXP, SEXP tot_Y_precSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
+MatrixXd sample_coefs_set_c(Rcpp::List model_matrices, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int grainSize);
+RcppExport SEXP _BSFG_sample_coefs_set_c(SEXP model_matricesSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::List >::type model_matrices(model_matricesSEXP);
-    Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Y_prec(tot_Y_precSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_coefs_set_c(model_matrices, tot_Y_prec, prior_mean, prior_prec, grainSize));
+    rcpp_result_gen = Rcpp::wrap(sample_coefs_set_c(model_matrices, prior_mean, prior_prec, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -283,6 +282,41 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type delta_2_rate(delta_2_rateSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type randg_draws(randg_drawsSEXP);
     rcpp_result_gen = Rcpp::wrap(sample_delta_c_Eigen(delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_trunc_delta_c_Eigen
+VectorXd sample_trunc_delta_c_Eigen(VectorXd delta, VectorXd tauh, Map<VectorXd> scores, Map<VectorXd> shapes, double delta_1_rate, double delta_2_rate, Map<MatrixXd> randu_draws);
+RcppExport SEXP _BSFG_sample_trunc_delta_c_Eigen(SEXP deltaSEXP, SEXP tauhSEXP, SEXP scoresSEXP, SEXP shapesSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_rateSEXP, SEXP randu_drawsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< VectorXd >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type tauh(tauhSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type scores(scoresSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type shapes(shapesSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_1_rate(delta_1_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_2_rate(delta_2_rateSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randu_draws(randu_drawsSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_trunc_delta_c_Eigen(delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_delta_omega_c_Eigen
+Rcpp::List sample_delta_omega_c_Eigen(VectorXd delta, VectorXd tauh, double omega2, double xi, Map<VectorXd> scores, double delta_1_rate, double delta_2_rate, Map<MatrixXd> randg_draws);
+RcppExport SEXP _BSFG_sample_delta_omega_c_Eigen(SEXP deltaSEXP, SEXP tauhSEXP, SEXP omega2SEXP, SEXP xiSEXP, SEXP scoresSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_rateSEXP, SEXP randg_drawsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< VectorXd >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type tauh(tauhSEXP);
+    Rcpp::traits::input_parameter< double >::type omega2(omega2SEXP);
+    Rcpp::traits::input_parameter< double >::type xi(xiSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type scores(scoresSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_1_rate(delta_1_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_2_rate(delta_2_rateSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randg_draws(randg_drawsSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_delta_omega_c_Eigen(delta, tauh, omega2, xi, scores, delta_1_rate, delta_2_rate, randg_draws));
     return rcpp_result_gen;
 END_RCPP
 }

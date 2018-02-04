@@ -37,8 +37,8 @@ sample_MME_fixedEffects_cis_c <- function(Y, X, cis_genotypes, Sigma_Choleskys, 
     .Call(`_BSFG_sample_MME_fixedEffects_cis_c`, Y, X, cis_genotypes, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, cis_effect_index, total_cis_effects, grainSize)
 }
 
-sample_coefs_set_c <- function(model_matrices, tot_Y_prec, prior_mean, prior_prec, grainSize) {
-    .Call(`_BSFG_sample_coefs_set_c`, model_matrices, tot_Y_prec, prior_mean, prior_prec, grainSize)
+sample_coefs_set_c <- function(model_matrices, prior_mean, prior_prec, grainSize) {
+    .Call(`_BSFG_sample_coefs_set_c`, model_matrices, prior_mean, prior_prec, grainSize)
 }
 
 get_fitted_set_c <- function(model_matrices, coefs, grainSize) {
@@ -75,6 +75,14 @@ sample_factors_scores_c <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_pre
 
 sample_delta_c_Eigen <- function(delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws) {
     .Call(`_BSFG_sample_delta_c_Eigen`, delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws)
+}
+
+sample_trunc_delta_c_Eigen <- function(delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws) {
+    .Call(`_BSFG_sample_trunc_delta_c_Eigen`, delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws)
+}
+
+sample_delta_omega_c_Eigen <- function(delta, tauh, omega2, xi, scores, delta_1_rate, delta_2_rate, randg_draws) {
+    .Call(`_BSFG_sample_delta_omega_c_Eigen`, delta, tauh, omega2, xi, scores, delta_1_rate, delta_2_rate, randg_draws)
 }
 
 rgig_multiple <- function(n, lambda, chi, psi) {

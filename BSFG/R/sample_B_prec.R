@@ -1,3 +1,51 @@
+sample_B_prec_RE = function(BSFG_state,...){
+  # treats B as a random effect - no parameter-specific shrinkage
+  # error if ncol(B_F)>0
+  priors         = BSFG_state$priors
+  run_variables  = BSFG_state$run_variables
+  current_state  = BSFG_state$current_state
+
+  current_state = with(c(priors,run_variables),
+                       with(B_prior,{
+                         #   list(
+                         #   # load priors
+                         #   B_df   = B_prior$B_df,
+                         #   B_F_df = B_prior$B_F_df,
+                         #   B_QTL_df   = B_prior$B_QTL_df,
+                         #   B_QTL_F_df = B_prior$B_QTL_F_df,
+                         #   separate_QTL_shrinkage = B_prior$separate_QTL_shrinkage
+                         # ),
+                         if(b > 0) {
+                           prec_shape = with(global, nu - 1)
+                           prec_rate = with(global, V * nu)
+                         }
+                         if(b_F > 0) {
+                           stop("sample_B_prec_RE doesn't work with B_F")
+                         }
+                         within(current_state,{
+
+                           # initialize variables if needed
+                           if(!exists('B_prec')){
+                             if(b > 0) {
+                               B_prec = matrix(rgamma(b,shape = prec_shape,rate=prec_rate),nrow = b, ncol = p)
+                             } else{
+                               B_prec = matrix(0,nrow=0,ncol=p)
+                             }
+                           }
+                           B2 = B^2
+
+                           B_prec[] = matrix(rgamma(b,shape = prec_shape + p/2,rate = prec_rate + rowSums(B2)/2),nrow = b, ncol = p)
+
+                           if(length(resid_intercept) > 0){
+                             B_prec[1,resid_intercept] = 1e-10
+                           }
+                         })
+                       }))
+  return(current_state)
+}
+
+
+
 sample_B_prec_ARD = function(BSFG_state,...){
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables

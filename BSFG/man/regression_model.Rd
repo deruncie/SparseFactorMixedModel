@@ -22,4 +22,5 @@ Eta is a matrix of individual-level parmaters for a regression-spline with
 \details{
 This function should pre-calculate design matrices for each individual (assuming they are all
     unique). During sampling, should sample regression coefficients \code{Eta} given the factor model state.
+    Set up to allow for non iid errors, but currently not implemented.
 }

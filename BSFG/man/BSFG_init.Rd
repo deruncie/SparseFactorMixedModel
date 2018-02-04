@@ -11,7 +11,7 @@ BSFG_init(Y, model, data, factor_model_fixed = NULL, priors = BSFG_priors(),
   posteriorSample_params = c("Lambda", "U_F", "F", "delta", "tot_F_prec",
   "F_h2", "tot_Eta_prec", "resid_h2", "B", "B_F", "B_QTL", "B_QTL_F", "U_R",
   "cis_effects"), posteriorMean_params = c(), ncores = detectCores(),
-  setup = NULL, verbose = T)
+  setup = NULL, verbose = T, run_ID = "BSFG_run")
 }
 \arguments{
 \item{Y}{either a) a n x p matrix of data (n individuals x p traits), or b) a list describing

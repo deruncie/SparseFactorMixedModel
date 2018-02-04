@@ -83,7 +83,7 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
   # ----------------------------------------------- #
 
   current_state = BSFG_state$current_state
-  saveRDS(current_state,file='current_state.rds')
+  saveRDS(current_state,file=sprintf('%s/current_state.rds',BSFG_state$run_ID))
 
   BSFG_state$RNG = list(
     Random.seed = .Random.seed,
