@@ -95,11 +95,12 @@ Rcpp::List sample_delta_omega_c_Eigen(
   double rate,delta_old;
   for(int i = 0; i < times; i++){
 
-    rate = 1.0/xi + tauh.dot(scores);
-    omega2 = randg_draws(i,0) / rate;
-
-    rate = 1.0 + 1.0 / omega2;
-    xi = randg_draws(i,1);
+    // rate = 1.0/xi + tauh.dot(scores);
+    // omega2 = rate / randg_draws(i,0);
+    //
+    // rate = 1.0 + 1.0 / omega2;
+    // xi = rate / randg_draws(i,1);
+    omega2 = 1;
 
     VectorXd std_scores = scores / omega2;
 

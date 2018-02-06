@@ -237,30 +237,18 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
                              Lambda_prec = matrix(1,p,k)
                            }
 
-                           Lambda2_std = Lambda^2 * tot_Eta_prec[1,]
 
-                           Lambda_phi2[] = matrix(1/rgamma(p*k,shape = 1, rate = 1/Lambda_nu + Lambda2_std * (tauh/(2*Lambda_omega2[1]))[rep(1,p),]),nr=p,nc = k)
+                           if(lambda_propto_Vp){
+                             Lambda2_std = Lambda^2 * (tot_Eta_prec[1,]/2)
+                           } else{
+                             Lambda2_std = Lambda^2/2
+                           }
+
+                           Lambda_phi2[] = matrix(1/rgamma(p*k,shape = 1, rate = 1/Lambda_nu + Lambda2_std * (tauh/Lambda_omega2[1])[rep(1,p),]),nr=p,nc = k)
                            Lambda_nu[] = matrix(1/rgamma(p*k,shape = 1, rate = 1 + 1/Lambda_phi2), nr = p, nc = k)
 
-                           # # -----Sample delta, update tauh------ #
-                           # scores = colSums(Lambda2_std / Lambda_phi2) / (2*Lambda_omega2[1])
-                           # shapes = c(delta_1_shape + 0.5*p*k,
-                           #            delta_2_shape + 0.5*p*((k-1):1))
-                           # times = delta_iteractions_factor
-                           # randg_draws = matrix(rgamma(times*k,shape = shapes,rate = 1),nr=times,byrow=T)
-                           # delta[] = sample_delta_c_Eigen( delta,tauh,scores,delta_1_rate,delta_2_rate,randg_draws)
-                           # # randu_draws = matrix(runif(times*k),nr=times)
-                           # # delta[] = sample_trunc_delta_c_Eigen( delta,tauh,scores,shapes,delta_1_rate,delta_2_rate,randu_draws)
-                           # tauh[]  = matrix(cumprod(delta),nrow=1)
-                           #
-                           # Lambda_omega2[] = 1/rgamma(1,
-                           #                            shape = (p*k + 1) / 2,
-                           #                            rate = 1/Lambda_xi + sum(colSums(Lambda2_std / Lambda_phi2) * tauh)/2)
-                           #
-                           # Lambda_xi[]  = 1/rgamma(1,shape = 1,rate = 1+1/Lambda_omega2)
-
-                           # # -----Sample delta, update tauh------ #
-                           scores = colSums(Lambda2_std / Lambda_phi2)/2# / (2*Lambda_omega2[1])
+                           # -----Sample delta, update tauh------ #
+                           scores = colSums(Lambda2_std / Lambda_phi2)
                            shapes = c((p*k + 1) / 2,1,
                                       delta_1_shape + 0.5*p*k,
                                       delta_2_shape + 0.5*p*((k-1):1))
@@ -273,9 +261,8 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
                            tauh[]  = matrix(cumprod(delta),nrow=1)
 
 
-                           # # -----Update Plam-------------------- #
-                           # Plam[] = 1/(Lambda_phi2 * Lambda_omega2[1]) * tauh[rep(1,p),] * tot_Eta_prec[,rep(1,k)]
-                           Lambda_prec[] = 1/(Lambda_phi2 * Lambda_omega2[1])
+                           # -----Update Plam-------------------- #
+                           Lambda_prec[] = (1/Lambda_omega2[1])/Lambda_phi2
                            Plam[] = Lambda_prec * tauh[rep(1,p),]
                            if(lambda_propto_Vp){
                              Plam[] = Plam * tot_Eta_prec[1,]

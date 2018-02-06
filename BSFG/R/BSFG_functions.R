@@ -566,6 +566,10 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = 1) {
   }
   if(is.null(samples)) {  # count # available samples for the first term in terms (assuming it is in Posterior)
     term1 = terms[terms %in% BSFG_state$Posterior$posteriorSample_params][1]
+    if(!term1 %in% names(BSFG_state$Posterior)) {
+      print(sprintf('%s not in Posterior',term1))
+      return(NULL)
+    }
     samples = 1:dim(BSFG_state$Posterior[[term1]])[1]
   }
   base_env = with(BSFG_state,c(data_matrices,priors,Posterior[BSFG_state$Posterior$posteriorMean_params],current_state))

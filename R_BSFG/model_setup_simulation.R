@@ -40,7 +40,7 @@ X = setup$X
 # setup$data$Group = gl(3,1,length = nrow(setup$data))
 
 run_parameters = BSFG_control(
-  lambda_propto_Vp = T,cauchy_sigma_tot = F,
+  lambda_propto_Vp = F,cauchy_sigma_tot = F,
   scale_Y = FALSE,
   simulation = T,
   h2_divisions = 20,
@@ -48,6 +48,10 @@ run_parameters = BSFG_control(
   burn = 100,
   thin=5
 )
+
+p0 = 20
+tau_0 = p0/(ncol(Y)-p0)*sqrt(4)/sqrt(nrow(Y))
+delta1_mean = 1/tau_0^2
 
 priors = BSFG_priors(
   tot_Y_var = list(V = 0.5,   nu = 10),
@@ -62,9 +66,11 @@ priors = BSFG_priors(
   # ),
   Lambda_prior = list(
     sampler = sample_Lambda_prec_horseshoe,
-    Lambda_df = 3,
-    delta_1   = list(shape = 1e6,  rate = 1e6),
-    delta_2   = list(shape = 5, rate = 1)
+    # Lambda_df = 3,
+    # delta_1   = list(shape = 1e6,  rate = 1e6),
+    delta_1   = list(shape = 1,  rate = 1/delta1_mean),
+    delta_2   = list(shape = 1, rate = 1)
+    # delta_2   = list(shape = 1e6, rate = 1e6)
   ),
   # Lambda_prior = list(
   #   sampler = sample_Lambda_prec_ARD_v2,
@@ -127,10 +133,12 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# 
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal) + (1|Sire), data,# factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|ID), data, #factor_model_fixed = ~0,
 # BSFG_state = BSFG_init(Y, model=~1+(1|animal), data, factor_model_fixed = ~0,
-                                  # K_mats = list(animal = K),
+                                  K_mats = list(animal = K),
                                   run_parameters=run_parameters,
                                   priors=priors,
-                                  setup = setup,run_ID = 'horseshoe_noK_1')
+posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'
+                           ,'Lambda_omega2','Lambda_phi2'),#),#
+                                  setup = setup,run_ID = 'horseshoe_4')
 
 # X = BSFG_state$data_matrices$X
 # X_F = BSFG_state$data_matrices$X_F
@@ -178,11 +186,20 @@ for(i  in 1:22) {
     }
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples)
-    # if(BSFG_state$Posterior$total_samples>0) trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
+
+    op=par(mfrow=c(1,2))
     if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
+    if(BSFG_state$Posterior$total_samples>0) {
+      meff = get_posterior_FUN(BSFG_state,{
+        a = sqrt(1/cumprod(delta))*sqrt(nrow(data))
+        a/(1+a)*nrow(Lambda)})
+      boxplot(meff)
+    }
+    par(op)
+
     if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn) {
       BSFG_state = reorder_factors(BSFG_state)
-      # BSFG_state$current_state = update_k(BSFG_state)
+      BSFG_state$current_state = update_k(BSFG_state)
       BSFG_state = clear_Posterior(BSFG_state)
       BSFG_state$run_parameters$burn = max(c(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100))
       print(BSFG_state$run_parameters$burn)
