@@ -97,5 +97,51 @@ y \mid \B{F},\B{\lambda}_j,\sigma^2 &\sim \mbox{N}(\B{F}\B{\lambda}_j, \sigma^2_
 \delta_h &\sim \mbox{Ga}(a_\delta,b_\delta), h \geq 1, \; \delta_1 = 1.
 \end{align*}
 
+Upon further thought and reading of Piironen and Vehtari, 2017, I propose to change the model for the column-shrinkage.
+
+Given a prior guess of a proportion $p_o$ of non-zero entries, they suggest setting $\tau_0 = \frac{p_{0_i}}{1-p_{0_i}}\frac{\sigma}{\sqrt{n}}$, which (contrary
+to the description in the paper), does not depend on $p$, but does depend on $n$ and $\sigma^2$. They suggest letting $\tau \sim \mbox{C}^+(0,\tau^2_0)$.
+
+For the factor model, we need to specify an equivalent to $\tau_0$ for each column. An approach could be to set $\delta_1 = 1/\tau^2_{0_1}$, and then calibrate 
+the prior on $\delta_i$ such that $\delta_i$ in expectation reduces $\tau^2_{0_i}$ relative to $\tau^2_{0_{i-1}}$ appropriately.
+
+The easiest thing is to keep multiplying the $\delta_i$ together.  If:
+
+
+\begin{align*}
+\tau^2_{0_{i-1}} &= \left(\frac{p_{0_{i-1}}}{1-p_{0_{i-1}}}\right)^2\frac{\sigma^2}{n} 
+\end{align*}
+
+\noindent then:
+\begin{align*}
+\tau^2_{0_{i}} = \frac{\tau^2_{0_{i-1}} }{\delta_i} = \left(\frac{p_{0_{i-1}}}{\delta^2_i(1-p_{0_{i-1}})}\right)^2\frac{\sigma^2}{n} 
+\end{align*}
+
+If we interpret the term inside the parentheses as the odds of each entry being non-zero, then these odds are reduced by a factor of $\delta^2_i$, or the log-odds are decreased by $2 \log\delta_i$
+
+
+
+
+
+
+Note:
+\begin{align*}
+\tau^2_{0_{i-1}} &= \left(\frac{p_{0_{i-1}}}{1-p_{0_{i-1}}}\right)^2\frac{\sigma^2}{n} \\
+\tau^2_{0_{i}} &= \left(\frac{p_{0_{i}}}{1-p_{0_{i}}}\right)^2\frac{\sigma^2}{n} 
+\end{align*}
+
+So:
+\begin{align*}
+\frac{1/\tau^2_{0_{i}}}{1/\tau^2_{0_{i-1}}} = 
+\end{align*}
+
+
+
+
+
+
+
+
+
 
 \end{document}  

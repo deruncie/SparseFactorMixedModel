@@ -69,7 +69,7 @@ priors = BSFG_priors(
     # Lambda_df = 3,
     # delta_1   = list(shape = 1e6,  rate = 1e6),
     delta_1   = list(shape = 1,  rate = 1/delta1_mean),
-    delta_2   = list(shape = 1, rate = 1)
+    delta_2   = list(shape = 1, rate = 1/3)#sqrt(delta1_mean))
     # delta_2   = list(shape = 1e6, rate = 1e6)
   ),
   # Lambda_prior = list(
@@ -137,7 +137,7 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# 
                                   run_parameters=run_parameters,
                                   priors=priors,
 posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'
-                           ,'Lambda_omega2','Lambda_phi2'),#),#
+                           ,'Lambda_phi2'),#),#
                                   setup = setup,run_ID = 'horseshoe_4')
 
 # X = BSFG_state$data_matrices$X

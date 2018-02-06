@@ -48,7 +48,8 @@ VectorXd sample_trunc_delta_c_Eigen(
     Map<VectorXd> shapes,
     double delta_1_rate,
     double delta_2_rate,
-    Map<MatrixXd> randu_draws
+    Map<MatrixXd> randu_draws,
+    double trunc_point
 ) {
   int times = randu_draws.rows();
   int k = tauh.size();
@@ -66,7 +67,7 @@ VectorXd sample_trunc_delta_c_Eigen(
     for(int h = 1; h < k; h++) {
       delta_old = delta(h);
       rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(scores.tail(k-h));
-      p = R::pgamma(1,shapes(h),1.0/rate,1,0);  // left-tuncate delta(h) at 1
+      p = R::pgamma(trunc_point,shapes(h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
       if(p > 0.999) p = 0.999;  // prevent over-flow.
       u = p + (1.0-p)*randu_draws(i,h);
       delta(h) = R::qgamma(u,shapes(h),1.0/rate,1,0);

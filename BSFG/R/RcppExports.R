@@ -77,8 +77,8 @@ sample_delta_c_Eigen <- function(delta, tauh, scores, delta_1_rate, delta_2_rate
     .Call(`_BSFG_sample_delta_c_Eigen`, delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws)
 }
 
-sample_trunc_delta_c_Eigen <- function(delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws) {
-    .Call(`_BSFG_sample_trunc_delta_c_Eigen`, delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws)
+sample_trunc_delta_c_Eigen <- function(delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point) {
+    .Call(`_BSFG_sample_trunc_delta_c_Eigen`, delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point)
 }
 
 sample_delta_omega_c_Eigen <- function(delta, tauh, omega2, xi, scores, delta_1_rate, delta_2_rate, randg_draws) {

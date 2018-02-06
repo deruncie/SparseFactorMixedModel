@@ -26,7 +26,7 @@ extern SEXP _BSFG_sample_MME_fixedEffects_hierarchical_c(SEXP, SEXP, SEXP, SEXP,
 extern SEXP _BSFG_sample_MME_single_diagK(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _BSFG_sample_MME_single_diagR(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _BSFG_sample_MME_ZKZts_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP _BSFG_sample_trunc_delta_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP _BSFG_sample_trunc_delta_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _BSFG_sample_delta_omega_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _BSFG_SxD(SEXP, SEXP);
 extern SEXP _BSFG_SxS(SEXP, SEXP);
@@ -52,7 +52,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_BSFG_sample_MME_single_diagK",                (DL_FUNC) &_BSFG_sample_MME_single_diagK,                 8},
     {"_BSFG_sample_MME_single_diagR",                (DL_FUNC) &_BSFG_sample_MME_single_diagR,                 6},
     {"_BSFG_sample_MME_ZKZts_c",                     (DL_FUNC) &_BSFG_sample_MME_ZKZts_c,                      7},
-    {"_BSFG_sample_trunc_delta_c_Eigen",             (DL_FUNC) &_BSFG_sample_trunc_delta_c_Eigen,              7},
+    {"_BSFG_sample_trunc_delta_c_Eigen",             (DL_FUNC) &_BSFG_sample_trunc_delta_c_Eigen,              8},
     {"_BSFG_sample_delta_omega_c_Eigen",             (DL_FUNC) &_BSFG_sample_delta_omega_c_Eigen,              8},
     {"_BSFG_SxD",                                    (DL_FUNC) &_BSFG_SxD,                                     2},
     {"_BSFG_SxS",                                    (DL_FUNC) &_BSFG_SxS,                                     2},
