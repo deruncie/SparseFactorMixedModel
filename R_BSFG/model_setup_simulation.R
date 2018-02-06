@@ -6,7 +6,7 @@ library(Matrix)
 
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
-seed = 2
+seed = 1
 new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 2, Ve = 2,Vb = 2)
 set.seed(seed)
 load('setup.RData')
@@ -49,8 +49,8 @@ run_parameters = BSFG_control(
   thin=5
 )
 
-p0 = 20
-tau_0 = p0/(ncol(Y)-p0)*sqrt(4)/sqrt(nrow(Y))
+p0 = .1
+tau_0 = p0/(1-p0)*sqrt(4)/sqrt(nrow(Y))
 delta1_mean = 1/tau_0^2
 
 priors = BSFG_priors(
@@ -68,8 +68,8 @@ priors = BSFG_priors(
     sampler = sample_Lambda_prec_horseshoe,
     # Lambda_df = 3,
     # delta_1   = list(shape = 1e6,  rate = 1e6),
-    delta_1   = list(shape = 1,  rate = 1/delta1_mean),
-    delta_2   = list(shape = 1, rate = 1/3)#sqrt(delta1_mean))
+    delta_1   = list(shape = 1e6,  rate = 1e6/delta1_mean),
+    delta_2   = list(shape = 1, rate = p0)#sqrt(delta1_mean))
     # delta_2   = list(shape = 1e6, rate = 1e6)
   ),
   # Lambda_prior = list(
@@ -137,7 +137,7 @@ BSFG_state = BSFG_init(Y, model=~Fixed1+Fixed2+Fixed3+Fixed4+(1|animal), data,# 
                                   run_parameters=run_parameters,
                                   priors=priors,
 posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'
-                           ,'Lambda_phi2'),#),#
+                           ,'Lambda_phi2','Lambda_omega2'),#),#
                                   setup = setup,run_ID = 'horseshoe_4')
 
 # X = BSFG_state$data_matrices$X
@@ -191,7 +191,7 @@ for(i  in 1:22) {
     if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
     if(BSFG_state$Posterior$total_samples>0) {
       meff = get_posterior_FUN(BSFG_state,{
-        a = sqrt(1/cumprod(delta))*sqrt(nrow(data))
+        a = sqrt(Lambda_omega2[1]/cumprod(delta))*sqrt(nrow(data))
         a/(1+a)*nrow(Lambda)})
       boxplot(meff)
     }

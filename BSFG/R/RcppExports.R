@@ -85,6 +85,10 @@ sample_delta_omega_c_Eigen <- function(delta, tauh, omega2, xi, scores, delta_1_
     .Call(`_BSFG_sample_delta_omega_c_Eigen`, delta, tauh, omega2, xi, scores, delta_1_rate, delta_2_rate, randg_draws)
 }
 
+sample_trunc_delta_omega_c_Eigen <- function(delta, tauh, omega2, xi, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point) {
+    .Call(`_BSFG_sample_trunc_delta_omega_c_Eigen`, delta, tauh, omega2, xi, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point)
+}
+
 rgig_multiple <- function(n, lambda, chi, psi) {
     .Call(`_BSFG_rgig_multiple`, n, lambda, chi, psi)
 }

@@ -321,6 +321,26 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_trunc_delta_omega_c_Eigen
+Rcpp::List sample_trunc_delta_omega_c_Eigen(VectorXd delta, VectorXd tauh, double omega2, double xi, Map<VectorXd> scores, Map<VectorXd> shapes, double delta_1_rate, double delta_2_rate, Map<MatrixXd> randu_draws, double trunc_point);
+RcppExport SEXP _BSFG_sample_trunc_delta_omega_c_Eigen(SEXP deltaSEXP, SEXP tauhSEXP, SEXP omega2SEXP, SEXP xiSEXP, SEXP scoresSEXP, SEXP shapesSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_rateSEXP, SEXP randu_drawsSEXP, SEXP trunc_pointSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< VectorXd >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type tauh(tauhSEXP);
+    Rcpp::traits::input_parameter< double >::type omega2(omega2SEXP);
+    Rcpp::traits::input_parameter< double >::type xi(xiSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type scores(scoresSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type shapes(shapesSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_1_rate(delta_1_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_2_rate(delta_2_rateSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randu_draws(randu_drawsSEXP);
+    Rcpp::traits::input_parameter< double >::type trunc_point(trunc_pointSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_trunc_delta_omega_c_Eigen(delta, tauh, omega2, xi, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rgig_multiple
 NumericVector rgig_multiple(int n, NumericVector lambda, NumericVector chi, NumericVector psi);
 RcppExport SEXP _BSFG_rgig_multiple(SEXP nSEXP, SEXP lambdaSEXP, SEXP chiSEXP, SEXP psiSEXP) {

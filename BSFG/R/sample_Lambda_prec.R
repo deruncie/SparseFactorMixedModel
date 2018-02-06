@@ -212,8 +212,9 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
   # adapting following guidance from Piironen and Vehtari for prior on tau2 (omega2)
   # for now, will remove omega2 and just use delta/tauh as before
   # idea is to calibrate prior on tau2 based on expectation of meff (proportion of non-zero entries)
-  # delta_1 controls the proportion in the 1st factor
-  # delta_i controls the change in proportion from one factor to the next
+  # Lambda_omega2/tauh | tauh ~ C+(0,1/tauh) controls the sparsity of the factors
+  # delta_1 controls the proportion in the 1st factor. This number should be approximately fixed.
+  # delta_i controls the decrease in odds of inclusion of each element for the ith factor relative to the (i-1)th
   # Note:  Piironen and Vehtari do not include sigma^2 in prior, so I have removed
   priors         = BSFG_state$priors
   run_variables  = BSFG_state$run_variables
@@ -234,6 +235,8 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
 
                            # initialize variables if needed
                            if(!exists('delta')){
+                             Lambda_omega2 = matrix(1,1,1)
+                             Lambda_xi = matrix(1,1,1)
                              Lambda_phi2 = matrix(1,p,k)
                              Lambda_nu = matrix(1,p,k)
                              delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
@@ -250,23 +253,27 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
                              Lambda2_std = Lambda^2
                            }
 
-                           Lambda_phi2[] = matrix(1/rgamma(p*k,shape = 1, rate = 1/Lambda_nu + Lambda2_std * tauh[rep(1,p),]/2),nr=p,nc = k)
+                           Lambda_phi2[] = matrix(1/rgamma(p*k,shape = 1, rate = 1/Lambda_nu + Lambda2_std * (tauh/Lambda_omega2[1]/2)[rep(1,p),]),nr=p,nc = k)
                            Lambda_nu[] = matrix(1/rgamma(p*k,shape = 1, rate = 1 + 1/Lambda_phi2), nr = p, nc = k)
 
                            # -----Sample delta, update tauh------ #
                            scores = colSums(Lambda2_std / Lambda_phi2)/2
-                           shapes = c(delta_1_shape + 0.5*p*k,
+                           shapes = c((p*k + 1) / 2,1,
+                                      delta_1_shape + 0.5*p*k,
                                       delta_2_shape + 0.5*p*((k-1):1))
                            times = delta_iteractions_factor
-                           # randg_draws = matrix(rgamma(times*k,shape = shapes,rate = 1),nr=times,byrow=T)
-                           # delta[] = sample_delta_c_Eigen( delta,tauh,scores,delta_1_rate,delta_2_rate,randg_draws)
-                           randu_draws = matrix(runif(times*k),nr=times)
-                           delta[] = sample_trunc_delta_c_Eigen( delta,tauh,scores,shapes,delta_1_rate,delta_2_rate,randu_draws,trunc_point_delta)
+                           # randg_draws = matrix(rgamma(times*(2+k),shape = shapes,rate = 1),nr=times,byrow=T)
+                           # deltas = sample_delta_omega_c_Eigen(delta,tauh,Lambda_omega2,Lambda_xi,scores,delta_1_rate,delta_2_rate,randg_draws)
+                           randu_draws = matrix(runif(times*(2+k)),nr=times)
+                           deltas = sample_trunc_delta_omega_c_Eigen( delta,tauh,Lambda_omega2,Lambda_xi,scores,shapes,delta_1_rate,delta_2_rate,randu_draws,trunc_point_delta)
+                           Lambda_omega2[] = deltas[[1]]
+                           Lambda_xi[] = deltas[[2]]
+                           delta[] = deltas[[3]]
                            tauh[]  = matrix(cumprod(delta),nrow=1)
 
 
                            # -----Update Plam-------------------- #
-                           Lambda_prec[] = 1/Lambda_phi2
+                           Lambda_prec[] = (1/Lambda_omega2[1])/Lambda_phi2
                            Plam[] = Lambda_prec * tauh[rep(1,p),]
                            if(lambda_propto_Vp){
                              Plam[] = Plam * tot_Eta_prec[1,]

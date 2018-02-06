@@ -56,9 +56,9 @@ a=sqrt(1e-1/(cumprod(c(1,rep(3,20)))))*sqrt(n);plot(a/(1+a)*p,ylim=c(0,p))
 p = ncol(Y)
 n = nrow(Y)
 p0 = .2*p
-tau_0 = p0/(ncol(Y)-p0)*sqrt(4)/sqrt(nrow(Y))
+tau_0 = p0/(p-p0)*sqrt(1)/sqrt(n)
 delta1_mean = 1/tau_0^2
-nR = 1e3
+nR = 1e4
 k = 20
 meff = t(sapply(1:nR,function(i) {
   tauh = rgamma(1,shape=5,rate=5/delta1_mean) * cumprod(c(delta1_mean,rgamma(k-1,shape=1,rate=1/delta1_mean)))
@@ -71,11 +71,13 @@ meff = t(sapply(1:nR,function(i) {
 boxplot(meff)
 tau = sqrt(1/rgamma(nR,shape=1,rate=1/delta1_mean))# * 1/rgamma(nR,shape=1,rate=1/3))
 # tau = abs(rnorm(nR,0,tau_0))
-# tau = abs(rcauchy(nR,0,tau_0^2))
+tau = abs(rcauchy(nR,0,.1)) * 1/sqrt(apply(matrix(rgamma(nR*10,shape=1,rate=1/3),nr=nR),1,prod))
+# tau = abs(rcauchy(nR,0,scale=tau_0^2))
+# tau = rep(tau_0,nR)
 l = matrix(rcauchy(p*nR),nc=nR)
-k = get_k(n,sigma2 = 4,tau2 = matrix(tau^2,p,nR,byrow=T),lambda2 = l^2)
+k = get_k(n,sigma2 = 1,tau2 = matrix(tau^2,p,nR,byrow=T),lambda2 = l^2)
 meff = colSums(1-k)
-hist(meff,breaks=seq(0,p,length=20));abline(v=p0)
+hist(meff,breaks=c(seq(0,100,length=100),Inf),xlim=c(0,100));abline(v=p0)
 
 # plot delta against p0 - it's non-linear, with changes in delta causing biggest
 # changes in p0 at 0.5*p
