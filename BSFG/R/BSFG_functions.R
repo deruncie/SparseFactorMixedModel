@@ -185,10 +185,27 @@ update_k = function( BSFG_state) {
   return(current_state)
 }
 
+get_meff = function(BSFG_state){
+  get_k = function(n,sigma2,tau2,lambda2,s2=1){
+    1/(1+n/sigma2 * tau2 * s2 * lambda2)
+  }
+  current_state = BSFG_state$current_state
+  current_state = within(current_state, {
+                         tauh = tauh / colMeans(F^2)
+                         })
+
+  ki = with(current_state,get_k(nrow(F),1/t(tot_Eta_prec[rep(1,k),]),
+             (Lambda_omega2[1]/tauh[rep(1,p),]),
+             Lambda_phi2)
+  )
+  meff = colSums(1-ki)
+  meff
+}
+
 #' Re-orders factors in decreasing order of magnitude
 #'
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
-reorder_factors = function(BSFG_state){
+reorder_factors = function(BSFG_state,factor_order = NULL){
   # re-orders factors in decreasing size of Lambda %*% F
   # based on current state
   # also re-orders Posterior
@@ -200,8 +217,10 @@ reorder_factors = function(BSFG_state){
   F = current_state$F
 
   # size is sum lambda_ij^2 * var(F_i)
-  sizes = colSums(Lambda^2) * colMeans(F^2)
-  factor_order = order(sizes,decreasing=T)
+  if(is.null(factor_order)) {
+    sizes = colSums(Lambda^2) * colMeans(F^2)
+    factor_order = order(sizes,decreasing=T)
+  }
 
   reorder_params = c('Lambda','Lambda_prec','Plam',
                      'delta','tauh',

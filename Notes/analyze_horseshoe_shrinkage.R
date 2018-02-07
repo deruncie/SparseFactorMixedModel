@@ -77,7 +77,7 @@ tau = abs(rcauchy(nR,0,.1)) * 1/sqrt(apply(matrix(rgamma(nR*10,shape=1,rate=1/3)
 l = matrix(rcauchy(p*nR),nc=nR)
 k = get_k(n,sigma2 = 1,tau2 = matrix(tau^2,p,nR,byrow=T),lambda2 = l^2)
 meff = colSums(1-k)
-hist(meff,breaks=c(seq(0,100,length=100),Inf),xlim=c(0,100));abline(v=p0)
+hist(meff/p,breaks = seq(0,1,length=100));abline(v=p0/p)
 
 # plot delta against p0 - it's non-linear, with changes in delta causing biggest
 # changes in p0 at 0.5*p
