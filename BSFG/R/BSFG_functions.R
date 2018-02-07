@@ -185,21 +185,28 @@ update_k = function( BSFG_state) {
   return(current_state)
 }
 
-get_meff = function(BSFG_state){
+get_ki = function(BSFG_state){
+  # calculation is from Piironen and Vehtari - 2.4
+  # adjust for emperical variance of the column of F - since this should really be set to 1
+  # could adjust for 1/tot_F_prec instead, since that's actually a parameter.
   get_k = function(n,sigma2,tau2,lambda2,s2=1){
     1/(1+n/sigma2 * tau2 * s2 * lambda2)
   }
   current_state = BSFG_state$current_state
   current_state = within(current_state, {
-                         tauh = tauh / colMeans(F^2)
-                         p = nrow(Lambda)
-                         n = nrow(F)
-                         })
+    tauh = tauh / colMeans(F^2)
+    p = nrow(Lambda)
+    n = nrow(F)
+  })
 
   ki = with(current_state,get_k(n,1/t(tot_Eta_prec[rep(1,k),]),
-             (Lambda_omega2[1]/tauh[rep(1,p),]),
-             Lambda_phi2)
+                                (Lambda_omega2[1]/tauh[rep(1,p),]),
+                                Lambda_phi2)
   )
+  ki
+}
+get_meff = function(BSFG_state){
+  ki = get_ki(BSFG_state)
   meff = colSums(1-ki)
   meff
 }
@@ -278,6 +285,7 @@ save_posterior_sample = function(BSFG_state) {
   # Posterior is a list of arrays.
   # All factor parameters are matrices with ncol == k
   # Posterior arrays are expanded / contracted as the number of factors changes (with update_k)
+  # values are re-scaled by var_Eta so that they are on the scale of the original data
 
   current_state = BSFG_state$current_state
   Posterior = BSFG_state$Posterior
@@ -293,11 +301,19 @@ save_posterior_sample = function(BSFG_state) {
     U_F = as.matrix(BSFG_state$data_matrices$RE_L %*% U_F)
     # transform variables so that the variance of each column of F is 1.
     F_var = 1/tot_F_prec
-    U_F = sweep(U_F,2,sqrt(F_var),'/')
-    B_F = sweep(B_F,2,sqrt(F_var),'/')
-    F = sweep(F,2,sqrt(F_var),'/')
-    Lambda = sweep(Lambda,2,sqrt(F_var),'*')
+    U_F[] = sweep(U_F,2,sqrt(F_var),'/')
+    B_F[] = sweep(B_F,2,sqrt(F_var),'/')
+    F[] = sweep(F,2,sqrt(F_var),'/')
+    Lambda[] = sweep(Lambda,2,sqrt(F_var),'*')
     tauh[] = tauh * tot_F_prec
+
+    # re-scale by var_Eta
+    if(!'var_Eta' %in% ls()) var_Eta = rep(1,nrow(Lambda))
+    U_R[] = sweep(U_R,2,sqrt(var_Eta),'*')
+    B[] = sweep(B,2,sqrt(var_Eta),'*')
+    B_QTL[] = sweep(B_QTL,2,sqrt(var_Eta),'*')
+    Lambda[] = sweep(Lambda,1,sqrt(var_Eta),'*')
+    tot_Eta_prec[] = tot_Eta_prec / var_Eta
   })
 
   sp = dim(Posterior$Lambda)[1]

@@ -41,7 +41,7 @@ X = setup$X
 
 run_parameters = BSFG_control(
   lambda_propto_Vp = F,cauchy_sigma_tot = F,
-  scale_Y = FALSE,
+  scale_Y = T,
   simulation = T,
   h2_divisions = 20,
   h2_step_size = .3,
@@ -179,6 +179,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 BSFG_state = reorder_factors(BSFG_state)
 BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
+BSFG_state$current_state$trunc_point_delta = 0
 for(i  in 1:22) {
     if(i %% 6 == 0 || (i>1 && i < 6)){
       BSFG_state = reorder_factors(BSFG_state,order(get_meff(BSFG_state),decreasing = T))
@@ -186,6 +187,7 @@ for(i  in 1:22) {
     }
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples)
+    print(apply(BSFG_state$current_state$F,2,var))
 
     op=par(mfrow=c(1,2))
     if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))

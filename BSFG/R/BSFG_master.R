@@ -1103,6 +1103,9 @@ initialize_variables = function(BSFG_state,...){
     F = X_F %*% B_F + ZL %*% U_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
     F = as.matrix(F)
 
+    # var_Eta
+    if(!'var_Eta' %in% ls()) var_Eta = rep(1,p)
+
     # ----------------------- #
     # ---Save initial values- #
     # ----------------------- #

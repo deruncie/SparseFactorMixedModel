@@ -128,6 +128,13 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
     F = sweep(F,2,sqrt(F_var),'/')
     Lambda = sweep(Lambda,2,sqrt(F_var),'*')
     tauh[] = tauh * tot_F_prec
+
+    if(!'var_Eta' %in% ls()) var_Eta = rep(1,nrow(Lambda))
+    U_R[] = sweep(U_R,2,sqrt(var_Eta),'*')
+    B[] = sweep(B,2,sqrt(var_Eta),'*')
+    B_QTL[] = sweep(B_QTL,2,sqrt(var_Eta),'*')
+    Lambda[] = sweep(Lambda,1,sqrt(var_Eta),'*')
+    tot_Eta_prec[] = tot_Eta_prec / var_Eta
   })
 
   Lambda = current_state$Lambda

@@ -33,14 +33,14 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
     observation_setup = with(c(observation_model_parameters,data_matrices,current_state),{
       if(scale_Y){
         Mean_Y = colMeans(Y,na.rm=T)
-        VY = apply(Y,2,var,na.rm=T)
+        var_Eta = apply(Y,2,var,na.rm=T)
         Eta = sweep(Y,2,Mean_Y,'-')
-        Eta = sweep(Eta,2,sqrt(VY),'/')
+        Eta = sweep(Eta,2,sqrt(var_Eta),'/')
       } else {
         Eta = Y
         p_Y = dim(Y)[2]
         Mean_Y = rep(0,p_Y)
-        VY = rep(1,p_Y)
+        var_Eta = rep(1,p_Y)
       }
       Y_missing = as(is.na(Y),'lgTMatrix')# un-compressed logical sparse matrix
       return(list(
@@ -49,7 +49,7 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
         p = ncol(Y),
         traitnames = colnames(Y),
         Mean_Y = Mean_Y,
-        VY = VY,
+        var_Eta = var_Eta,
         Y_missing = Y_missing,
         n_missing = sum(Y_missing),
         missing_indices = which(Y_missing)
@@ -73,7 +73,7 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
       }
       Eta[missing_indices] = Eta_mean[missing_indices] + resids
     }
-    return(list(Eta = Eta,Eta_mean = Eta_mean,Y_missing = Y_missing))
+    return(list(Eta = Eta,Eta_mean = Eta_mean,Y_missing = Y_missing, var_Eta = var_Eta))
   })
   return(list(state = observation_model_state,
               posteriorSample_params = c('Eta'),
