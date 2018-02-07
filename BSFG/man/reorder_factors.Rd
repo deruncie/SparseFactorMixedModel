@@ -4,7 +4,7 @@
 \alias{reorder_factors}
 \title{Re-orders factors in decreasing order of magnitude}
 \usage{
-reorder_factors(BSFG_state)
+reorder_factors(BSFG_state, factor_order = NULL)
 }
 \description{
 Re-orders factors in decreasing order of magnitude

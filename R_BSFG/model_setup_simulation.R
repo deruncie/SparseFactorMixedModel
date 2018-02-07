@@ -181,7 +181,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 n_samples = 100;
 for(i  in 1:22) {
     if(i %% 6 == 0 || (i>1 && i < 6)){
-      BSFG_state = reorder_factors(BSFG_state)
+      BSFG_state = reorder_factors(BSFG_state,order(get_meff(BSFG_state),decreasing = T))
       BSFG_state = clear_Posterior(BSFG_state)
     }
     print(sprintf('Run %d',i))

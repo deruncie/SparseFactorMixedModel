@@ -192,9 +192,11 @@ get_meff = function(BSFG_state){
   current_state = BSFG_state$current_state
   current_state = within(current_state, {
                          tauh = tauh / colMeans(F^2)
+                         p = nrow(Lambda)
+                         n = nrow(F)
                          })
 
-  ki = with(current_state,get_k(nrow(F),1/t(tot_Eta_prec[rep(1,k),]),
+  ki = with(current_state,get_k(n,1/t(tot_Eta_prec[rep(1,k),]),
              (Lambda_omega2[1]/tauh[rep(1,p),]),
              Lambda_phi2)
   )
