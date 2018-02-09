@@ -125,6 +125,46 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
 }
 
 
+#' B spline basis with option of centering and differencing coefficients
+#'
+#' parameters follow \link{bs}
+#'
+#' uses code from \link{bs}, but optionally transforms the basis into a difference
+#' between spline parameters.
+#'
+#' Also, optionally centers the spline so that the spline average is zero.
+#'
+#' @param x
+#' @param df
+#' @param knots
+#' @param degree
+#' @param intercept
+#' @param Boundary.knots
+#' @param differences
+#' @param center
+#'
+#' @return
+#' @export
+#'
+#' @examples
+b_spline = function(x, df = NULL, knots = NULL, degree = 3, intercept = FALSE,
+                    Boundary.knots = range(x),
+                    differences = TRUE,
+                    center = FALSE
+) {
+  X = bs(x,df,knots,degree,intercept,Boundary.knots)
+  if(center){
+    X = X %*% contr.sum(ncol(X))
+  }
+  if(differences){
+    D = diag(1,ncol(X))
+    D[lower.tri(D)] = 1
+    diag(D) = 1
+    X = X %*% D
+  }
+  X
+}
+
 #' Sample Eta given regression-splines individual-level model
 #'
 #' Eta is a matrix of individual-level parmaters for a regression-spline with
@@ -161,34 +201,6 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       Y = as.matrix(observations[,traits,drop=FALSE])
       Terms = delete.response(terms(mf))
 
-      # smooth bs() terms
-      # identify which columns of mm correspond to bs() coefficients
-      # pull out separate groups of coefficients for each bs() term.
-      # Make lower-triangular rotation matrix for each set of bs() coefficients.
-      mm_cols = colnames(mm)
-      mm_rotation = diag(1,ncol(mm))
-      rownames(mm_rotation) = colnames(mm_rotation) = mm_cols
-      bs_col_sets = rep(0,ncol(mm))  # vector identifying sets of bs coefficients
-      if((!'do_not_penalize_bs' %in% ls()) || !do_not_penalize_bs) {
-        bs_cols = mm_cols[grep('bs(',mm_cols,fixed=T)]
-        if(length(bs_cols) > 0){
-          unique_bs_groups = attr(Terms,'term.labels')
-          for(bs_group in unique_bs_groups){
-            bs_cols = grep(bs_group,mm_cols,fixed=T)
-            D = diag(1,length(bs_cols))
-            D[lower.tri(D)] = 1
-
-            # adjust for length of D
-            D = D / ncol(D)
-
-            mm_rotation[bs_cols,bs_cols] = D
-            colnames(mm_rotation)[bs_cols] = paste0(colnames(mm_rotation[bs_cols,bs_cols]),'_differences')
-
-            bs_col_sets[bs_cols] = match(bs_group,unique_bs_groups)
-          }
-        }
-      }
-      mm = mm %*% mm_rotation
       n_terms = ncol(mm)
 
       id_index = tapply(1:nrow(observations),observations$ID,function(x) x)
@@ -234,8 +246,6 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
         traitnames = traitnames,
         Eta_row_names = Eta_row_names,
         model_matrices = model_matrices,
-        mm_rotation = mm_rotation,
-        bs_col_sets = bs_col_sets,
         Y_missing = Y_missing
       )
       return(observation_setup)
