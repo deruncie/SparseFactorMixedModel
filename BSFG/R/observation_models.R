@@ -172,7 +172,7 @@ regression_model = function(observation_model_parameters,BSFG_state = list()){
       if((!'do_not_penalize_bs' %in% ls()) || !do_not_penalize_bs) {
         bs_cols = mm_cols[grep('bs(',mm_cols,fixed=T)]
         if(length(bs_cols) > 0){
-          unique_bs_groups = paste0(unique(sapply(bs_cols,function(x) strsplit(x,'bs(',fixed=TRUE)[[1]][1])),'bs(')
+          unique_bs_groups = attr(Terms,'term.labels')
           for(bs_group in unique_bs_groups){
             bs_cols = grep(bs_group,mm_cols,fixed=T)
             D = diag(1,length(bs_cols))

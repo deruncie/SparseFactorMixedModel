@@ -313,6 +313,7 @@ save_posterior_sample = function(BSFG_state) {
     B[] = sweep(B,2,sqrt(var_Eta),'*')
     B_QTL[] = sweep(B_QTL,2,sqrt(var_Eta),'*')
     Lambda[] = sweep(Lambda,1,sqrt(var_Eta),'*')
+    Eta[] = sweep(Eta,2,sqrt(var_Eta),'*')
     tot_Eta_prec[] = tot_Eta_prec / var_Eta
   })
 

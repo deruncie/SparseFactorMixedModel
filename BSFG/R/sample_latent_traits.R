@@ -113,7 +113,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     }
     if(b_QTL_F > 0){
       prior_mean = matrix(0,b_QTL_F,k)
-      prior_prec = B_QTL_F_prec * tot_F_prec[rep(1,b_QTL_F),,drop=FALSE]  # prior for B_QTL_F includes tot_F_prec
+      prior_prec = B_QTL_F_prec# * tot_F_prec[rep(1,b_QTL_F),,drop=FALSE]  # prior for B_QTL_F includes tot_F_prec
       B_QTL_F[] = sample_MME_fixedEffects_hierarchical_c(Qt_list[[1]] %**% F_tilde[rows,,drop=FALSE],
                                                        Qt1_QTL_Factors_Z,  # only includes rows of Qt1
                                                        QTL_factors_X,
@@ -143,10 +143,10 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       shape = shape + sum(!X_F_zero_variance)/2
       rate = rate + colSums((B_F^2*B_F_prec)[!X_F_zero_variance,,drop=FALSE])/2   # add this if tot_F_prec part of the prior for B_F
     }
-    if(b_QTL_F > 0) {
-      shape = shape + b_QTL_F/2
-      rate = rate + colSums(B_QTL_F^2 * B_QTL_F_prec)/2
-    }
+    # if(b_QTL_F > 0) {
+    #   shape = shape + b_QTL_F/2
+    #   rate = rate + colSums(B_QTL_F^2 * B_QTL_F_prec)/2
+    # }
     tot_F_prec[] = rgamma(k,shape = shape, rate = rate)
     # tot_F_prec[] = 1
 

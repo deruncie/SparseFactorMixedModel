@@ -23,8 +23,6 @@ setwd(folder)
 
 # initialize priors
 run_parameters = BSFG_control(
-  sampler = 'fast_BSFG',
-  # sampler = 'general_BSFG',
   scale_Y = FALSE,
   simulation = FALSE,
   h2_divisions = 20,
@@ -35,9 +33,9 @@ run_parameters = BSFG_control(
 
 priors = BSFG_priors(
   # fixed_var = list(V = 1,     nu = 3),
-  fixed_var = list(V = 1,     nu = 3),
-  QTL_resid_var = list(V = 1/1000,     nu = 3),
-  QTL_factors_var = list(V = 1/10000,     nu = 3),
+  # fixed_var = list(V = 1,     nu = 3),
+  # QTL_resid_var = list(V = 1/1000,     nu = 3),
+  # QTL_factors_var = list(V = 1/10000,     nu = 3),
   # tot_Y_var = list(V = 0.5,   nu = 3),
   tot_Y_var = list(V = 0.5,   nu = 10),
   tot_F_var = list(V = 18/20, nu = 20),
@@ -57,7 +55,9 @@ priors = BSFG_priors(
   #   delta_2   = list(shape = 3, rate = 1)
   # ),
   B_prior = list(
-    sampler = sample_B_prec_ARD_v2,
+    sampler = sample_B_prec_ARD,
+    global   = list(V = 1,nu = 3),
+    global_F = list(V = 1,nu = 3),
     B_df      = 3,
     B_F_df    = 3
   )
@@ -71,6 +71,19 @@ priors = BSFG_priors(
   #   B_F_omega  = 1/10,
   #   B_F_ncores = 1
   # )
+
+  # ,QTL_prior = list(
+  #   sampler = sample_QTL_prec_ARD,
+  #   global = list(V = 1,nu = 3),
+  #   QTL_df  = 3,
+  #   separate_QTL_shrinkage=T
+  # )
+  ,QTL_prior = list(
+    sampler = sample_QTL_prec_horseshoe,
+    separate_QTL_shrinkage=T,
+    cauchy_iteractions_factor = 10,
+    p0 = .05
+  )
 )
 
 
@@ -124,7 +137,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 # burn in
 
 n_samples = 100
-for(i  in 15:100) {
+for(i  in 1:100) {
   if(i < 10 || (i-1) %% 20 == 0) {
     # BSFG_state$current_state = update_k(BSFG_state)
     BSFG_state = reorder_factors(BSFG_state)
@@ -132,7 +145,10 @@ for(i  in 15:100) {
   }
   print(sprintf('Run %d',i))
   BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1,ncores=1)
-  trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
+  BSFG_state$current_state$tot_F_prec
+  # Image(BSFG_state$current_state$B_QTL_F,F)
+  # BSFG_state$current_state$B_QTL_F_tau
+  # trace_plot(BSFG_state$Posterior$tot_F_prec[,1,])
   print(BSFG_state$current_state$delta*BSFG_state$current_state$tot_F_prec[1])
   print(BSFG_state$current_state$tot_F_prec)
   # trace_plot(BSFG_state$Posterior$cis_effects[,1,1:10])

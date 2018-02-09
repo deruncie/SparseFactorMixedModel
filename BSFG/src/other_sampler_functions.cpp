@@ -214,7 +214,7 @@ VectorXd sample_MME_single_hierarchical_diagK(  // returns b x 1 vector
 ){
   // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
   // Phi = sqrt(tot_Eta_prec) * chol_R_invT * Z * X
-  // Phi = U * X = Vt * X
+  // Phi = U * X = Vt * X, where U = Vt = sqrt(tot_Eta_prec) * chol_R_invT * Z
   MatrixXd U = chol_R.transpose().triangularView<Lower>().solve(Z.toDense() * sqrt(tot_Eta_prec));
   MatrixXd Phi = U * X;
   MatrixXd V = U.transpose();
@@ -225,17 +225,13 @@ VectorXd sample_MME_single_hierarchical_diagK(  // returns b x 1 vector
   VectorXd v = Phi * u + randn_e;
   VectorXd alpha_v = alpha-v;
 
+  // Binomial inverse theorm: (A + UBV)^-1 = A^-1 - A^-1 * U (I + BVU)^-1*BVA^-1
+  MatrixXd B = X * prior_prec.cwiseInverse().asDiagonal() * X.transpose();
+  MatrixXd UB = U*B;
+  MatrixXd inner = B + UB.transpose()*UB;
+  VectorXd w = alpha_v - UB*inner.ldlt().solve(UB.transpose() * alpha_v);
 
-  MatrixXd D_XT = prior_prec.cwiseInverse().asDiagonal() * X.transpose();
-  MatrixXd B = X * D_XT;
-  MatrixXd I = MatrixXd::Identity(B.rows(),B.cols());
-  MatrixXd Binv = B.ldlt().solve(I);
-
-  MatrixXd inner = Binv + V*U;
-
-  VectorXd w = alpha_v - U*inner.ldlt().solve(V * alpha_v);
-
-  VectorXd theta = u + D_XT * (V * w);
+  VectorXd theta = u + prior_prec.cwiseInverse().asDiagonal() * (Phi.transpose() * w);
   return(theta);
 }
 

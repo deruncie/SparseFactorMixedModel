@@ -55,7 +55,7 @@ A horseshoe model for $\B{\lambda}_j$ could be:
 \lambda_{kj} \mid \phi^2_{kj}, \tau^2_k, \sigma^2_j &\sim \mbox{N}(0,\phi^2_{kj}\tilde{\omega}^2_k \sigma^2_j), \\
 \sigma^2_j &\sim \mbox{IG}(a,b), \\
 \phi_{kj} &\sim \mbox{C}^+(0,1), \\
-\tilde{\omega}_k = &\sim \mbox{C}^+(0,\tau^{-1/2}_k), \\
+\tilde{\omega}_k = &\sim \mbox{C}^+(0,\tau^{-1}_k), \\
 \tau_k &= \prod\limits_{h=1}^k \delta_h, \\
 \delta_h &\sim \mbox{Ga}(a_\delta,b_\delta), h \geq 1, \; \delta_1 = 1.
 \end{align*}
@@ -114,34 +114,9 @@ The easiest thing is to keep multiplying the $\delta_i$ together.  If:
 
 \noindent then:
 \begin{align*}
-\tau^2_{0_{i}} = \frac{\tau^2_{0_{i-1}} }{\delta_i} = \left(\frac{p_{0_{i-1}}}{\delta^2_i(1-p_{0_{i-1}})}\right)^2\frac{\sigma^2}{n} 
+\tau^2_{0_{i}} = \frac{\tau^2_{0_{i-1}} }{\delta_i} = \left(\frac{1}{\delta^2_i}\frac{p_{0_{i-1}}}{(1-p_{0_{i-1}})}\right)^2\frac{\sigma^2}{n} 
 \end{align*}
 
 If we interpret the term inside the parentheses as the odds of each entry being non-zero, then these odds are reduced by a factor of $\delta^2_i$, or the log-odds are decreased by $2 \log\delta_i$
-
-
-
-
-
-
-Note:
-\begin{align*}
-\tau^2_{0_{i-1}} &= \left(\frac{p_{0_{i-1}}}{1-p_{0_{i-1}}}\right)^2\frac{\sigma^2}{n} \\
-\tau^2_{0_{i}} &= \left(\frac{p_{0_{i}}}{1-p_{0_{i}}}\right)^2\frac{\sigma^2}{n} 
-\end{align*}
-
-So:
-\begin{align*}
-\frac{1/\tau^2_{0_{i}}}{1/\tau^2_{0_{i-1}}} = 
-\end{align*}
-
-
-
-
-
-
-
-
-
 
 \end{document}  

@@ -7,7 +7,7 @@ library(Matrix)
 # # choose a seed for the random number generator. This can be a random seed (for analysis), or you can choose your seed so that
 # # you can repeat the MCMC exactly
 seed = 1
-new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,5)),Va = 2, Ve = 2,Vb = 2)
+new_halfSib_simulation('Sim_FE_1', nSire=50,nRep=10,p=100, b=5, factor_h2s= c(rep(0,5),rep(0.7,10)),Va = 2, Ve = 2,Vb = 2)
 set.seed(seed)
 load('setup.RData')
 
@@ -69,7 +69,7 @@ priors = BSFG_priors(
     # Lambda_df = 3,
     # delta_1   = list(shape = 1e6,  rate = 1e6),
     delta_1   = list(shape = 1e6,  rate = 1e6/delta1_mean),
-    delta_2   = list(shape = 1, rate = p0)#sqrt(delta1_mean))
+    delta_2   = list(shape = 10, rate = 10*p0)#sqrt(delta1_mean))
     # delta_2   = list(shape = 1e6, rate = 1e6)
   ),
   # Lambda_prior = list(
@@ -187,7 +187,7 @@ for(i  in 1:22) {
     }
     print(sprintf('Run %d',i))
     BSFG_state = sample_BSFG(BSFG_state,n_samples)
-    print(apply(BSFG_state$current_state$F,2,var))
+    # print(apply(BSFG_state$current_state$F - BSFG_state$current_state$XFBF,2,var))
 
     op=par(mfrow=c(1,2))
     if(BSFG_state$Posterior$total_samples>0) trace_plot(log(BSFG_state$Posterior$delta[,1,]))
