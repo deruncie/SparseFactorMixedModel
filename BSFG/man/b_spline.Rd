@@ -19,3 +19,6 @@ between spline parameters.
 
 Also, optionally centers the spline so that the spline average is zero.
 }
+\references{
+following code from https://github.com/SurajGupta/r-source/blob/master/src/library/splines/R/splines.R
+}

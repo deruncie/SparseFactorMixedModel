@@ -146,13 +146,17 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
 #' @return
 #' @export
 #'
+#' @references following code from https://github.com/SurajGupta/r-source/blob/master/src/library/splines/R/splines.R
+#'
 #' @examples
 b_spline = function(x, df = NULL, knots = NULL, degree = 3, intercept = FALSE,
                     Boundary.knots = range(x),
                     differences = TRUE,
                     center = FALSE
 ) {
-  X = bs(x,df,knots,degree,intercept,Boundary.knots)
+  # following code from https://github.com/SurajGupta/r-source/blob/master/src/library/splines/R/splines.R
+  bs_X = bs(x,df,knots,degree,intercept,Boundary.knots)
+  X = bs_X
   if(center){
     X = X %*% contr.sum(ncol(X))
   }
@@ -162,7 +166,22 @@ b_spline = function(x, df = NULL, knots = NULL, degree = 3, intercept = FALSE,
     diag(D) = 1
     X = X %*% D
   }
+  # X
+  bs_X_attributes = attributes(bs_X)
+  bs_X_attributes = bs_X_attributes[names(bs_X_attributes) %in% c('dim','dimnames') == F]
+  attributes(X) = c(attributes(X),bs_X_attributes)
+  attr(X,'differences') = differences
+  attr(X,'center') = center
+  class(X) = c('b_spline',class(X))
   X
+}
+makepredictcall.b_spline <- function(var, call)
+{
+  if(as.character(call)[1L] != "b_spline") return(call)
+  at <- attributes(var)[c("degree", "knots", "Boundary.knots", "intercept","differences","center")]
+  xxx <- call[1L:2]
+  xxx[names(at)] <- at
+  xxx
 }
 
 #' Sample Eta given regression-splines individual-level model
