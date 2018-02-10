@@ -152,25 +152,34 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
 b_spline = function(x, df = NULL, knots = NULL, degree = 3, intercept = FALSE,
                     Boundary.knots = range(x),
                     differences = TRUE,
+                    periodic = FALSE,
                     center = FALSE
 ) {
   # following code from https://github.com/SurajGupta/r-source/blob/master/src/library/splines/R/splines.R
-  bs_X = bs(x,df,knots,degree,intercept,Boundary.knots)
+  if(periodic){
+    if(is.null(knots)) {
+      bs_X = pbs(x=x,df=df,degree=degree,intercept=intercept,Boundary.knots=Boundary.knots)
+    } else {
+      bs_X = pbs(x=x,knots=knots,degree=degree,intercept=intercept,Boundary.knots=Boundary.knots)
+    }
+  } else {
+    bs_X = bs(x,df,knots,degree,intercept,Boundary.knots)
+  }
   X = bs_X
-  if(center){
-    X = X %*% contr.sum(ncol(X))
-  }
   if(differences){
-    D = diag(1,ncol(X))
-    D[lower.tri(D)] = 1
-    diag(D) = 1
-    X = X %*% D
+    # D = diag(1,ncol(X))
+    # D[lower.tri(D)] = 1
+    # diag(D) = 1
+    # X = X %*% D
+    contr = contr.sdif(ncol(X))
+    if(!center) contr = cbind(1,contr)
+    X = X %*% contr
   }
-  # X
   bs_X_attributes = attributes(bs_X)
   bs_X_attributes = bs_X_attributes[names(bs_X_attributes) %in% c('dim','dimnames') == F]
   attributes(X) = c(attributes(X),bs_X_attributes)
   attr(X,'differences') = differences
+  attr(X,'periodic') = periodic
   attr(X,'center') = center
   class(X) = c('b_spline',class(X))
   X
@@ -178,7 +187,7 @@ b_spline = function(x, df = NULL, knots = NULL, degree = 3, intercept = FALSE,
 makepredictcall.b_spline <- function(var, call)
 {
   if(as.character(call)[1L] != "b_spline") return(call)
-  at <- attributes(var)[c("degree", "knots", "Boundary.knots", "intercept","differences","center")]
+  at <- attributes(var)[c("degree", "knots", "Boundary.knots", "intercept","differences","periodic","center")]
   xxx <- call[1L:2]
   xxx[names(at)] <- at
   xxx
