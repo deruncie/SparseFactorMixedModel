@@ -153,8 +153,7 @@ bs_diff = function(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
                     Boundary.knots = range(x),
                     differences = 1,
                     periodic = FALSE,
-                    center = TRUE,
-                    polyX = 0
+                    center = TRUE
 ) {
   # following code from https://github.com/SurajGupta/r-source/blob/master/src/library/splines/R/splines.R
   if(periodic){
@@ -167,21 +166,19 @@ bs_diff = function(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
     bs_X = splines::bs(x,df,knots,degree,intercept,Boundary.knots)
   }
   X = bs_X
+  diff = differences
   if(differences > 0) {
     # differences transformm the parameters into difference between consecutive parameters.
     # As we do this sequentially, it penalizes higher-order derivatives of the curve
-    # we then include the lower-order terms as polynomial splines.
+    # we include the averages of the lower-order splines as predictors as well
     m = ncol(X)
-    for(diff in 1:differences){
-      contr = MASS::contr.sdif(m-diff+1)
-      X = X %*% contr
-    }
+    contr = MASS::contr.sdif(m-differences+1)
     if(differences > 1) {
-      if(polyX == 0){
-        polyX = terms(model.frame(~0+poly(x,differences-1)))
+      for(diff in (differences-1):1){
+        contr = MASS::contr.sdif(m-diff+1) %*% cbind(1/m,contr)
       }
-      X = cbind(model.matrix(polyX,list(x=x)),X)
     }
+    X = X %*% contr
   }
   bs_X_attributes = attributes(bs_X)
   bs_X_attributes = bs_X_attributes[names(bs_X_attributes) %in% c('dim','dimnames') == F]
@@ -189,14 +186,13 @@ bs_diff = function(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
   attr(X,'differences') = differences
   attr(X,'periodic') = periodic
   attr(X,'center') = center
-  attr(X,'polyX') = polyX
   class(X) = c('bs_diff',class(X))
   X
 }
 makepredictcall.bs_diff <- function(var, call)
 {
   if(as.character(call)[1L] != "bs_diff") return(call)
-  at <- attributes(var)[c("degree", "knots", "Boundary.knots", "intercept","differences","periodic","center","polyX")]
+  at <- attributes(var)[c("degree", "knots", "Boundary.knots", "intercept","differences","periodic","center")]
   xxx <- call[1L:2]
   xxx[names(at)] <- at
   xxx

@@ -2,7 +2,7 @@ library(rrBLUP)
 library(splines)
 library(MASS)
 
-d = data.frame(time = seq(1,24,length=300))
+d = data.frame(time = seq(1,24,length=30))
 d$y = sin(d$time/24*6) + sin(d$time/24*12) + d$time*0
 d$y = d$y-mean(d$y)+1
 e = rnorm(nrow(d),0,.5);e=e-mean(e)
@@ -12,7 +12,7 @@ with(d,plot(time,y2))
 
 
 Z1 = model.matrix(~0+bs(d$time,df=10,intercept = F))
-Image(Z1,F)
+# Image(Z1,F)
 
 D1 = diag(1,ncol(Z1))
 D1[lower.tri(D1)] = 1
@@ -28,26 +28,28 @@ df = 10
 # Z4 = Z3 %*% D3
 # Z3 = model.matrix(~0+bs_diff(d$time,df=10,center=T,intercept = T)) %*% contr.sdif(9)
 # Z3 = model.matrix(~0+bs_diff(d$time,df=10,center=T,intercept = T)) %*% cbind(1,contr.sdif(9)) #%*% cbind(1,contr.sdif(9))
-Z3 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,differences= 0)) %*% cbind(1,contr.sdif(df)) %*%
-  cbind(1,rbind(0,cbind(1,contr.sdif(df-1))))
+Z3 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,differences= 0)) %*%
+  contr.sdif(df) %*%
+  cbind(1/df,contr.sdif(df-1)) #%*%
+  # cbind(1,rbind(1,cbind(1,contr.sdif(df-1))))
 
-Z1 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 2))
+Z1 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 3))
 Z2 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 1))
-Z4 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 5))
+Z4 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 4))
 
-Z4 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,differences= 0)) %*% contr.sdif(df) %*% contr.sdif(df-1)
-X4 = model.matrix(~time,d)
+# Z4 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,differences= 0)) %*% contr.sdif(df) %*% contr.sdif(df-1)
+# X4 = model.matrix(~time,d)
 
 res1 = mixed.solve(d$y2,Z=Z1)
 res2 = mixed.solve(d$y2,Z=Z2)
 res3 = mixed.solve(d$y2,Z=Z3)
-res4 = mixed.solve(d$y2,Z=Z4,X = X4)
+res4 = mixed.solve(d$y2,Z=Z4)
 
 with(d,plot(time,y2))
 lines(d$time,Z1 %*% res1$u + res1$beta[1],col=1)
 lines(d$time,Z2 %*% res2$u + res2$beta[1],col=2)
 lines(d$time,Z3 %*% res3$u + res3$beta[1],col=3)
-lines(d$time,Z4 %*% res4$u + X4 %*% res4$beta,col=4)
+lines(d$time,Z4 %*% res4$u + res4$beta[1],col=4)
 
 
 # mean(Z1 %*% res1$u)
