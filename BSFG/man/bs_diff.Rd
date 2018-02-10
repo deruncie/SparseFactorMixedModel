@@ -6,7 +6,7 @@
 \usage{
 bs_diff(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
   Boundary.knots = range(x), differences = 1, periodic = FALSE,
-  center = TRUE)
+  center = TRUE, polyX = 0)
 }
 \arguments{
 \item{center}{}

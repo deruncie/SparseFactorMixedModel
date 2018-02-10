@@ -30,7 +30,7 @@ meff2 = get_posterior_FUN(BSFG_state,
                        {
                        ks = get_k(nrow(data),
                                   1/t(tot_Eta_prec[rep(1,k),]),
-                 di                 (Lambda_omega2[1]/tauh[rep(1,p),]),
+                                  (Lambda_omega2[1]/tauh[rep(1,p),]),
                                   Lambda_phi2)
                        colSums(1-ks)
                        })
