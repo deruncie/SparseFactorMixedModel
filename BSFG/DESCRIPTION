@@ -27,9 +27,11 @@ Imports:
   compiler,
   caret,
   coda,
-  GIGrvg
-Suggests:
+  GIGrvg,
   splines,
+  pbs,
+  MASS
+Suggests:
   knitr, 
   rmarkdown
 LinkingTo: 

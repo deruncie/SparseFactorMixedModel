@@ -1,7 +1,7 @@
 library(rrBLUP)
 
 d = data.frame(time = seq(1,24,length=30))
-d$y = sin(d$time/24*6)
+d$y = sin(d$time/24*6) + d$time*0
 d$y = d$y-mean(d$y)+1
 e = rnorm(nrow(d),0,.5);e=e-mean(e)
 d$y2 = d$y + e
@@ -9,7 +9,7 @@ with(d,plot(time,y2))
 
 
 
-Z1 = model.matrix(~0+pbs(d$time,df=10,intercept = F,Boundary.knots = c(0,24)))
+Z1 = model.matrix(~0+bs(d$time,df=10,intercept = F))
 Image(Z1,F)
 
 D1 = diag(1,ncol(Z1))
@@ -17,12 +17,16 @@ D1[lower.tri(D1)] = 1
 
 Z2 = Z1 %*% D1
 
-Z3 = Z1 %*% contr.sum(ncol(Z1))
-D3 = diag(1,ncol(Z3))
-D3[lower.tri(D3)] = 1
-diag(D3) = 0
+# Z3 = Z1 %*% contr.sum(ncol(Z1))
+# D3 = diag(1,ncol(Z3))
+# D3[lower.tri(D3)] = 1
+# diag(D3) = 0
 
-Z4 = Z3 %*% D3
+# Z4 = Z3 %*% D3
+Z3 = model.matrix(~0+b_spline(d$time,df=10,center=T,intercept = T)) %*% contr.sdif(9)
+Z3 = model.matrix(~0+bs(d$time,df=10)) %*% contr.sdif(10) %*% contr.sdif(9)
+
+Z4 = model.matrix(~0+b_spline(d$time,df=10,center=T,intercept = T))
 
 res1 = mixed.solve(d$y2,Z=Z1)
 res2 = mixed.solve(d$y2,Z=Z2)
@@ -30,69 +34,20 @@ res3 = mixed.solve(d$y2,Z=Z3)
 res4 = mixed.solve(d$y2,Z=Z4)
 
 with(d,plot(time,y2))
-lines(d$time,Z1 %*% res1$u + res1$beta[1],col=1)
-lines(d$time,Z2 %*% res2$u + res2$beta[1],col=2)
+# lines(d$time,Z1 %*% res1$u + res1$beta[1],col=1)
+# lines(d$time,Z2 %*% res2$u + res2$beta[1],col=2)
 lines(d$time,Z3 %*% res3$u + res3$beta[1],col=3)
-# lines(d$time,Z4 %*% res4$u + res4$beta[1],col=4)
-
-b_spline = function(x, df = NULL, knots = NULL, degree = 3, intercept = FALSE,
-                    Boundary.knots = range(x),
-                    differences = TRUE,
-                    center = FALSE
-) {
-  # following code from https://github.com/SurajGupta/r-source/blob/master/src/library/splines/R/splines.R
-  bs_X = bs(x,df,knots,degree,intercept,Boundary.knots)
-  X = bs_X
-  if(center){
-    X = X %*% contr.sum(ncol(X))
-  }
-  if(differences){
-    D = diag(1,ncol(X))
-    D[lower.tri(D)] = 1
-    diag(D) = 1
-    X = X %*% D
-  }
-  # X
-  bs_X_attributes = attributes(bs_X)
-  bs_X_attributes = bs_X_attributes[names(bs_X_attributes) %in% c('dim','dimnames') == F]
-  attributes(X) = c(attributes(X),bs_X_attributes)
-  attr(X,'differences') = differences
-  attr(X,'center') = center
-  class(X) = c('b_spline',class(X))
-  X
-}
-makepredictcall.b_spline <- function(var, call)
-{
-  if(as.character(call)[1L] != "b_spline") return(call)
-  at <- attributes(var)[c("degree", "knots", "Boundary.knots", "intercept","differences","center")]
-  xxx <- call[1L:2]
-  xxx[names(at)] <- at
-  xxx
-}
-
-model=y2~b_spline(time,df=10)
-# model=y2~bs(time,df=10)
-terms = delete.response(terms(model.frame(model,d)))
-m1 = model.matrix(model,d)
-m2 = model.matrix(terms,data.frame(time=d$time[1:4]))
-m2-m1[1:4,]
+lines(d$time,Z4 %*% res4$u + res4$beta[1],col=4)
 
 
-Z5 = model.matrix(~0+b_spline(d$time,df=ncol(Z1),intercept = T))
-# Z5 = sweep(Z5,1,apply(Z5,1,sd),'/')
-res5 = mixed.solve(d$y2,Z=Z5,bounds = c(1e-9,1e1))
-lines(d$time,Z5 %*% res5$u + res5$beta[1],col=5)
-
-mean(Z1 %*% res1$u)
-mean(Z2 %*% res2$u)
-mean(Z3 %*% res3$u)
+# mean(Z1 %*% res1$u)
+# mean(Z2 %*% res2$u)
+# mean(Z3 %*% res3$u)
 mean(Z4 %*% res4$u)
-mean(Z5 %*% res5$u)
 res1$beta
 res2$beta
 res3$beta
 res4$beta
-res5$beta
 
 obj_LL2 = function(sigma2,log_det,e2){
   -1/2*(length(e2)*log(2*pi*sigma2)+ log_det) - sum(e2/sigma2)/2
