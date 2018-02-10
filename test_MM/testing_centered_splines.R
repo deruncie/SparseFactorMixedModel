@@ -1,7 +1,9 @@
 library(rrBLUP)
+library(splines)
+library(MASS)
 
 d = data.frame(time = seq(1,24,length=30))
-d$y = sin(d$time/24*6) + d$time*0
+d$y = sin(d$time/24*6) + d$time*1
 d$y = d$y-mean(d$y)+1
 e = rnorm(nrow(d),0,.5);e=e-mean(e)
 d$y2 = d$y + e
@@ -23,10 +25,11 @@ Z2 = Z1 %*% D1
 # diag(D3) = 0
 
 # Z4 = Z3 %*% D3
-Z3 = model.matrix(~0+b_spline(d$time,df=10,center=T,intercept = T)) %*% contr.sdif(9)
-Z3 = model.matrix(~0+bs(d$time,df=10)) %*% contr.sdif(10) %*% contr.sdif(9)
+# Z3 = model.matrix(~0+bs_diff(d$time,df=10,center=T,intercept = T)) %*% contr.sdif(9)
+# Z3 = model.matrix(~0+bs_diff(d$time,df=10,center=T,intercept = T)) %*% cbind(1,contr.sdif(9)) #%*% cbind(1,contr.sdif(9))
+Z3 = model.matrix(~0+bs_diff(d$time,df=10,center=T,intercept = T,differences=2))
 
-Z4 = model.matrix(~0+b_spline(d$time,df=10,center=T,intercept = T))
+Z4 = model.matrix(~0+bs_diff(d$time,df=10,center=T,intercept = T,periodic = F))
 
 res1 = mixed.solve(d$y2,Z=Z1)
 res2 = mixed.solve(d$y2,Z=Z2)

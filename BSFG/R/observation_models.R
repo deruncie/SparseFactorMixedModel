@@ -151,7 +151,7 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
 #' @examples
 bs_diff = function(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
                     Boundary.knots = range(x),
-                    differences = TRUE,
+                    differences = 1,
                     periodic = FALSE,
                     center = TRUE
 ) {
@@ -166,10 +166,10 @@ bs_diff = function(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
     bs_X = splines::bs(x,df,knots,degree,intercept,Boundary.knots)
   }
   X = bs_X
-  if(differences){
-    contr = MASS::contr.sdif(ncol(X))
-    if(!center) contr = cbind(1,contr)
-    X = X %*% contr
+  diff = differences
+  while(diff > 0){
+    X = X %*% cbind(1,MASS::contr.sdif(ncol(X)))
+    diff = diff - 1
   }
   bs_X_attributes = attributes(bs_X)
   bs_X_attributes = bs_X_attributes[names(bs_X_attributes) %in% c('dim','dimnames') == F]

@@ -5,7 +5,7 @@
 \title{B spline basis with option of centering and differencing coefficients}
 \usage{
 bs_diff(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
-  Boundary.knots = range(x), differences = TRUE, periodic = FALSE,
+  Boundary.knots = range(x), differences = 1, periodic = FALSE,
   center = TRUE)
 }
 \arguments{
