@@ -646,6 +646,7 @@ BSFG_init2 = function(
     RE_setup[[i]] = within(RE_setup[[i]],{
       if(!'ZL' %in% ls()){
         if('K' %in% ls() && !is.null(K)){
+          id_names = rownames(K)
           ldl_k = LDL(K)
           large_d = ldl_k$d > run_parameters$K_eigen_tol
           r_eff = sum(large_d)
@@ -663,6 +664,7 @@ BSFG_init2 = function(
           rownames(K_inv) = rownames(K)
           rm(list=c('ldl_k','large_d','r_eff'))
         } else if ('K_inv' %in% ls() && !is.null(K_inv)){
+          id_names = rownames(K_inv)
           if(is.null(rownames(K_inv))) rownames(K_inv) = 1:nrow(K_inv)
           K = solve(K_inv)
           rownames(K) = rownames(K_inv)
@@ -670,11 +672,12 @@ BSFG_init2 = function(
         } else{
           K = as(diag(1,ncol(Z)),'dgCMatrix')
           rownames(K) = colnames(Z)
+          id_names = rownames(K)
           K_inv = K
           L = as(diag(1,nrow(K)),'dgCMatrix')
         }
-        if(is.null(rownames(K))) rownames(K) = 1:nrow(K)
-        rownames(L) = paste(rownames(K),re_name,sep='::')
+        if(is.null(id_names)) id_names = 1:length(id_names)
+        rownames(L) = paste(id_names,re_name,sep='::')
         K = fix_K(K)
         ZL = Z %*% L
       }

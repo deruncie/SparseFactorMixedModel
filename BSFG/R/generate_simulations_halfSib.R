@@ -2,11 +2,10 @@ z_transform = function(X) {
   X <- sweep(X,2,colMeans(X),'-')
   X <- sweep(X,2,apply(X,2,sd),'/')
 }
-halfSib_simulation = function(name = 'simulation_1', nSire,nRep,p, b, factor_h2s, prop_Factor_p = 0.5,total_h2 = 0.5,Vb = 0, numeff = NULL){
-  nTot = mean(nRep) * nSire
-  nRep = rep(nRep,nSire/length(nRep))
-  Sire = as.factor(do.call(c,lapply(1:nSire,function(x) rep(x,nRep[x]))))
-  K = .25*tcrossprod(Matrix(model.matrix(~0+Sire))) + diag(.75,length(Sire))
+family_simulation = function(name = 'simulation_1', family_sizes,within_group_cor = .25,p, b, factor_h2s, prop_Factor_p = 0.5,total_h2 = 0.5,Vb = 0, numeff = NULL){
+  nTot = sum(family_sizes)
+  Sire = as.factor(do.call(c,lapply(1:length(family_sizes),function(x) rep(x,family_sizes[x]))))
+  K = within_group_cor*tcrossprod(Matrix(model.matrix(~0+Sire))) + diag(1-within_group_cor,length(Sire))
   rownames(K) = 1:nrow(K)
 
   # for more informative K
@@ -60,8 +59,8 @@ halfSib_simulation = function(name = 'simulation_1', nSire,nRep,p, b, factor_h2s
   Z = diag(1,n)
 
 
-  U_F = t(K_chol) %*% z_transform(rstdnorm_mat(nTot,k))
-  E_F = z_transform(rstdnorm_mat(nTot,k))
+  U_F = sweep(t(K_chol) %*% z_transform(rstdnorm_mat(nTot,k)),2,sqrt(factor_h2s),'*')
+  E_F = sweep(z_transform(rstdnorm_mat(nTot,k)),2,sqrt(1-factor_h2s),'*')
   F = as.matrix(X_F %*% B_F + Z %*% U_F + E_F)
   F = z_transform(F)
 
