@@ -33,9 +33,15 @@ Z3 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,differences= 0)
   cbind(1/df,contr.sdif(df-1)) #%*%
   # cbind(1,rbind(1,cbind(1,contr.sdif(df-1))))
 
-Z1 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 3))
+Z1 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 1))
 Z2 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 1))
 Z4 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 4))
+# spline = bs_diff(d$time,df=df,center=T,intercept = T,periodic = F,differences = 3)
+# bk = attr(spline,'Boundary.knots')
+# kn = attr(spline,'knots')
+# knots = sort(c(rep(bk,4),kn))
+# Z1a = splines::splineDesign(knots = knots,x=d$time,ord=4,derivs = 3)
+# Z1 = model.matrix(~Z1a)
 
 # Z4 = model.matrix(~0+bs_diff(d$time,df=df,center=T,intercept = T,differences= 0)) %*% contr.sdif(df) %*% contr.sdif(df-1)
 # X4 = model.matrix(~time,d)
@@ -47,9 +53,9 @@ res4 = mixed.solve(d$y2,Z=Z4)
 
 with(d,plot(time,y2))
 lines(d$time,Z1 %*% res1$u + res1$beta[1],col=1)
-lines(d$time,Z2 %*% res2$u + res2$beta[1],col=2)
-lines(d$time,Z3 %*% res3$u + res3$beta[1],col=3)
-lines(d$time,Z4 %*% res4$u + res4$beta[1],col=4)
+# lines(d$time,Z2 %*% res2$u + res2$beta[1],col=2)
+# lines(d$time,Z3 %*% res3$u + res3$beta[1],col=3)
+# lines(d$time,Z4 %*% res4$u + res4$beta[1],col=4)
 
 
 # mean(Z1 %*% res1$u)
