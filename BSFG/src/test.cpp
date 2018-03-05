@@ -6,6 +6,22 @@
 // using namespace Eigen;
 // using namespace RcppParallel;
 //
+//
+// // [[Rcpp::export()]]
+// List LU_sparse(MSpMat A) {
+//   Eigen::SparseLU<SpMat> LU_A;
+//   LU_A.compute(A);
+//   MatrixXd P = MatrixXd::Identity(A.rows(), A.rows());
+//   MatrixXd L = LU_A.matrixU().m_mapU;
+//   VectorXd d = VectorXd::Ones(L.cols());
+//   return(List::create(
+//       Named("P") = P.sparseView(),
+//       Named("L") = LU_A.matr(),
+//       Named("d") = chol_A.vectorD()
+//   ));
+// }
+
+//
 // // [[Rcpp::export()]]
 // MatrixXd rstdnorm_mat2(int n,int p) {  // returns nxp matrix
 //   VectorXd X_vec = as<VectorXd>(rnorm(n*p));

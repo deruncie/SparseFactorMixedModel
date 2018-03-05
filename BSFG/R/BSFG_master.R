@@ -634,7 +634,7 @@ BSFG_init2 = function(
   # function to decompose K as K = PtLDLtP
   LDL = function(K) {
     res = LDLt_sparse(as(K,'dgCMatrix')) # actually calculates K = PtLDLtP
-    if(is.character(validObject(res$L,test=TRUE)[1])) {
+    if(is.character(validObject(res$L,test=TRUE)[1]) || max(res$d > 1e10) || min(res$d < -1e-10)) { # criteria to protect against bad solutions.
       res = LDLt_notSparse(as.matrix(K))  # sparse sometimes fails with non-PD K
     }
     res
