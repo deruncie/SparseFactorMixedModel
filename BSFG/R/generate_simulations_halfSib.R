@@ -101,7 +101,8 @@ family_simulation = function(name = 'simulation_1', family_sizes,within_group_co
     # E_R = E_R,
     name = name
   )
-  save(setup,file='setup.RData')
+  return(setup)
+  # save(setup,file='setup.RData')
 }
 
 new_halfSib_simulation = function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, Ve = 0.2,Vb = 0, numeff = NULL){
