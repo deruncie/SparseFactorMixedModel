@@ -415,6 +415,7 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
 	    # name of variance component
 	    name = term
 	    if(n_factors > 1) name = paste(name,RE_terms$cnms[[i]][[j]],sep='.')
+	    while(name %in% names(RE_setup)) name = paste0(name,'.1') # hack for when same RE used multiple times
 
 	    # Z matrix
 	    Z = as(Zs_term[[j]],'dgCMatrix')
