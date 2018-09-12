@@ -18,6 +18,11 @@ importFrom(abind,abind)
 importFrom(reshape2,melt)
 importFrom(coda,HPDinterval)
 importFrom(coda,mcmc)
+importFrom("grDevices", "colorRampPalette")
+importFrom("graphics", "boxplot")
+importFrom("stats", "as.formula", "median", "na.omit", "sd")
+importFrom("utils", "getTxtProgressBar", "setTxtProgressBar",
+           "txtProgressBar")
 importFrom("grDevices", "dev.list", "dev.new", "dev.off", "dev.set",
            "pdf")
 importFrom("graphics", "abline", "arrows", "axis", "barplot", "hist",
