@@ -21,7 +21,7 @@ library(BSFG)
 seed = 1  # for reproducibility
 nSire = 50 # simulation design is a half-sib design: each of nSire fathers has nRep children, each with a different female
 nRep = 10
-nTraits = 100
+nTraits = 10000
 nFixedEffects = 2 # fixed effects are effects on the factors
 nFactors = 10
 factor_h2s = c(rep(0,nFactors/2),rep(0.3,nFactors/2))  # factor_h2 is the % of variance in each factor trait that is explained by additive genetic variation.
@@ -53,7 +53,7 @@ run_parameters = BSFG_control(
   h2_divisions = 20, # Each variance component is allowed to explain between 0% and 100% of the total variation. How many segments should the range [0,100) be divided into for each random effect?
   h2_step_size = NULL, # if NULL, all possible values of random effects are tried each iteration. If in (0,1), a new candidate set of random effect proportional variances is drawn uniformily with a range of this size
   burn = 00,  # number of burn in samples before saving posterior samples
-  k_init = 15 # number of factors
+  k_init = 150 # number of factors
 )
 ```
 

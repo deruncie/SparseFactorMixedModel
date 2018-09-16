@@ -28,15 +28,68 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
       if(length(cols) == 0 || length(rows) == 0) next
 
       if(is.null(cis_genotypes)){
-        coefs = sample_MME_fixedEffects_c(Qt_list[[set]] %**% Eta_tilde[rows,cols,drop=FALSE],
-                                          cbind(QtX_list[[set]], Qt_list[[set]] %**% F[rows,,drop=FALSE]),
-                                          Sigma_Choleskys_list[[set]],
-                                          resid_h2_index[cols],
-                                          tot_Eta_prec[cols],
-                                          prior_mean[,cols,drop=FALSE],
-                                          prior_prec[,cols,drop=FALSE],
-                                          grainSize
+        library(microbenchmark)
+        QtE = Qt_list[[set]] %**% Eta_tilde[rows,cols,drop=FALSE]
+        QtX = cbind(QtX_list[[set]], Qt_list[[set]] %**% F[rows,,drop=FALSE])
+        Sigma_Choleskys_list_dense = list()
+        Sigma_Choleskys_list_dense[[1]] = lapply(Sigma_Choleskys_list[[1]],function(x) within(x,{chol_Sigma = as.matrix(chol_Sigma)}))
+        x = chol(tcrossprod(rstdnorm_mat(n,n)) + diag(1,n))
+        Sigma_Choleskys_list_dense[[1]][[1]]$chol_Sigma = x
+        Sigma_Choleskys_list[[1]][[1]]$chol_Sigma = as(x,'CsparseMatrix')
+        resid_h2_index[] = 1
+        microbenchmark(
+        # coefs = sample_MME_fixedEffects_c(QtE,
+        #                                   QtX,
+        #                                   Sigma_Choleskys_list[[set]],
+        #                                   resid_h2_index[cols],
+        #                                   tot_Eta_prec[cols],
+        #                                   prior_mean[,cols,drop=FALSE],
+        #                                   prior_prec[,cols,drop=FALSE],
+        #                                   grainSize
+        # ) ,
+        coefs2 = sample_MME_fixedEffects_c2(QtE,
+                                            QtX,
+                                            Sigma_Choleskys_list_dense[[set]],
+                                            resid_h2_index[cols],
+                                            tot_Eta_prec[cols],
+                                            prior_mean[,cols,drop=FALSE],
+                                            prior_prec[,cols,drop=FALSE],
+                                            grainSize
+        ),
+        coefs3 = sample_MME_fixedEffects_c3(QtE,
+                                            QtX,
+                                            Sigma_Choleskys_list_dense[[set]],
+                                            resid_h2_index[cols],
+                                            tot_Eta_prec[cols],
+                                            prior_mean[,cols,drop=FALSE],
+                                            prior_prec[,cols,drop=FALSE],
+                                            grainSize
+        ),
+        coefs4 = sample_MME_fixedEffects_c4(QtE,
+                                            QtX,
+                                            Sigma_Choleskys_list_dense[[set]],
+                                            resid_h2_index[cols],
+                                            tot_Eta_prec[cols],
+                                            prior_mean[,cols,drop=FALSE],
+                                            prior_prec[,cols,drop=FALSE],
+                                            grainSize
         )
+        ,times=2)
+        #
+        # microbenchmark({
+        # set.seed(1)
+        # x2=rstdnorm_mat2(n,p)
+        # },{
+        #   set.seed(1)
+        #   x3=rstdnorm_mat3(n,p)
+        # },{
+        #   set.seed(1)
+        #   x4=rstdnorm_mat4(n,p)
+        # },times=100)
+        # microbenchmark(
+        #   test_rstdnorm2(n,p),
+        #   test_rstdnorm3(n,p)
+        # )
         if(b > 0) {
           B[,cols] = coefs[1:b,,drop=FALSE]
         }
