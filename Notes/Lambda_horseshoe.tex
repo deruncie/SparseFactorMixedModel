@@ -18,6 +18,24 @@
 
 \begin{document}
 
+\subsection{Notes}
+ideas from reading Piironen and Vehtari (2017):
+\begin{itemize}
+	\item $\beta$ should be proportional to $\sigma$. This is important for setting the prior with m\textsubscript{eff}.
+	\item The calculation of  m\textsubscript{eff} is somewhat different for regularized horseshoe
+	\item A Gibbs sampler is fine for the regularized horseshoe thinking of it as a two-part prior for $\beta$
+	\item Should be able to use the Makalic / Rajaratnam method for simultaneously sampling $\beta$ and $\sigma^2$. This is not hugely more computationally difficult that sampling them separately. Does it help when $p << n$? Probably most helpful for eQTL.
+	\item prior for $c$ is still challenging. I think that the prior for the variance explained by $\bm{X}\bm{\beta}$ should be  $\mbox{m\textsubscript{eff}} \times c^2$, because the approximately m\textsubscript{eff} $\beta_j$ are approximatly distributed as $\mbox{N}(0,c^2)$. So, If we want the total variance to be 1 and fraction $\pi$ to be from $\bm{X}\bm{\beta}$, we should set $c = \pi / \mbox{m\textsubscript{eff}}$, and $\sigma^2 = (1-\pi)$.
+	\item This does mean that when $\tau^2 \rightarrow 0$ in the prior for $\beta_j$, the total variance of the factor will go to $(1-\pi)$. This suggests that maybe I don't want both $\tau$ and $pi$ to be parameters? But I do: I want both a prior on the fraction of variation explained by X, and a separate prior on the number of non-zero $\beta_j$. Maybe a prior with a large weight on $\pi = 0$ would address this? This would effectively ``turn off" $\bm{X\beta}$ for some factors. I think that as long as the prior on is decreasing, then if $\tau \rightarrow 0$, then $pi \rightarrow 0$.
+	\item It appears that the prior on the variance of $\bm{X\beta}$ is approximately $\mbox{m\textsubscript{eff}} \times c^2$ when m\textsubscript{eff} is large, but $\mbox{m\textsubscript{eff}} \times c$ when m\textsubscript{eff} is small.
+	\item What I'd like is for the prior to be on the variance of $\bm{X\beta}$ to be independent of $\tau$, so that we can explain the same percentage of variance with a few large effects or a bunch of small effects. This means that $c$ needs to be a function of $\tau$.
+	\item This would be hard to do directly, because then the posterior of $\tau$ would depend on $c$, and this is unlikely to be conjugate.
+	\item But, if $c$ is specific to each factor and $\tau$ is general across factors, then this isn't a huge problem. At least, it should be constant across factors.
+	\
+\end{itemize}
+
+
+
 We propose an ``Sparse Infinite Factor Model" based on the horseshoe prior. 
 The horsehoe prior is a popular choice for inducing approximate sparsity in the coefficients of a regression model. 
 Bhattarcharya and Dunson (2011) proposed an ``Infinite factor model" by ordering the latent factors from most-to-least

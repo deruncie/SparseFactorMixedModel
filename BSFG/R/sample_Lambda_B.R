@@ -47,15 +47,15 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
         #                                   prior_prec[,cols,drop=FALSE],
         #                                   grainSize
         # ) ,
-        coefs2 = sample_MME_fixedEffects_c2(QtE,
-                                            QtX,
-                                            Sigma_Choleskys_list_dense[[set]],
-                                            resid_h2_index[cols],
-                                            tot_Eta_prec[cols],
-                                            prior_mean[,cols,drop=FALSE],
-                                            prior_prec[,cols,drop=FALSE],
-                                            grainSize
-        ),
+        # coefs2 = sample_MME_fixedEffects_c2(QtE,
+        #                                     QtX,
+        #                                     Sigma_Choleskys_list_dense[[set]],
+        #                                     resid_h2_index[cols],
+        #                                     tot_Eta_prec[cols],
+        #                                     prior_mean[,cols,drop=FALSE],
+        #                                     prior_prec[,cols,drop=FALSE],
+        #                                     grainSize
+        # ),
         coefs3 = sample_MME_fixedEffects_c3(QtE,
                                             QtX,
                                             Sigma_Choleskys_list_dense[[set]],
@@ -73,8 +73,17 @@ sample_Lambda_B = function(BSFG_state,grainSize = 1,...) {
                                             prior_mean[,cols,drop=FALSE],
                                             prior_prec[,cols,drop=FALSE],
                                             grainSize
+        ),
+        coefs5 = sample_MME_fixedEffects_c5(QtE,
+                                            QtX,
+                                            Sigma_Choleskys_list_dense[[set]],
+                                            resid_h2_index[cols],
+                                            tot_Eta_prec[cols],
+                                            prior_mean[,cols,drop=FALSE],
+                                            prior_prec[,cols,drop=FALSE],
+                                            grainSize
         )
-        ,times=2)
+        ,times=4)
         #
         # microbenchmark({
         # set.seed(1)

@@ -630,3 +630,77 @@ MatrixXd sample_MME_fixedEffects_c5(  // returns bxp matrix
   return(coefs);
 }
 
+
+
+
+// [[Rcpp::export()]]
+VectorXd sample_MME_block(  // returns b x 1 vector
+    VectorXd y,           // nx1
+    MatrixXd X,           // nxb
+    VectorXd prior_mean,  // bx1
+    VectorXd prior_prec,  // bx1
+    MSpMat chol_R,        // nxn upper triangular Cholesky decomposition of R. Format: dgCMatrix
+    VectorXd randn_theta, // bx1
+    VectorXd randn_e,      // 0x1 or nx1. 0x1 if b<n
+    double rgamma_1
+){
+  if(randn_e.size() == 0){
+    MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);
+    VectorXd RinvSqy = chol_R.transpose().triangularView<Lower>().solve(y);
+    VectorXd XtRinvy = RinvSqX.transpose() * RinvSqy;
+
+    MatrixXd C = RinvSqX.transpose() * RinvSqX;
+    C.diagonal() += prior_prec;
+    LLT<MatrixXd> C_llt;
+    C_llt.compute(C);
+    MatrixXd chol_C = C_llt.matrixU();
+
+    VectorXd prod1 = chol_C.transpose().triangularView<Lower>().solve(XtRinvy);
+    double score = (RinvSqy.dot(RinvSqy) - prod1.dot(prod1))/2;
+    double tot_Eta_prec = rgamma_1/score;
+
+    VectorXd XtRinvy_std_mu = XtRinvy*tot_Eta_prec + prior_prec.asDiagonal()*prior_mean;
+    VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu) / sqrt(tot_Eta_prec);
+    b += randn_theta;
+    b = chol_C.triangularView<Upper>().solve(b) / sqrt(tot_Eta_prec);
+
+    VectorXd result(b.size() + 1);
+    result << tot_Eta_prec,b;
+    return(result);
+  } else {
+    // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
+    MatrixXd Phi = chol_R.transpose().triangularView<Lower>().solve(X);
+    VectorXd alpha = chol_R.transpose().triangularView<Lower>().solve(y);
+
+    MatrixXd D_PhiT = prior_prec.cwiseInverse().asDiagonal() * Phi.transpose();
+    MatrixXd cov = Phi * D_PhiT;
+    cov.diagonal().array() += 1.0;
+
+    LDLT<MatrixXd> cov_ldlt;
+    cov_ldlt.compute(cov);
+
+    VectorXd prod1 = cov_ldlt.solve(alpha);
+    double score = alpha.dot(prod1)/2;
+    double tot_Eta_prec = rgamma_1/score;
+
+    Phi *= sqrt(tot_Eta_prec);
+    alpha *= sqrt(tot_Eta_prec);
+    D_PhiT /= sqrt(tot_Eta_prec);
+
+    VectorXd u = randn_theta.array() / (prior_prec * tot_Eta_prec).cwiseSqrt().array();
+    u += prior_mean;
+    VectorXd v = Phi * u + randn_e;
+    VectorXd alpha_v = alpha-v;
+
+    VectorXd w = cov_ldlt.solve(alpha_v);
+
+    VectorXd theta = u + D_PhiT * w;
+
+    VectorXd result(theta.size() + 1);
+    result << tot_Eta_prec,theta;
+    return(result);
+  }
+}
+
+
+
