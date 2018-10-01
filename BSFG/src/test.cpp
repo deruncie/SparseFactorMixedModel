@@ -631,8 +631,6 @@ MatrixXd sample_MME_fixedEffects_c5(  // returns bxp matrix
 }
 
 
-
-
 // [[Rcpp::export()]]
 VectorXd sample_MME_block(  // returns b x 1 vector
     VectorXd y,           // nx1
@@ -704,3 +702,869 @@ VectorXd sample_MME_block(  // returns b x 1 vector
 
 
 
+MatrixXd get_RinvSqX(SEXP chol_R_, MatrixXd X){
+  MatrixXd RinvSqX;
+  if(Rf_isMatrix(chol_R_)) {
+    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+    RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);// * sqrt(tot_Eta_prec));
+  } else{
+    MSpMat chol_R = as<MSpMat>(chol_R_);
+    RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);// * sqrt(tot_Eta_prec));
+  }
+  return(RinvSqX);
+}
+
+
+VectorXd regression_sampler_v1(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b < n
+    const Ref<const VectorXd>& y,           // nx1
+    const MatrixXd& W,           // nxa
+    const MatrixXd& RinvSqX,                // nxb
+    const MatrixXd& C,                     // bxb
+    const VectorXd& prior_prec_alpha, // ax 1
+    const Ref<const VectorXd>& prior_mean_beta,  // bx1
+    const Ref<const VectorXd>& prior_prec_beta,  // bx1
+    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    double Y_prec,                    // double
+    const VectorXd& randn_alpha,
+    const Ref<const VectorXd>& randn_beta,
+    const double rgamma_1,
+    const double Y_prec_b0
+){
+  int n = y.size();
+  int a = W.cols();
+  int b = RinvSqX.cols();
+
+  // Check inputs
+  if(W.rows() != n) stop("Wrong dimension of W");
+  if(RinvSqX.rows() != n) stop("Wrong dimension of X");
+  if(C.rows() != b || C.cols() != b) stop("Wrong dimension of C");
+  if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+  if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+  if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+  if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+  if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+
+  // Calculate cholesky of A_beta
+  // C = Xt(RtR)^-1X
+  MatrixXd C_beta = C;
+  C_beta.diagonal() += prior_prec_beta;
+  LLT<MatrixXd> A_beta_llt;
+  A_beta_llt.compute(C_beta);
+  MatrixXd chol_A_beta = A_beta_llt.matrixU();
+  // Y_prec * chol_A_beta^\T * chol_A_beta = A_beta
+
+  // Step 1
+  VectorXd alpha(a);
+  VectorXd y_tilde = y;
+  if(a > 0) {
+    // Sample alpha
+    // Calculate A_alpha = Y_prec*W^T*Sigma_beta^{-1}*W + D_alpha^{-1}
+    // We don't need to actually calculate Sigma_beta^{-1} directly.
+    MatrixXd RinvSqW = get_RinvSqX(chol_R_,W);  // n*n*a -> n x a
+    MatrixXd WtRinvX = RinvSqW.transpose() * RinvSqX; // a*n*b -> a*b
+    MatrixXd invSqAbXtRinvW = chol_A_beta.transpose().triangularView<Lower>().solve(WtRinvX.transpose()); // b*b*a -> b x a
+
+    MatrixXd A_alpha = Y_prec * (RinvSqW.transpose() * RinvSqW - invSqAbXtRinvW.transpose() * invSqAbXtRinvW);
+    A_alpha.diagonal() += prior_prec_alpha;
+
+    LLT<MatrixXd> A_alpha_llt;
+    A_alpha_llt.compute(A_alpha);
+    MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+
+    VectorXd Rinvsqy = get_RinvSqX(chol_R_,y); // n*n*q -> n x 1;
+    VectorXd XtRinvy = RinvSqX.transpose() * Rinvsqy; // b*n*1 >- b x 1
+    VectorXd invSqAbXtRinvy = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy); // b*b*1 -> b*1
+
+    VectorXd WtSbinvy = RinvSqW.transpose() * Rinvsqy - invSqAbXtRinvW.transpose() * invSqAbXtRinvy;
+
+    alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+    alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+    y_tilde = y - W * alpha;
+  }
+
+  // Step 2 - sample Y_prec
+  // We don't need to actually calculate Sigma_beta^{-1} directly.
+  VectorXd RinvSqy = get_RinvSqX(chol_R_,y_tilde);
+  VectorXd XtRinvy = RinvSqX.transpose() * RinvSqy;
+  VectorXd prod1 = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy);
+  double score = Y_prec_b0 + (RinvSqy.dot(RinvSqy) - prod1.dot(prod1))/2;
+  Y_prec = rgamma_1/score;
+
+  // Step 3 - sample beta
+  VectorXd XtRinvy_std_mu = XtRinvy*Y_prec + prior_prec_beta.asDiagonal()*prior_mean_beta;
+  VectorXd beta = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy_std_mu) / sqrt(Y_prec) + randn_beta;
+  beta = chol_A_beta.triangularView<Upper>().solve(beta) / sqrt(Y_prec);
+
+  VectorXd result(1+a+b);
+  result << Y_prec,alpha,beta;
+
+  return(result);
+}
+
+
+VectorXd regression_sampler_v2(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b > n
+    const Ref<const VectorXd>& y,           // nx1
+    const MatrixXd& W,           // nxa
+    const MatrixXd& X,           // nxm or nxb
+    const VectorXd& prior_prec_alpha, // ax 1
+    const Ref<const VectorXd>& prior_mean_beta,  // bx1
+    const Ref<const VectorXd>& prior_prec_beta,  // bx1
+    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const MatrixXd& R,
+    double Y_prec,                    // double
+    const VectorXd& randn_alpha,
+    const Ref<const VectorXd>& randn_beta,
+    const Ref<const VectorXd>& randn_e,
+    const double rgamma_1,
+    const double Y_prec_b0
+){
+  int n = y.size();
+  int a = W.cols();
+  int b = X.cols();
+
+  // Check inputs
+  if(W.rows() != n) stop("Wrong dimension of W");
+  if(X.rows() != n) stop("Wrong dimension of X");
+  if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+  if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+  if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+  if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+  if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+
+  // Calculate inverse of Sigma_beta
+  MatrixXd DXt = prior_prec_beta.cwiseInverse().asDiagonal() * X.transpose();
+  MatrixXd Sigma_beta = X * DXt + R;
+  LDLT<MatrixXd> Sigma_beta_ldlt;
+  Sigma_beta_ldlt.compute(Sigma_beta);
+
+  // Step 1
+  VectorXd alpha(a);
+  VectorXd y_tilde = y;
+  if(a > 0) {
+    // Sample alpha
+    MatrixXd SbinvW = Sigma_beta_ldlt.solve(W);
+    MatrixXd A_alpha = Y_prec * SbinvW.transpose() * W;
+    A_alpha.diagonal() += prior_prec_alpha;
+
+    LLT<MatrixXd> A_alpha_llt;
+    A_alpha_llt.compute(A_alpha);
+    MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+
+    VectorXd WtSbinvy = SbinvW.transpose() * y;
+    alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+    alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+    y_tilde = y - W * alpha;
+  }
+
+  // Step 2 - sample Y_prec
+  VectorXd e2 = y_tilde.transpose() * Sigma_beta_ldlt.solve(y_tilde);
+  double score = Y_prec_b0 + e2[0]/2;
+  Y_prec = rgamma_1/score;
+
+  // Step 3 - sample beta
+  // what about prior mean?
+  VectorXd u = randn_beta.array() / (prior_prec_beta * Y_prec).cwiseSqrt().array() + prior_mean_beta.array();
+  VectorXd v = sqrt(Y_prec) * X * u;
+  if(Rf_isMatrix(chol_R_)) {
+    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  } else{
+    MSpMat chol_R = as<MSpMat>(chol_R_);
+    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  }
+  VectorXd w = Sigma_beta_ldlt.solve(y_tilde * sqrt(Y_prec) - v);
+  VectorXd beta = u + DXt * w / sqrt(Y_prec);
+
+  VectorXd result(1+a+b);
+  result << Y_prec,alpha,beta;
+
+  return(result);
+}
+
+
+VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b > n > m
+    const Ref<const VectorXd>& y,           // nx1
+    const MatrixXd& W,           // nxa
+    const MatrixXd& U,           // nxm or nxb
+    const MatrixXd& V,           // mxb
+    const VectorXd& prior_prec_alpha, // ax 1
+    const Ref<const VectorXd>& prior_mean_beta,  // bx1
+    const Ref<const VectorXd>& prior_prec_beta,  // bx1
+    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const MatrixXd& Rinv,
+    const MatrixXd& RinvU,
+    const MatrixXd& UtRinvU,
+    double Y_prec,                    // double
+    const VectorXd& randn_alpha,
+    const Ref<const VectorXd>& randn_beta,
+    const Ref<const VectorXd>& randn_e,
+    const double rgamma_1,
+    const double Y_prec_b0
+){
+  int n = y.size();
+  int a = W.cols();
+  if(V.rows() != U.cols()) stop("Wrong dimensions of V");
+  MatrixXd X = U*V;
+  int b = X.cols();
+
+  // Check inputs
+  if(W.rows() != n) stop("Wrong dimension of W");
+  if(X.rows() != n) stop("Wrong dimension of X");
+  if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+  if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+  if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+  if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+  if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+
+  // Calculate inverse of Sigma_beta
+  // MatrixXd Sigma_beta_inv;
+  MatrixXd DVt = prior_prec_beta.cwiseInverse().asDiagonal() * V.transpose();
+  if(RinvU.rows() != n) stop("Wrong dimensions of RinvU");
+  MatrixXd inner = (V * DVt).inverse() + UtRinvU;
+  LDLT<MatrixXd> inner_ldlt;
+  inner_ldlt.compute(inner);
+  // Sigma_beta_inv = Rinv - RinvU * inner.ldlt().solve(RinvU.transpose());  // Don't actually calculate this. Stay in mxm space
+
+  // Step 1
+  VectorXd alpha(a);
+  VectorXd y_tilde = y;
+  if(a > 0) {
+    // Sample alpha
+    // MatrixXd SbinvW = Sigma_beta_inv * W;
+    // MatrixXd A_alpha = Y_prec * SbinvW.transpose() * W;
+    MatrixXd RinvW = Rinv * W;
+    MatrixXd UtRinvW = U.transpose() * RinvW;
+    MatrixXd A_alpha = Y_prec * (W.transpose() * RinvW - UtRinvW.transpose() * inner_ldlt.solve(UtRinvW));
+    A_alpha.diagonal() += prior_prec_alpha;
+
+    LLT<MatrixXd> A_alpha_llt;
+    A_alpha_llt.compute(A_alpha);
+    MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+
+    // VectorXd WtSbinvy = SbinvW.transpose() * y;
+    VectorXd UtRinvy = RinvU.transpose() * y;
+    VectorXd WtSbinvy = RinvW.transpose() * y - UtRinvW.transpose() * inner_ldlt.solve(UtRinvy);
+
+    alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+    alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+    y_tilde = y - W * alpha;
+  }
+
+  // Step 2 - sample Y_prec
+  // VectorXd e2 = y_tilde.transpose() * Sigma_beta_inv * y_tilde;
+  VectorXd Rinv_y = Rinv * y_tilde;
+  VectorXd UtRinvy = RinvU.transpose() * y_tilde;
+  VectorXd e2 = y_tilde.transpose() * Rinv_y - UtRinvy.transpose() * inner_ldlt.solve(UtRinvy);
+
+  double score = Y_prec_b0 + e2[0]/2;
+  Y_prec = rgamma_1/score;
+
+  // Step 3 - sample beta
+  // what about prior mean?
+  VectorXd u = randn_beta.array() / (prior_prec_beta * Y_prec).cwiseSqrt().array() + prior_mean_beta.array();
+  VectorXd v = sqrt(Y_prec) * X * u;
+  if(Rf_isMatrix(chol_R_)) {
+    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  } else{
+    MSpMat chol_R = as<MSpMat>(chol_R_);
+    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  }
+  // VectorXd w = Sigma_beta_inv * (y_tilde * sqrt(Y_prec) - v);
+  VectorXd e = y_tilde * sqrt(Y_prec) - v;
+  VectorXd UtRinve = RinvU.transpose() * e;
+  VectorXd w = Rinv * e - RinvU * inner_ldlt.solve(UtRinve);
+
+  VectorXd beta = u + DVt * (U.transpose() * w) / sqrt(Y_prec); //b*b*1 + b*n*1
+
+  VectorXd result(1+a+b);
+  result << Y_prec,alpha,beta;
+
+  return(result);
+}
+
+
+
+struct regression_sampler_worker : public RcppParallel::Worker {
+  const int sampler;  // which sampler to use?
+  const IntegerVector& trait_set;
+  const Map<MatrixXd> Y;           // nx1
+  const Map<MatrixXd> W_base;           // nxa
+  const Rcpp::List W_list;           // nxa
+  const Map<MatrixXd> X_U;   // could be X or U.
+  const Map<MatrixXd> V;
+  const MatrixXd RinvSqX;                // nxb
+  const MatrixXd& C;                     // bxb
+  SEXP chol_R_;                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+  const MatrixXd& R;
+  const MatrixXd& Rinv;
+  const MatrixXd& RinvU;
+  const MatrixXd& UtRinvU;
+  const Map<MatrixXd> prior_prec_alpha1; // a1 x p matrix of prior precisions for alpha1
+  const VectorXd& prior_prec_alpha2;     // p-vector of precision of alpha2s for each trait
+  const Map<MatrixXd> prior_mean_beta; // b x p matrix of prior means of beta
+  const Map<MatrixXd> prior_prec_beta; // b x p matrix of prior precisions of beta
+  double Y_prec_b0;
+
+  const MatrixXd& randn_alpha1;
+  const std::vector<VectorXd>& randn_alpha2;
+  const MatrixXd& randn_beta;
+  const MatrixXd& randn_e;
+  const VectorXd& rgamma_1;
+
+  MatrixXd& alpha1;
+  Rcpp::List alpha2;
+  MatrixXd& beta;
+  VectorXd& Y_prec;
+
+  regression_sampler_worker(
+    const int sampler,
+    const Rcpp::IntegerVector& trait_set,
+    const Map<MatrixXd> Y,           // nx1
+    const Map<MatrixXd> W_base,           // nxa
+    const Rcpp::List W_list,           // nxa
+    const Map<MatrixXd> X_U,
+    const Map<MatrixXd> V,
+    const MatrixXd RinvSqX,                // nxb
+    const MatrixXd& C,                     // bxb
+    SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const MatrixXd& R,
+    const MatrixXd& Rinv,
+    const MatrixXd& RinvU,
+    const MatrixXd& UtRinvU,
+    const Map<MatrixXd> prior_prec_alpha1, // a1 x p matrix of prior precisions for alpha1
+    const VectorXd& prior_prec_alpha2,     // p-vector of precision of alpha2s for each trait
+    const Map<MatrixXd> prior_mean_beta, // b x p matrix of prior means of beta
+    const Map<MatrixXd> prior_prec_beta, // b x p matrix of prior precisions of beta
+    double Y_prec_b0,
+    const MatrixXd& randn_alpha1,
+    const std::vector<VectorXd>& randn_alpha2,
+    const MatrixXd& randn_beta,
+    const MatrixXd& randn_e,
+    const VectorXd& rgamma_1,
+    MatrixXd& alpha1,
+    Rcpp::List alpha2,
+    MatrixXd& beta,
+    VectorXd& Y_prec
+  ):
+    sampler(sampler), trait_set(trait_set),
+    Y(Y), W_base(W_base), W_list(W_list), X_U(X_U), V(V), RinvSqX(RinvSqX),
+    C(C), chol_R_(chol_R_), R(R), Rinv(Rinv), RinvU(RinvU), UtRinvU(UtRinvU),
+    prior_prec_alpha1(prior_prec_alpha1), prior_prec_alpha2(prior_prec_alpha2), prior_mean_beta(prior_mean_beta), prior_prec_beta(prior_prec_beta),
+    Y_prec_b0(Y_prec_b0),
+    randn_alpha1(randn_alpha1), randn_alpha2(randn_alpha2), randn_beta(randn_beta), randn_e(randn_e), rgamma_1(rgamma_1),
+    alpha1(alpha1), alpha2(alpha2), beta(beta), Y_prec(Y_prec)
+    {}
+
+  void operator()(std::size_t begin, std::size_t end) {
+    int n = Y.rows();
+    int a1 = W_base.cols();
+
+    for(std::size_t i = begin; i < end; i++){
+      int j = trait_set[i];
+      MatrixXd W;
+      int a;
+      int a2 = 0;
+      int b;
+      VectorXd prior_prec_alpha;
+      VectorXd randn_alpha;
+      if(W_list.length() == 0) {
+        W = W_base;
+        a = a1;
+        prior_prec_alpha = prior_prec_alpha1.col(j);
+        randn_alpha = randn_alpha1.col(j);
+      } else{
+        Map<MatrixXd> W2 = as<Map<MatrixXd> >(W_list[j]);
+        a2 = W2.cols();
+        a = a1+a2;
+        W = MatrixXd(n,a);
+        W << W_base,W2;
+        prior_prec_alpha = VectorXd(a);
+        prior_prec_alpha.head(a1) = prior_prec_alpha1.col(j);
+        prior_prec_alpha.tail(a2).array() = prior_prec_alpha2[j];
+        randn_alpha = VectorXd(a);
+        randn_alpha.head(a1) = randn_alpha1.col(j);
+        randn_alpha.tail(a2) = randn_alpha2[j];
+      }
+
+      VectorXd samples;
+      if(sampler == 1) {
+        b = RinvSqX.cols();
+        samples = regression_sampler_v1(Y.col(j), W, RinvSqX, C, prior_prec_alpha, prior_mean_beta.col(j),
+                                               prior_prec_beta.col(j), chol_R_, Y_prec[j], randn_alpha,
+                                               randn_beta.col(j), rgamma_1[j],Y_prec_b0);
+      } else if(sampler == 2) {
+        b = X_U.cols();
+        samples = regression_sampler_v2(Y.col(j), W, X_U, prior_prec_alpha, prior_mean_beta.col(j),
+                                        prior_prec_beta.col(j), chol_R_, R, Y_prec[j], randn_alpha,
+                                        randn_beta.col(j), randn_e.col(j),rgamma_1[j],Y_prec_b0);
+      } else if(sampler == 3) {
+        b = V.cols();
+        samples = regression_sampler_v3(Y.col(j), W, X_U, V, prior_prec_alpha, prior_mean_beta.col(j),
+                                        prior_prec_beta.col(j), chol_R_, Rinv, RinvU, UtRinvU, Y_prec[j], randn_alpha,
+                                        randn_beta.col(j), randn_e.col(j),rgamma_1[j],Y_prec_b0);
+
+      } else {
+        stop("sampler not implemented");
+      }
+
+      // extract samples
+      Y_prec[j] = samples[0];
+      if(a1 > 0) alpha1.col(j) = samples.segment(1,a1);
+      if(a2 > 0) alpha2[j] = samples.segment(1+a1,a2);
+      if(b > 0) beta.col(j) = samples.tail(b);
+    }
+  }
+};
+
+
+
+// [[Rcpp::export]]
+Rcpp::IntegerVector which(Rcpp::LogicalVector x) {
+  Rcpp::IntegerVector v = Rcpp::seq(0, x.size()-1);
+  return v[x];
+}
+
+// [[Rcpp::export]]
+Rcpp::List regression_sampler_parallel(
+  Map<MatrixXd> Y,               // n x p matrix of observations
+  Map<MatrixXd> W_base,          // n x a1 matrix of W covariates common to all p. Can be NULL
+  Rcpp::List W_list,             // p-list of n x a2 matrices of W covariates unique to each p. Can be NULL
+  Map<MatrixXd> X,               // either X, a n x b matrix, or U, a n x m matrix. If U, then V must be non-NULL
+  SEXP V_,                       // m x b matrix if X is U
+  Rcpp::IntegerVector h2s_index, // p-vector of indices for appropriate V of each trait
+  Rcpp::List chol_V_list,        // list of cholesky decompositions of V: RtR (each nxn). Can be either dense or sparse
+  VectorXd Y_prec,               // p-vector of Y current precisions
+  double Y_prec_a0,
+  double Y_prec_b0,
+  Map<MatrixXd> prior_prec_alpha1, // a1 x p matrix of prior precisions for alpha1
+  VectorXd prior_prec_alpha2,     // p-vector of precision of alpha2s for each trait
+  Map<MatrixXd> prior_mean_beta, // b x p matrix of prior means of beta
+  Map<MatrixXd> prior_prec_beta, // b x p matrix of prior precisions of beta
+  int grainSize) {
+
+  int n = Y.rows();
+  int p = Y.cols();
+
+  // W_base
+  if(W_base.rows() != n) stop("Wrong dimension of W_base");
+  int a1 = W_base.cols();
+
+  // W_list
+  if(W_list.size() > 0) {
+    if(W_list.size() != p) stop("Wrong length of W_list");
+  }
+
+  // X or U and V
+  Map<MatrixXd> U = X;
+  MatrixXd z = MatrixXd::Zero(0,0);
+  Map<MatrixXd> V(z.data(),0,0);
+  int b = X.cols();
+  if(X.rows() != n) stop("Wrong dimension of X");
+  if(Rf_isMatrix(V_)) {
+    // Map<MatrixXd> V__ = as<Map<MatrixXd> >(V_);
+    // new (&v) Map<MatrixXd> (V__,V__.rows(),V__.cols());
+    new (&V) Map<MatrixXd> (as<Map<MatrixXd> >(V_));
+    if(U.cols() != V.rows()) stop("X and V_ have incompatible dimensions");
+    b = V.cols();
+  }
+
+  // chol_V_list
+  if(max(h2s_index) > chol_V_list.size()) {
+    stop("max(h2s_index) > length(chol_V_list)");
+  }
+
+  // priors
+  if(Y_prec.size() != p) {
+    stop("Wrong length of Y_prec");
+  }
+  if(prior_prec_alpha1.rows() != a1 || prior_prec_alpha1.cols() != p) stop("Wrong dimensions of prior_prec_alpha1");
+  if(prior_prec_alpha2.size() != p) {
+    stop("Wrong length of prior_prec_alpha2");
+  }
+  if(prior_mean_beta.rows() != b || prior_mean_beta.cols() != p) stop("Wrong dimensions of prior_mean_beta");
+  if(prior_prec_beta.rows() != b || prior_prec_beta.cols() != p) stop("Wrong dimensions of prior_prec_beta");
+
+  // generate random numbers
+  MatrixXd randn_alpha1 = rstdnorm_mat2(a1,p);
+  std::vector<VectorXd> randn_alpha2;
+  if(W_list.size() > 0){
+    for(int i = 0; i < p; i++){
+      Map<MatrixXd> W2 = as<Map<MatrixXd> >(W_list[i]);
+      randn_alpha2.push_back(rstdnorm_mat2(W2.cols(),1));
+    }
+  }
+  MatrixXd randn_beta = rstdnorm_mat2(b,p);
+  MatrixXd randn_e;
+  if(b > n) {
+    randn_e = rstdnorm_mat2(n,p);
+  }
+  VectorXd rgamma_1 = as<VectorXd>(rgamma(p,Y_prec_a0 + n/2.0,1.0));
+
+  // Results structures
+  MatrixXd alpha1(a1,p);
+  Rcpp::List alpha2(W_list.size());
+  MatrixXd beta(b,p);
+
+  // go through h2s indices and sample columns with same index as a set
+  for(int i = min(h2s_index); i <= max(h2s_index); i++) {
+    int h2_index = i;
+    IntegerVector trait_set = which(h2s_index == h2_index);  // list of traits with same h2_index
+
+    if(trait_set.size() > 0){
+      // prepare matrices for sampler
+      MatrixXd RinvSqX, C, R, Rinv, RinvU, UtRinvU;
+      SEXP chol_R_ = chol_V_list[h2_index - 1];
+      int which_sampler;
+      // Decide which sampler to use
+      if(b <= n) {
+        // use regression_sampler_v1
+        which_sampler = 1;
+        if(Rf_isMatrix(chol_R_)) {
+          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+          RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);
+        } else{
+          MSpMat chol_R = as<MSpMat>(chol_R_);
+          RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);
+        }
+        C = RinvSqX.transpose() * RinvSqX;
+      }
+      else if(V.cols() == 0) {
+        // use regression_sampler_v2
+        which_sampler = 2;
+        if(Rf_isMatrix(chol_R_)) {
+          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+          R = chol_R.transpose().triangularView<Lower>() * chol_R;
+        } else{
+          MSpMat chol_R = as<MSpMat>(chol_R_);
+          R = chol_R.transpose().triangularView<Lower>() * chol_R;
+        }
+      } else {
+        // use regression_sampler_v3
+        which_sampler = 3;
+        if(Rf_isMatrix(chol_R_)) {
+          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+          Rinv = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
+          RinvU = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(U));
+        } else{
+          MSpMat chol_R = as<MSpMat>(chol_R_);
+          Rinv = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
+          RinvU = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(U));
+        }
+        UtRinvU = U.transpose() * RinvU;
+      }
+      regression_sampler_worker sampler(which_sampler, trait_set,Y,W_base,W_list,X,V,RinvSqX,C,
+                                        chol_R_,R,Rinv,RinvU,UtRinvU,
+                                        prior_prec_alpha1,prior_prec_alpha2,prior_mean_beta,prior_prec_beta,Y_prec_b0,
+                                        randn_alpha1,randn_alpha2,randn_beta,randn_e, rgamma_1,
+                                        alpha1,alpha2,beta,Y_prec);
+      RcppParallel::parallelFor(0,trait_set.size(),sampler,grainSize);
+    }
+  }
+  return(Rcpp::List::create(
+      Named("alpha1") = alpha1,
+      Named("alpha2") = alpha2,
+      Named("beta") = beta,
+      Named("Y_prec") = Y_prec
+           ));
+}
+
+
+
+// // [[Rcpp::export()]]
+// VectorXd regression_sampler_v2a(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b > n
+//     VectorXd y,           // nx1
+//     MatrixXd W,           // nxa
+//     MatrixXd RinvSqX,                // nxb
+//     VectorXd prior_prec_alpha, // ax 1
+//     VectorXd prior_mean_beta,  // bx1
+//     VectorXd prior_prec_beta,  // bx1
+//     SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+//     double Y_prec,                    // double
+//     VectorXd randn_alpha,
+//     VectorXd randn_beta,
+//     VectorXd randn_e,
+//     double rgamma_1,
+//     double Y_prec_b0
+// ){
+//   int n = y.size();
+//   int a = W.cols();
+//   int b = RinvSqX.cols();
+//
+//   // Check inputs
+//   if(W.rows() != n) stop("Wrong dimension of W");
+//   if(RinvSqX.rows() != n) stop("Wrong dimension of X");
+//   if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+//   if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+//   if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+//   if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+//   if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+//
+//   // Calculate cholesky of Sigma_beta
+//
+//   // form LinvXDbXtLit + I -> LDLt -> Sbinv
+//   MatrixXd RinvSqX_D = RinvSqX * prior_prec_beta.cwiseInverse().asDiagonal();
+//   MatrixXd A_w = RinvSqX_D * RinvSqX.transpose();
+//   A_w.diagonal().array() += 1.0;
+//   LDLT<MatrixXd> A_w_ldlt;
+//   A_w_ldlt.compute(A_w);
+//   // Sigma_beta_inv = chol_R * A_w_ldlt.solve(chol_R.transpose())
+//
+//   // Step 1
+//   VectorXd alpha(a);
+//   VectorXd y_tilde = y;
+//   if(a > 0) {
+//     // Sample alpha
+//     // Calculate A_alpha = Y_prec*W^T*Sigma_beta^{-1}*W + D_alpha^{-1}
+//     // We don't need to actually calculate Sigma_beta^{-1} directly.
+//     MatrixXd RinvsqW = get_RinvSqX(chol_R_,W); // n*n*a -> n x a;
+//     VectorXd Rinvsqy = get_RinvSqX(chol_R_,y); // n*n*1 -> n x 1;
+//     MatrixXd A_alpha = Y_prec * RinvsqW.transpose() * A_w_ldlt.solve(RinvsqW);
+//     A_alpha.diagonal() += prior_prec_alpha;
+//
+//     LLT<MatrixXd> A_alpha_llt;
+//     A_alpha_llt.compute(A_alpha);
+//     MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+//
+//     VectorXd WtSbinvy = RinvsqW.transpose() * A_w_ldlt.solve(Rinvsqy);
+//
+//     alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+//     alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+//     y_tilde = y - W * alpha;
+//   }
+//
+//   // Step 2 - sample Y_prec
+//   // We don't need to actually calculate Sigma_beta^{-1} directly.
+//   VectorXd Rinvsqy = get_RinvSqX(chol_R_,y_tilde); // n*n*1 -> n x 1;
+//   VectorXd e2 = Rinvsqy.transpose() * A_w_ldlt.solve(Rinvsqy);
+//   double score = Y_prec_b0 + e2[0]/2;
+//   Y_prec = rgamma_1/score;
+//
+//   // Step 3 - sample beta
+//   VectorXd u = randn_beta.array() / (prior_prec_beta * Y_prec).cwiseSqrt().array();
+//   u += prior_mean_beta;
+//   VectorXd v = sqrt(Y_prec)*RinvSqX * u + randn_e;
+//   VectorXd w = A_w_ldlt.solve(Rinvsqy * sqrt(Y_prec) - v);
+//   VectorXd beta = u + RinvSqX_D.transpose() * w / sqrt(Y_prec);
+//
+//   // // actually, probably don't need to form Sigma_beta explicitly
+//   // MatrixXd Sigma_beta;
+//   // if(Rf_isMatrix(chol_R_)) {
+//   //   Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+//   //   Sigma_beta = chol_R.triangularView<Upper>() * A_w_ldlt.solve(chol_R.transpose().triangularView<Lower>());
+//   // } else{
+//   //   MSpMat chol_R = as<MSpMat>(chol_R_);
+//   //   Sigma_beta = chol_R.triangularView<Upper>() * A_w_ldlt.solve(chol_R.transpose().triangularView<Lower>());
+//   // }
+//
+//
+//   VectorXd result(1+a+b);
+//   result << Y_prec,alpha,beta;
+//
+//   return(result);
+// }
+
+
+
+void mod_list(Rcpp::List l,int i){
+  l[i] = i+1;
+}
+
+// [[Rcpp::export()]]
+Rcpp::List makeList(int n){
+  Rcpp::List l(n);
+  for(int i = 0; i < n; i++){
+    mod_list(l,i);
+  }
+  return(l);
+}
+
+// }
+
+
+VectorXd cumprod(const VectorXd& x) {
+  int n = x.size();
+  VectorXd res(n);
+  res[0] = x[0];
+  if(n > 1) {
+    for(int i = 1; i < n; i++){
+      res[i] = res[i-1]*x[i];
+    }
+  }
+  return(res);
+}
+
+
+// // [[Rcpp::export()]]
+// Rcpp::List sample_tau2_delta_c_Eigen(
+//     double tau2,
+//     duble xi,
+//     VectorXd delta,
+//     Map<VectorXd> scores,
+//     double delta_rate,
+//     Map<MatrixXd> randg_draws  // all done with rate = 1;
+// ) {
+//   int times = randg_draws.rows();
+//   int k = tauh.size();
+//
+//   double rate,delta_old;
+//   for(int i = 0; i < times; i++){
+//
+//     rate = 1.0/xi + tauh.dot(scores);
+//     omega2 = rate / randg_draws(i,0);
+//
+//     rate = 1.0 + 1.0 / omega2;
+//     xi = rate / randg_draws(i,1);
+//
+//     VectorXd std_scores = scores / omega2;
+//
+//     delta_old = delta(0);
+//     rate = delta_1_rate + (1/delta(0)) * tauh.dot(std_scores);
+//     delta(0) = randg_draws(i,2) / rate;
+//     // tauh = cumprod(delta);
+//     tauh *= delta(0)/delta_old;   // replaces re-calculating cumprod
+//
+//     for(int h = 1; h < k; h++) {
+//       delta_old = delta(h);
+//       rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(std_scores.tail(k-h));
+//       delta(h) = randg_draws(i,2+h) / rate;
+//       // tauh = cumprod(delta);
+//       tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
+//       // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
+//     }
+//   }
+//   return(Rcpp::List::create(omega2,xi,delta));
+// }
+
+
+// // [[Rcpp::export()]]
+// Rcpp::List sample_trunc_delta_omega_c_Eigen(
+//     VectorXd delta,
+//     VectorXd tauh,
+//     double omega2,
+//     double xi,
+//     Map<VectorXd> scores,
+//     Map<VectorXd> shapes,
+//     double delta_1_rate,
+//     double delta_2_rate,
+//     Map<MatrixXd> randu_draws,
+//     double trunc_point
+// ) {
+//   int times = randu_draws.rows();
+//   int k = tauh.size();
+//
+//   double rate,delta_old, u,p;
+//   for(int i = 0; i < times; i++){
+//
+//     rate = 1.0/xi + tauh.dot(scores);
+//     u = randu_draws(i,0); // don't truncate delta(0)
+//     omega2 = 1.0 / R::qgamma(u,shapes(0),1.0/rate,1,0);
+//
+//     rate = 1.0 + 1.0 / omega2;
+//     u = randu_draws(i,1); // don't truncate delta(0)
+//     xi = 1.0 / R::qgamma(u,shapes(1),1.0/rate,1,0);
+//
+//     VectorXd std_scores = scores / omega2;
+//
+//     delta_old = delta(0);
+//     rate = delta_1_rate + (1/delta(0)) * tauh.dot(std_scores);
+//     u = randu_draws(i,2); // don't truncate delta(0)
+//     delta(0) = R::qgamma(u,shapes(2),1.0/rate,1,0);
+//     // tauh = cumprod(delta);
+//     tauh *= delta(0)/delta_old;   // replaces re-calculating cumprod
+//
+//     for(int h = 1; h < k; h++) {
+//       delta_old = delta(h);
+//       rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(std_scores.tail(k-h));
+//       p = R::pgamma(trunc_point,shapes(2+h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
+//       if(p > 0.999) p = 0.999;  // prevent over-flow.
+//       u = p + (1.0-p)*randu_draws(i,2+h);
+//       delta(h) = R::qgamma(u,shapes(2+h),1.0/rate,1,0);
+//       // tauh = cumprod(delta);
+//       tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
+//       // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
+//     }
+//   }
+//   return(Rcpp::List::create(omega2,xi,delta));
+// }
+
+
+
+
+
+
+// [[Rcpp::export()]]
+VectorXd sample_delta_c_Eigen_v2(
+    VectorXd delta,
+    Map<VectorXd> scores,
+    double delta_rate,
+    Map<MatrixXd> randg_draws  // all done with rate = 1;
+) {
+  int times = randg_draws.rows();
+  int k = delta.size();
+
+  VectorXd cumprod_delta = cumprod(delta);
+  double rate,delta_old;
+  for(int i = 0; i < times; i++){
+    for(int h = 0; h < k; h++){
+      rate = delta_rate + (1/delta[h]) * cumprod_delta.tail(k-h).dot(scores.tail(k-h));
+      delta[h] = randg_draws(i,h) / rate;
+      cumprod_delta = cumprod(delta);
+    }
+  }
+  return(delta);
+}
+
+
+// [[Rcpp::export()]]
+VectorXd sample_trunc_delta_c_Eigen_v2(
+    VectorXd delta,
+    Map<VectorXd> scores,
+    Map<VectorXd> shapes,
+    double delta_rate,
+    Map<MatrixXd> randu_draws,
+    double trunc_point
+) {
+  int times = randu_draws.rows();
+  int k = delta.size();
+  double p,u;
+  VectorXd cumprod_delta = cumprod(delta);
+
+  double rate,delta_old;
+  for(int i = 0; i < times; i++){
+    for(int h = 0; h < k; h++) {
+      rate = delta_rate + (1/delta[h]) * cumprod_delta.tail(k-h).dot(scores.tail(k-h));
+      p = R::pgamma(trunc_point,shapes(h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
+      if(p > 0.999) p = 0.999;  // prevent over-flow.
+      u = p + (1.0-p)*randu_draws(i,h);
+      delta(h) = R::qgamma(u,shapes(h),1.0/rate,1,0);
+      cumprod_delta = cumprod(delta);
+    }
+  }
+  return(delta);
+}
+
+// [[Rcpp::export()]]
+NumericVector my_gamma(int n, NumericVector shape, NumericVector scale) {
+  NumericVector result(n);
+  if(shape.size() == 1) shape = NumericVector::create(n,shape[0]);
+  if(shape.size() != n) stop("Wrong length of shape");
+  for(int i = 0; i < n; i++){
+    // int shape_i;
+    // int scale_i;
+    // if(shape.size() == 1) {
+    //   shape_i = shape[0];
+    // } else {
+    //   shape_i = shape[i];
+    // }
+    // if(scale.size() == 1) {
+    //   scale_i = scale[0];
+    // } else {
+    //   scale_i = scale[i];
+    // }
+    result[i] = Rcpp::rgamma(1,shape[i],1.0)[0];
+  }
+  if(scale.size() == 1) return(result * scale[0]);
+  if(scale.size() == n) return(result * scale);
+  stop("Wrong length of scale");
+}

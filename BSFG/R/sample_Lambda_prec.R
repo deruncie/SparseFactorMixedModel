@@ -282,3 +282,103 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
                        }))
   return(current_state)
 }
+
+
+
+sample_Lambda_prec_reg_horseshoe = function(BSFG_state,...) {
+  # sampling as described in Supplemental methods, except we multiply columns of Prec_lambda by delta
+  # phi2 = \lambda^2 in methods
+  # the delta sequence controls tau_k. We have tau_1~C+(0,tau_0), and tau_k = tau_1*prod_{l=1}^k(delta^{-1}_l)
+  # delta_l controls the decrease in odds of inclusion of each element for the lth factor relative to the (l-1)th
+  # Note:  Piironen and Vehtari do not include sigma^2 in prior, so I have removed
+  priors         = BSFG_state$priors
+  run_variables  = BSFG_state$run_variables
+  run_parameters = BSFG_state$run_parameters
+  current_state  = BSFG_state$current_state
+
+  current_state = with(c(priors,run_variables,run_parameters),
+                       with(Lambda_prior,{
+
+                         if(!exists('delta_iterations_factor')) delta_iterations_factor = 100
+
+                         # delta_1_shape = delta_1$shape  delta_1 = 1
+                         # delta_1_rate  = delta_1$rate
+                         delta_l_shape = delta_l$shape
+                         delta_l_rate  = delta_l$rate
+
+                         c2_shape = c2$shape
+                         c2_rate = c2$rate
+
+                         within(current_state,{
+
+                           # initialize variables if needed
+                           if(!exists('delta')){
+                             Lambda_omega2 = matrix(1,1,1)
+                             Lambda_xi = matrix(1,1,1)
+                             Lambda_phi2 = matrix(1,p,k)
+                             Lambda_nu = matrix(1,p,k)
+                             delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(k-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
+                             tauh  = matrix(cumprod(delta),nrow=1)
+                             Plam = matrix(1,p,k)
+                             Lambda_prec = matrix(1,p,k)
+                             trunc_point_delta = 1
+                           }
+
+                           Lambda2 = Lambda^2
+                           Lambda2_std = Lambda2 * (tot_Eta_prec[1,]) / 2
+
+                           Lambda_nu[] = matrix(1/rgamma(p*k,shape = 1, rate = 1 + 1/Lambda_phi2), nr = p, nc = k)
+                           Lambda2_std_delta = Lambda2_std * cumprod(delta)[rep(1,p),]
+                           Lambda_phi2[] = matrix(1/rgamma(p*k,shape = 1, rate = 1/Lambda_nu + Lambda2_std_delta / Lambda_tau2),nr=p,nc = k)
+
+                           Lambda2_std_delta_phi2 = Lambda2_std_delta/Lambda_phi2
+
+                           Lambda_tau2[] = 1/rgamma(1,shape = (p*k+1)/2,rate = 1/Lambda_xi + sum(Lambda2_std_delta_phi2))
+                           Lambda_xi[] = 1/rgamma(1,1+1/Lambda_tau2)
+
+                           scores = colSums(Lambda2_std / Lambda_phi2)
+                           shapes = c((p*k + 1) / 2,1,
+                                      delta_1_shape + 0.5*p*k,
+                                      delta_2_shape + 0.5*p*((k-1):1))
+                           times = delta_iterations_factor
+                           randu_draws = matrix(runif(times*(2+k)),nr=times)
+                           deltas = sample_trunc_delta_omega_c_Eigen( delta,tauh,Lambda_omega2,Lambda_xi,scores,shapes,delta_1_rate,delta_2_rate,randu_draws,trunc_point_delta)
+
+
+
+
+                           if(lambda_propto_Vp){
+                             Lambda2_std = Lambda^2 * (tot_Eta_prec[1,])
+                           } else{
+                             Lambda2_std = Lambda^2
+                           }
+
+                           Lambda_phi2[] = matrix(1/rgamma(p*k,shape = 1, rate = 1/Lambda_nu + Lambda2_std * (tauh/Lambda_omega2[1]/2)[rep(1,p),]),nr=p,nc = k)
+                           Lambda_nu[] = matrix(1/rgamma(p*k,shape = 1, rate = 1 + 1/Lambda_phi2), nr = p, nc = k)
+
+                           # -----Sample delta, update tauh------ #
+                           scores = colSums(Lambda2_std / Lambda_phi2) / (2*Lambda_tau2)
+                           shapes = c((p*k + 1) / 2,1,
+                                      delta_1_shape + 0.5*p*k,
+                                      delta_2_shape + 0.5*p*((k-1):1))
+                           times = delta_iteractions_factor
+                           # randg_draws = matrix(rgamma(times*(2+k),shape = shapes,rate = 1),nr=times,byrow=T)
+                           # deltas = sample_delta_omega_c_Eigen(delta,tauh,Lambda_omega2,Lambda_xi,scores,delta_1_rate,delta_2_rate,randg_draws)
+                           randu_draws = matrix(runif(times*(2+k)),nr=times)
+                           deltas = sample_trunc_delta_omega_c_Eigen( delta,tauh,Lambda_omega2,Lambda_xi,scores,shapes,delta_1_rate,delta_2_rate,randu_draws,trunc_point_delta)
+                           Lambda_omega2[] = deltas[[1]]
+                           Lambda_xi[] = deltas[[2]]
+                           delta[] = deltas[[3]]
+                           tauh[]  = matrix(cumprod(delta),nrow=1)
+
+
+                           # -----Update Plam-------------------- #
+                           Lambda_prec[] = (1/Lambda_omega2[1])/Lambda_phi2
+                           Plam[] = Lambda_prec * tauh[rep(1,p),]
+                           if(lambda_propto_Vp){
+                             Plam[] = Plam * tot_Eta_prec[1,]
+                           }
+                         })
+                       }))
+  return(current_state)
+}
