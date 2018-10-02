@@ -2,7 +2,7 @@
 library(BSFG)
 library(Matrix)
 library(MCMCpack)
-n = 300
+n = 59
 b = 60
 Var = 1
 X = rstdnorm_mat(n,b)
@@ -58,10 +58,11 @@ for(i in -100:nI){
     rb = rnorm(b)
     if(b>n) {
       re = rnorm(n)
+      rg = rgamma(1,shape=n/2,rate=1)
     } else{
-      re = rnorm(0)
+      rg = rgamma(1,shape=n/2,rate=1)
+      re = rnorm(n)
     }
-    rg = rgamma(1,shape=n/2,rate=1)
     res0 = sample_MME_block(y,X,rep(0,b),1/(lambda2),chol_R_,rb,rep(0,0),rg)
     res = sample_MME_block(y,X,rep(0,b),1/(lambda2),chol_R_,rb,re,rg)
     # R = as.matrix(crossprod(chol_R))
@@ -76,7 +77,7 @@ for(i in -100:nI){
     res2 = regression_sampler_v2(y,W,X,matrix(0,0,0),rep(0,b),1/(lambda2),chol_R,
                                  Sigma_R,1/var,ra,rb,re,rg,prec_b)
     res3 = regression_sampler_v3(y,W,U,V,matrix(0,0,0),rep(0,b),1/(lambda2),chol_R,
-                                 Sigma_R,Rinv,RinvU,UtRinvU,1/var,ra,rb,re,rg,prec_b)
+                                 Rinv,RinvU,UtRinvU,1/var,ra,rb,re,rg,prec_b)
     RinvSqX = as.matrix(solve(t(chol_R),X))
     res2a = regression_sampler_v2a(y,W,RinvSqX,matrix(0,0,0),rep(0,b),1/(lambda2),chol_R,1/var,ra,rb,re,rg,prec_b)
     C = crossprod(solve(t(chol_R),X))
@@ -84,6 +85,10 @@ for(i in -100:nI){
 
     set.seed(1)
     res4 = regression_sampler_parallel(y,W,NULL,X,NULL,1,list(chol_R),1/var,0,prec_b,rep(0,ncol(W)),rep(0,1),matrix(0,b,1),matrix(1/lambda2,b,1),1)
+    set.seed(1)
+    res5 = regression_sampler_parallel(y,W,NULL,U,V,1,list(chol_R),1/var,0,prec_b,rep(0,ncol(W)),rep(0,1),matrix(0,b,1),matrix(1/lambda2,b,1),1)
+    Wa = matrix(1,n,1)
+    res4 = regression_sampler_parallel(y,Wa,NULL,X,NULL,1,list(chol_R),1/var,0,prec_b,rep(0,ncol(Wa)),rep(0,1),matrix(0,b,1),matrix(1/lambda2,b,1),1)
     microbenchmark::microbenchmark(
       # sample_MME_block(y,X,rep(0,b),1/(lambda2),chol_R_,rb,rep(0,0),rg),
       # sample_MME_block(y,X,rep(0,b),1/(lambda2),chol_R_,rb,re,rg),

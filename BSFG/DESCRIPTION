@@ -17,6 +17,7 @@ Imports:
   Rcpp (>= 0.12.9),
   RcppEigen,
   RcppParallel,
+  RcppZiggurat,
   Matrix,
   lme4,
   parallel,
@@ -27,7 +28,6 @@ Imports:
   compiler,
   caret,
   coda,
-  GIGrvg,
   splines,
   pbs,
   MASS
@@ -37,8 +37,8 @@ Suggests:
 LinkingTo: 
   Rcpp (>= 0.11.2), 
   RcppEigen (>= 0.3.3.3.0),
-  RcppParallel,
-  GIGrvg
+  RcppParallel
+  RcppZiggurat
 SystemRequirements: GNU make
 RoxygenNote: 6.0.1
 ByteCompile: TRUE

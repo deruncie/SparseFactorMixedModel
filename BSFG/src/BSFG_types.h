@@ -1,6 +1,7 @@
 #include <RcppEigen.h>
 #include <RcppParallel.h>
-#include <GIGrvg.h>
+#include <ZigguratR.h>
+using namespace Rcpp;
 
 
 using Eigen::Map;               	      // 'Eigen::Maps' rather than copies
@@ -17,6 +18,8 @@ typedef Eigen::Map<SpMat> MSpMat;
 using namespace Rcpp;
 using namespace RcppParallel;
 using namespace Eigen;
+
+static Ziggurat::R::ZigguratR ziggr;
 
 VectorXd find_candidate_states(MatrixXd, double, int);
 MatrixXd uncorrelated_prec_mat(VectorXd,VectorXd,VectorXd);

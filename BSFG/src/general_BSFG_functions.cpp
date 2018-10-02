@@ -11,23 +11,49 @@ using namespace RcppParallel;
 // ---------- helper functions --------- //
 // -------------------------------------------- //
 // functions to speed up sparse multiplication and conversion to dense matrices
+
 // [[Rcpp::export()]]
-MatrixXd SxD(MSpMat X, Map<MatrixXd> Y){
-  if(X.cols() != Y.rows()) stop("X and Y have wrong dimensions for multiplying");
-  return(X * Y);
+MatrixXd matrix_multiply_toDense(SEXP X_, SEXP Y_){
+  if(Rf_isNull(X_)) return(as<Map<MatrixXd> >(Y_));
+  if(Rf_isMatrix(X_)) {
+    Map<MatrixXd> X = as<Map<MatrixXd> >(X_);
+    if(Rf_isMatrix(Y_)) {
+      Map<MatrixXd> Y = as<Map<MatrixXd> >(Y_);
+      if(X.cols() != Y.rows()) stop("Wrong dimensions of matrices");
+      return(X*Y);
+    } else{
+      MSpMat Y = as<MSpMat>(Y_);
+      if(X.cols() != Y.rows()) stop("Wrong dimensions of matrices");
+      return(X*Y);
+    }
+  }
+  else {
+    MSpMat X = as<MSpMat>(X_);
+    if(Rf_isMatrix(Y_)) {
+      Map<MatrixXd> Y = as<Map<MatrixXd> >(Y_);
+      if(X.cols() != Y.rows()) stop("Wrong dimensions of matrices");
+      return(X*Y);
+    } else{
+      MSpMat Y = as<MSpMat>(Y_);
+      if(X.cols() != Y.rows()) stop("Wrong dimensions of matrices");
+      return(X*Y);
+    }
+  }
 }
-// [[Rcpp::export()]]
-MatrixXd SxS(MSpMat X, MSpMat Y){
-  if(X.cols() != Y.rows()) stop("X and Y have wrong dimensions for multiplying");
-  return(X * Y);
-}
+
+
 
 // [[Rcpp::export()]]
 MatrixXd rstdnorm_mat(int n,int p) {  // returns nxp matrix
-  VectorXd X_vec = as<VectorXd>(rnorm(n*p));
-  Map<MatrixXd> X_mat(X_vec.data(),n,p);
+  VectorXd X_vec(n*p);
+  for(int i = 0; i < n*p; i++){
+    X_vec[i] = ziggr.norm();
+  }
+  MatrixXd X_mat = Map<MatrixXd>(X_vec.data(),n,p);
   return(X_mat);
 }
+
+
 
 // [[Rcpp::export()]]
 VectorXd find_candidate_states(
@@ -53,421 +79,602 @@ VectorXd find_candidate_states(
   return indices.head(count);
 }
 
+
+
 // -------------------------------------------- //
-// ---------- sample_MME_fixedEffects --------- //
+// ---------- regression_sampler --------- //
 // -------------------------------------------- //
 
-// [[Rcpp::export()]]
-VectorXd sample_MME_single_diagK(  // returns b x 1 vector
-    VectorXd y,           // nx1
-    MatrixXd X,           // nxb
-    VectorXd prior_mean,  // bx1
-    VectorXd prior_prec,  // bx1
-    MSpMat chol_R,        // nxn upper triangular Cholesky decomposition of R. Format: dgCMatrix
-    double tot_Eta_prec, // double
-    VectorXd randn_theta, // bx1
-    VectorXd randn_e      // 0x1 or nx1. 0x1 if b<n
-){
-  if(randn_e.size() == 0){
-    MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
-    VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
-    VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
-    MatrixXd C = RinvSqX.transpose() * RinvSqX;
-    C.diagonal() += prior_prec;
-    LLT<MatrixXd> C_llt;
-    C_llt.compute(C);
-    MatrixXd chol_C = C_llt.matrixU();
-
-    VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
-    b += randn_theta;
-    b = chol_C.triangularView<Upper>().solve(b);
-    return(b);
-  } else {
-    // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
-    MatrixXd Phi = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
-    VectorXd alpha = chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
-
-    VectorXd u = randn_theta.array() / prior_prec.cwiseSqrt().array();
-    u += prior_mean;
-    VectorXd v = Phi * u + randn_e;
-    VectorXd alpha_v = alpha-v;
-
-    MatrixXd D_PhiT = prior_prec.cwiseInverse().asDiagonal() * Phi.transpose();
-    MatrixXd cov = Phi * D_PhiT;
-    cov.diagonal().array() += 1.0;
-
-    VectorXd w = cov.ldlt().solve(alpha_v);
-
-    VectorXd theta = u + D_PhiT * w;
-
-    return(theta);
-  }
-}
 
 
-// RcppParallel struct for sampling coefficients from a set of parallel regression problems:
-// Y = X %*% B + E, where
-// b[i,j] ~ N(prior_mean[i,j],1/prior_prec[i,j])
-// E[,j] ~ N(0,t(chol_R) %*% chol(R) / tot_Eta_prec[j])
-// where chol_R is selected from a list based on h2s_index[j]
-// Y is complete, so everythign has the same dimensions
-struct sample_MME_single_diagK_worker : public RcppParallel::Worker {
-  MatrixXd Y;
-  MatrixXd X;
-  MatrixXd prior_mean, prior_prec, randn_theta, randn_e;
-  const std::vector<MSpMat> chol_R_list;
-  VectorXi h2s_index;
-  VectorXd tot_Eta_prec;
-  MatrixXd &coefs;
-
-  sample_MME_single_diagK_worker(
-    MatrixXd Y,           // nxp
-    MatrixXd X,           // nxb
-    MatrixXd prior_mean,  // bxp
-    MatrixXd prior_prec,  // bxp
-    const std::vector<MSpMat> &chol_R_list, // each element a MSpMat nxn upper-triangular cholesky decomposition of R
-    VectorXi h2s_index,   // px1, 1-based index
-    VectorXd tot_Eta_prec,// px1
-    MatrixXd randn_theta, // bxp
-    MatrixXd randn_e,     // 0xp or nxp. The former if b<n, the latter if b >= n
-    MatrixXd &coefs       // bxp
-  ):
-    Y(Y), X(X), prior_mean(prior_mean), prior_prec(prior_prec), randn_theta(randn_theta), randn_e(randn_e),
-    chol_R_list(chol_R_list), h2s_index(h2s_index), tot_Eta_prec(tot_Eta_prec), coefs(coefs) {}
-
-  void operator()(std::size_t begin, std::size_t end) {
-    for(std::size_t j = begin; j < end; j++){
-      int h2_index = h2s_index[j] - 1;
-      MSpMat chol_R = chol_R_list[h2_index];
-      coefs.col(j) = sample_MME_single_diagK(Y.col(j), X, prior_mean.col(j), prior_prec.col(j), chol_R, tot_Eta_prec[j], randn_theta.col(j),randn_e.col(j));
-    }
-  }
-};
-
-
-// -------------------------------------------------- //
-// -- Versions of the independent residuals regression model --- //
-// -------------------------------------------------- //
-
-
-// basic version - all regression have same dimensions
-// [[Rcpp::export()]]
-MatrixXd sample_MME_fixedEffects_c(  // returns bxp matrix
-    Map<MatrixXd> Y,              // nxp
-    Map<MatrixXd> X,              // nxb
-    Rcpp::List Sigma_Choleskys,   // list of Cholesky decompositions of residuals. nxn upper triangular, dgCMatrix
-    VectorXi h2s_index,           // px1 index of Cholesky matrix for each column
-    Map<VectorXd> tot_Eta_prec,   // px1
-    Map<MatrixXd> prior_mean,     // bxp
-    Map<MatrixXd> prior_prec,     // bxp
-    int grainSize) {
-
-  int b = X.cols();
-  int p = Y.cols();
-  int n = Y.rows();
-
-  MatrixXd randn_theta = rstdnorm_mat(b,p);
-  MatrixXd randn_e;
-  if(b < n) {
-    randn_e = rstdnorm_mat(0,p);
+MatrixXd get_RinvSqX(SEXP chol_R_, MatrixXd X){
+  MatrixXd RinvSqX;
+  if(Rf_isMatrix(chol_R_)) {
+    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+    RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);// * sqrt(tot_Eta_prec));
   } else{
-    randn_e = rstdnorm_mat(n,p);
+    MSpMat chol_R = as<MSpMat>(chol_R_);
+    RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);// * sqrt(tot_Eta_prec));
   }
-
-  std::vector<MSpMat> chol_R_list;
-  for(int i = 0; i < h2s_index.maxCoeff(); i++){
-    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
-    chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
-  }
-
-  MatrixXd coefs(b,p);
-
-  sample_MME_single_diagK_worker sampler(Y,X,prior_mean,prior_prec,chol_R_list,h2s_index,tot_Eta_prec,randn_theta,randn_e, coefs);
-  RcppParallel::parallelFor(0,p,sampler,grainSize);
-  return(coefs);
+  return(RinvSqX);
 }
 
 
-struct sample_MME_single_diagK_cis_worker : public Worker {
-  MatrixXd Y;
-  MatrixXd X;
-  std::vector<Map<MatrixXd>> cis_X;
-  MatrixXd prior_mean, prior_prec, randn_theta;
-  VectorXd randn_cis;
-  const std::vector<MSpMat> chol_R_list;
-  VectorXi h2s_index;
-  VectorXd cis_effect_index;
-  VectorXd tot_Eta_prec;
-  MatrixXd &coefs;
-  VectorXd &cis_effects;
+// [[Rcpp::export]]
+Rcpp::IntegerVector which(Rcpp::LogicalVector x) {
+  Rcpp::IntegerVector v = Rcpp::seq(0, x.size()-1);
+  return v[x];
+}
 
-  sample_MME_single_diagK_cis_worker(
-               MatrixXd Y,
-               MatrixXd X,
-               std::vector<Map<MatrixXd>> cis_X,
-               MatrixXd prior_mean,
-               MatrixXd prior_prec,
-               const std::vector<MSpMat> &chol_R_list,
-               VectorXi h2s_index,
-               VectorXd cis_effect_index,
-               VectorXd tot_Eta_prec,
-               MatrixXd randn_theta,
-               VectorXd randn_cis,
-               MatrixXd &coefs,
-               VectorXd &cis_effects):
-    Y(Y), X(X), cis_X(cis_X),prior_mean(prior_mean), prior_prec(prior_prec),
-    randn_theta(randn_theta), randn_cis(randn_cis),
-    chol_R_list(chol_R_list), h2s_index(h2s_index), cis_effect_index(cis_effect_index),tot_Eta_prec(tot_Eta_prec),
-    coefs(coefs), cis_effects(cis_effects) {}
 
-  void operator()(std::size_t begin, std::size_t end) {
-    int n = X.rows();
-    int b = X.cols();
-    VectorXd randn_e_j = VectorXd::Zero(0);
-    for(std::size_t j = begin; j < end; j++){
-      int h2_index = h2s_index[j] - 1;
-      MSpMat chol_R = chol_R_list[h2_index];
+VectorXd regression_sampler_v1(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b < n
+    const Ref<const VectorXd>& y,           // nx1
+    const MatrixXd& W,           // nxa
+    const MatrixXd& RinvSqX,                // nxb
+    const MatrixXd& C,                     // bxb
+    const VectorXd& prior_prec_alpha, // ax 1
+    const Ref<const VectorXd>& prior_mean_beta,  // bx1
+    const Ref<const VectorXd>& prior_prec_beta,  // bx1
+    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    double Y_prec,                    // double
+    const VectorXd& randn_alpha,
+    const Ref<const VectorXd>& randn_beta,
+    const double rgamma_1,
+    const double Y_prec_b0
+){
+  int n = y.size();
+  int a = W.cols();
+  int b = RinvSqX.cols();
 
-      int b_cis = cis_X[j].cols();
-      MatrixXd X_cisj(n,b+b_cis);
-      X_cisj << X, cis_X[j];
+  // Check inputs
+  if(W.rows() != n) stop("Wrong dimension of W");
+  if(RinvSqX.rows() != n) stop("Wrong dimension of X");
+  if(C.rows() != b || C.cols() != b) stop("Wrong dimension of C");
+  if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+  if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+  if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+  if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+  if(randn_beta.size() != b) stop("Wrong length of randn_beta");
 
-      VectorXd prior_mean_j = VectorXd::Zero(b+b_cis);
-      prior_mean_j.head(b) = prior_mean.col(j);
+  // Calculate cholesky of A_beta
+  // C = Xt(RtR)^-1X
+  MatrixXd C_beta = C;
+  C_beta.diagonal() += prior_prec_beta;
+  LLT<MatrixXd> A_beta_llt;
+  A_beta_llt.compute(C_beta);
+  MatrixXd chol_A_beta = A_beta_llt.matrixU();
+  // Y_prec * chol_A_beta^\T * chol_A_beta = A_beta
 
-      VectorXd prior_prec_j = VectorXd::Constant(b+b_cis,1e-10);
-      prior_prec_j.head(b) = prior_prec.col(j);
+  // Step 1
+  VectorXd alpha(a);
+  VectorXd y_tilde = y;
+  if(a > 0) {
+    // Sample alpha
+    // Calculate A_alpha = Y_prec*W^T*Sigma_beta^{-1}*W + D_alpha^{-1}
+    // We don't need to actually calculate Sigma_beta^{-1} directly.
+    MatrixXd RinvSqW = get_RinvSqX(chol_R_,W);  // n*n*a -> n x a
+    MatrixXd WtRinvX = RinvSqW.transpose() * RinvSqX; // a*n*b -> a*b
+    MatrixXd invSqAbXtRinvW = chol_A_beta.transpose().triangularView<Lower>().solve(WtRinvX.transpose()); // b*b*a -> b x a
 
-      VectorXd randn_theta_j(b+b_cis);
-      randn_theta_j.head(b) = randn_theta.col(j);
-      randn_theta_j.tail(b_cis) = randn_cis.segment(cis_effect_index[j]-1,b_cis);
+    MatrixXd A_alpha = Y_prec * (RinvSqW.transpose() * RinvSqW - invSqAbXtRinvW.transpose() * invSqAbXtRinvW);
+    A_alpha.diagonal() += prior_prec_alpha;
 
-      VectorXd result = sample_MME_single_diagK(Y.col(j), X_cisj, prior_mean_j, prior_prec_j, chol_R, tot_Eta_prec[j], randn_theta_j,randn_e_j);
-      coefs.col(j) = result.head(b);
-      cis_effects.segment(cis_effect_index[j]-1,b_cis) = result.tail(b_cis);
-    }
+    LLT<MatrixXd> A_alpha_llt;
+    A_alpha_llt.compute(A_alpha);
+    MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+
+    VectorXd Rinvsqy = get_RinvSqX(chol_R_,y); // n*n*q -> n x 1;
+    VectorXd XtRinvy = RinvSqX.transpose() * Rinvsqy; // b*n*1 >- b x 1
+    VectorXd invSqAbXtRinvy = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy); // b*b*1 -> b*1
+
+    VectorXd WtSbinvy = RinvSqW.transpose() * Rinvsqy - invSqAbXtRinvW.transpose() * invSqAbXtRinvy;
+
+    alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+    alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+    y_tilde = y - W * alpha;
   }
-};
+
+  // Step 2 - sample Y_prec
+  // We don't need to actually calculate Sigma_beta^{-1} directly.
+  VectorXd RinvSqy = get_RinvSqX(chol_R_,y_tilde);
+  VectorXd XtRinvy = RinvSqX.transpose() * RinvSqy;
+  VectorXd prod1 = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy);
+  double score = Y_prec_b0 + (RinvSqy.dot(RinvSqy) - prod1.dot(prod1))/2;
+  Y_prec = rgamma_1/score;
+
+  // Step 3 - sample beta
+  VectorXd XtRinvy_std_mu = XtRinvy*Y_prec + prior_prec_beta.asDiagonal()*prior_mean_beta;
+  VectorXd beta = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy_std_mu) / sqrt(Y_prec) + randn_beta;
+  beta = chol_A_beta.triangularView<Upper>().solve(beta) / sqrt(Y_prec);
+
+  VectorXd result(1+a+b);
+  result << Y_prec,alpha,beta;
+
+  return(result);
+}
 
 
-// [[Rcpp::export()]]
-Rcpp::List sample_MME_fixedEffects_cis_c(
-    Map<MatrixXd> Y,
-    Map<MatrixXd> X,
-    Rcpp::List cis_genotypes,
-    Rcpp::List Sigma_Choleskys,
-    VectorXi h2s_index,
-    Map<VectorXd> tot_Eta_prec,
-    Map<MatrixXd> prior_mean,
-    Map<MatrixXd> prior_prec,
-    Map<VectorXd> cis_effect_index,
-    int total_cis_effects,
-    int grainSize) {
-
-  int p = Y.cols();
+VectorXd regression_sampler_v2(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b > n
+    const Ref<const VectorXd>& y,           // nx1
+    const MatrixXd& W,           // nxa
+    const MatrixXd& X,           // nxm or nxb
+    const VectorXd& prior_prec_alpha, // ax 1
+    const Ref<const VectorXd>& prior_mean_beta,  // bx1
+    const Ref<const VectorXd>& prior_prec_beta,  // bx1
+    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const MatrixXd& R,
+    double Y_prec,                    // double
+    const VectorXd& randn_alpha,
+    const Ref<const VectorXd>& randn_beta,
+    const Ref<const VectorXd>& randn_e,
+    const double rgamma_1,
+    const double Y_prec_b0
+){
+  int n = y.size();
+  int a = W.cols();
   int b = X.cols();
 
-  std::vector<MSpMat> chol_R_list;
-  for(int i = 0; i < h2s_index.maxCoeff(); i++){
-    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
-    chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
+  // Check inputs
+  if(W.rows() != n) stop("Wrong dimension of W");
+  if(X.rows() != n) stop("Wrong dimension of X");
+  if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+  if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+  if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+  if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+  if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+
+  // Calculate inverse of Sigma_beta
+  MatrixXd DXt = prior_prec_beta.cwiseInverse().asDiagonal() * X.transpose();
+  MatrixXd Sigma_beta = X * DXt + R;
+  LDLT<MatrixXd> Sigma_beta_ldlt;
+  Sigma_beta_ldlt.compute(Sigma_beta);
+
+  // Step 1
+  VectorXd alpha(a);
+  VectorXd y_tilde = y;
+  if(a > 0) {
+    // Sample alpha
+    MatrixXd SbinvW = Sigma_beta_ldlt.solve(W);
+    MatrixXd A_alpha = Y_prec * SbinvW.transpose() * W;
+    A_alpha.diagonal() += prior_prec_alpha;
+
+    LLT<MatrixXd> A_alpha_llt;
+    A_alpha_llt.compute(A_alpha);
+    MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+
+    VectorXd WtSbinvy = SbinvW.transpose() * y;
+    alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+    alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+    y_tilde = y - W * alpha;
   }
 
-  std::vector<Map<MatrixXd>> cis_X;
-  for(int i = 0; i < p; i++){
-    cis_X.push_back(Rcpp::as<Map<MatrixXd>>(cis_genotypes[i]));
+  // Step 2 - sample Y_prec
+  VectorXd e2 = y_tilde.transpose() * Sigma_beta_ldlt.solve(y_tilde);
+  double score = Y_prec_b0 + e2[0]/2;
+  Y_prec = rgamma_1/score;
+
+  // Step 3 - sample beta
+  // what about prior mean?
+  VectorXd u = randn_beta.array() / (prior_prec_beta * Y_prec).cwiseSqrt().array() + prior_mean_beta.array();
+  VectorXd v = sqrt(Y_prec) * X * u;
+  if(Rf_isMatrix(chol_R_)) {
+    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  } else{
+    MSpMat chol_R = as<MSpMat>(chol_R_);
+    v += chol_R.transpose().triangularView<Lower>() * randn_e;
   }
+  VectorXd w = Sigma_beta_ldlt.solve(y_tilde * sqrt(Y_prec) - v);
+  VectorXd beta = u + DXt * w / sqrt(Y_prec);
 
-  MatrixXd coefs(b,p);
-  VectorXd cis_effects(total_cis_effects);
-  MatrixXd randn_theta = rstdnorm_mat(b,p);
-  VectorXd randn_cis   = rstdnorm_mat(total_cis_effects,1).col(0);
+  VectorXd result(1+a+b);
+  result << Y_prec,alpha,beta;
 
-  sample_MME_single_diagK_cis_worker sampler(Y,X,cis_X,prior_mean,prior_prec,chol_R_list,h2s_index,cis_effect_index,tot_Eta_prec,randn_theta,randn_cis,coefs,cis_effects);
-  RcppParallel::parallelFor(0,p,sampler,grainSize);
-
-  return(Rcpp::List::create(coefs,cis_effects));
+  return(result);
 }
 
 
-struct sample_coefs_set_worker : public RcppParallel::Worker {
-  std::vector<MatrixXd> y_list;
-  std::vector<MatrixXd> X_list;
-  std::vector<MatrixXd> tot_Y_prec_list;
-  std::vector<ArrayXi> nonZero_cols_X;
-  std::vector<MatrixXd> randn_theta_list;
-  MatrixXd prior_mean,prior_prec;
-  int n_traits;
-  MatrixXd &coefs;
+VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b > n > m
+    const Ref<const VectorXd>& y,           // nx1
+    const MatrixXd& W,           // nxa
+    const MatrixXd& U,           // nxm or nxb
+    const MatrixXd& V,           // mxb
+    const VectorXd& prior_prec_alpha, // ax 1
+    const Ref<const VectorXd>& prior_mean_beta,  // bx1
+    const Ref<const VectorXd>& prior_prec_beta,  // bx1
+    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const MatrixXd& Rinv,
+    const MatrixXd& RinvU,
+    const MatrixXd& UtRinvU,
+    double Y_prec,                    // double
+    const VectorXd& randn_alpha,
+    const Ref<const VectorXd>& randn_beta,
+    const Ref<const VectorXd>& randn_e,
+    const double rgamma_1,
+    const double Y_prec_b0
+){
+  int n = y.size();
+  int a = W.cols();
+  if(V.rows() != U.cols()) stop("Wrong dimensions of V");
+  MatrixXd X = U*V;
+  int b = X.cols();
 
-  sample_coefs_set_worker(
-    std::vector<MatrixXd> &y_list,
-    std::vector<MatrixXd> &X_list,
-    std::vector<MatrixXd> &tot_Y_prec_list,
-    std::vector<ArrayXi>  &nonZero_cols_X,
-    std::vector<MatrixXd> &randn_theta_list,
-    MatrixXd prior_mean,
-    MatrixXd prior_prec,
-    int n_traits,
-    MatrixXd &coefs) :
-    y_list(y_list), X_list(X_list), tot_Y_prec_list(tot_Y_prec_list), nonZero_cols_X(nonZero_cols_X), randn_theta_list(randn_theta_list),
-    prior_mean(prior_mean), prior_prec(prior_prec),n_traits(n_traits),
-    coefs(coefs)
+  // Check inputs
+  if(W.rows() != n) stop("Wrong dimension of W");
+  if(X.rows() != n) stop("Wrong dimension of X");
+  if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+  if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+  if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+  if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+  if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+
+  // Calculate inverse of Sigma_beta
+  // MatrixXd Sigma_beta_inv;
+  MatrixXd DVt = prior_prec_beta.cwiseInverse().asDiagonal() * V.transpose();
+  if(RinvU.rows() != n) stop("Wrong dimensions of RinvU");
+  MatrixXd inner = (V * DVt).inverse() + UtRinvU;
+  LDLT<MatrixXd> inner_ldlt;
+  inner_ldlt.compute(inner);
+  // Sigma_beta_inv = Rinv - RinvU * inner.ldlt().solve(RinvU.transpose());  // Don't actually calculate this. Stay in mxm space
+
+  // Step 1
+  VectorXd alpha(a);
+  VectorXd y_tilde = y;
+  if(a > 0) {
+    // Sample alpha
+    // MatrixXd SbinvW = Sigma_beta_inv * W;
+    // MatrixXd A_alpha = Y_prec * SbinvW.transpose() * W;
+    MatrixXd RinvW = Rinv * W;
+    MatrixXd UtRinvW = U.transpose() * RinvW;
+    MatrixXd A_alpha = Y_prec * (W.transpose() * RinvW - UtRinvW.transpose() * inner_ldlt.solve(UtRinvW));
+    A_alpha.diagonal() += prior_prec_alpha;
+
+    LLT<MatrixXd> A_alpha_llt;
+    A_alpha_llt.compute(A_alpha);
+    MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+
+    // VectorXd WtSbinvy = SbinvW.transpose() * y;
+    VectorXd UtRinvy = RinvU.transpose() * y;
+    VectorXd WtSbinvy = RinvW.transpose() * y - UtRinvW.transpose() * inner_ldlt.solve(UtRinvy);
+
+    alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+    alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+    y_tilde = y - W * alpha;
+  }
+
+  // Step 2 - sample Y_prec
+  // VectorXd e2 = y_tilde.transpose() * Sigma_beta_inv * y_tilde;
+  VectorXd Rinv_y = Rinv * y_tilde;
+  VectorXd UtRinvy = RinvU.transpose() * y_tilde;
+  VectorXd e2 = y_tilde.transpose() * Rinv_y - UtRinvy.transpose() * inner_ldlt.solve(UtRinvy);
+
+  double score = Y_prec_b0 + e2[0]/2;
+  Y_prec = rgamma_1/score;
+
+  // Step 3 - sample beta
+  // what about prior mean?
+  VectorXd u = randn_beta.array() / (prior_prec_beta * Y_prec).cwiseSqrt().array() + prior_mean_beta.array();
+  VectorXd v = sqrt(Y_prec) * X * u;
+  if(Rf_isMatrix(chol_R_)) {
+    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  } else{
+    MSpMat chol_R = as<MSpMat>(chol_R_);
+    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  }
+  // VectorXd w = Sigma_beta_inv * (y_tilde * sqrt(Y_prec) - v);
+  VectorXd e = y_tilde * sqrt(Y_prec) - v;
+  VectorXd UtRinve = RinvU.transpose() * e;
+  VectorXd w = Rinv * e - RinvU * inner_ldlt.solve(UtRinve);
+
+  VectorXd beta = u + DVt * (U.transpose() * w) / sqrt(Y_prec); //b*b*1 + b*n*1
+
+  VectorXd result(1+a+b);
+  result << Y_prec,alpha,beta;
+
+  return(result);
+}
+
+
+
+struct regression_sampler_worker : public RcppParallel::Worker {
+  const int sampler;  // which sampler to use?
+  const IntegerVector& trait_set;
+  const Map<MatrixXd> Y;           // nx1
+  const Map<MatrixXd> W_base;           // nxa
+  const Rcpp::List W_list;           // nxa
+  const Map<MatrixXd> X_U;   // could be X or U.
+  const Map<MatrixXd> V;
+  const MatrixXd RinvSqX;                // nxb
+  const MatrixXd& C;                     // bxb
+  SEXP chol_R_;                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+  const MatrixXd& R;
+  const MatrixXd& Rinv;
+  const MatrixXd& RinvU;
+  const MatrixXd& UtRinvU;
+  const Map<MatrixXd> prior_prec_alpha1; // a1 x p matrix of prior precisions for alpha1
+  const VectorXd& prior_prec_alpha2;     // p-vector of precision of alpha2s for each trait
+  const Map<MatrixXd> prior_mean_beta; // b x p matrix of prior means of beta
+  const Map<MatrixXd> prior_prec_beta; // b x p matrix of prior precisions of beta
+  double Y_prec_b0;
+
+  const MatrixXd& randn_alpha1;
+  const std::vector<VectorXd>& randn_alpha2;
+  const MatrixXd& randn_beta;
+  const MatrixXd& randn_e;
+  const VectorXd& rgamma_1;
+
+  MatrixXd& alpha1;
+  std::vector<VectorXd>& alpha2;
+  MatrixXd& beta;
+  VectorXd& Y_prec;
+
+  regression_sampler_worker(
+    const int sampler,
+    const Rcpp::IntegerVector& trait_set,
+    const Map<MatrixXd> Y,           // nx1
+    const Map<MatrixXd> W_base,           // nxa
+    const Rcpp::List W_list,           // nxa
+    const Map<MatrixXd> X_U,
+    const Map<MatrixXd> V,
+    const MatrixXd RinvSqX,                // nxb
+    const MatrixXd& C,                     // bxb
+    SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const MatrixXd& R,
+    const MatrixXd& Rinv,
+    const MatrixXd& RinvU,
+    const MatrixXd& UtRinvU,
+    const Map<MatrixXd> prior_prec_alpha1, // a1 x p matrix of prior precisions for alpha1
+    const VectorXd& prior_prec_alpha2,     // p-vector of precision of alpha2s for each trait
+    const Map<MatrixXd> prior_mean_beta, // b x p matrix of prior means of beta
+    const Map<MatrixXd> prior_prec_beta, // b x p matrix of prior precisions of beta
+    double Y_prec_b0,
+    const MatrixXd& randn_alpha1,
+    const std::vector<VectorXd>& randn_alpha2,
+    const MatrixXd& randn_beta,
+    const MatrixXd& randn_e,
+    const VectorXd& rgamma_1,
+    MatrixXd& alpha1,
+    std::vector<VectorXd>& alpha2,
+    MatrixXd& beta,
+    VectorXd& Y_prec
+  ):
+    sampler(sampler), trait_set(trait_set),
+    Y(Y), W_base(W_base), W_list(W_list), X_U(X_U), V(V), RinvSqX(RinvSqX),
+    C(C), chol_R_(chol_R_), R(R), Rinv(Rinv), RinvU(RinvU), UtRinvU(UtRinvU),
+    prior_prec_alpha1(prior_prec_alpha1), prior_prec_alpha2(prior_prec_alpha2), prior_mean_beta(prior_mean_beta), prior_prec_beta(prior_prec_beta),
+    Y_prec_b0(Y_prec_b0),
+    randn_alpha1(randn_alpha1), randn_alpha2(randn_alpha2), randn_beta(randn_beta), randn_e(randn_e), rgamma_1(rgamma_1),
+    alpha1(alpha1), alpha2(alpha2), beta(beta), Y_prec(Y_prec)
   {}
 
   void operator()(std::size_t begin, std::size_t end) {
-    for(std::size_t j = begin; j < end; j++){
-      MatrixXd Y = y_list[j];
-      MatrixXd X = X_list[j];
-      MatrixXd tot_Y_prec = tot_Y_prec_list[j];
-      int b = randn_theta_list[j].rows();
-      int b_X = X.cols();
-      MatrixXd randn_e = MatrixXd::Zero(0,n_traits);
-      for(int t = 0; t < n_traits; t++) {
-        // Create cholesky decomposition of the residual variance matrix using tot_Y_prec.
-        SpMat Rsqrt = tot_Y_prec.col(t).cwiseSqrt().cwiseInverse().asDiagonal().toDenseMatrix().sparseView();
-        MSpMat chol_R(Rsqrt.rows(),Rsqrt.cols(), Rsqrt.nonZeros(),Rsqrt.outerIndexPtr(),Rsqrt.innerIndexPtr(),Rsqrt.valuePtr());
+    int n = Y.rows();
+    int a1 = W_base.cols();
 
-        // first assign the result vector to prior_mean + randn/sqrt(prec)
-        // will then replace values with sampled values.
-        VectorXd prior_mean_tj = prior_mean.block(t*b,j,b,1);
-        VectorXd prior_prec_tj = prior_prec.block(t*b,j,b,1);
-        VectorXd randn_theta_tj = randn_theta_list[j].col(t);
-        coefs.block(t*b,j,b,1) = prior_mean_tj.array() + randn_theta_tj.array() / prior_prec_tj.array().sqrt();
-
-        // now, pull out parameters for the coefficients corresponding to the columns of X
-        VectorXd prior_mean_tj_X(b_X);
-        VectorXd prior_prec_tj_X(b_X);
-        VectorXd randn_theta_tj_X(b_X);
-        for(int k = 0; k < b_X; k++){
-          int element = nonZero_cols_X[j][k]-1;
-          prior_mean_tj_X.coeffRef(k) = prior_mean_tj.coeffRef(element);
-          prior_prec_tj_X.coeffRef(k) = prior_prec_tj.coeffRef(element);
-          randn_theta_tj_X.coeffRef(k) = randn_theta_tj.coeffRef(element);
-        }
-        VectorXd coefs_X = sample_MME_single_diagK(Y.col(t), X,
-                                                    prior_mean_tj_X, prior_prec_tj_X,
-                                                    chol_R,1.0,
-                                                    randn_theta_tj_X,randn_e.col(t));
-
-        // now replace the values in coef with the corresponding ones in coefs_X
-        for(int k = 0; k < b_X; k++){
-          int element = nonZero_cols_X[j][k]-1;
-          coefs.coeffRef(t*b + element,j) = coefs_X.coeffRef(k);
-        }
+    for(std::size_t i = begin; i < end; i++){
+      int j = trait_set[i];
+      MatrixXd W;
+      int a;
+      int a2 = 0;
+      int b;
+      VectorXd prior_prec_alpha;
+      VectorXd randn_alpha;
+      if(W_list.length() == 0) {
+        W = W_base;
+        a = a1;
+        prior_prec_alpha = prior_prec_alpha1.col(j);
+        randn_alpha = randn_alpha1.col(j);
+      } else{
+        Map<MatrixXd> W2 = as<Map<MatrixXd> >(W_list[j]);
+        a2 = W2.cols();
+        a = a1+a2;
+        W = MatrixXd(n,a);
+        W << W_base,W2;
+        prior_prec_alpha = VectorXd(a);
+        prior_prec_alpha.head(a1) = prior_prec_alpha1.col(j);
+        prior_prec_alpha.tail(a2).array() = prior_prec_alpha2[j];
+        randn_alpha = VectorXd(a);
+        randn_alpha.head(a1) = randn_alpha1.col(j);
+        randn_alpha.tail(a2) = randn_alpha2[j];
       }
+
+      VectorXd samples;
+      if(sampler == 1) {
+        b = RinvSqX.cols();
+        samples = regression_sampler_v1(Y.col(j), W, RinvSqX, C, prior_prec_alpha, prior_mean_beta.col(j),
+                                        prior_prec_beta.col(j), chol_R_, Y_prec[j], randn_alpha,
+                                        randn_beta.col(j), rgamma_1[j],Y_prec_b0);
+      } else if(sampler == 2) {
+        b = X_U.cols();
+        samples = regression_sampler_v2(Y.col(j), W, X_U, prior_prec_alpha, prior_mean_beta.col(j),
+                                        prior_prec_beta.col(j), chol_R_, R, Y_prec[j], randn_alpha,
+                                        randn_beta.col(j), randn_e.col(j),rgamma_1[j],Y_prec_b0);
+      } else if(sampler == 3) {
+        b = V.cols();
+        samples = regression_sampler_v3(Y.col(j), W, X_U, V, prior_prec_alpha, prior_mean_beta.col(j),
+                                        prior_prec_beta.col(j), chol_R_, Rinv, RinvU, UtRinvU, Y_prec[j], randn_alpha,
+                                        randn_beta.col(j), randn_e.col(j),rgamma_1[j],Y_prec_b0);
+
+      } else {
+        stop("sampler not implemented");
+      }
+
+      // extract samples
+      Y_prec[j] = samples[0];
+      if(a1 > 0) alpha1.col(j) = samples.segment(1,a1);
+      if(a2 > 0) alpha2[j] = samples.segment(1+a1,a2);
+      if(b > 0) beta.col(j) = samples.tail(b);
     }
   }
 };
 
-// [[Rcpp::export()]]
-MatrixXd sample_coefs_set_c(    // return pxn matrix
-    Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x p), nonZero_cols_X.
-    Map<MatrixXd> prior_mean,   // pxn
-    Map<MatrixXd> prior_prec,   // pxn
-    int grainSize){
 
-  int n = model_matrices.size();
-  int p = prior_mean.rows();
+// [[Rcpp::export]]
+Rcpp::List regression_sampler_parallel(
+    Map<MatrixXd> Y,               // n x p matrix of observations
+    Map<MatrixXd> W_base,          // n x a1 matrix of W covariates common to all p. Can be NULL
+    Rcpp::List W_list,             // p-list of n x a2 matrices of W covariates unique to each p. Can be NULL
+    Map<MatrixXd> X,               // either X, a n x b matrix, or U, a n x m matrix. If U, then V must be non-NULL
+    SEXP V_,                       // m x b matrix if X is U
+    Rcpp::IntegerVector h2s_index, // p-vector of indices for appropriate V of each trait
+    Rcpp::List chol_V_list,        // list of cholesky decompositions of V: RtR (each nxn). Can be either dense or sparse
+    VectorXd Y_prec,               // p-vector of Y current precisions
+    double Y_prec_a0,
+    double Y_prec_b0,
+    Map<MatrixXd> prior_prec_alpha1, // a1 x p matrix of prior precisions for alpha1
+    VectorXd prior_prec_alpha2,     // p-vector of precision of alpha2s for each trait
+    Map<MatrixXd> prior_mean_beta, // b x p matrix of prior means of beta
+    Map<MatrixXd> prior_prec_beta, // b x p matrix of prior precisions of beta
+    int grainSize) {
 
-  std::vector<MatrixXd> y_list;
-  std::vector<MatrixXd> X_list;
-  std::vector<MatrixXd> tot_Y_prec_list;
-  std::vector<ArrayXi> nonZero_cols_X;
-  std::vector<MatrixXd> randn_theta_list;
-  for(int i = 0; i < n; i++){
-    Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
-    y_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["y"]));                    // matrix of observations (n_i x t)
-    X_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));                    // design matrix (n_i x b_X), only including columns that are non-zero
-    tot_Y_prec_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["tot_Y_prec"]));                    // matrix of residual precisions (n_i x t)
-    nonZero_cols_X.push_back(Rcpp::as<ArrayXi>(model_matrix_i["nonZero_cols_X"])); // list of which columns b_X correspond to in full X matrix
+  int n = Y.rows();
+  int p = Y.cols();
 
-    int t = y_list[i].cols();
-    MatrixXd randn_theta = rstdnorm_mat(p/t,t);
-    randn_theta_list.push_back(randn_theta);
+  // W_base
+  if(W_base.rows() != n) stop("Wrong dimension of W_base");
+  int a1 = W_base.cols();
+
+  // W_list
+  if(W_list.size() > 0) {
+    if(W_list.size() != p) stop("Wrong length of W_list");
   }
 
-  int n_traits = y_list[0].cols();
-
-  MatrixXd coefs(p,n);
-
-  sample_coefs_set_worker sampler(y_list, X_list,tot_Y_prec_list, nonZero_cols_X,randn_theta_list,prior_mean,prior_prec,n_traits,coefs);
-  RcppParallel::parallelFor(0,n,sampler,grainSize);
-
-  return(coefs);
-}
-
-// [[Rcpp::export()]]
-MatrixXd get_fitted_set_c(  // returns n_tot x p matrix in same order as data
-    Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x b), s (n_i x 1), position (n_i x 1)
-    Map<MatrixXd> coefs,  // b x n matrix
-    int grainSize){
-
-  std::vector<MatrixXd> X_list;
-  std::vector<ArrayXi> position_list;
-  std::vector<ArrayXi> nonZero_cols_X;
-  int total_obs = 0;
-  int n = model_matrices.size();
-  for(int i = 0; i < n; i++){
-    Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
-    X_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));
-    position_list.push_back(Rcpp::as<ArrayXi>(model_matrix_i["position"]));
-    nonZero_cols_X.push_back(Rcpp::as<ArrayXi>(model_matrix_i["nonZero_cols_X"])); // list of which columns b_X correspond to in full X matrix
-
-    int n_obs = X_list[i].rows();
-    total_obs += n_obs;
+  // X or U and V
+  Map<MatrixXd> U = X;
+  MatrixXd z = MatrixXd::Zero(0,0);
+  Map<MatrixXd> V(z.data(),0,0);
+  int b = X.cols();
+  if(X.rows() != n) stop("Wrong dimension of X");
+  if(Rf_isMatrix(V_)) {
+    // Map<MatrixXd> V__ = as<Map<MatrixXd> >(V_);
+    // new (&v) Map<MatrixXd> (V__,V__.rows(),V__.cols());
+    new (&V) Map<MatrixXd> (as<Map<MatrixXd> >(V_));
+    if(U.cols() != V.rows()) stop("X and V_ have incompatible dimensions");
+    b = V.cols();
   }
 
-  Rcpp::List model_matrix_1 = Rcpp::as<Rcpp::List>(model_matrices[0]);
-  MatrixXd Y = Rcpp::as<MatrixXd>(model_matrix_1["y"]);
-  int n_traits = Y.cols();
+  // chol_V_list
+  if(max(h2s_index) > chol_V_list.size()) {
+    stop("max(h2s_index) > length(chol_V_list)");
+  }
 
-  MatrixXd Y_fitted(total_obs,n_traits);
+  // priors
+  if(Y_prec.size() != p) {
+    stop("Wrong length of Y_prec");
+  }
+  if(prior_prec_alpha1.rows() != a1 || prior_prec_alpha1.cols() != p) stop("Wrong dimensions of prior_prec_alpha1");
+  if(prior_prec_alpha2.size() != p) {
+    stop("Wrong length of prior_prec_alpha2");
+  }
+  if(prior_mean_beta.rows() != b || prior_mean_beta.cols() != p) stop("Wrong dimensions of prior_mean_beta");
+  if(prior_prec_beta.rows() != b || prior_prec_beta.cols() != p) stop("Wrong dimensions of prior_prec_beta");
 
-  struct sampleColumn : public RcppParallel::Worker {
-    std::vector<MatrixXd> X_list;
-    std::vector<ArrayXi> position_list;
-    std::vector<ArrayXi> nonZero_cols_X;
-    int n_traits;
-    MatrixXd coefs;
-    MatrixXd &Y_fitted;
-
-    sampleColumn(
-      std::vector<MatrixXd> &X_list,
-      std::vector<ArrayXi>  &position_list,
-      std::vector<ArrayXi>  &nonZero_cols_X,
-      int n_traits,
-      MatrixXd coefs,
-      MatrixXd &Y_fitted) :
-      X_list(X_list), position_list(position_list),nonZero_cols_X(nonZero_cols_X),
-      n_traits(n_traits),
-      coefs(coefs),Y_fitted(Y_fitted)
-    {}
-
-    void operator()(std::size_t begin, std::size_t end) {
-      for(std::size_t j = begin; j < end; j++){
-        int b_X = X_list[j].cols();
-        int b_tot = coefs.rows() / n_traits;
-        VectorXd coefs_j(b_X * n_traits);
-        for(int t = 0; t < n_traits; t++){
-          for(int k = 0; k < b_X; k++){
-            coefs_j[t*b_X+k] = coefs.coeffRef(t*b_tot+nonZero_cols_X[j][k]-1,j);
-          }
-        }
-        Map<MatrixXd> Eta_i(coefs_j.data(),b_X,n_traits);
-        MatrixXd Y_fitted_j = X_list[j] * Eta_i;
-        for(int i = 0; i < position_list[j].size(); i++) {
-          Y_fitted.row(position_list[j][i]-1) = Y_fitted_j.row(i);
-        }
-      }
+  // generate random numbers
+  MatrixXd randn_alpha1 = rstdnorm_mat2(a1,p);
+  std::vector<VectorXd> randn_alpha2;
+  if(W_list.size() > 0){
+    for(int i = 0; i < p; i++){
+      Map<MatrixXd> W2 = as<Map<MatrixXd> >(W_list[i]);
+      randn_alpha2.push_back(rstdnorm_mat2(W2.cols(),1));
     }
-  };
+  }
+  MatrixXd randn_beta = rstdnorm_mat2(b,p);
+  MatrixXd randn_e;
+  if(b > n) {
+    randn_e = rstdnorm_mat2(n,p);
+  }
+  VectorXd rgamma_1 = as<VectorXd>(rgamma(p,Y_prec_a0 + n/2.0,1.0));
 
-  sampleColumn sampler(X_list,position_list,nonZero_cols_X,n_traits,coefs,Y_fitted);
-  RcppParallel::parallelFor(0,n,sampler,grainSize);
+  // Results structures
+  MatrixXd alpha1(a1,p);
+  std::vector<VectorXd> alpha2;
+  alpha2.reserve(W_list.size());
+  int alpha2_size = 0;
+  if(W_list.size() > 0){
+    for(int i = 0; i < W_list.size(); i++){
+      MatrixXd W2_i = as<Map<MatrixXd> >(W_list[i]);
+      int a2 = W2_i.cols();
+      alpha2.push_back(VectorXd::Zero(a2));
+      alpha2_size += a2;
+    }
+  }
+  MatrixXd beta(b,p);
 
-  return(Y_fitted);
+  // go through h2s indices and sample columns with same index as a set
+  for(int i = min(h2s_index); i <= max(h2s_index); i++) {
+    int h2_index = i;
+    IntegerVector trait_set = which(h2s_index == h2_index);  // list of traits with same h2_index
+
+    if(trait_set.size() > 0){
+      // prepare matrices for sampler
+      MatrixXd RinvSqX, C, R, Rinv, RinvU, UtRinvU;
+      SEXP chol_R_ = chol_V_list[h2_index - 1];
+      int which_sampler;
+      // Decide which sampler to use
+      if(b <= n) {
+        // use regression_sampler_v1
+        which_sampler = 1;
+        if(Rf_isMatrix(chol_R_)) {
+          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+          RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);
+        } else{
+          MSpMat chol_R = as<MSpMat>(chol_R_);
+          RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);
+        }
+        C = RinvSqX.transpose() * RinvSqX;
+      }
+      else if(V.cols() == 0) {
+        // use regression_sampler_v2
+        which_sampler = 2;
+        if(Rf_isMatrix(chol_R_)) {
+          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+          R = chol_R.transpose().triangularView<Lower>() * chol_R;
+        } else{
+          MSpMat chol_R = as<MSpMat>(chol_R_);
+          R = chol_R.transpose().triangularView<Lower>() * chol_R;
+        }
+      } else {
+        // use regression_sampler_v3
+        which_sampler = 3;
+        if(Rf_isMatrix(chol_R_)) {
+          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
+          Rinv = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
+          RinvU = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(U));
+        } else{
+          MSpMat chol_R = as<MSpMat>(chol_R_);
+          Rinv = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
+          RinvU = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(U));
+        }
+        UtRinvU = U.transpose() * RinvU;
+      }
+      regression_sampler_worker sampler(which_sampler, trait_set,Y,W_base,W_list,X,V,RinvSqX,C,
+                                        chol_R_,R,Rinv,RinvU,UtRinvU,
+                                        prior_prec_alpha1,prior_prec_alpha2,prior_mean_beta,prior_prec_beta,Y_prec_b0,
+                                        randn_alpha1,randn_alpha2,randn_beta,randn_e, rgamma_1,
+                                        alpha1,alpha2,beta,Y_prec);
+      RcppParallel::parallelFor(0,trait_set.size(),sampler,grainSize);
+    }
+  }
+
+  // collect alpha2 into a vector
+  VectorXd alpha2_vec(alpha2_size);
+  if(W_list.size() > 0){
+    int index = 0;
+    for(int i = 0; i < W_list.size(); i++){
+      alpha2_vec.segment(index,alpha2[i].size()) = alpha2[i];
+      index += alpha2[i].size();
+    }
+  }
+
+  return(Rcpp::List::create(
+      Named("alpha1") = alpha1,
+      Named("alpha2") = alpha2_vec,
+      Named("beta") = beta,
+      Named("Y_prec") = Y_prec
+  ));
 }
+
 
 // -------------------------------------------- //
 // ------------ sample_MME_ZKZts -------------- //
@@ -481,41 +688,42 @@ MatrixXd get_fitted_set_c(  // returns n_tot x p matrix in same order as data
 // [[Rcpp::export()]]
 VectorXd sample_MME_single_diagR(
     VectorXd y,           // nx1
-    SpMat Zt,             // nxr dgCMatrix
-    MSpMat &chol_C,       // rxr dgCMatrix upper triangular: chol(ZtRinvZ + diag(Kinv))
+    MSpMat Z,             // nxr dgCMatrix
+    MSpMat chol_ZtZ_Kinv,       // rxr CsparseMatrix upper triangular: chol(ZtRinvZ + diag(Kinv))
     double tot_Eta_prec,   // double
     double pe,            // double
     VectorXd randn_theta  // rx1
 ){
-  VectorXd b = Zt * y * pe;
-  b = chol_C.transpose().triangularView<Lower>().solve(b / sqrt(tot_Eta_prec));
+  VectorXd b = Z.transpose() * y * pe;
+  b = chol_ZtZ_Kinv.transpose().triangularView<Lower>().solve(b / sqrt(tot_Eta_prec));
   b += randn_theta;
-  b = chol_C.triangularView<Upper>().solve(b / sqrt(tot_Eta_prec));
+  b = chol_ZtZ_Kinv.triangularView<Upper>().solve(b / sqrt(tot_Eta_prec));
   return(b);
 }
 
 
 struct sample_MME_single_diagR_worker : public RcppParallel::Worker {
-  MatrixXd Y;
-  SpMat Zt;
-  const std::vector<MSpMat> chol_C_list;
-  ArrayXd pes;
-  VectorXd tot_Eta_prec;
-  VectorXi h2s_index;
-  MatrixXd randn_theta;
+  const Map<MatrixXd> Y;
+  const MSpMat Z;
+  const Rcpp::List chol_ZtZ_Kinv_list;
+  const ArrayXd& pes;
+  const Map<VectorXd> tot_Eta_prec;
+  const Map<VectorXi> h2s_index;
+  const Map<MatrixXd> randn_theta;
   MatrixXd &coefs;
 
-  sample_MME_single_diagR_worker(MatrixXd Y,                                // nxp
-                                  SpMat Zt,                                  // nxr
-                                  const std::vector<MSpMat> &chol_C_list,     // std::vector of rxr SpMat upper-triangle
-                                  ArrayXd pes,                               // px1
-                                  VectorXd tot_Eta_prec,                     // px1
-                                  VectorXi h2s_index,                        // px1, 1-based index
-                                  MatrixXd randn_theta,                      // rxp
-                                  MatrixXd &coefs                            // rxp
+  sample_MME_single_diagR_worker(
+    const Map<MatrixXd> Y,                                // nxp
+    const MSpMat Z,                                  // nxr
+    const Rcpp::List chol_ZtZ_Kinv_list,     // std::vector of rxr SpMat upper-triangle
+    const ArrayXd& pes,                               // px1
+    const Map<VectorXd> tot_Eta_prec,                     // px1
+    const Map<VectorXi> h2s_index,                        // px1, 1-based index
+    const Map<MatrixXd> randn_theta,                      // rxp
+    MatrixXd &coefs                            // rxp
   ):
-    Y(Y), Zt(Zt),
-    chol_C_list(chol_C_list),
+    Y(Y), Z(Z),
+    chol_ZtZ_Kinv_list(chol_ZtZ_Kinv_list),
     pes(pes), tot_Eta_prec(tot_Eta_prec),h2s_index(h2s_index),
     randn_theta(randn_theta),
     coefs(coefs) {}
@@ -523,8 +731,8 @@ struct sample_MME_single_diagR_worker : public RcppParallel::Worker {
   void operator()(std::size_t begin, std::size_t end) {
     for(std::size_t j = begin; j < end; j++){
       int h2_index = h2s_index[j] - 1;
-      MSpMat chol_C = chol_C_list[h2_index];  // C needs to be scaled by tot_Eta_prec[j]. C = Zt*Rinv*Z + Kinv, where Rinv and Kinv are scaled by h2.
-      coefs.col(j) = sample_MME_single_diagR(Y.col(j), Zt, chol_C, tot_Eta_prec[j], pes[j],randn_theta.col(j));
+      MSpMat chol_ZtZ_Kinv = as<MSpMat>chol_ZtZ_Kinv_list[h2_index];  // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
+      coefs.col(j) = sample_MME_single_diagR(Y.col(j), Zt, chol_ZtZ_Kinv, tot_Eta_prec[j], pes[j],randn_theta.col(j));
     }
   }
 };
@@ -540,7 +748,7 @@ MatrixXd sample_MME_ZKZts_c(
     Map<MatrixXd> Y,                    // nxp
     MSpMat Z,                           // nxr
     Map<VectorXd> tot_Eta_prec,         // px1
-    Rcpp::List randomEffect_C_Choleskys, // List. Each element contains chol_C and chol_K_inv (both rxr dgCMatrix upper-triangle)
+    Rcpp::List chol_ZtZ_Kinv_list,      // List or R st RtR = ZtZ_Kinv
     Map<MatrixXd> h2s,                  // n_RE x p
     VectorXi h2s_index,                 // px1
     int grainSize) {
@@ -550,75 +758,19 @@ MatrixXd sample_MME_ZKZts_c(
 
   MatrixXd randn_theta = rstdnorm_mat(r,p);
 
-  std::vector<MSpMat> chol_C_list;
-  for(int i = 0; i < h2s_index.maxCoeff(); i++){
-    Rcpp::List randomEffect_C_Cholesky_i = Rcpp::as<Rcpp::List>(randomEffect_C_Choleskys[i]);
-    chol_C_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_C"]));
-  }
+  // std::vector<MSpMat> chol_C_list;
+  // for(int i = 0; i < h2s_index.maxCoeff(); i++){
+  //   Rcpp::List randomEffect_C_Cholesky_i = Rcpp::as<Rcpp::List>(randomEffect_C_Choleskys[i]);
+  //   chol_C_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_C"]));
+  // }
 
   MatrixXd U(r,p);
   ArrayXd h2_e = 1.0 - h2s.colwise().sum().array();
   ArrayXd pes = tot_Eta_prec.array() / h2_e.array();
 
-  sample_MME_single_diagR_worker sampler(Y,Z.transpose(),chol_C_list,pes,tot_Eta_prec,h2s_index,randn_theta,U);
+  sample_MME_single_diagR_worker sampler(Y,Z,chol_ZtZ_Kinv_list,pes,tot_Eta_prec,h2s_index,randn_theta,U);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return(U);
-}
-
-
-// -------------------------------------------- //
-// -------------- tot_prec_scores ------------- //
-// -------------------------------------------- //
-
-
-struct tot_prec_scores_worker : public RcppParallel::Worker {
-  MatrixXd Y;
-  const std::vector<MSpMat> chol_R_list;
-  VectorXi h2s_index;
-  VectorXd &scores;
-
-  tot_prec_scores_worker(MatrixXd Y,                                // nxp
-                         const std::vector<MSpMat> &chol_R_list,     // std::vector of nxn SpMat upper-triangule
-                         VectorXi h2s_index,                        // px1, 1-based index
-                         VectorXd &scores                           // px1
-                           ):
-    Y(Y), chol_R_list(chol_R_list), h2s_index(h2s_index),
-    scores(scores) {}
-
-  void operator()(std::size_t begin, std::size_t end) {
-    for(std::size_t j = begin; j < end; j++){
-      int h2_index = h2s_index[j] - 1;
-      MSpMat chol_R = chol_R_list[h2_index];
-      VectorXd score = chol_R.transpose().triangularView<Lower>().solve(Y.col(j));
-      scores[j] = score.dot(score);
-    }
-  }
-};
-
-// calculates normal scores for:
-// Y_resid %*% Sigma_inv %*% t(Y_resid)
-// assumes complete data Y
-// [[Rcpp::export()]]
-VectorXd tot_prec_scores(
-    Map<MatrixXd> Y,              // nxp
-    Rcpp::List Sigma_Choleskys,   // List of nxn dgCMatrix upper-triangule
-    VectorXi h2s_index,           // px1
-    int grainSize)
-{
-
-
-  int p = Y.cols();
-  VectorXd scores(p);
-
-  std::vector<MSpMat> chol_R_list;
-  for(int i = 0; i < h2s_index.maxCoeff(); i++){
-    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
-    chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
-  }
-
-  tot_prec_scores_worker sampler(Y,chol_R_list,h2s_index,scores);
-  RcppParallel::parallelFor(0,p,sampler,grainSize);
-  return scores;
 }
 
 // -------------------------------------------- //
@@ -626,34 +778,40 @@ VectorXd tot_prec_scores(
 // -------------------------------------------- //
 
 struct log_ps_worker : public RcppParallel::Worker {
-  MatrixXd Y;
-  VectorXd tot_Eta_prec;
-  const std::vector<MSpMat> chol_R_list;
-  VectorXd log_det_Sigmas;
-  VectorXd discrete_priors;
+  const Map<MatrixXd> Y;
+  const Map<VectorXd> tot_Eta_prec;
+  const Rcpp::List chol_V_list;
+  const Map<VectorXd> discrete_priors;
   MatrixXd &log_ps;
 
-  log_ps_worker(MatrixXd Y,                           // nxp
-               VectorXd tot_Eta_prec,                 // px1
-               const std::vector<MSpMat> &chol_R_list, // std::vector of nxn SpMat, upper-triangular
-               VectorXd log_det_Sigmas,               // n_h2 x 1
-               VectorXd discrete_priors,              // n_h2 x 1
-               MatrixXd &log_ps                       // n_h2 x p
-    ):
-    Y(Y), tot_Eta_prec(tot_Eta_prec), chol_R_list(chol_R_list),
-    log_det_Sigmas(log_det_Sigmas), discrete_priors(discrete_priors), log_ps(log_ps) {}
+  log_ps_worker(
+    const Map<MatrixXd> Y,                           // nxp
+    const Map<VectorXd> tot_Eta_prec,                 // px1
+    const Rcpp::List chol_V_list, // std::vector of nxn SpMat, upper-triangular
+    const Map<VectorXd> discrete_priors,              // n_h2 x 1
+    MatrixXd &log_ps                       // n_h2 x p
+  ):
+    Y(Y), tot_Eta_prec(tot_Eta_prec), chol_V_list(chol_V_list),
+    discrete_priors(discrete_priors), log_ps(log_ps) {}
 
   void operator()(std::size_t begin, std::size_t end) {
     int p = Y.cols();
     int n = Y.rows();
     for(std::size_t i = begin; i < end; i++){
-      MSpMat chol_R = chol_R_list[i];
-      VectorXd scores2(p);
-      for(int j = 0; j < p; j++){
-        VectorXd x_std = chol_R.transpose().triangularView<Lower>().solve(Y.col(j));
-        scores2[j] = tot_Eta_prec[j] * x_std.dot(x_std);
+      SEXP chol_R_ = chol_V_list[i];
+      MatrixXd y_std(n,end-begin);
+      double log_det_V;
+      if(Rf_isMatrix(chol_R)){
+        Map<MatrixXd> chol_R(chol_R_);
+        y_std = chol_R.transpose().triangularView<Lower>().solve(Y);
+        log_det_V = 2*chol_R.diagonal().array().log().sum();
+      } else{
+        MSpMat chol_R = as<MSpMat>(chol_R_);
+        y_std = chol_R.transpose().triangularView<Lower>().solve(Y);
+        log_det_V = 2*chol_R.diagonal().array().log().sum();
       }
-      log_ps.row(i) = (-n/2.0 * log(2*M_PI) - 0.5 * (log_det_Sigmas[i] - n*tot_Eta_prec.array().log()) -
+      VectorXd scores2 = (y_std.transpose() * y_std).diagonal().array() * tot_Eta_prec.array();
+      log_ps.row(i) = (-n/2.0 * log(2*M_PI) - 0.5 * (log_det_V - n*tot_Eta_prec.array().log()) -
         0.5 * scores2.array() + log(discrete_priors[i]));
     }
   }
@@ -663,24 +821,24 @@ struct log_ps_worker : public RcppParallel::Worker {
 MatrixXd log_p_h2s(
     Map<MatrixXd> Y,              // nxp
     Map<VectorXd> tot_Eta_prec,   // px1
-    Rcpp::List Sigma_Choleskys,   // List. Each element contains: chol_Sigma: nxn dgCMatrix, upper-triangular, log_det
+    Rcpp::List chol_V_list,       // List. Each element contains: R st RtR = V. may be sparse or dense
     Map<VectorXd> discrete_priors,// n_h2 x 1
     int grainSize)
 {
   int b = discrete_priors.size();
   int p = Y.cols();
 
-  std::vector<MSpMat> chol_R_list;
-  VectorXd log_det_Sigmas(b);
-  for(int i = 0; i < b; i++){
-    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
-    chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
-    log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
-  }
+  // std::vector<MSpMat> chol_R_list;
+  // VectorXd log_det_Sigmas(b);
+  // for(int i = 0; i < b; i++){
+  //   Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
+  //   chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
+  //   log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
+  // }
 
   MatrixXd log_ps(b,p);
 
-  log_ps_worker sampler(Y,tot_Eta_prec,chol_R_list,log_det_Sigmas,discrete_priors,log_ps);
+  log_ps_worker sampler(Y,tot_Eta_prec,chol_V_list,discrete_priors,log_ps);
   RcppParallel::parallelFor(0,b,sampler,grainSize);
   return(log_ps);
 }
@@ -739,13 +897,23 @@ VectorXi sample_h2s(
 
 double log_prob_h2_c(
     VectorXd y,           // nx1
-    MSpMat chol_R,         // nxn dgCMatrix upper-triangular
+    SEXP chol_R_,         // nxn dgCMatrix upper-triangular
     double log_det_Sigma, // double
     int n,                // int
     double tot_Eta_prec,  // double
     double discrete_prior // double
 ){
-  VectorXd x_std = chol_R.transpose().triangularView<Lower>().solve(y);
+  VectorXd x_std;
+  double log_det_V;
+  if(Rf_isMatrix(chol_R)){
+    Map<MatrixXd> chol_R(chol_R_);
+    y_std = chol_R.transpose().triangularView<Lower>().solve(y);
+    log_det_V = 2*chol_R.diagonal().array().log().sum();
+  } else{
+    MSpMat chol_R = as<MSpMat>(chol_R_);
+    y_std = chol_R.transpose().triangularView<Lower>().solve(y);
+    log_det_V = 2*chol_R.diagonal().array().log().sum();
+  }
   double score2 = tot_Eta_prec * x_std.dot(x_std);
 
   double log_p = -n/2.0 * log(2*M_PI) - 0.5*(log_det_Sigma - n*log(tot_Eta_prec)) - 0.5 * score2 + log(discrete_prior);
@@ -755,7 +923,7 @@ double log_prob_h2_c(
 struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
   const MatrixXd Y;
   const MatrixXd h2s_matrix;
-  const std::vector<MSpMat> chol_R_list;
+  const Rcpp::List chol_V_list;
   const VectorXd log_det_Sigmas;
   const VectorXd tot_Eta_prec;
   const VectorXd discrete_priors;
@@ -765,21 +933,21 @@ struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
   const double step_size;
   VectorXi &new_index;
 
-  sample_h2s_discrete_MH_worker(const MatrixXd Y,                           // nxp
-                                const MatrixXd h2s_matrix,                  // n_RE x n_h2
-                                const std::vector<MSpMat> &chol_R_list,     // std::vector of nxn SpMat, upper-triangular
-                                const VectorXd log_det_Sigmas,              // n_h2 x 1
-                                const VectorXd tot_Eta_prec,                // p x 1
-                                const VectorXd discrete_priors,             // n_h2 x 1
-                                const VectorXd r_draws,                     // px1
-                                const VectorXd state_draws,                 // px1
-                                const VectorXi h2_index,                    // px1 - 1-based index
-                                const double step_size,                     // double
-                                VectorXi &new_index                         // px1 - 1-based index
-                                  ):
+  sample_h2s_discrete_MH_worker(const MatrixXd Y,                 // nxp
+                                const MatrixXd h2s_matrix,        // n_RE x n_h2
+                                const Rcpp::List chol_V_list,     // List of R st RtR = V
+                                const VectorXd log_det_Sigmas,    // n_h2 x 1
+                                const VectorXd tot_Eta_prec,      // p x 1
+                                const VectorXd discrete_priors,   // n_h2 x 1
+                                const VectorXd r_draws,           // px1
+                                const VectorXd state_draws,       // px1
+                                const VectorXi h2_index,          // px1 - 1-based index
+                                const double step_size,           // double
+                                VectorXi &new_index               // px1 - 1-based index
+  ):
 
     Y(Y), h2s_matrix(h2s_matrix),
-    chol_R_list(chol_R_list), log_det_Sigmas(log_det_Sigmas),
+    chol_V_list(chol_V_list), log_det_Sigmas(log_det_Sigmas),
     tot_Eta_prec(tot_Eta_prec),  discrete_priors(discrete_priors),
     r_draws(r_draws),state_draws(state_draws),h2_index(h2_index),step_size(step_size),new_index(new_index) {}
 
@@ -794,8 +962,8 @@ struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
       if(discrete_priors[proposed_state] == 0.0) {
         new_index[j] = old_state;  // don't bother with calculations if prior == 0.0
       } else{
-        double old_log_p = log_prob_h2_c(Y.col(j),chol_R_list[old_state],log_det_Sigmas[old_state],n,tot_Eta_prec[j],discrete_priors[old_state]);
-        double new_log_p = log_prob_h2_c(Y.col(j),chol_R_list[proposed_state],log_det_Sigmas[proposed_state],n,tot_Eta_prec[j],discrete_priors[proposed_state]);
+        double old_log_p = log_prob_h2_c(Y.col(j),chol_V_list[old_state],log_det_Sigmas[old_state],n,tot_Eta_prec[j],discrete_priors[old_state]);
+        double new_log_p = log_prob_h2_c(Y.col(j),chol_V_list[proposed_state],log_det_Sigmas[proposed_state],n,tot_Eta_prec[j],discrete_priors[proposed_state]);
 
         VectorXd candidate_states_from_new_state = find_candidate_states(h2s_matrix,step_size,proposed_state);
 
@@ -822,7 +990,7 @@ VectorXi sample_h2s_discrete_MH_c(
     Map<VectorXd> discrete_priors,  // n_h2 x 1
     VectorXi h2s_index,              // px1
     Map<MatrixXd> h2s_matrix,       // n_RE x n_h2
-    Rcpp::List Sigma_Choleskys,     // List of nxn dgCMatrices, upper-triangular
+    Rcpp::List chol_V_list,         // List of R st RtR = V, can be dense or sparse
     double step_size,               // double
     int grainSize
 ){
@@ -833,18 +1001,18 @@ VectorXi sample_h2s_discrete_MH_c(
   VectorXd state_draws = as<VectorXd>(runif(p));
 
   VectorXi new_index(p);
+//
+//   std::vector<MSpMat> chol_R_list;
+//   VectorXd log_det_Sigmas(b);
+//   for(int i = 0; i < b; i++){
+//     Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
+//
+//     chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
+//     log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
+//   }
 
-  std::vector<MSpMat> chol_R_list;
-  VectorXd log_det_Sigmas(b);
-  for(int i = 0; i < b; i++){
-    Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
 
-    chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
-    log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
-  }
-
-
-  sample_h2s_discrete_MH_worker sampler(Y,h2s_matrix,chol_R_list,log_det_Sigmas,tot_Eta_prec,discrete_priors,r_draws,state_draws,h2s_index,step_size,new_index);
+  sample_h2s_discrete_MH_worker sampler(Y,h2s_matrix,chol_V_list,tot_Eta_prec,discrete_priors,r_draws,state_draws,h2s_index,step_size,new_index);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return new_index;
 }
@@ -885,3 +1053,7 @@ MatrixXd sample_factors_scores_c( // returns nxk matrix
 
   return Ft.transpose();
 }
+
+
+
+

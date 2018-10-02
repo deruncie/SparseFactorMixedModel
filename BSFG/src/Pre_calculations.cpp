@@ -4,228 +4,196 @@ using namespace Rcpp;
 using namespace Eigen;
 using namespace RcppParallel;
 
-#include <math.h>
-#include <iostream>
-#include "BSFG_types.h"
-
-// [[Rcpp::depends(RcppEigen)]]
-using namespace Eigen;
-using namespace RcppParallel;
-
 // [[Rcpp::export()]]
-List LDLt_sparse(MSpMat A) {
-  Eigen::SimplicialLDLT<SpMat> chol_A;
-  chol_A.compute(A);
-  MatrixXd I = MatrixXd::Identity(chol_A.rows(), chol_A.rows());
-  MatrixXd P = chol_A.permutationP() * I;
-  return(List::create(
-      Named("P") = P.sparseView(),
-      Named("L") =chol_A.matrixL(),
-      Named("d") = chol_A.vectorD()
-  ));
+List LDLt(SEXP A_) {
+  if(Rf_isMatrix(A_)){
+    Map<MatrixXd> A = as<Map<MatrixXd> >(A_);
+    Eigen::LDLT<MatrixXd> ldlt_A;
+    ldlt_A.compute(A);
+    MatrixXd I = MatrixXd::Identity(ldlt_A.rows(), ldlt_A.rows());
+    MatrixXd P = ldlt_A.transpositionsP() * I;
+    VectorXd d = ldlt_A.vectorD();
+    MatrixXd L = ldlt_A.matrixL();
+    return(List::create(
+        Named("P") = P.sparseView(),
+        Named("L") = L.sparseView(),
+        Named("d") = d
+    ));
+  } else{
+    MSpMat A = as<MSpMat>(A_);
+    Eigen::SimplicialLDLT<SpMat> ldlt_A;
+    ldlt_A.compute(A);
+    MatrixXd I = MatrixXd::Identity(ldlt_A.rows(), ldlt_A.rows());
+    MatrixXd P = ldlt_A.permutationP() * I;
+    return(List::create(
+        Named("P") = P.sparseView(),
+        Named("L") = ldlt_A.matrixL(),
+        Named("d") = ldlt_A.vectorD()
+    ));
+  }
 }
 
-// [[Rcpp::export()]]
-List LDLt_notSparse(Map<MatrixXd> A) {
-  Eigen::LDLT<MatrixXd> chol_A;
-  chol_A.compute(A);
-  MatrixXd I = MatrixXd::Identity(chol_A.rows(), chol_A.rows());
-  MatrixXd P = chol_A.transpositionsP() * I;
-  VectorXd d = chol_A.vectorD();
-  MatrixXd L = chol_A.matrixL();
-  return(List::create(
-      Named("P") = P.sparseView(),
-      Named("L") = L.sparseView(),
-      Named("d") = d
-  ));
-}
-
-SpMat make_C(SpMat chol_K_inv,VectorXd h2s, SpMat ZtZ){
-  SpMat Ki = chol_K_inv.transpose() * chol_K_inv;
-  SpMat C = ZtZ;
-  C /= (1.0 - h2s.sum());
-  C += Ki;
-  return C;
-}
-
-SpMat make_Chol_K(std::vector<SpMat> chol_Ki_mats, VectorXd h2s,double tol){
+SpMat make_chol_K_inv(Rcpp::List chol_Ki_mats, VectorXd h2s,double tol){
   int h = h2s.size();
   VectorXd sizes(h);
   int total_size = 0;
   for(int i = 0; i < h; i++){
-    sizes(i) = chol_Ki_mats[i].rows();
+    MSpMat chol_Ki = as<MSpMat>(chol_Ki_mats[i]);
+    sizes(i) = chol_Ki.rows();
     total_size += sizes(i);
   }
-  MatrixXd chol_K_dense(total_size,total_size);
-  chol_K_dense.setZero();
+  MatrixXd chol_K_inv_dense(total_size,total_size);
+  chol_K_inv_dense.setZero();
   int curr_row = 0;
   int curr_col = 0;
   for(int i = 0; i < h; i++){
     if(h2s[i] == 0) {
-      chol_K_dense.block(curr_row,curr_col,sizes(i),sizes(i)).diagonal().setOnes();
-      chol_K_dense.block(curr_row,curr_col,sizes(i),sizes(i)).diagonal() /= 0;
+      chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)).diagonal().setOnes();
+      chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)).diagonal() /= 0;
     } else{
-      chol_K_dense.block(curr_row,curr_col,sizes(i),sizes(i)) = chol_Ki_mats[i];
-      chol_K_dense.block(curr_row,curr_col,sizes(i),sizes(i)) /= sqrt(h2s[i]);
+      MSpMat chol_Ki = as<MSpMat>(chol_Ki_mats[i]);
+      chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)) = chol_Ki;
+      chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)) /= sqrt(h2s[i]);
     }
     curr_row += sizes(i);
     curr_col += sizes(i);
   }
-  SpMat chol_K = chol_K_dense.sparseView(0,tol);
-  return chol_K;
+  SpMat chol_K_inv = chol_K_inv_dense.sparseView(0,tol);
+  return chol_K_inv;
 }
 
-struct randomEffect_C_Cholesky{
-  SpMat chol_Ci,chol_K_inv;
-  MatrixXd P;
+struct make_chol_ZtZ_Kinv_worker : public RcppParallel::Worker {
+  const Rcpp::List chol_Ki_mats;
+  const Map<MatrixXd> h2s_matrix;
+  const MSpMat ZtZ;
+  const double tol;
+  std::vector<SpMat>& chol_ZtZ_Kinv_list;
+
+  make_chol_ZtZ_Kinv_worker(
+    const Rcpp::List chol_Ki_mats,
+    const Map<MatrixXd> h2s_matrix,
+    const MSpMat ZtZ,
+    const double tol,
+    std::vector<SpMat>& chol_ZtZ_Kinv_list
+  ):
+    chol_Ki_mats(chol_Ki_mats), h2s_matrix(h2s_matrix), ZtZ(ZtZ), tol(tol),
+    chol_ZtZ_Kinv_list(chol_ZtZ_Kinv_list) {}
+
+  void operator()(std::size_t begin, std::size_t end) {
+    for(std::size_t j = begin; j < end; j++){
+      VectorXd h2s = h2s_matrix.col(j);
+      SpMat chol_K_inv = make_chol_K_inv(chol_Ki_mats,h2s,tol);
+      MatrixXd ZtZ_Kinv = 1.0/(1.0 - h2s.sum()) * ZtZ + chol_K_inv.transpose() * chol_K_inv;
+      Eigen::LLT<MatrixXd> chol_ZtZ_Kinv(ZtZ_Kinv);
+      MatrixXd chol_ZtZ_Kinv_R = chol_ZtZ_Kinv.matrixU();
+      chol_ZtZ_Kinv_list[j] = chol_ZtZ_Kinv_R.sparseView(0,tol);
+    }
+  }
 };
 
-class randomEffect_C_Cholesky_database {
-public:
-  randomEffect_C_Cholesky_database(List chol_Ki_mats_list, MatrixXd h2s_matrix, MSpMat ZtZ,double tol, int grainSize);
-  SpMat get_chol_Ci(int i) {return randomEffect_C_Cholesky_list[i-1].chol_Ci;}
-  SpMat get_chol_K_inv_i(int i) {return randomEffect_C_Cholesky_list[i-1].chol_K_inv;}
-private:
-  VectorXd h2s;
-  std::vector<randomEffect_C_Cholesky> randomEffect_C_Cholesky_list;
-};
+// [[Rcpp::export()]]
+Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats,
+                                   Map<MatrixXd> h2s_matrix,
+                                   MSpMat ZtZ,
+                                   double drop0_tol,
+                                   SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar,
+                                   int ncores) {
+  int s = h2s_matrix.cols();
 
-randomEffect_C_Cholesky_database::randomEffect_C_Cholesky_database(List chol_Ki_mats_list, MatrixXd h2s_matrix, MSpMat ZtZ,double tol,int grainSize) {
-  std::vector<SpMat> chol_Ki_mats;
-  int h = h2s_matrix.rows();
-  int n = h2s_matrix.cols();
-  for(int i = 0; i < h; i++){
-    chol_Ki_mats.push_back(Rcpp::as<MSpMat>(chol_Ki_mats_list[i]));
+  std::vector<SpMat> chol_ZtZ_Kinv_list;
+  chol_ZtZ_Kinv_list.reserve(s);
+  for(int i = 0; i < s; i++){
+    chol_ZtZ_Kinv_list.push_back(SpMat(0,0));
   }
 
-  struct calc_matrices : public Worker {
-    std::vector<SpMat> chol_Ki_mats;
-    MatrixXd h2s_matrix;
-    SpMat ZtZ;
-    double tol;
-    std::vector<randomEffect_C_Cholesky> &randomEffect_C_Cholesky_list_parallel;
+  int n_groups = s/ncores;
+  for(int i = 0; i <= n_groups; i++){
+    make_chol_ZtZ_Kinv_worker make_chols(chol_Ki_mats,h2s_matrix,ZtZ,drop0_tol,chol_ZtZ_Kinv_list);
+    int start = ncores*i;
+    int end = std::min(static_cast<double>(s),ncores*(i+1.0));
+    RcppParallel::parallelFor(start,end,make_chols,1);
+    int pb_state = as<int>(getTxtProgressBar(pb));
+    setTxtProgressBar(pb,pb_state+(end-start));
+  }
 
-    calc_matrices(std::vector<SpMat> chol_Ki_mats,
-                  MatrixXd h2s_matrix,
-                  SpMat ZtZ,
-                  double tol,
-                  std::vector<randomEffect_C_Cholesky> &randomEffect_C_Cholesky_list_parallel
-                ):
-      chol_Ki_mats(chol_Ki_mats),
-      h2s_matrix(h2s_matrix), ZtZ(ZtZ),tol(tol),
-      randomEffect_C_Cholesky_list_parallel(randomEffect_C_Cholesky_list_parallel)
-      {}
-    void operator()(std::size_t begin, std::size_t end) {
-        for(std::size_t j = begin; j < end; j++){
-          VectorXd h2s = h2s_matrix.col(j);
-          randomEffect_C_Cholesky randomEffect_C_Cholesky_j;
-          randomEffect_C_Cholesky_j.chol_K_inv = make_Chol_K(chol_Ki_mats,h2s,tol);
-          SpMat C = make_C(randomEffect_C_Cholesky_j.chol_K_inv,h2s,ZtZ);
-          // Eigen::SimplicialLLT<SpMat> chol_C;   // This might work, but would need to re-build all uses of this matrix in terms of the permutation matrix.
-          // chol_C.compute(C);
-          // SpMat chol_C_R = chol_C.matrixU();
-          // randomEffect_C_Cholesky_j.chol_Ci = chol_C_R;
-          // PermutationMatrix<Eigen::Dynamic> perm = chol_C.permutationP();
-          // MatrixXd P = perm.toDenseMatrix().cast<double>();
-          // randomEffect_C_Cholesky_j.P = P;
-          // chol_C_L = (P*chol_C_L).sparseView(0,1e-10);
-          // chol_C_R = chol_C_R;//*chol_C.permutationPinv();
-          // randomEffect_C_Cholesky_j.chol_Ci = chol_C_L.transpose();
-          Eigen::LLT<MatrixXd> chol_C;
-          chol_C.compute(C);
-          MatrixXd chol_C_R = chol_C.matrixU();
-          randomEffect_C_Cholesky_j.chol_Ci = chol_C_R.sparseView(0,tol);
-          randomEffect_C_Cholesky_list_parallel[j] = randomEffect_C_Cholesky_j;
-        }
-    }
-  };
+  Rcpp::List chol_ZtZ_Kinv_list_out(s);
+  for(int i = 0; i < s; i++){
+    chol_ZtZ_Kinv_list_out[i] = chol_ZtZ_Kinv_list[i];
+  }
 
-  randomEffect_C_Cholesky_list.resize(n);
-
-  calc_matrices calculator(chol_Ki_mats,h2s_matrix,ZtZ,tol,randomEffect_C_Cholesky_list);
-  RcppParallel::parallelFor(0,n,calculator,grainSize);
+  return(chol_ZtZ_Kinv_list_out);
 }
 
-SpMat make_Sigma(std::vector<SpMat> ZKZts, VectorXd h2s,double tol){
-  int n = ZKZts[0].rows();
+
+SpMat make_chol_R(Rcpp::List ZKZts, const VectorXd h2s, const double tol){  //std::vector<Map<MatrixXd> > ZKZts
+  Map<MatrixXd> ZKZts_0 = as<Map<MatrixXd> >(ZKZts[0]);
+  int n = ZKZts_0.rows();
   int h = h2s.size();
   MatrixXd R(n,n);
   R.setZero();
   for(int i = 0; i < h; i++){
-    R += h2s[i] * ZKZts[i];
+    Map<MatrixXd> ZKZts_i = as<Map<MatrixXd> >(ZKZts[i]);
+    R += h2s[i] * ZKZts_i;
   }
   R.diagonal().array() += (1.0-h2s.sum());
-  return R.sparseView(0,tol);
+
+  Eigen::LLT<MatrixXd> chol_R(R);
+  MatrixXd chol_R_U = chol_R.matrixU();
+  return chol_R_U.sparseView(0,tol);
 }
 
-struct Sigma_Cholesky{
-  SpMat chol_Sigma;
-  double log_det;
+
+struct make_chol_R_worker : public RcppParallel::Worker {
+  // const std::vector<Map<MatrixXd> > ZKZts;
+  const Rcpp::List ZKZts;
+  const Map<MatrixXd> h2s_matrix;
+  const double tol;
+  std::vector<SpMat>& chol_R_list;
+
+  make_chol_R_worker(
+    const Rcpp::List ZKZts, //const std::vector<Map<MatrixXd> > ZKZts,
+    const Map<MatrixXd> h2s_matrix,
+    const double tol,
+    std::vector<SpMat>& chol_R_list
+  ):
+    ZKZts(ZKZts), h2s_matrix(h2s_matrix), tol(tol),
+    chol_R_list(chol_R_list) {}
+
+  void operator()(std::size_t begin, std::size_t end) {
+    for(std::size_t j = begin; j < end; j++){
+      chol_R_list[j] = make_chol_R(ZKZts, h2s_matrix.col(j), tol);
+    }
+  }
 };
 
+// [[Rcpp::export()]]
+Rcpp::List make_chol_R_list(Rcpp::List ZKZts,
+                            Map<MatrixXd> h2s_matrix,
+                            double drop0_tol,
+                            SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar,
+                            int ncores) {
+  int s = h2s_matrix.cols();
 
-class Sigma_Cholesky_database {
-public:
-  Sigma_Cholesky_database(List chol_Ki_mats_list, MatrixXd h2s_matrix, double tol, int grainSize);
-  SpMat get_chol_Sigma(int i) {return Sigma_Cholesky_list[i-1].chol_Sigma;}
-  double get_log_det(int i) {return Sigma_Cholesky_list[i-1].log_det;}
-private:
-  VectorXd h2s;
-  std::vector<Sigma_Cholesky> Sigma_Cholesky_list;
-};
-Sigma_Cholesky_database::Sigma_Cholesky_database(List ZtZs_list, MatrixXd h2s_matrix,double tol, int grainSize) {
-  std::vector<SpMat> ZKZts;
-  int h = h2s_matrix.rows();
-  int n = h2s_matrix.cols();
-  for(int i = 0; i < h; i++){
-    ZKZts.push_back(Rcpp::as<MSpMat>(ZtZs_list[i]));
+  std::vector<SpMat> chol_R_list;
+  chol_R_list.reserve(s);
+  for(int i = 0; i < s; i++){
+    chol_R_list.push_back(SpMat(0,0));
   }
 
-  struct calc_matrices : public Worker {
-    std::vector<SpMat> ZKZts;
-    MatrixXd h2s_matrix;
-    double tol;
-    std::vector<Sigma_Cholesky> &Sigma_Cholesky_list_parallel;
+  int n_groups = s/ncores;
+  for(int i = 0; i <= n_groups; i++){
+    make_chol_R_worker make_chols(ZKZts,h2s_matrix,drop0_tol,chol_R_list);
+    int start = ncores*i;
+    int end = std::min(static_cast<double>(s),ncores*(i+1.0));
+    RcppParallel::parallelFor(start,end,make_chols,1);
+    int pb_state = as<int>(getTxtProgressBar(pb));
+    setTxtProgressBar(pb,pb_state+(end-start));
+  }
 
-    calc_matrices(std::vector<SpMat> ZKZts,
-                  MatrixXd h2s_matrix,
-                  double tol,
-                  std::vector<Sigma_Cholesky> &Sigma_Cholesky_list_parallel
-    ):
-      ZKZts(ZKZts),
-      h2s_matrix(h2s_matrix),
-      tol(tol),
-      Sigma_Cholesky_list_parallel(Sigma_Cholesky_list_parallel)
-    {}
-    void operator()(std::size_t begin, std::size_t end) {
-      for(std::size_t j = begin; j < end; j++){
-        VectorXd h2s = h2s_matrix.col(j);
+  Rcpp::List chol_R_list_out(s);
+  for(int i = 0; i < s; i++){
+    chol_R_list_out[i] = chol_R_list[i];
+  }
 
-        SpMat Sigma = make_Sigma(ZKZts, h2s,tol);
-        Eigen::LLT<MatrixXd> chol_Sigma(Sigma);
-        MatrixXd chol_SigmaU = chol_Sigma.matrixU();
-        Sigma_Cholesky_list_parallel[j].chol_Sigma = chol_SigmaU.sparseView(0,tol);
-        Sigma_Cholesky_list_parallel[j].log_det = 2*chol_SigmaU.diagonal().array().log().sum();
-      }
-    }
-  };
-
-  Sigma_Cholesky_list.resize(n);
-
-  calc_matrices calculator(ZKZts,h2s_matrix,tol,Sigma_Cholesky_list);
-  RcppParallel::parallelFor(0,n,calculator,grainSize);
-}
-
-
-RCPP_MODULE(Pre_calculations) {
-  class_<randomEffect_C_Cholesky_database>("randomEffect_C_Cholesky_database")
-  .constructor<List, MatrixXd, MSpMat,double,int>()
-  .method("get_chol_Ci",&randomEffect_C_Cholesky_database::get_chol_Ci)
-  .method("get_chol_K_inv_i",&randomEffect_C_Cholesky_database::get_chol_K_inv_i)
-  ;
-  class_<Sigma_Cholesky_database>("Sigma_Cholesky_database")
-    .constructor<List,MatrixXd,double,int>()
-    .method("get_chol_Sigma",&Sigma_Cholesky_database::get_chol_Sigma)
-    .method("get_log_det",&Sigma_Cholesky_database::get_log_det)
-  ;
+  return(chol_R_list_out);
 }

@@ -43,20 +43,14 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
     BSFG_state$current_state$nrun = i
     BSFG_state$current_state = BSFG_state$current_state[!sapply(BSFG_state$current_state,is.null)]
 
-    # ----- Sample Lambda ---------------- #
-    BSFG_state$current_state = sample_Lambda_B(BSFG_state,grainSize = grainSize,...)
-
-    # ----- Sample other factor model parameters  ---------------- #
+    # ----- Sample model parameters  except precisions ---------------- #
     BSFG_state$current_state = sample_latent_traits(BSFG_state,grainSize = grainSize,...)
 
     # -----Sample Lambda_prec ------------- #
     BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state,...)
 
-    # -----Sample B_prec ------------- #
-    BSFG_state$current_state = BSFG_state$priors$B_prior$sampler(BSFG_state,...)
-
-    # -----Sample QTL_prec ------------- #
-    BSFG_state$current_state = BSFG_state$priors$QTL_prior$sampler(BSFG_state,...)
+    # -----Sample B2_prec ------------- #
+    BSFG_state$current_state = BSFG_state$priors$B2_prior$sampler(BSFG_state,...)
 
     # ----- sample Eta ----- #
     observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)$state

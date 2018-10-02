@@ -47,9 +47,7 @@
 #'
 BSFG_control = function(
                         simulation = c(F,T),scale_Y = c(T,F),
-                        lambda_propto_Vp = TRUE,cauchy_sigma_tot = FALSE,
-                        b0 = 1, b1 = 0.0005, epsilon = 1e-1, prop = 1.00,
-                        k_init = 20, h2_divisions = 100, h2_step_size = NULL,
+                        K = 20, h2_divisions = 100, h2_step_size = NULL,
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,thin = 2,
                         num_NA_groups = Inf,
@@ -110,23 +108,18 @@ BSFG_priors = function(
                         h2_priors_resids_fun = function(h2s, n) 1,
                         h2_priors_factors_fun = function(h2s, n) 1,
                         Lambda_prior = list(
-                          sampler = sample_Lambda_prec_ARD,
-                          Lambda_df = 3,
-                          delta_1   = list(shape = 2,  rate = 1),
-                          delta_2   = list(shape = 3, rate = 1),
-                          delta_iteractions_factor = 100
+                          sampler = sample_Lambda_reg_horseshoe,
+                          prop_0 = 0.1,
+                          delta_l = list(shape = 3, rate = 1),
+                          delta_iterations_factor = 100
                         ),
-                        B_prior = list(
-                          sampler = sample_B_prec_ARD,
-                          global   = list(V = 1,nu = 3),
-                          global_F = list(V = 1,nu = 3),
-                          B_df      = 3,
-                          B_F_df    = 3
+                        B2_prior = list(
+                          sampler = sample_B2_reg_horseshoe,
+                          prop_0 = 0.1,
+                          c2 = list(V=1,nu=1e6)
                         ),
-                        QTL_prior = list(
-                          sampler = sample_QTL_prec_horseshoe,
-                          separate_QTL_shrinkage=T,
-                          cauchy_iteractions_factor = 10
+                        cis_effects_prior = list(
+                          prec = 1
                         )
 
                     ) {
@@ -135,6 +128,640 @@ BSFG_priors = function(
   all_args[names(passed_args)] = passed_args
   return(all_args)
 }
+
+
+setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotypes = NULL,run_parameters = BSFG_control(),setup=NULL,run_ID = 'BSFG_run'){
+  # creates model matrices, RE_setup, current_state
+  # returns BSFG_state
+
+  # ----------------------------- #
+  # -------- observation model ---------- #
+  # ----------------------------- #
+
+  if(is(Y,'list')){
+    if(!'observation_model' %in% names(Y)) stop('observation_model not specified in Y')
+    observation_model = Y$observation_model
+    observation_model_parameters = Y[names(Y) != 'observation_model']
+  } else{
+    if(!is(Y,'matrix'))	Y = as.matrix(Y)
+    if(nrow(Y) != nrow(data)) stop('Y and data have different numbers of rows')
+    observation_model = missing_data_model
+    observation_model_parameters = list(
+      Y = Y,
+      scale_Y = run_parameters$scale_Y
+    )
+  }
+
+  # initialize observation_model
+  observation_model_parameters$observation_setup = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
+  n = nrow(data)
+  p = observation_model_parameters$observation_setup$p
+
+  traitnames = observation_model_parameters$observation_setup$traitnames
+  if(is.null(traitnames)) traitnames = paste('trait',1:p,sep='_')
+  if(is.null(observation_model_parameters$observation_setup$Y_missing)) {
+    observation_model_parameters$observation_setup$Y_missing = matrix(0,n,p)
+  }
+  if(!is(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')){
+    observation_model_parameters$observation_setup$Y_missing = as(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')
+  }
+
+  # ----------------------------- #
+  # -------- model matrices ---------- #
+  # ----------------------------- #
+
+  model_setup = make_model_setup(formula,data,relmat)
+
+  # X1 is the "fixed effects", un-shrunk covariates that only affect residuals
+  X1 = model_setup$lmod$X
+  b1_R = ncol(X1)
+
+  # -------- regressions ---------- #
+  # X2_F and X2_R (and V_F and V_R) are the coefficient matrices for the regularized regression coefficients
+  # these are specifed as lists with either X (n x b) or {U(nxm),V(mxp)}
+  if(!is.list(factors_regression)) stop("factors_regression should be a list")
+  if('X' %in% names(factors_regression)){
+    X2_F = factors_regression
+    U2_F = X2_F
+    V2_F = NULL
+    b2_F = ncol(X2_F)
+  } else{
+    if(!all(c('U','V') %in% names(factors_regression))){
+      U2_F = factors_regression$U
+      V2_F = factors_regression$V
+      X2_F = U2_F %*% V2_F
+      b2_F = ncol(V2_F)
+    } else{
+      stop("missing U or V in factors_regression")
+    }
+  } else{
+    X2_F = matrix(0,n,0)
+    U2_F = X2_F
+    V2_F = NULL
+    b2_F = 0
+  }
+  if(!nrow(X2_F) == n) stop("Wrong dimension of X in factors_regression")
+
+  if(!is.list(resids_regression)) stop("resids_regression should be a list")
+  if('X' %in% names(resids_regression)){
+    X2_R = resids_regression
+    b2_R = ncol(X2_R)
+  } else{
+    if(!all(c('U','V') %in% names(resids_regression))){
+      X2_R = resids_regression$U %*% resids_regression$V
+      b2_R = ncol(V2_R)
+    }else{
+      stop("missing U or V in factors_regression")
+    }
+  } else{
+    X2_R = matrix(0,n,0)
+    b2_R = 0
+  }
+  if(!nrow(X2_R) == n) stop("Wrong dimension of X in resids_regression")
+
+  # -------- cis genotypes ---------- #
+  if(is.null(cis_genotypes)){
+    n_cis_effects = NULL
+    cis_effects_index = NULL
+  } else{
+    n_cis_effects = sapply(cis_genotypes,ncol)
+    cis_effects_index = c(0,cumsum(n_cis_effects))+1
+  }
+
+  # -------- Random effects ---------- #
+
+  # RE_setup is a list like from BGLR that describes the random effects (for both residuals and factors)
+  RE_setup = model_setup$RE_setup
+
+  # add names to RE_setup if needed
+  n_RE = length(RE_setup)
+  for(i in 1:n_RE){
+    if(is.null(names(RE_setup)[i]) || names(RE_setup)[i] == ''){
+      names(RE_setup)[i] = paste0('RE.',i)
+    }
+  }
+  RE_names = names(RE_setup)
+
+  # combine Z matrices
+  Z = do.call(cbind,lapply(RE_setup,function(x) x$Z))
+  Z = as(Z,'dgCMatrix')
+
+
+  # find RE indices
+  RE_lengths = sapply(RE_setup,function(x) ncol(x$Z))
+  RE_starts = cumsum(c(0,RE_lengths)[1:n_RE])
+  names(RE_starts) = RE_names
+  RE_indices = lapply(RE_names,function(re) RE_starts[re] + 1:RE_lengths[re])
+  names(RE_indices) = RE_names
+
+  # function to ensure that covariance matrices are sparse and symmetric
+  fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
+
+  # construct RE_L and ZL for each random effect
+  for(i in 1:length(RE_setup)){
+    re_name = names(RE_setup)[i]
+    RE_setup[[i]] = within(RE_setup[[i]],{
+      if(!'ZL' %in% ls()){
+        if('K' %in% ls() && !is.null(K)){
+          id_names = rownames(K)
+          ldl_k = LDLt(K)
+          large_d = ldl_k$d > run_parameters$K_eigen_tol
+          r_eff = sum(large_d)
+          # if need to use reduced rank model, then use D of K in place of K and merge L into Z
+          # otherwise, use original K, set L = Diagonal(1,r)
+          if(r_eff < length(ldl_k$d)) {
+            K = as(diag(ldl_k$d[large_d]),'CsparseMatrix')
+            K_inv = as(diag(1/ldl_k$d[large_d]),'CsparseMatrix')
+            L = t(ldl_k$P) %*% ldl_k$L[,large_d]
+          } else{
+            L = as(diag(1,nrow(K)),'CsparseMatrix')
+            K_inv = as(with(ldl_k,t(P) %*% crossprod(diag(1/sqrt(d)) %*% solve(L)) %*% P),'CsparseMatrix')
+          }
+          if(is.null(rownames(K))) rownames(K) = 1:nrow(K)
+          rownames(K_inv) = rownames(K)
+          rm(list=c('ldl_k','large_d','r_eff'))
+        } else if ('K_inv' %in% ls() && !is.null(K_inv)){
+          id_names = rownames(K_inv)
+          if(is.null(rownames(K_inv))) rownames(K_inv) = 1:nrow(K_inv)
+          K = solve(K_inv)
+          rownames(K) = rownames(K_inv)
+          L = as(diag(1,nrow(K)),'CsparseMatrix')
+        } else{
+          K = as(diag(1,ncol(Z)),'CsparseMatrix')
+          rownames(K) = colnames(Z)
+          id_names = rownames(K)
+          K_inv = K
+          L = as(diag(1,nrow(K)),'CsparseMatrix')
+        }
+        if(is.null(id_names)) id_names = 1:length(id_names)
+        rownames(L) = paste(id_names,re_name,sep='::')
+        K = fix_K(K)
+        ZL = Z %*% L
+      }
+    })
+  }
+  ZL = do.call(cbind,lapply(RE_setup,function(re) re$ZL))
+  ZL = as(ZL,'dgCMatrix')
+
+  if(length(RE_setup) > 1) {
+    RE_L = do.call(bdiag,lapply(RE_setup,function(re) re$L))
+    rownames(RE_L) = do.call(c,lapply(RE_setup,function(re) rownames(re$L)))
+  } else{
+    RE_L = RE_setup[[1]]$L
+  }
+  r_RE = sapply(RE_setup,function(re) ncol(re$ZL))
+
+  h2_divisions = run_parameters$h2_divisions
+  if(length(h2_divisions) < n_RE){
+    if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
+    h2_divisions = rep(h2_divisions,n_RE)
+  }
+  if(is.null(names(h2_divisions))) {
+    names(h2_divisions) = RE_names
+  }
+  h2s_matrix = expand.grid(lapply(RE_names,function(re) seq(0,1,length = h2_divisions[[re]]+1)))
+  colnames(h2s_matrix) = RE_names
+  h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
+  colnames(h2s_matrix) = NULL
+
+
+
+  run_variables = list(
+    p      = p,
+    n      = n,
+    r_RE   = r_RE,
+    RE_names = RE_names,
+    b1       = b1,
+    b2_R = b2_R,
+    b2_F = b2_F,
+    n_cis_effects     = n_cis_effects,
+    cis_effects_index = cis_effects_index
+  )
+
+  data_matrices = list(
+    X1           = X1,
+    X2_F = X2_F,
+    U2_F = U2_F,
+    V2_F = V2_F,
+    X2_R = X2_R,
+    Z           = Z,
+    ZL          = ZL,
+    RE_setup    = RE_setup,
+    RE_L        = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
+    RE_indices  = RE_indices,
+    h2s_matrix  = h2s_matrix,
+    cis_genotypes = cis_genotypes,
+    data       = data
+  )
+
+  run_parameters$observation_model = observation_model
+  run_parameters$observation_model_parameters = observation_model_parameters
+  run_parameters$traitnames = traitnames
+
+
+  # ----------------------------- #
+  # -- create BSFG_state object - #
+  # ----------------------------- #
+
+  RNG = list(
+    Random.seed = .Random.seed,
+    RNGkind = RNGkind()
+  )
+
+  BSFG_state = list(
+    run_ID         = run_ID,
+    data_matrices  = data_matrices,
+    # priors         = priors,
+    run_parameters = run_parameters,
+    run_variables  = run_variables,
+    RNG            = RNG,
+    setup          = setup
+  )
+  class(BSFG_state) = append('BSFG_state',class(BSFG_state))
+
+  BSFG_state
+}
+
+set_priors_BSFG = function(BSFG_state,priors = BSFG_priors()) {
+  # returns BSFG_state
+
+  p = BSFG_state$run_variables$p
+
+  # ----------------------------- #
+  # ----- re-formulate priors --- #
+  # ----------------------------- #
+  # total precision
+  if(length(priors$tot_Y_var$V == 1)) {
+    priors$tot_Y_var$V = rep(priors$tot_Y_var$V,p)
+    priors$tot_Y_varnu = rep(priors$tot_Y_var$nu,p)
+  }
+  priors$tot_Eta_prec_rate   = with(priors$tot_Y_var,V * nu)
+  priors$tot_Eta_prec_shape  = with(priors$tot_Y_var,nu - 1)
+  priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
+  priors$tot_F_prec_shape    = with(priors$tot_F_var,nu - 1)
+
+  # h2_priors_resids
+  if(exists('h2_priors_resids',priors)) {
+    if(length(priors$h2_priors_resids) == 1) priors$h2_priors_resids = rep(priors$h2_priors_resids,ncol(h2s_matrix))
+    if(!length(priors$h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_resids')
+  } else{
+    if(!is(priors$h2_priors_resids_fun,'function')) stop('need to provide a priors$h2_priors_resids_fun() to specify discrete h2 prior for resids')
+    priors$h2_priors_resids = apply(h2s_matrix,2,priors$h2_priors_resids_fun,n = ncol(h2s_matrix))
+  }
+  priors$h2_priors_resids = priors$h2_priors_resids/sum(priors$h2_priors_resids)
+  # h2_priors_factors
+  if(exists('h2_priors_factors',priors)) {
+    if(length(priors$h2_priors_factors) == 1) priors$h2_priors_factors = rep(priors$h2_priors_factors,ncol(h2s_matrix))
+    if(!length(priors$h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_factors')
+  } else{
+    if(!is(priors$h2_priors_factors_fun,'function')) stop('need to provide a priors$h2_priors_factors_fun() to specify discrete h2 prior for factors')
+    priors$h2_priors_factors = apply(h2s_matrix,2,priors$h2_priors_factors_fun,n = ncol(h2s_matrix))
+  }
+  priors$h2_priors_factors = priors$h2_priors_factors/sum(priors$h2_priors_factors)
+
+  BSFG_state$priors = priors
+
+}
+
+
+
+initialize_variables_BSFG = function(BSFG_state,...){
+  run_parameters = BSFG_state$run_parameters
+  run_variables = BSFG_state$run_variables
+  data_matrices = BSFG_state$data_matrices
+  priors = BSFG_state$priors
+
+  BSFG_state$current_state = with(c(run_parameters,run_variables,data_matrices,priors),{
+
+    # Factors loadings:
+
+    Plam = matrix(1,p,K)
+
+    # Lambda - factor loadings
+    #   Prior: Normal distribution for each element.
+    #       mu = 0
+    #       sd = sqrt(1/Plam)
+    Lambda = matrix(rnorm(p*K,0,sqrt(1/Plam)),nr = p,nc = K)
+    rownames(Lambda) = traitnames
+
+    # residuals
+    # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
+    #  Prior: Gamma distribution for each element
+    #       shape = tot_Eta_prec_shape
+    #       rate = tot_Eta_prec_rate
+    tot_Eta_prec = matrix(rgamma(p,shape = tot_Eta_prec_shape,rate = tot_Eta_prec_rate),nrow = 1)
+    colnames(tot_Eta_prec) = traitnames
+
+    # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
+    #  Prior: Gamma distribution for each element
+    #       shape = tot_F_prec_shape
+    #       rate = tot_F_prec_rate
+    tot_F_prec = matrix(1,nrow=1,ncol=K)
+    #with(priors,matrix(rgamma(K,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
+
+    # Factor scores:
+
+    # Resid discrete variances
+    # p-matrix of n_RE x p with
+    resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
+    resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
+
+    # Factor discrete variances
+    # K-matrix of n_RE x K with
+    F_h2_index = sample(1:ncol(h2s_matrix),K,replace=T)
+    F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
+
+    U_F = matrix(rnorm(sum(r_RE) * K, 0, sqrt(F_h2[1,] / tot_F_prec)),ncol = K, byrow = T)
+    rownames(U_F) = colnames(ZL)
+
+    U_R = matrix(rnorm(sum(r_RE) * p, 0, sqrt(resid_h2[1,] / tot_Eta_prec)),ncol = p, byrow = T)
+    colnames(U_R) = traitnames
+    rownames(U_R) = colnames(ZL)
+
+    # Fixed effects
+    B1 = matrix(rnorm(b1*p), ncol = p)
+    colnames(B) = traitnames
+
+    B2_R = 0*matrix(rnorm(b2_R*p),ncol = p)
+    colnames(B2_R) = traitnames
+
+    # Factor fixed effects
+    B2_F = 0*matrix(rnorm(b2_F * K),b2_F,K)
+
+    XB = X1 %**% B1 + X2_R %*% B2_R
+
+    F = X2_F %*% B2_F + ZL %*% U_F + matrix(rnorm(n * K, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = K, byrow = T)
+    F = as.matrix(F)
+
+    cis_effects = rnorm(length(cis_effects_index))
+
+    # var_Eta
+    if(!'var_Eta' %in% ls()) var_Eta = rep(1,p)
+
+    # ----------------------- #
+    # ---Save initial values- #
+    # ----------------------- #
+    current_state = list(
+      K              = K,
+      Lambda         = Lambda,
+      tot_F_prec     = tot_F_prec,
+      F_h2_index     = F_h2_index,
+      F_h2           = F_h2,
+      U_F            = U_F,
+      F              = F,
+      tot_Eta_prec   = tot_Eta_prec,
+      resid_h2_index = resid_h2_index,
+      resid_h2       = resid_h2,
+      U_R            = U_R,
+      B1              = B1,
+      B2_R            = B2_R,
+      B2_F            = B2_F,
+      XB             = XB,
+      cis_effects    = cis_effects,
+      nrun           = 0,
+      total_time     = 0
+    )
+    return(current_state)
+  })
+
+  # Initialize parameters for Lambda_prior, B_prior, and QTL_prior (may be model-specific)
+  BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state)
+  BSFG_state$current_state = BSFG_state$priors$B2_prior$sampler(BSFG_state)
+
+  # Initialize Eta
+  observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)
+  BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
+
+  BSFG_state$Posterior$posteriorSample_params = unique(c(BSFG_state$Posterior$posteriorSample_params,observation_model_state$posteriorSample_params))
+  BSFG_state$Posterior$posteriorMean_params = unique(c(BSFG_state$Posterior$posteriorMean_params,observation_model_state$posteriorMean_params))
+
+  return(BSFG_state)
+}
+
+
+
+initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL, chol_R_list = NULL, chol_ZKZt_list = NULL) {
+  # calculates Qt_list, chol_R_list and chol_ZKZt_list
+  # returns BSFG_state
+
+  run_parameters = BSFG_state$run_parameters
+  data_matrices = BSFG_state$data_matrices
+  Y_missing = BSFG_state$observation_model_parameters$observation_setup$Y_missing
+  h2s_matrix = BSFG_state$data_matrices$h2s_matrix
+
+  RE_setup = data_matrices$RE_setup
+  ZL = data_matrices$ZL
+
+  n_RE = length(RE_setup)
+
+  # ------------------------------------ #
+  # ----Precalculate ZKZts, chol_Ks ---- #
+  # ------------------------------------ #
+
+  # first, identify sets of traits with same pattern of missingness
+  # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
+  if(run_parameters$num_NA_groups > 0) {
+    # columns with same patterns of missing data
+    Y_missing_mat = as.matrix(Y_missing)
+    Y_col_obs = lapply(1:ncol(Y_missing_mat),function(x) {
+      obs = which(!Y_missing_mat[,x],useNames=F)
+      names(obs) = NULL
+      obs
+    })
+    non_missing_rows = unname(which(rowSums(!Y_missing_mat)>0))
+    unique_Y_col_obs = unique(c(list(non_missing_rows),Y_col_obs))
+    unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
+    Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
+
+    if(length(unique_Y_col_obs) > run_parameters$num_NA_groups){
+      col_counts = sort(tapply(Y_col_obs_index,Y_col_obs_index,length),decreasing = T)
+      biggest_cols = as.numeric(names(col_counts))[1:run_parameters$num_NA_groups]
+      biggest_cols = unique(c(1,biggest_cols))
+      unique_Y_col_obs = unique_Y_col_obs[biggest_cols]
+      Y_col_obs_index_new = rep(NA,length(Y_col_obs))
+      for(i in 1:length(Y_col_obs_index)){
+        if(Y_col_obs_index[i] %in% biggest_cols){
+          Y_col_obs_index_new[i] = match(Y_col_obs_index[i],biggest_cols)
+        } else{
+          diffs = sapply(unique_Y_col_obs,function(x) sum(Y_col_obs[[i]] %in% x == F) + sum(x %in% Y_col_obs[[i]] == F))
+          Y_col_obs_index_new[i] = order(diffs)[1]
+          Y_missing_mat[,i] = T
+          Y_missing_mat[unique_Y_col_obs[[Y_col_obs_index_new[i]]],i] = F
+        }
+      }
+      Y_col_obs_index = Y_col_obs_index_new
+    }
+
+    Missing_data_map = lapply(seq_along(unique_Y_col_obs),function(i) {
+      x = unique_Y_col_obs[[i]]
+      return(list(
+        Y_obs = x,
+        Y_cols = which(Y_col_obs_index == i)
+      ))
+    })
+
+    # rows with same patterns of missing data
+    Y_row_obs = lapply(1:nrow(Y_missing_mat),function(x) {
+      obs = which(!Y_missing_mat[x,],useNames=F)
+      names(obs) = NULL
+      obs
+    })
+    non_missing_cols = unname(which(colSums(!Y_missing_mat)>0))
+    unique_Y_row_obs = unique(c(list(non_missing_cols),Y_row_obs))
+    unique_Y_row_obs_str = lapply(unique_Y_row_obs,paste,collapse='')
+    Y_row_obs_index = sapply(Y_row_obs,function(x) which(unique_Y_row_obs_str == paste(x,collapse='')))
+
+    Missing_row_data_map = lapply(seq_along(unique_Y_row_obs),function(i) {
+      x = unique_Y_row_obs[[i]]
+      return(list(
+        Y_cols = x,
+        Y_obs = which(Y_row_obs_index == i)
+      ))
+    })
+  } else{
+    Missing_data_map = list(list(
+      Y_obs = 1:n,
+      Y_cols = 1:p
+    ))
+    Missing_row_data_map = list(list(
+      Y_obs = 1:n,
+      Y_cols = 1:p
+    ))
+  }
+
+  # now, for each set of columns, pre-calculate a set of matrices, etc
+  # do calculations in several chunks
+  n_matrices = 2*ncol(h2s_matrix)
+
+  if(verbose) {
+    print(sprintf("Pre-calculating random effect inverse matrices for %d groups of traits and %d sets of random effect weights", length(Missing_data_map), ncol(h2s_matrix)))
+    pb = txtProgressBar(min=0,max = length(Missing_data_map) * n_matrices,style=3)
+  }
+
+  X1   = data_matrices$X1
+  X2_F = data_matrices$X2_F
+  X2_R = data_matrices$X2_R
+  ZL   = data_matrices$ZL
+
+
+  # cholesky decompositions (RtR) of each K_inverse matrix
+  chol_Ki_mats = lapply(RE_setup,function(re) as(chol(as.matrix(re$K_inv)),'CsparseMatrix'))
+
+
+  Qt_list = list()
+  QtZL_list = list()
+  QtX1_list = list()
+  QtX2_R_list = list()
+  Qt_cis_genotypes = list()
+
+  chol_V_list_list = list()
+  chol_ZtZ_Kinv_list_list = list()
+
+  if(n_RE == 1 && run_parameters$svd_K == TRUE){
+    svd_K1 = svd(RE_setup[[1]]$K)
+  }
+
+  for(set in seq_along(Missing_data_map)){
+    x = Missing_data_map[[set]]$Y_obs
+    cols = Missing_data_map[[set]]$Y_cols
+    if(length(x) == 0) next
+
+    if(n_RE == 1){
+      if(run_parameters$svd_K == TRUE) {
+        # a faster way of taking the SVD of ZLKZLt, particularly if ncol(ZL) < nrow(ZL). Probably no benefit if ncol(K) > nrow(ZL)
+        qr_ZU = qr(ZL[x,,drop=FALSE] %*% svd_K1$u)
+        R_ZU = drop0(qr.R(qr_ZU,complete=F),tol=run_parameters$drop0_tol)
+        Q_ZU = drop0(qr.Q(qr_ZU,complete=T),tol=run_parameters$drop0_tol)
+        RKRt = R_ZU %*% diag(svd_K1$d) %*% t(R_ZU)
+        svd_RKRt = svd(RKRt)
+        RKRt_U = svd_RKRt$u
+        if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
+        Qt = t(Q_ZU %*% RKRt_U)
+      } else{
+        ZKZt = ZL[x,,drop=FALSE] %*% RE_setup[[1]]$K %*% t(ZL[x,,drop=FALSE])
+        result = svd(ZKZt)
+        Qt = t(result$u)
+      }
+      Qt = as(drop0(as(Qt,'CsparseMatrix'),tol = run_parameters$drop0_tol),'CsparseMatrix')
+      if(nnzero(Qt)/length(Qt) > 0.5) Qt = as.matrix(Qt)  # only store as sparse if it is sparse
+    } else{
+      Qt = as(diag(1,length(x)),'CsparseMatrix')
+    }
+    QtZL_matrices_set = lapply(RE_setup,function(re) Qt %*% re$ZL[x,,drop=FALSE])
+    QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
+    if(nnzero(QtZL_set)/length(QtZL_set) > 0.5)  QtZL_set = as(QtZL_set,'CsparseMatrix')
+    QtX1_set = Qt %**% X1[x,,drop=FALSE]
+    QtX2_R_set = Qt %**% X2_R[x,,drop=FALSE]
+
+    Qt_cis_genotypes[set] = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
+
+    Qt_list[[set]]   = Qt
+    QtZL_list[[set]]  = QtZL_set
+    QtX1_list[[set]]  = QtX1_set
+    QtX2_R_list[[set]]  = QtX2_R_set
+
+    ZKZts_set = list()
+    for(i in 1:n_RE){
+      ZKZts_set[[i]] = as.matrix(forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% RE_setup[[i]]$K %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol)))
+    }
+
+    ZtZ_set = as(forceSymmetric(drop0(crossprod(ZL[x,]),tol = run_parameters$drop0_tol)),'CsparseMatrix')
+
+    chol_V_list_list[[set]] = make_chol_V_list(ZKZts_set,h2s_matrix,run_parameters$drop0_tol,bp,setTxtProgressBar,getTxtProgressBar,ncores)
+    chol_ZtZ_Kinv_list_list[[set]] = make_chol_ZtZ_Kinv_list(chol_Ki_mats,h2s_matrix,ZtZ_set,run_parameters$drop0_tol,bp,setTxtProgressBar,getTxtProgressBar,ncores)
+  }
+  if(verbose) close(pb)
+
+  # Qt matrices for factors are only used with row set 1
+  x = Missing_data_map[[1]]$Y_obs
+  Qt1_U2_F = Qt_list[[1]] %**% U2_F[x,,drop=FALSE]
+
+
+  BSFG_state$run_variables = c(BSFG_state$run_variables,
+    list(
+    Qt_list    = Qt_list,
+    QtZL_list   = QtZL_list,
+    QtX1_list   = QtX1_list,
+    QtX2_R_list = QtX2_R_list,
+    Qt1_U2_F = Qt1_U2_F,
+    Qt_cis_genotypes = Qt_cis_genotypes,
+    Qt_cis_genotypes_list = Qt_cis_genotypes_list,
+    Missing_data_map      = Missing_data_map,
+    Missing_row_data_map  = Missing_row_data_map,
+    chol_V_list_list          = chol_V_list_list,
+    chol_ZtZ_Kinv_list_list = chol_ZtZ_Kinv_list_list
+  ))
+
+  # ----------------------------- #
+  # --- Initialize BSFG_state --- #
+  # ----------------------------- #
+
+  BSFG_state$Posterior = list(
+    posteriorSample_params = posteriorSample_params,
+    posteriorMean_params = posteriorMean_params,
+    total_samples = 0,
+    folder = sprintf('%s/Posterior',run_ID),
+    files = c()
+  )
+
+  BSFG_state = initialize_variables(BSFG_state)
+
+  Posterior = reset_Posterior(BSFG_state$Posterior,BSFG_state)
+  BSFG_state$Posterior = Posterior
+
+
+  return(BSFG_state)
+}
+
+new_starting_value_BSFG = function(BSFG_state) {
+  # creates new current_state randomly
+}
+
+
+
+
+
+
 
 
 
@@ -235,922 +862,802 @@ BSFG_init = function(Y, model, data, factor_model_fixed = NULL, priors = BSFG_pr
                      posteriorMean_params = c(),
                      ncores = detectCores(),setup = NULL,verbose=T, run_ID = 'BSFG_run') {
 
-  # ----------------------------- #
-  # ---- build model matrices --- #
-  # ----------------------------- #
-
-	# check that all terms in models are in data
-	terms = c(all.vars(model),all.vars(factor_model_fixed))
-	if(!all(terms %in% colnames(data))) {
-	  missing_terms = terms[!terms %in% colnames(data)]
-	  stop(sprintf('terms %s missing from data',paste(missing_terms,sep=', ')))
-	}
-
-	# -------- Fixed effects ---------- #
-
-	# build X from fixed model
-	  # for Eta
-
-	X = model.matrix(nobars(model),data)
-	linear_combos = caret::findLinearCombos(X)
-	if(!is.null(linear_combos$remove)) {
-	  cat(sprintf('dropping column(s) %s to make X_resid full rank\n',paste(linear_combos$remove,sep=',')))
-	  X = X[,-linear_combos$remove]
-	}
-	if(any(is.na(X))) stop('Missing values in X_resid')
-
-  # for F
-	# if factor_model_fixed not specified, use fixed effects from model for both
-	if(is.null(factor_model_fixed)) {
-	  factor_model_fixed = nobars(model)
-	}
-
-	# check that there are no random effects specifed in factor_model_fixed
-	if(length(findbars(factor_model_fixed))) stop('Do not specify random effects in `factor_model_fixed`. Random effects for factors taken from `model`')
-
-	X_F = model.matrix(factor_model_fixed,data)
-	linear_combos = caret::findLinearCombos(X_F)
-	if(!is.null(linear_combos$remove)) {
-	  cat(sprintf('dropping column(s) %s to make X_factor full rank\n',paste(linear_combos$remove,sep=',')))
-	  X_F = X_F[,-linear_combos$remove]
-	}
-	X_F = sweep(X_F,2,colMeans(X_F),'-') # note columns are centered, potentially resulting in zero-variance columns
-	if(any(is.na(X_F))) stop('Missing values in X_F')
-
-	# -------- QTL effects ---------- #
-	QTL_resid_Z = QTL_resid_X = NULL
-	b_QTL = 0
-	if(!is.null(QTL_resid)){
-	  if(class(QTL_resid) == 'list'){
-	    QTL_model = findbars(QTL_resid$model)
-	    if(length(QTL_model) == 0) stop('no grouping factors found in QTL_resid model')
-	    if(length(QTL_model) > 1)  stop('more than one grouping factor found in QTL_resid model')
-
-	    group_model = as.formula(paste0('~',as.character(QTL_model[[1]][2])))
-	    group_mm = model.matrix(group_model,data)
-
-	    groupIDs = levels(as.factor(data[[as.character(QTL_model[[1]][[3]])]]))
-
-	    QTL_terms = mkReTrms(QTL_model,data,drop.unused.levels = FALSE)
-	    QTL_resid_Z = as(t(QTL_terms$Zt),'dgCMatrix')
-	    QTL_resid_Z = QTL_resid_Z[,c(matrix(1:ncol(QTL_resid_Z),ncol = ncol(group_mm),byrow=T))]
-	    if(!all(colnames(QTL_resid_Z) %in% rownames(QTL_resid$X))) stop(sprintf('Missing %s from QTL_resid$X',names(QTL_terms$cnms)[1]))
-	    if(!all(colnames(group_mm) == QTL_terms$cnms[[1]])) stop("QTL_resid model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
-	    if(!all(colnames(QTL_resid_Z)[1:length(groupIDs)] == groupIDs)) stop("QTL_resid model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
-
-	    QTL_resid_X = do.call(bdiag,lapply(1:ncol(group_mm),function(i) QTL_resid$X[groupIDs,]))
-	    QTL_resid_X = as.matrix(QTL_resid_X)
-
-	    if(is.null(colnames(QTL_resid$X))) {
-	      colnames(QTL_resid_X) = rep(paste0('m',1:ncol(QTL_resid$X)),ncol(group_mm))
-	    } else {
-	      colnames(QTL_resid_X) = rep(colnames(QTL_resid$X),ncol(group_mm))
-	    }
-	    colnames(QTL_resid_X) = paste(rep(colnames(group_mm),each = ncol(QTL_resid$X)),colnames(QTL_resid_X),sep='.')
-	  } else{
-	    if(nrow(QTL_resid) != nrow(data)) stop(sprintf('QTL_resid has wrong number of rows. Should be %d',nrow(data)))
-	    QTL_resid_Z = as(diag(1,nrow(data)),'dgCMatrix')
-	    if(is.data.frame(QTL_resid)) QTL_resid = as.matrix(QTL_resid)
-	    QTL_resid_X = QTL_resid
-	  }
-	  b_QTL = ncol(QTL_resid_X)
-	}
-
-	QTL_factors_Z = QTL_factors_X = NULL
-	b_QTL_F = 0
-	if(!is.null(QTL_factors)){
-	  if(class(QTL_factors) == 'list'){
-	    QTL_model = findbars(QTL_factors$model)
-	    if(length(QTL_model) == 0) stop('no grouping factors found in QTL_factors model')
-	    if(length(QTL_model) > 1)  stop('more than one grouping factor found in QTL_factors model')
-
-	    group_model = as.formula(paste0('~',as.character(QTL_model[[1]][2])))
-	    group_mm = model.matrix(group_model,data)
-
-	    groupIDs = levels(as.factor(data[[as.character(QTL_model[[1]][[3]])]]))
-
-	    QTL_terms = mkReTrms(QTL_model,data,drop.unused.levels = FALSE)
-	    QTL_factors_Z = as(t(QTL_terms$Zt),'dgCMatrix')
-	    QTL_factors_Z = QTL_factors_Z[,c(matrix(1:ncol(QTL_factors_Z),ncol = ncol(group_mm),byrow=T))]
-	    if(!all(colnames(QTL_factors_Z) %in% rownames(QTL_factors$X))) stop(sprintf('Missing %s from QTL_factors$X',names(QTL_terms$cnms)[1]))
-	    if(!all(colnames(group_mm) == QTL_terms$cnms[[1]])) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
-	    if(!all(colnames(QTL_factors_Z)[1:length(groupIDs)] %in% groupIDs)) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
-
-	    QTL_factors_X = do.call(bdiag,lapply(1:ncol(group_mm),function(i) QTL_factors$X[groupIDs,]))
-	    QTL_factors_X = as.matrix(QTL_factors_X)
-
-	    if(is.null(colnames(QTL_factors$X))) {
-	      colnames(QTL_factors_X) = rep(paste0('m',1:ncol(QTL_factors$X)),ncol(group_mm))
-	    } else {
-	      colnames(QTL_factors_X) = rep(colnames(QTL_factors$X),ncol(group_mm))
-	    }
-	    colnames(QTL_factors_X) = paste(rep(colnames(group_mm),each = ncol(QTL_factors$X)),colnames(QTL_factors_X),sep='.')
-	  } else{
-	    if(nrow(QTL_factors) != nrow(data)) stop(sprintf('QTL_factors has wrong number of rows. Should be %d',nrow(data)))
-	    QTL_factors_Z = as(diag(1,nrow(data)),'dgCMatrix')
-	    if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
-	    QTL_factors_X = QTL_factors
-	  }
-	  b_QTL_F = ncol(QTL_factors_X)
-	}
-
-
-	# -------- Random effects ---------- #
-	# ensure that only K or K_inv provided for each random effect
-	# check that all IDs from data are in rownames of K or K_inv
-	# add IDs from K or K_inv to levels data[[re]] for IDs not in data
-
-	RE_levels = list() # a list of levels for each of the random effects
-	if(is.null(K_mats)) K_mats = list()
-	for(re in names(K_mats)) {
-	  # check that K is a matrix, then convert to Matrix
-	  if(is.data.frame(K_mats[[re]])) K_mats[[re]] = as.matrix(K_mats[[re]])
-	  if(is.matrix(K_mats[[re]])) K_mats[[re]] = Matrix(K_mats[[re]],sparse=T)
-	  if(is.null(rownames(K_mats[[re]]))) stop(sprintf('K %s must have rownames',re))
-	  if(re %in% names(K_inv_mats)) stop(sprintf('Both K and Kinv provided for %s. Please provide only one for each random effect',re))
-	  RE_levels[[re]] = rownames(K_mats[[re]])
-	}
-	for(re in names(K_inv_mats)) {
-	  # check that K_inv is a matrix, then convert to Matrix
-	  if(is.data.frame(K_inv_mats[[re]])) K_inv_mats[[re]] = as.matrix(K_inv_mats[[re]])
-	  if(is.matrix(K_inv_mats[[re]])) K_inv_mats[[re]] = Matrix(K_inv_mats[[re]],sparse=T)
-
-	  if(is.null(rownames(K_inv_mats[[re]]))) stop(sprintf('K_inv %s must have rownames',re))
-	  RE_levels[[re]] = rownames(K_inv_mats[[re]])
-	}
-	for(re in names(RE_levels)){
-	  if(!re %in% colnames(data)) stop(sprintf('Column "%s" required in data',re))
-	  data[[re]] = as.factor(data[[re]]) # ensure 'data[[re]]' is a factor
-	  if(!all(levels(data[[re]]) %in% RE_levels[[re]])) stop(sprintf('Levels of random effect %s missing from provided %s',re,c('K_inv','K')[(re %in% names(K_mats))+1]))
-	  data[[re]] = factor(data[[re]],levels = RE_levels[[re]]) # add levels to data[[re]]
-	}
-
-	# use lme4 functions to parse random effects
-	#  note: correlated random effects are not allowed. Will convert to un-correlated REs
-	RE_terms = mkReTrms(findbars(model),data,drop.unused.levels = FALSE)  # extracts terms and builds Zt matrices
-
-	# construct the RE_setup list
-	  # contains:
-	    # Z: n x r design matrix
-	    # K: r x r PSD covariance matrix
-	    # K_inv: r x r inverse covariance matrix.
-	    # only one of K or K_inv is needed
-	RE_setup = list()
-	for(i in 1:length(RE_terms$cnms)){
-	  term = names(RE_terms$cnms)[i]
-	  n_factors = length(RE_terms$cnms[[i]])  # number of factors for this grouping factor
-	  K = K_inv = NULL
-	  if(term %in% names(K_mats)){
-	    K = K_mats[[term]]
-	  } else if(term %in% names(K_inv_mats)){
-	    K_inv = K_inv_mats[[term]]
-	  }
-
-	  # extract combined Z matrix
-	  combined_Zt = RE_terms$Ztlist[[i]]
-	  Zs_term = tapply(1:nrow(combined_Zt),gl(n_factors,1,nrow(combined_Zt),labels = RE_terms$cnms[[term]]),function(x) t(combined_Zt[x,]))
-
-	  # make an entry in RE_setup for each random effect
-	  for(j in 1:n_factors){
-	    # name of variance component
-	    name = term
-	    if(n_factors > 1) name = paste(name,RE_terms$cnms[[i]][[j]],sep='.')
-	    while(name %in% names(RE_setup)) name = paste0(name,'.1') # hack for when same RE used multiple times
-
-	    # Z matrix
-	    Z = as(Zs_term[[j]],'dgCMatrix')
-
-	    RE_setup[[name]] = list(
-	      Z = Z,
-	      K = K,
-	      K_inv = K_inv
-	    )
-	  }
-	}
-
-	BSFG_init2(
-	  Y = Y,
-	  X = X,
-	  X_F = X_F,
-	  QTL_resid_Z = QTL_resid_Z,
-	  QTL_resid_X = QTL_resid_X,
-	  QTL_factors_Z = QTL_factors_Z,
-	  QTL_factors_X = QTL_factors_X,
-	  RE_setup = RE_setup,
-	  data = data,
-	  priors = priors,
-	  run_parameters = run_parameters,
-	  cis_genotypes = cis_genotypes,
-	  posteriorSample_params = posteriorSample_params,
-	  posteriorMean_params = posteriorMean_params,
-	  ncores = ncores,setup = setup,verbose=verbose,
-	  run_ID = run_ID
-	)
+#   # ----------------------------- #
+#   # ---- build model matrices --- #
+#   # ----------------------------- #
+#
+# 	# check that all terms in models are in data
+# 	terms = c(all.vars(model),all.vars(factor_model_fixed))
+# 	if(!all(terms %in% colnames(data))) {
+# 	  missing_terms = terms[!terms %in% colnames(data)]
+# 	  stop(sprintf('terms %s missing from data',paste(missing_terms,sep=', ')))
+# 	}
+#
+# 	# -------- Fixed effects ---------- #
+#
+# 	# build X from fixed model
+# 	  # for Eta
+#
+# 	X = model.matrix(nobars(model),data)
+# 	linear_combos = caret::findLinearCombos(X)
+# 	if(!is.null(linear_combos$remove)) {
+# 	  cat(sprintf('dropping column(s) %s to make X_resid full rank\n',paste(linear_combos$remove,sep=',')))
+# 	  X = X[,-linear_combos$remove]
+# 	}
+# 	if(any(is.na(X))) stop('Missing values in X_resid')
+#
+#   # for F
+# 	# if factor_model_fixed not specified, use fixed effects from model for both
+# 	if(is.null(factor_model_fixed)) {
+# 	  factor_model_fixed = nobars(model)
+# 	}
+#
+# 	# check that there are no random effects specifed in factor_model_fixed
+# 	if(length(findbars(factor_model_fixed))) stop('Do not specify random effects in `factor_model_fixed`. Random effects for factors taken from `model`')
+#
+# 	X_F = model.matrix(factor_model_fixed,data)
+# 	linear_combos = caret::findLinearCombos(X_F)
+# 	if(!is.null(linear_combos$remove)) {
+# 	  cat(sprintf('dropping column(s) %s to make X_factor full rank\n',paste(linear_combos$remove,sep=',')))
+# 	  X_F = X_F[,-linear_combos$remove]
+# 	}
+# 	X_F = sweep(X_F,2,colMeans(X_F),'-') # note columns are centered, potentially resulting in zero-variance columns
+# 	if(any(is.na(X_F))) stop('Missing values in X_F')
+#
+# 	# -------- QTL effects ---------- #
+# 	QTL_resid_Z = QTL_resid_X = NULL
+# 	b_QTL = 0
+# 	if(!is.null(QTL_resid)){
+# 	  if(class(QTL_resid) == 'list'){
+# 	    QTL_model = findbars(QTL_resid$model)
+# 	    if(length(QTL_model) == 0) stop('no grouping factors found in QTL_resid model')
+# 	    if(length(QTL_model) > 1)  stop('more than one grouping factor found in QTL_resid model')
+#
+# 	    group_model = as.formula(paste0('~',as.character(QTL_model[[1]][2])))
+# 	    group_mm = model.matrix(group_model,data)
+#
+# 	    groupIDs = levels(as.factor(data[[as.character(QTL_model[[1]][[3]])]]))
+#
+# 	    QTL_terms = mkReTrms(QTL_model,data,drop.unused.levels = FALSE)
+# 	    QTL_resid_Z = as(t(QTL_terms$Zt),'dgCMatrix')
+# 	    QTL_resid_Z = QTL_resid_Z[,c(matrix(1:ncol(QTL_resid_Z),ncol = ncol(group_mm),byrow=T))]
+# 	    if(!all(colnames(QTL_resid_Z) %in% rownames(QTL_resid$X))) stop(sprintf('Missing %s from QTL_resid$X',names(QTL_terms$cnms)[1]))
+# 	    if(!all(colnames(group_mm) == QTL_terms$cnms[[1]])) stop("QTL_resid model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+# 	    if(!all(colnames(QTL_resid_Z)[1:length(groupIDs)] == groupIDs)) stop("QTL_resid model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+#
+# 	    QTL_resid_X = do.call(bdiag,lapply(1:ncol(group_mm),function(i) QTL_resid$X[groupIDs,]))
+# 	    QTL_resid_X = as.matrix(QTL_resid_X)
+#
+# 	    if(is.null(colnames(QTL_resid$X))) {
+# 	      colnames(QTL_resid_X) = rep(paste0('m',1:ncol(QTL_resid$X)),ncol(group_mm))
+# 	    } else {
+# 	      colnames(QTL_resid_X) = rep(colnames(QTL_resid$X),ncol(group_mm))
+# 	    }
+# 	    colnames(QTL_resid_X) = paste(rep(colnames(group_mm),each = ncol(QTL_resid$X)),colnames(QTL_resid_X),sep='.')
+# 	  } else{
+# 	    if(nrow(QTL_resid) != nrow(data)) stop(sprintf('QTL_resid has wrong number of rows. Should be %d',nrow(data)))
+# 	    QTL_resid_Z = as(diag(1,nrow(data)),'dgCMatrix')
+# 	    if(is.data.frame(QTL_resid)) QTL_resid = as.matrix(QTL_resid)
+# 	    QTL_resid_X = QTL_resid
+# 	  }
+# 	  b_QTL = ncol(QTL_resid_X)
+# 	}
+#
+# 	QTL_factors_Z = QTL_factors_X = NULL
+# 	b_QTL_F = 0
+# 	if(!is.null(QTL_factors)){
+# 	  if(class(QTL_factors) == 'list'){
+# 	    QTL_model = findbars(QTL_factors$model)
+# 	    if(length(QTL_model) == 0) stop('no grouping factors found in QTL_factors model')
+# 	    if(length(QTL_model) > 1)  stop('more than one grouping factor found in QTL_factors model')
+#
+# 	    group_model = as.formula(paste0('~',as.character(QTL_model[[1]][2])))
+# 	    group_mm = model.matrix(group_model,data)
+#
+# 	    groupIDs = levels(as.factor(data[[as.character(QTL_model[[1]][[3]])]]))
+#
+# 	    QTL_terms = mkReTrms(QTL_model,data,drop.unused.levels = FALSE)
+# 	    QTL_factors_Z = as(t(QTL_terms$Zt),'dgCMatrix')
+# 	    QTL_factors_Z = QTL_factors_Z[,c(matrix(1:ncol(QTL_factors_Z),ncol = ncol(group_mm),byrow=T))]
+# 	    if(!all(colnames(QTL_factors_Z) %in% rownames(QTL_factors$X))) stop(sprintf('Missing %s from QTL_factors$X',names(QTL_terms$cnms)[1]))
+# 	    if(!all(colnames(group_mm) == QTL_terms$cnms[[1]])) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+# 	    if(!all(colnames(QTL_factors_Z)[1:length(groupIDs)] %in% groupIDs)) stop("QTL_factors model didn't parse correctly. \nYou may have to create the X matrix yourself and use ~(1|group) as the model")
+#
+# 	    QTL_factors_X = do.call(bdiag,lapply(1:ncol(group_mm),function(i) QTL_factors$X[groupIDs,]))
+# 	    QTL_factors_X = as.matrix(QTL_factors_X)
+#
+# 	    if(is.null(colnames(QTL_factors$X))) {
+# 	      colnames(QTL_factors_X) = rep(paste0('m',1:ncol(QTL_factors$X)),ncol(group_mm))
+# 	    } else {
+# 	      colnames(QTL_factors_X) = rep(colnames(QTL_factors$X),ncol(group_mm))
+# 	    }
+# 	    colnames(QTL_factors_X) = paste(rep(colnames(group_mm),each = ncol(QTL_factors$X)),colnames(QTL_factors_X),sep='.')
+# 	  } else{
+# 	    if(nrow(QTL_factors) != nrow(data)) stop(sprintf('QTL_factors has wrong number of rows. Should be %d',nrow(data)))
+# 	    QTL_factors_Z = as(diag(1,nrow(data)),'dgCMatrix')
+# 	    if(is.data.frame(QTL_factors)) QTL_factors = as.matrix(QTL_factors)
+# 	    QTL_factors_X = QTL_factors
+# 	  }
+# 	  b_QTL_F = ncol(QTL_factors_X)
+# 	}
+#
+#
+# 	# -------- Random effects ---------- #
+# 	# ensure that only K or K_inv provided for each random effect
+# 	# check that all IDs from data are in rownames of K or K_inv
+# 	# add IDs from K or K_inv to levels data[[re]] for IDs not in data
+#
+# 	RE_levels = list() # a list of levels for each of the random effects
+# 	if(is.null(K_mats)) K_mats = list()
+# 	for(re in names(K_mats)) {
+# 	  # check that K is a matrix, then convert to Matrix
+# 	  if(is.data.frame(K_mats[[re]])) K_mats[[re]] = as.matrix(K_mats[[re]])
+# 	  if(is.matrix(K_mats[[re]])) K_mats[[re]] = Matrix(K_mats[[re]],sparse=T)
+# 	  if(is.null(rownames(K_mats[[re]]))) stop(sprintf('K %s must have rownames',re))
+# 	  if(re %in% names(K_inv_mats)) stop(sprintf('Both K and Kinv provided for %s. Please provide only one for each random effect',re))
+# 	  RE_levels[[re]] = rownames(K_mats[[re]])
+# 	}
+# 	for(re in names(K_inv_mats)) {
+# 	  # check that K_inv is a matrix, then convert to Matrix
+# 	  if(is.data.frame(K_inv_mats[[re]])) K_inv_mats[[re]] = as.matrix(K_inv_mats[[re]])
+# 	  if(is.matrix(K_inv_mats[[re]])) K_inv_mats[[re]] = Matrix(K_inv_mats[[re]],sparse=T)
+#
+# 	  if(is.null(rownames(K_inv_mats[[re]]))) stop(sprintf('K_inv %s must have rownames',re))
+# 	  RE_levels[[re]] = rownames(K_inv_mats[[re]])
+# 	}
+# 	for(re in names(RE_levels)){
+# 	  if(!re %in% colnames(data)) stop(sprintf('Column "%s" required in data',re))
+# 	  data[[re]] = as.factor(data[[re]]) # ensure 'data[[re]]' is a factor
+# 	  if(!all(levels(data[[re]]) %in% RE_levels[[re]])) stop(sprintf('Levels of random effect %s missing from provided %s',re,c('K_inv','K')[(re %in% names(K_mats))+1]))
+# 	  data[[re]] = factor(data[[re]],levels = RE_levels[[re]]) # add levels to data[[re]]
+# 	}
+#
+# 	# use lme4 functions to parse random effects
+# 	#  note: correlated random effects are not allowed. Will convert to un-correlated REs
+# 	RE_terms = mkReTrms(findbars(model),data,drop.unused.levels = FALSE)  # extracts terms and builds Zt matrices
+#
+# 	# construct the RE_setup list
+# 	  # contains:
+# 	    # Z: n x r design matrix
+# 	    # K: r x r PSD covariance matrix
+# 	    # K_inv: r x r inverse covariance matrix.
+# 	    # only one of K or K_inv is needed
+# 	RE_setup = list()
+# 	for(i in 1:length(RE_terms$cnms)){
+# 	  term = names(RE_terms$cnms)[i]
+# 	  n_factors = length(RE_terms$cnms[[i]])  # number of factors for this grouping factor
+# 	  K = K_inv = NULL
+# 	  if(term %in% names(K_mats)){
+# 	    K = K_mats[[term]]
+# 	  } else if(term %in% names(K_inv_mats)){
+# 	    K_inv = K_inv_mats[[term]]
+# 	  }
+#
+# 	  # extract combined Z matrix
+# 	  combined_Zt = RE_terms$Ztlist[[i]]
+# 	  Zs_term = tapply(1:nrow(combined_Zt),gl(n_factors,1,nrow(combined_Zt),labels = RE_terms$cnms[[term]]),function(x) t(combined_Zt[x,]))
+#
+# 	  # make an entry in RE_setup for each random effect
+# 	  for(j in 1:n_factors){
+# 	    # name of variance component
+# 	    name = term
+# 	    if(n_factors > 1) name = paste(name,RE_terms$cnms[[i]][[j]],sep='.')
+# 	    while(name %in% names(RE_setup)) name = paste0(name,'.1') # hack for when same RE used multiple times
+#
+# 	    # Z matrix
+# 	    Z = as(Zs_term[[j]],'dgCMatrix')
+#
+# 	    RE_setup[[name]] = list(
+# 	      Z = Z,
+# 	      K = K,
+# 	      K_inv = K_inv
+# 	    )
+# 	  }
+# 	}
+#
+# 	BSFG_init2(
+# 	  Y = Y,
+# 	  X = X,
+# 	  X_F = X_F,
+# 	  QTL_resid_Z = QTL_resid_Z,
+# 	  QTL_resid_X = QTL_resid_X,
+# 	  QTL_factors_Z = QTL_factors_Z,
+# 	  QTL_factors_X = QTL_factors_X,
+# 	  RE_setup = RE_setup,
+# 	  data = data,
+# 	  priors = priors,
+# 	  run_parameters = run_parameters,
+# 	  cis_genotypes = cis_genotypes,
+# 	  posteriorSample_params = posteriorSample_params,
+# 	  posteriorMean_params = posteriorMean_params,
+# 	  ncores = ncores,setup = setup,verbose=verbose,
+# 	  run_ID = run_ID
+# 	)
 }
 
 
-BSFG_init2 = function(
-  Y,
-  X = NULL,
-  X_F = NULL,
-  QTL_resid_Z = NULL,
-  QTL_resid_X = NULL,
-  QTL_factors_Z = NULL,
-  QTL_factors_X = NULL,
-  RE_setup,
-  data = NULL,
-  priors = BSFG_priors(),
-  run_parameters = BSFG_control(),
-  cis_genotypes = NULL,
-  posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'),
-  posteriorMean_params = c(),
-  ncores = detectCores(),setup = NULL,verbose=T, run_ID = 'BSFG_run') {
-
-  try(dir.create(run_ID),silent=T)
-
-  # -------- n_RE ---------- #
-
-  n_RE = length(RE_setup)
-  if(n_RE == 0) stop('no random effects provided')
-
-  # -------- find n ---------- #
-
-  n = NULL
-  if(!is.null(X)) n = nrow(X)
-  if(!is.null(X_F)){
-    if(!is.null(n) && nrow(X_F) != n) stop(sprintf('nrow(X_F) != %d',n))
-    n = nrow(X_F)
-  }
-  for(i in 1:length(RE_setup)){
-    if(!'Z' %in% names(RE_setup[[i]])) {
-      if('K' %in% names(RE_setup[[i]])){
-        RE_setup[[i]]$Z = as(diag(1,nrow(RE_setup[[i]]$K)),'dgCMatrix')
-      } else if('K_inv' %in% names(RE_setup[[i]])) {
-        RE_setup[[i]]$Z = as(diag(1,nrow(RE_setup[[i]]$K_inv)),'dgCMatrix')
-      } else{
-        stop('random effect %s needs at least one of (Z, K, K_inv)',names(RE_setup)[i])
-      }
-    }
-    if(!is.null(n) && nrow(RE_setup[[i]]$Z) != n) stop(sprintf('nrow(Z-%s) != %d',names(RE_setup)[i],n))
-    n = nrow(RE_setup[[i]]$Z)
-  }
-
-
-
-  # -------- replace missing matrices ---------- #
-
-  if(is.null(X)) X = matrix(1,n,1)
-  if(is.null(X_F)) X_F = matrix(0,n,0)
-  if(is.null(data)) data = data.frame(ID = 1:n)
-
-
-  # -------- Fixed effects ---------- #
-
-  X = as.matrix(X)
-  X_F = as.matrix(X_F)
-
-  b = ncol(X)
-  resid_intercept = ncol(X) > 0 && all(X[,1] == 1)  # if the first column of X is all 1's, don't penalize the prior
-
-  b_F = ncol(X_F)
-  X_F_zero_variance = apply(X_F,2,var) == 0
-
-  # identify fixed effects present in both X and X_F
-  fixed_effects_common = matrix(0,nr=2,nc=0)  # 2 x b_c matrix with row1 indexes of X and row2 corresponding indexes of X_F
-  non_null_X = which(apply(X,2,var)>0)
-  non_null_XF = which(!X_F_zero_variance)
-  if(length(non_null_X) > 0 && length(non_null_XF) > 0){
-    cor_X = abs(cor(X[,non_null_X,drop=FALSE],X_F[,non_null_XF,drop=FALSE]))
-    for(j in 1:nrow(cor_X)){
-      if(any(cor_X[j,] == 1)){
-        fixed_effects_common = cbind(fixed_effects_common,c(non_null_X[j],non_null_XF[which(cor_X[j,] == 1)[1]]))
-      }
-    }
-  }
-  fixed_effects_only_resid = NULL
-  fixed_effects_only_factors = NULL
-  if(ncol(fixed_effects_common) < ncol(X)){
-    if(ncol(fixed_effects_common) > 0) {
-      fixed_effects_only_resid = (1:ncol(X))[-fixed_effects_common[1,]]
-    } else{
-      fixed_effects_only_resid = (1:ncol(X))
-    }
-  }
-  if(ncol(fixed_effects_common) < ncol(X_F)){
-    if(ncol(fixed_effects_common) > 0) {
-      fixed_effects_only_factors = (1:ncol(X_F))[-fixed_effects_common[2,]]
-    } else{
-      fixed_effects_only_factors = (1:ncol(X_F))
-    }
-  }
-
-  X = as(X,'dgCMatrix')
-  X_F = as(X_F,'dgCMatrix')
-
-
-
-  # -------- QTL effects ---------- #
-
-  b_QTL = ncol(QTL_resid_X)
-  if(is.null(b_QTL)) b_QTL = 0
-  if(b_QTL > 0 && is.null(QTL_resid_Z)) {
-    QTL_resid_Z = as(diag(1,n),'dgCMatrix')
-  }
-
-  b_QTL_F = ncol(QTL_factors_X)
-  if(is.null(b_QTL_F)) b_QTL_F = 0
-  if(b_QTL_F > 0 && is.null(QTL_factors_Z)) {
-    QTL_factors_Z = as(diag(1,n),'dgCMatrix')
-  }
-
-
-
-  # -------- cis genotypes ---------- #
-  if(is.null(cis_genotypes)){
-    n_cis_effects = NULL
-    cis_effects_index = NULL
-  } else{
-    n_cis_effects = sapply(cis_genotypes,ncol)
-    cis_effects_index = c(0,cumsum(n_cis_effects))+1
-  }
-
-
-  # -------- observation model ---------- #
-
-  if(is(Y,'list')){
-    if(!'observation_model' %in% names(Y)) stop('observation_model not specified in Y')
-    observation_model = Y$observation_model
-    observation_model_parameters = Y[names(Y) != 'observation_model']
-  } else{
-    if(!is(Y,'matrix'))	Y = as.matrix(Y)
-    if(nrow(Y) != nrow(data)) stop('Y and data have different numbers of rows')
-    observation_model = missing_data_model
-    observation_model_parameters = list(
-      Y = Y,
-      scale_Y = run_parameters$scale_Y
-    )
-  }
-
-  # initialize observation_model
-  observation_model_parameters$observation_setup = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
-  n = nrow(data)
-  p = observation_model_parameters$observation_setup$p
-  traitnames = observation_model_parameters$observation_setup$traitnames
-  if(is.null(traitnames)) traitnames = paste('trait',1:p,sep='_')
-  if(is.null(observation_model_parameters$observation_setup$Y_missing)) {
-    observation_model_parameters$observation_setup$Y_missing = matrix(0,n,p)
-  }
-  if(!is(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')){
-    observation_model_parameters$observation_setup$Y_missing = as(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')
-  }
-  Y_missing = observation_model_parameters$observation_setup$Y_missing
-
-
-  # -------- Random effects ---------- #
-
-  # add names to RE_setup if needed
-  n_RE = length(RE_setup)
-  for(i in 1:n_RE){
-    if(is.null(names(RE_setup)[i]) || names(RE_setup)[i] == ''){
-      names(RE_setup)[i] = paste0('RE.',i)
-    }
-  }
-  RE_names = names(RE_setup)
-
-  # combine Z matrices
-  Z = do.call(cbind,lapply(RE_setup,function(x) x$Z))
-  Z = as(Z,'dgCMatrix')
-
-
-  # find RE indices
-  RE_lengths = sapply(RE_setup,function(x) ncol(x$Z))
-  RE_starts = cumsum(c(0,RE_lengths)[1:n_RE])
-  names(RE_starts) = RE_names
-  RE_indices = lapply(RE_names,function(re) RE_starts[re] + 1:RE_lengths[re])
-  names(RE_indices) = RE_names
-
-  # function to ensure that covariance matrices are sparse and symmetric
-  fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
-
-  # function to decompose K as K = PtLDLtP
-  LDL = function(K) {
-    res = LDLt_sparse(as(K,'dgCMatrix')) # actually calculates K = PtLDLtP
-    if(is.character(validObject(res$L,test=TRUE)[1]) || max(res$d > 1e10) || min(res$d < -1e-10)) { # criteria to protect against bad solutions.
-      res = LDLt_notSparse(as.matrix(K))  # sparse sometimes fails with non-PD K
-    }
-    res
-  }
-
-  # construct RE_L and ZL for each random effect
-  for(i in 1:length(RE_setup)){
-    re_name = names(RE_setup)[i]
-    RE_setup[[i]] = within(RE_setup[[i]],{
-      if(!'ZL' %in% ls()){
-        if('K' %in% ls() && !is.null(K)){
-          id_names = rownames(K)
-          ldl_k = LDL(K)
-          large_d = ldl_k$d > run_parameters$K_eigen_tol
-          r_eff = sum(large_d)
-          # if need to use reduced rank model, then use D of K in place of K and merge L into Z
-          # otherwise, use original K, set L = Diagonal(1,r)
-          if(r_eff < length(ldl_k$d)) {
-            K = as(diag(ldl_k$d[large_d]),'dgCMatrix')
-            K_inv = as(diag(1/ldl_k$d[large_d]),'dgCMatrix')
-            L = t(ldl_k$P) %*% ldl_k$L[,large_d]
-          } else{
-            L = as(diag(1,nrow(K)),'dgCMatrix')
-            K_inv = as(with(ldl_k,t(P) %*% crossprod(diag(1/sqrt(d)) %*% solve(L)) %*% P),'dgCMatrix')
-          }
-          if(is.null(rownames(K))) rownames(K) = 1:nrow(K)
-          rownames(K_inv) = rownames(K)
-          rm(list=c('ldl_k','large_d','r_eff'))
-        } else if ('K_inv' %in% ls() && !is.null(K_inv)){
-          id_names = rownames(K_inv)
-          if(is.null(rownames(K_inv))) rownames(K_inv) = 1:nrow(K_inv)
-          K = solve(K_inv)
-          rownames(K) = rownames(K_inv)
-          L = as(diag(1,nrow(K)),'dgCMatrix')
-        } else{
-          K = as(diag(1,ncol(Z)),'dgCMatrix')
-          rownames(K) = colnames(Z)
-          id_names = rownames(K)
-          K_inv = K
-          L = as(diag(1,nrow(K)),'dgCMatrix')
-        }
-        if(is.null(id_names)) id_names = 1:length(id_names)
-        rownames(L) = paste(id_names,re_name,sep='::')
-        K = fix_K(K)
-        ZL = Z %*% L
-      }
-    })
-  }
-  ZL = do.call(cbind,lapply(RE_setup,function(re) re$ZL))
-  ZL = as(ZL,'dgCMatrix')
-
-  if(length(RE_setup) > 1) {
-    RE_L = do.call(bdiag,lapply(RE_setup,function(re) re$L))
-    rownames(RE_L) = do.call(c,lapply(RE_setup,function(re) rownames(re$L)))
-  } else{
-    RE_L = RE_setup[[1]]$L
-  }
-  r_RE = sapply(RE_setup,function(re) ncol(re$ZL))
-
-  # cholesky decompositions (L'L) of each K_inverse matrix
-  chol_Ki_mats = lapply(RE_setup,function(re) chol(as.matrix(re$K_inv)))
-
-
-
-  # -------- h2s ---------- #
-
-  # table of possible h2s for each random effect
-  #   These are percentages of the total residual variance accounted for by each random effect
-  #   Each column is a set of percentages, the sum of which must be less than 1 (so that Ve is > 0)
-  # can specify different levels of granularity for each random effect
-  h2_divisions = run_parameters$h2_divisions
-  if(length(h2_divisions) < n_RE){
-    if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
-    h2_divisions = rep(h2_divisions,n_RE)
-  }
-  if(is.null(names(h2_divisions))) {
-    names(h2_divisions) = RE_names
-  }
-  h2s_matrix = expand.grid(lapply(RE_names,function(re) seq(0,1,length = h2_divisions[[re]]+1)))
-  colnames(h2s_matrix) = RE_names
-  h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
-  colnames(h2s_matrix) = NULL
-
-
-  # ------------------------------------ #
-	# ----Precalculate ZKZts, chol_Ks ---- #
-	# ------------------------------------ #
-
-	# first, identify sets of traits with same pattern of missingness
-  # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
-	if(run_parameters$num_NA_groups > 0) {
-	  # columns with same patterns of missing data
-	  Y_missing_mat = as.matrix(Y_missing)
-    Y_col_obs = lapply(1:ncol(Y_missing_mat),function(x) {
-      obs = which(!Y_missing_mat[,x],useNames=F)
-      names(obs) = NULL
-      obs
-    })
-    non_missing_rows = unname(which(rowSums(!Y_missing_mat)>0))
-    unique_Y_col_obs = unique(c(list(non_missing_rows),Y_col_obs))
-    unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
-    Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
-
-    if(length(unique_Y_col_obs) > run_parameters$num_NA_groups){
-      col_counts = sort(tapply(Y_col_obs_index,Y_col_obs_index,length),decreasing = T)
-      biggest_cols = as.numeric(names(col_counts))[1:run_parameters$num_NA_groups]
-      biggest_cols = unique(c(1,biggest_cols))
-      unique_Y_col_obs = unique_Y_col_obs[biggest_cols]
-      Y_col_obs_index_new = rep(NA,length(Y_col_obs))
-      for(i in 1:length(Y_col_obs_index)){
-        if(Y_col_obs_index[i] %in% biggest_cols){
-          Y_col_obs_index_new[i] = match(Y_col_obs_index[i],biggest_cols)
-        } else{
-          diffs = sapply(unique_Y_col_obs,function(x) sum(Y_col_obs[[i]] %in% x == F) + sum(x %in% Y_col_obs[[i]] == F))
-          Y_col_obs_index_new[i] = order(diffs)[1]
-          Y_missing_mat[,i] = T
-          Y_missing_mat[unique_Y_col_obs[[Y_col_obs_index_new[i]]],i] = F
-        }
-      }
-      Y_col_obs_index = Y_col_obs_index_new
-    }
-
-    Missing_data_map = lapply(seq_along(unique_Y_col_obs),function(i) {
-      x = unique_Y_col_obs[[i]]
-      return(list(
-        Y_obs = x,
-        Y_cols = which(Y_col_obs_index == i)
-      ))
-    })
-
-    # rows with same patterns of missing data
-    Y_row_obs = lapply(1:nrow(Y_missing_mat),function(x) {
-      obs = which(!Y_missing_mat[x,],useNames=F)
-      names(obs) = NULL
-      obs
-    })
-    non_missing_cols = unname(which(colSums(!Y_missing_mat)>0))
-    unique_Y_row_obs = unique(c(list(non_missing_cols),Y_row_obs))
-    unique_Y_row_obs_str = lapply(unique_Y_row_obs,paste,collapse='')
-    Y_row_obs_index = sapply(Y_row_obs,function(x) which(unique_Y_row_obs_str == paste(x,collapse='')))
-
-    Missing_row_data_map = lapply(seq_along(unique_Y_row_obs),function(i) {
-      x = unique_Y_row_obs[[i]]
-      return(list(
-        Y_cols = x,
-        Y_obs = which(Y_row_obs_index == i)
-      ))
-    })
-	} else{
-	  Missing_data_map = list(list(
-	    Y_obs = 1:n,
-	    Y_cols = 1:p
-	  ))
-	  Missing_row_data_map = list(list(
-	    Y_obs = 1:n,
-	    Y_cols = 1:p
-	  ))
-	}
-
-  # now, for each set of columns, pre-calculate a set of matrices, etc
-  # do calculations in several chunks
-  group_size = 2*ncores
-  n_groups = ceiling(ncol(h2s_matrix)/group_size)
-  col_groups = tapply(1:ncol(h2s_matrix),gl(n_groups,group_size,ncol(h2s_matrix)),function(x) x)
-
-  if(verbose) {
-    print(sprintf("Pre-calculating random effect inverse matrices for %d groups of traits and %d sets of random effect weights", length(Missing_data_map), ncol(h2s_matrix)))
-    pb = txtProgressBar(min=0,max = length(Missing_data_map)*  length(col_groups) * 2,style=3)
-  }
-
-  Qt_list = list()
-  QtX_list = list()
-  Qt_QTL_resid_Z_list = list()
-  QtZL_list = list()
-  Qt_cis_genotypes_list = list()
-  randomEffect_C_Choleskys_list = list()
-  Sigma_Choleskys_list = list()
-
-  if(n_RE == 1 && run_parameters$svd_K == TRUE){
-    svd_K1 = svd(RE_setup[[1]]$K)
-  }
-
-  for(set in seq_along(Missing_data_map)){
-    x = Missing_data_map[[set]]$Y_obs
-    cols = Missing_data_map[[set]]$Y_cols
-    if(length(x) == 0) next
-
-    if(n_RE == 1){
-      if(run_parameters$svd_K == TRUE) {
-        # a faster way of taking the SVD of ZLKZLt, particularly if ncol(ZL) < nrow(ZL). Probably no benefit if ncol(K) > nrow(ZL)
-        qr_ZU = qr(ZL[x,,drop=FALSE] %*% svd_K1$u)
-        R_ZU = drop0(qr.R(qr_ZU,complete=F),tol=run_parameters$drop0_tol)
-        Q_ZU = drop0(qr.Q(qr_ZU,complete=T),tol=run_parameters$drop0_tol)
-        RKRt = R_ZU %*% diag(svd_K1$d) %*% t(R_ZU)
-        svd_RKRt = svd(RKRt)
-        RKRt_U = svd_RKRt$u
-        if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
-        Qt = t(Q_ZU %*% RKRt_U)
-      } else{
-        ZKZt = ZL[x,,drop=FALSE] %*% RE_setup[[1]]$K %*% t(ZL[x,,drop=FALSE])
-        result = svd(ZKZt)
-        Qt = t(result$u)
-      }
-      Qt = as(drop0(as(Qt,'dgCMatrix'),tol = run_parameters$drop0_tol),'dgCMatrix')
-    } else{
-      Qt = as(diag(1,length(x)),'dgCMatrix')
-    }
-    QtZL_matrices_set = lapply(RE_setup,function(re) Qt %*% re$ZL[x,,drop=FALSE])
-    QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
-    QtZL_set = as(QtZL_set,'dgCMatrix')
-    QtX_set = Qt %**% X[x,,drop=FALSE]
-    if(!is.null(QTL_resid_Z)){
-      Qt_QTL_resid_Z_set = as(drop0(Qt %*% QTL_resid_Z[x,,drop=FALSE],tol=run_parameters$drop0_tol),'dgCMatrix')
-    } else{
-      Qt_QTL_resid_Z_set = NULL
-    }
-    Qt_cis_genotypes_set = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
-
-    Qt_list[[set]]   = Qt
-    QtX_list[[set]]  = QtX_set
-    Qt_QTL_resid_Z_list[[set]] = Qt_QTL_resid_Z_set
-    QtZL_list[[set]]  = QtZL_set
-    Qt_cis_genotypes_list[[set]] = Qt_cis_genotypes_set
-
-    ZKZts_set = list()
-    for(i in 1:n_RE){
-      ZKZts_set[[i]] = as(forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% RE_setup[[i]]$K %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol)),'dgCMatrix')
-    }
-
-
-    Sigma_Choleskys_c_list = list()
-    for(i in 1:length(col_groups)){
-      Sigma_Choleskys_c_list[[i]] = new(Sigma_Cholesky_database,ZKZts_set,h2s_matrix[,col_groups[[i]],drop=FALSE],run_parameters$drop0_tol,1)
-      if(verbose) setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
-    }
-    Sigma_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
-      Sigma_Choleskys_c = Sigma_Choleskys_c_list[[j]]
-      lapply(1:length(col_groups[[j]]),function(i) {
-        list(log_det = Sigma_Choleskys_c$get_log_det(i),
-             chol_Sigma = drop0(Sigma_Choleskys_c$get_chol_Sigma(i),tol = run_parameters$drop0_tol)
-            )
-      })
-    }))
-
-    ZtZ_set = as(forceSymmetric(drop0(crossprod(ZL[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
-
-    randomEffect_C_Choleskys_c_list = list()
-    for(i in 1:length(col_groups)){
-      randomEffect_C_Choleskys_c_list[[i]] = new(randomEffect_C_Cholesky_database,lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix[,col_groups[[i]],drop=FALSE],ZtZ_set,run_parameters$drop0_tol,1)
-      if(verbose) setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
-    }
-    randomEffect_C_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
-      randomEffect_C_Choleskys_c = randomEffect_C_Choleskys_c_list[[j]]
-      lapply(1:length(col_groups[[j]]),function(i) {
-        list(chol_C     = randomEffect_C_Choleskys_c$get_chol_Ci(i),
-             chol_K_inv = randomEffect_C_Choleskys_c$get_chol_K_inv_i(i)
-        )
-      })
-    }))
-  }
-  if(verbose) close(pb)
-
-  # Qt matrices for factors are only used with row set 1
-  x = Missing_data_map[[1]]$Y_obs
-  Qt1_XF = Qt_list[[1]] %**% X_F[x,,drop=FALSE]
-  if(!is.null(QTL_factors_Z)){
-    Qt1_QTL_Factors_Z = as(drop0(Qt_list[[1]] %*% QTL_factors_Z[x,,drop=FALSE],tol = run_parameters$drop0_tol),'dgCMatrix')
-  } else{
-    Qt1_QTL_Factors_Z = NULL
-  }
-
-
-  run_variables = list(
-    p      = p,
-    n      = n,
-    r_RE   = r_RE,
-    RE_names = RE_names,
-    b       = b,
-    b_F     = b_F,
-    b_QTL   = b_QTL,
-    b_QTL_F = b_QTL_F,
-    fixed_effects_common = fixed_effects_common,
-    fixed_effects_only_resid = fixed_effects_only_resid,
-    fixed_effects_only_factors = fixed_effects_only_factors,
-    resid_intercept   = resid_intercept,
-    X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
-    n_cis_effects     = n_cis_effects,
-    cis_effects_index = cis_effects_index,
-    Qt_list    = Qt_list,
-    QtX_list   = QtX_list,
-    Qt_QTL_resid_Z_list = Qt_QTL_resid_Z_list,
-    QtZL_list   = QtZL_list,
-    Qt_cis_genotypes_list = Qt_cis_genotypes_list,
-    Qt1_XF  = Qt1_XF,
-    Qt1_QTL_Factors_Z = Qt1_QTL_Factors_Z,
-    Missing_data_map      = Missing_data_map,
-    Missing_row_data_map  = Missing_row_data_map,
-    Sigma_Choleskys_list          = Sigma_Choleskys_list,
-    randomEffect_C_Choleskys_list = randomEffect_C_Choleskys_list
-  )
-
-	data_matrices = list(
-	  X           = X,
-	  X_F         = X_F,
-	  Z           = Z,
-	  ZL          = ZL,
-	  RE_setup    = RE_setup,
-	  RE_L        = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
-	  RE_indices  = RE_indices,
-	  h2s_matrix  = h2s_matrix,
-	  cis_genotypes = cis_genotypes,
-	  QTL_resid_Z = QTL_resid_Z,
-	  QTL_resid_X = QTL_resid_X,
-	  QTL_factors_Z = QTL_factors_Z,
-	  QTL_factors_X = QTL_factors_X,
-	  data       = data
-	)
-
-	run_parameters$observation_model = observation_model
-	run_parameters$observation_model_parameters = observation_model_parameters
-	run_parameters$traitnames = traitnames
-
-
-	# ----------------------------- #
-	# ----- re-formulate priors --- #
-	# ----------------------------- #
-	# total precision
-	if(length(priors$tot_Y_var$V == 1)) {
-	  priors$tot_Y_var$V = rep(priors$tot_Y_var$V,p)
-	  priors$tot_Y_varnu = rep(priors$tot_Y_var$nu,p)
-	}
-	priors$tot_Eta_prec_rate   = with(priors$tot_Y_var,V * nu)
-	priors$tot_Eta_prec_shape  = with(priors$tot_Y_var,nu - 1)
-	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
-	priors$tot_F_prec_shape    = with(priors$tot_F_var,nu - 1)
-
-	# h2_priors_resids
-	if(exists('h2_priors_resids',priors)) {
-	  if(length(priors$h2_priors_resids) == 1) priors$h2_priors_resids = rep(priors$h2_priors_resids,ncol(h2s_matrix))
-	  if(!length(priors$h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_resids')
-	} else{
-	  if(!is(priors$h2_priors_resids_fun,'function')) stop('need to provide a priors$h2_priors_resids_fun() to specify discrete h2 prior for resids')
-	  priors$h2_priors_resids = apply(h2s_matrix,2,priors$h2_priors_resids_fun,n = ncol(h2s_matrix))
-	}
-	priors$h2_priors_resids = priors$h2_priors_resids/sum(priors$h2_priors_resids)
-	# h2_priors_factors
-	if(exists('h2_priors_factors',priors)) {
-	  if(length(priors$h2_priors_factors) == 1) priors$h2_priors_factors = rep(priors$h2_priors_factors,ncol(h2s_matrix))
-	  if(!length(priors$h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_factors')
-	} else{
-	  if(!is(priors$h2_priors_factors_fun,'function')) stop('need to provide a priors$h2_priors_factors_fun() to specify discrete h2 prior for factors')
-	  priors$h2_priors_factors = apply(h2s_matrix,2,priors$h2_priors_factors_fun,n = ncol(h2s_matrix))
-	}
-	priors$h2_priors_factors = priors$h2_priors_factors/sum(priors$h2_priors_factors)
-
-	# ----------------------------- #
-	# -- create BSFG_state object - #
-	# ----------------------------- #
-
-	RNG = list(
-	  Random.seed = .Random.seed,
-	  RNGkind = RNGkind()
-	)
-
-	BSFG_state = list(
-	  run_ID         = run_ID,
-	  data_matrices  = data_matrices,
-	  priors         = priors,
-	  run_parameters = run_parameters,
-	  run_variables  = run_variables,
-	  RNG            = RNG,
-	  setup          = setup
-	)
-	class(BSFG_state) = append('BSFG_state',class(BSFG_state))
-
-	# ----------------------------- #
-	# --- Initialize BSFG_state --- #
-	# ----------------------------- #
-
-	BSFG_state$Posterior = list(
-	  posteriorSample_params = posteriorSample_params,
-	  posteriorMean_params = posteriorMean_params,
-	  total_samples = 0,
-	  folder = sprintf('%s/Posterior',run_ID),
-	  files = c()
-	)
-
-	BSFG_state = initialize_variables(BSFG_state)
-
-	Posterior = reset_Posterior(BSFG_state$Posterior,BSFG_state)
-	BSFG_state$Posterior = Posterior
-
-
-	return(BSFG_state)
-}
-
-initialize_variables = function(BSFG_state,...){
-  run_parameters = BSFG_state$run_parameters
-  run_variables = BSFG_state$run_variables
-  data_matrices = BSFG_state$data_matrices
-  priors = BSFG_state$priors
-
-  BSFG_state$current_state = with(c(run_parameters,run_variables,data_matrices,priors),{
-
-    # Factors loadings:
-    #  initial number of factors
-    k = k_init
-
-    Plam = matrix(1,p,k)
-
-    # Lambda - factor loadings
-    #   Prior: Normal distribution for each element.
-    #       mu = 0
-    #       sd = sqrt(1/Plam)
-    Lambda = matrix(rnorm(p*k,0,sqrt(1/Plam)),nr = p,nc = k)
-    rownames(Lambda) = traitnames
-
-    # residuals
-    # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
-    #  Prior: Gamma distribution for each element
-    #       shape = tot_Eta_prec_shape
-    #       rate = tot_Eta_prec_rate
-    tot_Eta_prec = matrix(rgamma(p,shape = tot_Eta_prec_shape,rate = tot_Eta_prec_rate),nrow = 1)
-    colnames(tot_Eta_prec) = traitnames
-
-    # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
-    #  Prior: Gamma distribution for each element
-    #       shape = tot_F_prec_shape
-    #       rate = tot_F_prec_rate
-    tot_F_prec = matrix(1,nrow=1,ncol=k)
-    #with(priors,matrix(rgamma(k,shape = tot_F_prec_shape,rate = tot_F_prec_rate),nrow=1))
-
-    # Factor scores:
-
-    # Resid discrete variances
-    # p-matrix of n_RE x p with
-    resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
-    resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
-
-    # Factor discrete variances
-    # k-matrix of n_RE x k with
-    F_h2_index = sample(1:ncol(h2s_matrix),k,replace=T)
-    F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
-
-    U_F = matrix(rnorm(sum(r_RE) * k, 0, sqrt(F_h2[1,] / tot_F_prec)),ncol = k, byrow = T)
-    rownames(U_F) = colnames(ZL)
-
-    U_R = matrix(rnorm(sum(r_RE) * p, 0, sqrt(resid_h2[1,] / tot_Eta_prec)),ncol = p, byrow = T)
-    colnames(U_R) = traitnames
-    rownames(U_R) = colnames(ZL)
-
-    # Fixed effects
-    B = 0*matrix(rnorm(b*p), ncol = p)
-    colnames(B) = traitnames
-
-    # Factor fixed effects
-    B_F = 0*matrix(rnorm(b_F * k),b_F,k)
-
-    # QTL effects
-    B_QTL = 0*rstdnorm_mat(b_QTL,p)
-    B_QTL_F = 0*rstdnorm_mat(b_QTL_F,k)
-
-    # cis effects
-    cis_effects = matrix(rnorm(cis_effects_index[length(cis_effects_index)]-1,0,1),nrow=1)
-
-    XB = X %**% B
-    if(b_QTL > 0) XB = XB + QTL_resid_Z %**% (QTL_resid_X %**% B_QTL)
-
-    F = X_F %*% B_F + ZL %*% U_F + matrix(rnorm(n * k, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = k, byrow = T)
-    F = as.matrix(F)
-
-    # var_Eta
-    if(!'var_Eta' %in% ls()) var_Eta = rep(1,p)
-
-    # ----------------------- #
-    # ---Save initial values- #
-    # ----------------------- #
-    current_state = list(
-      k              = k,
-      Lambda         = Lambda,
-      tot_F_prec     = tot_F_prec,
-      F_h2_index     = F_h2_index,
-      F_h2           = F_h2,
-      U_F            = U_F,
-      F              = F,
-      tot_Eta_prec   = tot_Eta_prec,
-      resid_h2_index = resid_h2_index,
-      resid_h2       = resid_h2,
-      U_R            = U_R,
-      B              = B,
-      B_F            = B_F,
-      B_QTL          = B_QTL,
-      B_QTL_F        = B_QTL_F,
-      XB             = XB,
-      cis_effects    = cis_effects,
-      nrun           = 0,
-      total_time     = 0
-    )
-    return(current_state)
-  })
-
-  # Initialize parameters for Lambda_prior, B_prior, and QTL_prior (may be model-specific)
-  BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state)
-  BSFG_state$current_state = BSFG_state$priors$B_prior$sampler(BSFG_state)
-  BSFG_state$current_state = BSFG_state$priors$QTL_prior$sampler(BSFG_state)
-
-  # Initialize Eta
-  observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)
-  BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
-
-  BSFG_state$Posterior$posteriorSample_params = unique(c(BSFG_state$Posterior$posteriorSample_params,observation_model_state$posteriorSample_params))
-  BSFG_state$Posterior$posteriorMean_params = unique(c(BSFG_state$Posterior$posteriorMean_params,observation_model_state$posteriorMean_params))
-
-  return(BSFG_state)
-}
+# BSFG_init2 = function(
+#   Y,
+#   X = NULL,
+#   X_F = NULL,
+#   QTL_resid_Z = NULL,
+#   QTL_resid_X = NULL,
+#   QTL_factors_Z = NULL,
+#   QTL_factors_X = NULL,
+#   RE_setup,
+#   data = NULL,
+#   priors = BSFG_priors(),
+#   run_parameters = BSFG_control(),
+#   cis_genotypes = NULL,
+#   posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F','B_QTL','B_QTL_F','U_R','cis_effects'),
+#   posteriorMean_params = c(),
+#   ncores = detectCores(),setup = NULL,verbose=T, run_ID = 'BSFG_run') {
+#
+#   try(dir.create(run_ID),silent=T)
+#
+#   # -------- n_RE ---------- #
+#
+#   n_RE = length(RE_setup)
+#   if(n_RE == 0) stop('no random effects provided')
+#
+#   # -------- find n ---------- #
+#
+#   n = NULL
+#   if(!is.null(X)) n = nrow(X)
+#   if(!is.null(X_F)){
+#     if(!is.null(n) && nrow(X_F) != n) stop(sprintf('nrow(X_F) != %d',n))
+#     n = nrow(X_F)
+#   }
+#   for(i in 1:length(RE_setup)){
+#     if(!'Z' %in% names(RE_setup[[i]])) {
+#       if('K' %in% names(RE_setup[[i]])){
+#         RE_setup[[i]]$Z = as(diag(1,nrow(RE_setup[[i]]$K)),'dgCMatrix')
+#       } else if('K_inv' %in% names(RE_setup[[i]])) {
+#         RE_setup[[i]]$Z = as(diag(1,nrow(RE_setup[[i]]$K_inv)),'dgCMatrix')
+#       } else{
+#         stop('random effect %s needs at least one of (Z, K, K_inv)',names(RE_setup)[i])
+#       }
+#     }
+#     if(!is.null(n) && nrow(RE_setup[[i]]$Z) != n) stop(sprintf('nrow(Z-%s) != %d',names(RE_setup)[i],n))
+#     n = nrow(RE_setup[[i]]$Z)
+#   }
+#
+#
+#
+#   # -------- replace missing matrices ---------- #
+#
+#   if(is.null(X)) X = matrix(1,n,1)
+#   if(is.null(X_F)) X_F = matrix(0,n,0)
+#   if(is.null(data)) data = data.frame(ID = 1:n)
+#
+#
+#   # -------- Fixed effects ---------- #
+#
+#   X = as.matrix(X)
+#   X_F = as.matrix(X_F)
+#
+#   b = ncol(X)
+#   resid_intercept = ncol(X) > 0 && all(X[,1] == 1)  # if the first column of X is all 1's, don't penalize the prior
+#
+#   b_F = ncol(X_F)
+#   X_F_zero_variance = apply(X_F,2,var) == 0
+#
+#   # identify fixed effects present in both X and X_F
+#   fixed_effects_common = matrix(0,nr=2,nc=0)  # 2 x b_c matrix with row1 indexes of X and row2 corresponding indexes of X_F
+#   non_null_X = which(apply(X,2,var)>0)
+#   non_null_XF = which(!X_F_zero_variance)
+#   if(length(non_null_X) > 0 && length(non_null_XF) > 0){
+#     cor_X = abs(cor(X[,non_null_X,drop=FALSE],X_F[,non_null_XF,drop=FALSE]))
+#     for(j in 1:nrow(cor_X)){
+#       if(any(cor_X[j,] == 1)){
+#         fixed_effects_common = cbind(fixed_effects_common,c(non_null_X[j],non_null_XF[which(cor_X[j,] == 1)[1]]))
+#       }
+#     }
+#   }
+#   fixed_effects_only_resid = NULL
+#   fixed_effects_only_factors = NULL
+#   if(ncol(fixed_effects_common) < ncol(X)){
+#     if(ncol(fixed_effects_common) > 0) {
+#       fixed_effects_only_resid = (1:ncol(X))[-fixed_effects_common[1,]]
+#     } else{
+#       fixed_effects_only_resid = (1:ncol(X))
+#     }
+#   }
+#   if(ncol(fixed_effects_common) < ncol(X_F)){
+#     if(ncol(fixed_effects_common) > 0) {
+#       fixed_effects_only_factors = (1:ncol(X_F))[-fixed_effects_common[2,]]
+#     } else{
+#       fixed_effects_only_factors = (1:ncol(X_F))
+#     }
+#   }
+#
+#   X = as(X,'dgCMatrix')
+#   X_F = as(X_F,'dgCMatrix')
+#
+#
+#
+#   # -------- QTL effects ---------- #
+#
+#   b_QTL = ncol(QTL_resid_X)
+#   if(is.null(b_QTL)) b_QTL = 0
+#   if(b_QTL > 0 && is.null(QTL_resid_Z)) {
+#     QTL_resid_Z = as(diag(1,n),'dgCMatrix')
+#   }
+#
+#   b_QTL_F = ncol(QTL_factors_X)
+#   if(is.null(b_QTL_F)) b_QTL_F = 0
+#   if(b_QTL_F > 0 && is.null(QTL_factors_Z)) {
+#     QTL_factors_Z = as(diag(1,n),'dgCMatrix')
+#   }
+#
+#
+#
+#   # -------- cis genotypes ---------- #
+#   if(is.null(cis_genotypes)){
+#     n_cis_effects = NULL
+#     cis_effects_index = NULL
+#   } else{
+#     n_cis_effects = sapply(cis_genotypes,ncol)
+#     cis_effects_index = c(0,cumsum(n_cis_effects))+1
+#   }
+#
+#
+#   # -------- observation model ---------- #
+#
+#   if(is(Y,'list')){
+#     if(!'observation_model' %in% names(Y)) stop('observation_model not specified in Y')
+#     observation_model = Y$observation_model
+#     observation_model_parameters = Y[names(Y) != 'observation_model']
+#   } else{
+#     if(!is(Y,'matrix'))	Y = as.matrix(Y)
+#     if(nrow(Y) != nrow(data)) stop('Y and data have different numbers of rows')
+#     observation_model = missing_data_model
+#     observation_model_parameters = list(
+#       Y = Y,
+#       scale_Y = run_parameters$scale_Y
+#     )
+#   }
+#
+#   # initialize observation_model
+#   observation_model_parameters$observation_setup = observation_model(observation_model_parameters,list(data_matrices = list(data = data)))
+#   n = nrow(data)
+#   p = observation_model_parameters$observation_setup$p
+#   traitnames = observation_model_parameters$observation_setup$traitnames
+#   if(is.null(traitnames)) traitnames = paste('trait',1:p,sep='_')
+#   if(is.null(observation_model_parameters$observation_setup$Y_missing)) {
+#     observation_model_parameters$observation_setup$Y_missing = matrix(0,n,p)
+#   }
+#   if(!is(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')){
+#     observation_model_parameters$observation_setup$Y_missing = as(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')
+#   }
+#   Y_missing = observation_model_parameters$observation_setup$Y_missing
+#
+#
+#   # -------- Random effects ---------- #
+#
+#   # add names to RE_setup if needed
+#   n_RE = length(RE_setup)
+#   for(i in 1:n_RE){
+#     if(is.null(names(RE_setup)[i]) || names(RE_setup)[i] == ''){
+#       names(RE_setup)[i] = paste0('RE.',i)
+#     }
+#   }
+#   RE_names = names(RE_setup)
+#
+#   # combine Z matrices
+#   Z = do.call(cbind,lapply(RE_setup,function(x) x$Z))
+#   Z = as(Z,'dgCMatrix')
+#
+#
+#   # find RE indices
+#   RE_lengths = sapply(RE_setup,function(x) ncol(x$Z))
+#   RE_starts = cumsum(c(0,RE_lengths)[1:n_RE])
+#   names(RE_starts) = RE_names
+#   RE_indices = lapply(RE_names,function(re) RE_starts[re] + 1:RE_lengths[re])
+#   names(RE_indices) = RE_names
+#
+#   # function to ensure that covariance matrices are sparse and symmetric
+#   fix_K = function(x) forceSymmetric(drop0(x,tol = run_parameters$drop0_tol))
+#
+#   # function to decompose K as K = PtLDLtP
+#   LDL = function(K) {
+#     res = LDLt_sparse(as(K,'dgCMatrix')) # actually calculates K = PtLDLtP
+#     if(is.character(validObject(res$L,test=TRUE)[1]) || max(res$d > 1e10) || min(res$d < -1e-10)) { # criteria to protect against bad solutions.
+#       res = LDLt_notSparse(as.matrix(K))  # sparse sometimes fails with non-PD K
+#     }
+#     res
+#   }
+#
+#   # construct RE_L and ZL for each random effect
+#   for(i in 1:length(RE_setup)){
+#     re_name = names(RE_setup)[i]
+#     RE_setup[[i]] = within(RE_setup[[i]],{
+#       if(!'ZL' %in% ls()){
+#         if('K' %in% ls() && !is.null(K)){
+#           id_names = rownames(K)
+#           ldl_k = LDL(K)
+#           large_d = ldl_k$d > run_parameters$K_eigen_tol
+#           r_eff = sum(large_d)
+#           # if need to use reduced rank model, then use D of K in place of K and merge L into Z
+#           # otherwise, use original K, set L = Diagonal(1,r)
+#           if(r_eff < length(ldl_k$d)) {
+#             K = as(diag(ldl_k$d[large_d]),'dgCMatrix')
+#             K_inv = as(diag(1/ldl_k$d[large_d]),'dgCMatrix')
+#             L = t(ldl_k$P) %*% ldl_k$L[,large_d]
+#           } else{
+#             L = as(diag(1,nrow(K)),'dgCMatrix')
+#             K_inv = as(with(ldl_k,t(P) %*% crossprod(diag(1/sqrt(d)) %*% solve(L)) %*% P),'dgCMatrix')
+#           }
+#           if(is.null(rownames(K))) rownames(K) = 1:nrow(K)
+#           rownames(K_inv) = rownames(K)
+#           rm(list=c('ldl_k','large_d','r_eff'))
+#         } else if ('K_inv' %in% ls() && !is.null(K_inv)){
+#           id_names = rownames(K_inv)
+#           if(is.null(rownames(K_inv))) rownames(K_inv) = 1:nrow(K_inv)
+#           K = solve(K_inv)
+#           rownames(K) = rownames(K_inv)
+#           L = as(diag(1,nrow(K)),'dgCMatrix')
+#         } else{
+#           K = as(diag(1,ncol(Z)),'dgCMatrix')
+#           rownames(K) = colnames(Z)
+#           id_names = rownames(K)
+#           K_inv = K
+#           L = as(diag(1,nrow(K)),'dgCMatrix')
+#         }
+#         if(is.null(id_names)) id_names = 1:length(id_names)
+#         rownames(L) = paste(id_names,re_name,sep='::')
+#         K = fix_K(K)
+#         ZL = Z %*% L
+#       }
+#     })
+#   }
+#   ZL = do.call(cbind,lapply(RE_setup,function(re) re$ZL))
+#   ZL = as(ZL,'dgCMatrix')
+#
+#   if(length(RE_setup) > 1) {
+#     RE_L = do.call(bdiag,lapply(RE_setup,function(re) re$L))
+#     rownames(RE_L) = do.call(c,lapply(RE_setup,function(re) rownames(re$L)))
+#   } else{
+#     RE_L = RE_setup[[1]]$L
+#   }
+#   r_RE = sapply(RE_setup,function(re) ncol(re$ZL))
+#
+#   # cholesky decompositions (L'L) of each K_inverse matrix
+#   chol_Ki_mats = lapply(RE_setup,function(re) chol(as.matrix(re$K_inv)))
+#
+#
+#
+#   # -------- h2s ---------- #
+#
+#   # table of possible h2s for each random effect
+#   #   These are percentages of the total residual variance accounted for by each random effect
+#   #   Each column is a set of percentages, the sum of which must be less than 1 (so that Ve is > 0)
+#   # can specify different levels of granularity for each random effect
+#   h2_divisions = run_parameters$h2_divisions
+#   if(length(h2_divisions) < n_RE){
+#     if(length(h2_divisions) != 1) stop('Must provide either 1 h2_divisions parameter, or 1 for each random effect')
+#     h2_divisions = rep(h2_divisions,n_RE)
+#   }
+#   if(is.null(names(h2_divisions))) {
+#     names(h2_divisions) = RE_names
+#   }
+#   h2s_matrix = expand.grid(lapply(RE_names,function(re) seq(0,1,length = h2_divisions[[re]]+1)))
+#   colnames(h2s_matrix) = RE_names
+#   h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
+#   colnames(h2s_matrix) = NULL
+#
+#
+#   # ------------------------------------ #
+# 	# ----Precalculate ZKZts, chol_Ks ---- #
+# 	# ------------------------------------ #
+#
+# 	# first, identify sets of traits with same pattern of missingness
+#   # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
+# 	if(run_parameters$num_NA_groups > 0) {
+# 	  # columns with same patterns of missing data
+# 	  Y_missing_mat = as.matrix(Y_missing)
+#     Y_col_obs = lapply(1:ncol(Y_missing_mat),function(x) {
+#       obs = which(!Y_missing_mat[,x],useNames=F)
+#       names(obs) = NULL
+#       obs
+#     })
+#     non_missing_rows = unname(which(rowSums(!Y_missing_mat)>0))
+#     unique_Y_col_obs = unique(c(list(non_missing_rows),Y_col_obs))
+#     unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
+#     Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
+#
+#     if(length(unique_Y_col_obs) > run_parameters$num_NA_groups){
+#       col_counts = sort(tapply(Y_col_obs_index,Y_col_obs_index,length),decreasing = T)
+#       biggest_cols = as.numeric(names(col_counts))[1:run_parameters$num_NA_groups]
+#       biggest_cols = unique(c(1,biggest_cols))
+#       unique_Y_col_obs = unique_Y_col_obs[biggest_cols]
+#       Y_col_obs_index_new = rep(NA,length(Y_col_obs))
+#       for(i in 1:length(Y_col_obs_index)){
+#         if(Y_col_obs_index[i] %in% biggest_cols){
+#           Y_col_obs_index_new[i] = match(Y_col_obs_index[i],biggest_cols)
+#         } else{
+#           diffs = sapply(unique_Y_col_obs,function(x) sum(Y_col_obs[[i]] %in% x == F) + sum(x %in% Y_col_obs[[i]] == F))
+#           Y_col_obs_index_new[i] = order(diffs)[1]
+#           Y_missing_mat[,i] = T
+#           Y_missing_mat[unique_Y_col_obs[[Y_col_obs_index_new[i]]],i] = F
+#         }
+#       }
+#       Y_col_obs_index = Y_col_obs_index_new
+#     }
+#
+#     Missing_data_map = lapply(seq_along(unique_Y_col_obs),function(i) {
+#       x = unique_Y_col_obs[[i]]
+#       return(list(
+#         Y_obs = x,
+#         Y_cols = which(Y_col_obs_index == i)
+#       ))
+#     })
+#
+#     # rows with same patterns of missing data
+#     Y_row_obs = lapply(1:nrow(Y_missing_mat),function(x) {
+#       obs = which(!Y_missing_mat[x,],useNames=F)
+#       names(obs) = NULL
+#       obs
+#     })
+#     non_missing_cols = unname(which(colSums(!Y_missing_mat)>0))
+#     unique_Y_row_obs = unique(c(list(non_missing_cols),Y_row_obs))
+#     unique_Y_row_obs_str = lapply(unique_Y_row_obs,paste,collapse='')
+#     Y_row_obs_index = sapply(Y_row_obs,function(x) which(unique_Y_row_obs_str == paste(x,collapse='')))
+#
+#     Missing_row_data_map = lapply(seq_along(unique_Y_row_obs),function(i) {
+#       x = unique_Y_row_obs[[i]]
+#       return(list(
+#         Y_cols = x,
+#         Y_obs = which(Y_row_obs_index == i)
+#       ))
+#     })
+# 	} else{
+# 	  Missing_data_map = list(list(
+# 	    Y_obs = 1:n,
+# 	    Y_cols = 1:p
+# 	  ))
+# 	  Missing_row_data_map = list(list(
+# 	    Y_obs = 1:n,
+# 	    Y_cols = 1:p
+# 	  ))
+# 	}
+#
+#   # now, for each set of columns, pre-calculate a set of matrices, etc
+#   # do calculations in several chunks
+#   group_size = 2*ncores
+#   n_groups = ceiling(ncol(h2s_matrix)/group_size)
+#   col_groups = tapply(1:ncol(h2s_matrix),gl(n_groups,group_size,ncol(h2s_matrix)),function(x) x)
+#
+#   if(verbose) {
+#     print(sprintf("Pre-calculating random effect inverse matrices for %d groups of traits and %d sets of random effect weights", length(Missing_data_map), ncol(h2s_matrix)))
+#     pb = txtProgressBar(min=0,max = length(Missing_data_map)*  length(col_groups) * 2,style=3)
+#   }
+#
+#   Qt_list = list()
+#   QtX_list = list()
+#   Qt_QTL_resid_Z_list = list()
+#   QtZL_list = list()
+#   Qt_cis_genotypes_list = list()
+#   randomEffect_C_Choleskys_list = list()
+#   Sigma_Choleskys_list = list()
+#
+#   if(n_RE == 1 && run_parameters$svd_K == TRUE){
+#     svd_K1 = svd(RE_setup[[1]]$K)
+#   }
+#
+#   for(set in seq_along(Missing_data_map)){
+#     x = Missing_data_map[[set]]$Y_obs
+#     cols = Missing_data_map[[set]]$Y_cols
+#     if(length(x) == 0) next
+#
+#     if(n_RE == 1){
+#       if(run_parameters$svd_K == TRUE) {
+#         # a faster way of taking the SVD of ZLKZLt, particularly if ncol(ZL) < nrow(ZL). Probably no benefit if ncol(K) > nrow(ZL)
+#         qr_ZU = qr(ZL[x,,drop=FALSE] %*% svd_K1$u)
+#         R_ZU = drop0(qr.R(qr_ZU,complete=F),tol=run_parameters$drop0_tol)
+#         Q_ZU = drop0(qr.Q(qr_ZU,complete=T),tol=run_parameters$drop0_tol)
+#         RKRt = R_ZU %*% diag(svd_K1$d) %*% t(R_ZU)
+#         svd_RKRt = svd(RKRt)
+#         RKRt_U = svd_RKRt$u
+#         if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
+#         Qt = t(Q_ZU %*% RKRt_U)
+#       } else{
+#         ZKZt = ZL[x,,drop=FALSE] %*% RE_setup[[1]]$K %*% t(ZL[x,,drop=FALSE])
+#         result = svd(ZKZt)
+#         Qt = t(result$u)
+#       }
+#       Qt = as(drop0(as(Qt,'dgCMatrix'),tol = run_parameters$drop0_tol),'dgCMatrix')
+#     } else{
+#       Qt = as(diag(1,length(x)),'dgCMatrix')
+#     }
+#     QtZL_matrices_set = lapply(RE_setup,function(re) Qt %*% re$ZL[x,,drop=FALSE])
+#     QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
+#     QtZL_set = as(QtZL_set,'dgCMatrix')
+#     QtX_set = Qt %**% X[x,,drop=FALSE]
+#     if(!is.null(QTL_resid_Z)){
+#       Qt_QTL_resid_Z_set = as(drop0(Qt %*% QTL_resid_Z[x,,drop=FALSE],tol=run_parameters$drop0_tol),'dgCMatrix')
+#     } else{
+#       Qt_QTL_resid_Z_set = NULL
+#     }
+#     Qt_cis_genotypes_set = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
+#
+#     Qt_list[[set]]   = Qt
+#     QtX_list[[set]]  = QtX_set
+#     Qt_QTL_resid_Z_list[[set]] = Qt_QTL_resid_Z_set
+#     QtZL_list[[set]]  = QtZL_set
+#     Qt_cis_genotypes_list[[set]] = Qt_cis_genotypes_set
+#
+#     ZKZts_set = list()
+#     for(i in 1:n_RE){
+#       ZKZts_set[[i]] = as(forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% RE_setup[[i]]$K %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol)),'dgCMatrix')
+#     }
+#
+#
+#     Sigma_Choleskys_c_list = list()
+#     for(i in 1:length(col_groups)){
+#       Sigma_Choleskys_c_list[[i]] = new(Sigma_Cholesky_database,ZKZts_set,h2s_matrix[,col_groups[[i]],drop=FALSE],run_parameters$drop0_tol,1)
+#       if(verbose) setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
+#     }
+#     Sigma_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
+#       Sigma_Choleskys_c = Sigma_Choleskys_c_list[[j]]
+#       lapply(1:length(col_groups[[j]]),function(i) {
+#         list(log_det = Sigma_Choleskys_c$get_log_det(i),
+#              chol_Sigma = drop0(Sigma_Choleskys_c$get_chol_Sigma(i),tol = run_parameters$drop0_tol)
+#             )
+#       })
+#     }))
+#
+#     ZtZ_set = as(forceSymmetric(drop0(crossprod(ZL[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
+#
+#     randomEffect_C_Choleskys_c_list = list()
+#     for(i in 1:length(col_groups)){
+#       randomEffect_C_Choleskys_c_list[[i]] = new(randomEffect_C_Cholesky_database,lapply(chol_Ki_mats,function(x) as(x,'dgCMatrix')),h2s_matrix[,col_groups[[i]],drop=FALSE],ZtZ_set,run_parameters$drop0_tol,1)
+#       if(verbose) setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
+#     }
+#     randomEffect_C_Choleskys_list[[set]] = do.call(c,lapply(1:length(col_groups),function(j) {
+#       randomEffect_C_Choleskys_c = randomEffect_C_Choleskys_c_list[[j]]
+#       lapply(1:length(col_groups[[j]]),function(i) {
+#         list(chol_C     = randomEffect_C_Choleskys_c$get_chol_Ci(i),
+#              chol_K_inv = randomEffect_C_Choleskys_c$get_chol_K_inv_i(i)
+#         )
+#       })
+#     }))
+#   }
+#   if(verbose) close(pb)
+#
+#   # Qt matrices for factors are only used with row set 1
+#   x = Missing_data_map[[1]]$Y_obs
+#   Qt1_XF = Qt_list[[1]] %**% X_F[x,,drop=FALSE]
+#   if(!is.null(QTL_factors_Z)){
+#     Qt1_QTL_Factors_Z = as(drop0(Qt_list[[1]] %*% QTL_factors_Z[x,,drop=FALSE],tol = run_parameters$drop0_tol),'dgCMatrix')
+#   } else{
+#     Qt1_QTL_Factors_Z = NULL
+#   }
+#
+#
+#   run_variables = list(
+#     p      = p,
+#     n      = n,
+#     r_RE   = r_RE,
+#     RE_names = RE_names,
+#     b       = b,
+#     b_F     = b_F,
+#     b_QTL   = b_QTL,
+#     b_QTL_F = b_QTL_F,
+#     fixed_effects_common = fixed_effects_common,
+#     fixed_effects_only_resid = fixed_effects_only_resid,
+#     fixed_effects_only_factors = fixed_effects_only_factors,
+#     resid_intercept   = resid_intercept,
+#     X_F_zero_variance = X_F_zero_variance,   # used to identify fixed effect coefficients that should be forced to zero
+#     n_cis_effects     = n_cis_effects,
+#     cis_effects_index = cis_effects_index,
+#     Qt_list    = Qt_list,
+#     QtX_list   = QtX_list,
+#     Qt_QTL_resid_Z_list = Qt_QTL_resid_Z_list,
+#     QtZL_list   = QtZL_list,
+#     Qt_cis_genotypes_list = Qt_cis_genotypes_list,
+#     Qt1_XF  = Qt1_XF,
+#     Qt1_QTL_Factors_Z = Qt1_QTL_Factors_Z,
+#     Missing_data_map      = Missing_data_map,
+#     Missing_row_data_map  = Missing_row_data_map,
+#     Sigma_Choleskys_list          = Sigma_Choleskys_list,
+#     randomEffect_C_Choleskys_list = randomEffect_C_Choleskys_list
+#   )
+#
+# 	data_matrices = list(
+# 	  X           = X,
+# 	  X_F         = X_F,
+# 	  Z           = Z,
+# 	  ZL          = ZL,
+# 	  RE_setup    = RE_setup,
+# 	  RE_L        = RE_L,  # matrix necessary to back-transform U_F and U_R (RE_L*U_F and RE_L*U_R) to get original random effects
+# 	  RE_indices  = RE_indices,
+# 	  h2s_matrix  = h2s_matrix,
+# 	  cis_genotypes = cis_genotypes,
+# 	  QTL_resid_Z = QTL_resid_Z,
+# 	  QTL_resid_X = QTL_resid_X,
+# 	  QTL_factors_Z = QTL_factors_Z,
+# 	  QTL_factors_X = QTL_factors_X,
+# 	  data       = data
+# 	)
+#
+# 	run_parameters$observation_model = observation_model
+# 	run_parameters$observation_model_parameters = observation_model_parameters
+# 	run_parameters$traitnames = traitnames
+#
+#
+# 	# ----------------------------- #
+# 	# ----- re-formulate priors --- #
+# 	# ----------------------------- #
+# 	# total precision
+# 	if(length(priors$tot_Y_var$V == 1)) {
+# 	  priors$tot_Y_var$V = rep(priors$tot_Y_var$V,p)
+# 	  priors$tot_Y_varnu = rep(priors$tot_Y_var$nu,p)
+# 	}
+# 	priors$tot_Eta_prec_rate   = with(priors$tot_Y_var,V * nu)
+# 	priors$tot_Eta_prec_shape  = with(priors$tot_Y_var,nu - 1)
+# 	priors$tot_F_prec_rate     = with(priors$tot_F_var,V * nu)
+# 	priors$tot_F_prec_shape    = with(priors$tot_F_var,nu - 1)
+#
+# 	# h2_priors_resids
+# 	if(exists('h2_priors_resids',priors)) {
+# 	  if(length(priors$h2_priors_resids) == 1) priors$h2_priors_resids = rep(priors$h2_priors_resids,ncol(h2s_matrix))
+# 	  if(!length(priors$h2_priors_resids) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_resids')
+# 	} else{
+# 	  if(!is(priors$h2_priors_resids_fun,'function')) stop('need to provide a priors$h2_priors_resids_fun() to specify discrete h2 prior for resids')
+# 	  priors$h2_priors_resids = apply(h2s_matrix,2,priors$h2_priors_resids_fun,n = ncol(h2s_matrix))
+# 	}
+# 	priors$h2_priors_resids = priors$h2_priors_resids/sum(priors$h2_priors_resids)
+# 	# h2_priors_factors
+# 	if(exists('h2_priors_factors',priors)) {
+# 	  if(length(priors$h2_priors_factors) == 1) priors$h2_priors_factors = rep(priors$h2_priors_factors,ncol(h2s_matrix))
+# 	  if(!length(priors$h2_priors_factors) == ncol(h2s_matrix)) stop('wrong length of priors$h2_priors_factors')
+# 	} else{
+# 	  if(!is(priors$h2_priors_factors_fun,'function')) stop('need to provide a priors$h2_priors_factors_fun() to specify discrete h2 prior for factors')
+# 	  priors$h2_priors_factors = apply(h2s_matrix,2,priors$h2_priors_factors_fun,n = ncol(h2s_matrix))
+# 	}
+# 	priors$h2_priors_factors = priors$h2_priors_factors/sum(priors$h2_priors_factors)
+#
+# 	# ----------------------------- #
+# 	# -- create BSFG_state object - #
+# 	# ----------------------------- #
+#
+# 	RNG = list(
+# 	  Random.seed = .Random.seed,
+# 	  RNGkind = RNGkind()
+# 	)
+#
+# 	BSFG_state = list(
+# 	  run_ID         = run_ID,
+# 	  data_matrices  = data_matrices,
+# 	  priors         = priors,
+# 	  run_parameters = run_parameters,
+# 	  run_variables  = run_variables,
+# 	  RNG            = RNG,
+# 	  setup          = setup
+# 	)
+# 	class(BSFG_state) = append('BSFG_state',class(BSFG_state))
+#
+# 	# ----------------------------- #
+# 	# --- Initialize BSFG_state --- #
+# 	# ----------------------------- #
+#
+# 	BSFG_state$Posterior = list(
+# 	  posteriorSample_params = posteriorSample_params,
+# 	  posteriorMean_params = posteriorMean_params,
+# 	  total_samples = 0,
+# 	  folder = sprintf('%s/Posterior',run_ID),
+# 	  files = c()
+# 	)
+#
+# 	BSFG_state = initialize_variables(BSFG_state)
+#
+# 	Posterior = reset_Posterior(BSFG_state$Posterior,BSFG_state)
+# 	BSFG_state$Posterior = Posterior
+#
+#
+# 	return(BSFG_state)
+# }
 
 
 #' Print more detailed statistics on current BSFG state
@@ -1162,7 +1669,11 @@ summary.BSFG_state = function(BSFG_state){
   with(BSFG_state,{
     cat(
       c(sprintf('\n BSFG_state object for data of size %d x %d \n',nrow(data_matrices$Y),ncol(data_matrices$Y))),
-      c(sprintf('Model dimensions: fixed = %d, random = %d \n',ncol(data_matrices$X),ncol(data_matrices$ZL))),
+      c(sprintf('Model dimensions: factors = %d, fixed = %d, regression_R = %d, regression_F = %d, random = %d \n',
+                current_state$K,
+                ncol(data_matrices$X1),
+                ncol(data_matrices(X2_R)),ncol(data_matrices(X2_F)),
+                ncol(data_matrices$ZL))),
       c(sprintf('Sampler: %s \n',run_parameters$sampler)),
       c(sprintf('Current iteration: %d, Posterior_samples: %d \n',current_state$nrun,Posterior$total_samples)),
       c(sprintf('Current factor dimension: %d factors \n',ncol(current_state$Lambda))),
