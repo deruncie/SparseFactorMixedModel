@@ -6,6 +6,164 @@
 // using namespace Eigen;
 // using namespace RcppParallel;
 //
+//
+// // [[Rcpp::export()]]
+// MatrixXd rstdnorm_mat2(int n,int p) {  // returns nxp matrix
+//   VectorXd X_vec(n*p);
+//   for(int i = 0; i < n*p; i++){
+//     X_vec[i] = ziggr.norm();
+//   }
+//   MatrixXd X_mat = Map<MatrixXd>(X_vec.data(),n,p);
+//   return(X_mat);
+// }
+//
+// struct R_matrix {
+//   Map<MatrixXd> X_d;
+//   MSpMat X_s;
+//   bool dense;
+//   R_matrix(Map<MatrixXd> X_d_, MSpMat X_s_,bool dense_) : X_d(X_d_), X_s(X_s_), dense(dense_) {}
+// };
+//
+// void load_R_matrix(const Rcpp::List X_list, std::vector<R_matrix>& X_vector){
+//   int n;
+//   SEXP X0_ = X_list[0];
+//   if(Rf_isMatrix(X0_)){
+//     Map<MatrixXd> X0 = as<Map<MatrixXd> >(X0_);
+//     n = X0.rows();
+//     if(X0.cols() != n) stop("X not square");
+//   } else{
+//     MSpMat X0 = as<MSpMat>(X0_);
+//     n = X0.rows();
+//     if(X0.cols() != n) stop("X not square");
+//   }
+//
+//   // null_matrices
+//   MatrixXd null_d = MatrixXd::Zero(0,0);
+//   Map<MatrixXd> M_null_d(null_d.data(),0,0);
+//   SpMat null_s = null_d.sparseView();
+//   MSpMat M_null_s(0,0,0,null_s.outerIndexPtr(),null_s.innerIndexPtr(),null_s.valuePtr());
+//
+//   int p = X_list.size();
+//   X_vector.reserve(p);
+//   for(int i = 0; i < p; i++){
+//     SEXP Xi_ = X_list[i];
+//     if(Rf_isMatrix(Xi_)){
+//       Map<MatrixXd> Xi = as<Map<MatrixXd> >(Xi_);
+//       n = Xi.rows();
+//       if(Xi.cols() != n) stop("X not square");
+//       R_matrix Xim(Xi,M_null_s,true);
+//       X_vector.push_back(Xim);
+//     } else{
+//       MSpMat Xi = as<MSpMat>(Xi_);
+//       n = Xi.rows();
+//       if(Xi.cols() != n) stop("X not square");
+//       R_matrix Xim(M_null_d,Xi,false);
+//       X_vector.push_back(Xim);
+//     }
+//   }
+// }
+//
+//
+// // [[Rcpp::export()]]
+// VectorXd sample_MME_single_diagR2(
+//     VectorXd y,           // nx1
+//     MSpMat Z,             // nxr dgCMatrix
+//     MSpMat chol_ZtZ_Kinv,       // rxr CsparseMatrix upper triangular: chol(ZtRinvZ + diag(Kinv))
+//     double tot_Eta_prec,   // double
+//     double pe,            // double
+//     VectorXd randn_theta  // rx1
+// ){
+//   VectorXd b = Z.transpose() * y * pe;
+//   b = chol_ZtZ_Kinv.transpose().triangularView<Lower>().solve(b / sqrt(tot_Eta_prec));
+//   b += randn_theta;
+//   b = chol_ZtZ_Kinv.triangularView<Upper>().solve(b / sqrt(tot_Eta_prec));
+//   return(b);
+// }
+
+
+// struct sample_MME_single_diagR_worker2 : public RcppParallel::Worker {
+//   const Map<MatrixXd> Y;
+//   const MSpMat Z;
+//   const std::vector<R_matrix> chol_ZtZ_Kinv_list;
+//   const ArrayXd& pes;
+//   const Map<VectorXd> tot_Eta_prec;
+//   const VectorXi& h2s_index;
+//   const MatrixXd& randn_theta;
+//   MatrixXd &coefs;
+//
+//   sample_MME_single_diagR_worker2(
+//     const Map<MatrixXd> Y,                                // nxp
+//     const MSpMat Z,                                  // nxr
+//     const std::vector<R_matrix> chol_ZtZ_Kinv_list,     // std::vector of rxr SpMat upper-triangle
+//     const ArrayXd& pes,                               // px1
+//     const Map<VectorXd> tot_Eta_prec,                     // px1
+//     const VectorXi& h2s_index,                        // px1, 1-based index
+//     const MatrixXd& randn_theta,                      // rxp
+//     MatrixXd &coefs                            // rxp
+//   ):
+//     Y(Y), Z(Z),
+//     chol_ZtZ_Kinv_list(chol_ZtZ_Kinv_list),
+//     pes(pes), tot_Eta_prec(tot_Eta_prec),h2s_index(h2s_index),
+//     randn_theta(randn_theta),
+//     coefs(coefs) {}
+//
+//   void operator()(std::size_t begin, std::size_t end) {
+//     for(std::size_t j = begin; j < end; j++){
+//       int h2_index = h2s_index[j] - 1;
+//       // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
+//       coefs.col(j) = sample_MME_single_diagR2(Y.col(j), Z, chol_ZtZ_Kinv_list[h2_index].X_s, tot_Eta_prec[j], pes[j],randn_theta.col(j));
+//     }
+//   }
+// };
+//
+//
+// // samples random effects from model:
+// // Y = ZU + E
+// // U[,j] ~ N(0,1/tot_Eta_prec[j] * h2[j] * K)
+// // E[,j] ~ N(0,1/tot_Eta_prec[j] * (1-h2[j]) * I_n)
+// // For complete data, ie no missing obs.
+// // [[Rcpp::export()]]
+// MatrixXd sample_MME_ZKZts_c2(
+//     Map<MatrixXd> Y,                    // nxp
+//     MSpMat Z,                           // nxr
+//     Map<VectorXd> tot_Eta_prec,         // px1
+//     Rcpp::List chol_ZtZ_Kinv_list_,      // List or R st RtR = ZtZ_Kinv
+//     Map<MatrixXd> h2s,                  // n_RE x p
+//     VectorXi h2s_index,                 // px1
+//     int grainSize) {
+//
+//   int p = Y.cols();
+//   int r = Z.cols();
+//
+//   MatrixXd randn_theta = rstdnorm_mat2(r,p);
+//
+//   // std::vector<MSpMat> chol_C_list;
+//   // for(int i = 0; i < h2s_index.maxCoeff(); i++){
+//   //   Rcpp::List randomEffect_C_Cholesky_i = Rcpp::as<Rcpp::List>(randomEffect_C_Choleskys[i]);
+//   //   chol_C_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_C"]));
+//   // }
+//
+//   std::vector<R_matrix> chol_ZtZ_Kinv_list;
+//   load_R_matrix(chol_ZtZ_Kinv_list_, chol_ZtZ_Kinv_list);
+//
+//   MatrixXd U(r,p);
+//   ArrayXd h2_e = 1.0 - h2s.colwise().sum().array();
+//   ArrayXd pes = tot_Eta_prec.array() / h2_e.array();
+//
+//   sample_MME_single_diagR_worker2 sampler(Y,Z,chol_ZtZ_Kinv_list,pes,tot_Eta_prec,h2s_index,randn_theta,U);
+//   RcppParallel::parallelFor(0,p,sampler,grainSize);
+//   return(U);
+// }
+
+
+
+
+
+
+
+
+
+//
 // // [[Rcpp::export()]]
 // VectorXd rgamma2(int n,double shape,double scale){
 //   VectorXd res(n);

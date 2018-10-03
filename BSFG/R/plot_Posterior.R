@@ -124,15 +124,14 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
     # transform variables so that the variance of each column of F is 1.
     F_var = 1/tot_F_prec
     U_F = sweep(U_F,2,sqrt(F_var),'/')
-    B_F = sweep(B_F,2,sqrt(F_var),'/')
+    B2_F = sweep(B2_F,2,sqrt(F_var),'/')
     F = sweep(F,2,sqrt(F_var),'/')
     Lambda = sweep(Lambda,2,sqrt(F_var),'*')
-    tauh[] = tauh * tot_F_prec
 
     if(!'var_Eta' %in% ls()) var_Eta = rep(1,nrow(Lambda))
     U_R[] = sweep(U_R,2,sqrt(var_Eta),'*')
-    B[] = sweep(B,2,sqrt(var_Eta),'*')
-    B_QTL[] = sweep(B_QTL,2,sqrt(var_Eta),'*')
+    B1[] = sweep(B1,2,sqrt(var_Eta),'*')
+    B2_R[] = sweep(B2_R,2,sqrt(var_Eta),'*')
     Lambda[] = sweep(Lambda,1,sqrt(var_Eta),'*')
     tot_Eta_prec[] = tot_Eta_prec / var_Eta
   })
@@ -168,15 +167,15 @@ plot_current_state_simulation = function(BSFG_state, device = NULL){
 
   # B's
   if(dim(setup$B)[1] > 1) {
-    B = BSFG_state$current_state$B
-    B_factor = BSFG_state$current_state$B_F   %*% t(BSFG_state$current_state$Lambda)
-    try({plot(c(B),c(setup$B))},silent = TRUE)
+    B2_R = BSFG_state$current_state$B2_R
+    B2_F = BSFG_state$current_state$B2_F   %*% t(BSFG_state$current_state$Lambda)
+    try({plot(c(B2_R),c(setup$B))},silent = TRUE)
     abline(0,1)
-    if(dim(B_factor)[1] > 1) {
-      try({plot(c(B_factor),c(setup$B_F %*% t(setup$error_factor_Lambda)))},silent = TRUE)
+    if(dim(B2_F)[1] > 1) {
+      try({plot(c(B2_F),c(setup$B_F %*% t(setup$error_factor_Lambda)))},silent = TRUE)
       abline(0,1)
-      xlim = ylim = range(c(B,B_factor))
-      try({plot(c(B_factor),c(B),xlim = xlim,ylim=ylim);abline(0,1)},silent = TRUE)
+      xlim = ylim = range(c(B2_R,B2_F))
+      try({plot(c(B2_F),c(B2_R),xlim = xlim,ylim=ylim);abline(0,1)},silent = TRUE)
     }
   }
 
@@ -250,22 +249,22 @@ plot_posterior_simulation = function(BSFG_state, device = NULL){
   plot_factor_h2s(apply(Posterior$F_h2,c(2,3),mean))
 
   if(dim(setup$B)[1] > 1) {
-    B_mean = apply(Posterior$B,c(2,3),mean)
+    B_mean = apply(Posterior$B1,c(2,3),mean)
     try({plot(c(B_mean),c(setup$B))},silent = TRUE)
     abline(0,1)
-    if(!is.null(setup$B_F) & ncol(BSFG_state$data_matrices$X_F) == nrow(setup$B_F)){
+    if(!is.null(setup$B_F) & ncol(BSFG_state$data_matrices$X2_F) == nrow(setup$B_F)){
       B_factor_mean = with(c(Posterior,BSFG_state$data_matrices), {
-        if(ncol(X_F) == 0) return(rep(0,dim(Lambda)[1]))
-        matrix(rowMeans(sapply(1:total_samples,function(i) B_F[i,,] %*% t(Lambda[i,,]))),nrow = ncol(X_F))
+        if(ncol(X2_F) == 0) return(rep(0,dim(Lambda)[1]))
+        matrix(rowMeans(sapply(1:total_samples,function(i) B2_F[i,,] %*% t(Lambda[i,,]))),nrow = ncol(X2_F))
       })
       try({plot(c(B_factor_mean),c(setup$B_F %*% t(setup$error_factor_Lambda)));abline(0,1)},silent = TRUE)
       xlim = ylim = range(c(B_mean[-1,],B_factor_mean))
       try({plot(c(B_factor_mean),c(B_mean),xlim = xlim,ylim=ylim);abline(0,1)},silent = TRUE)
-      B_f_HPD = HPDinterval(mcmc(Posterior$B_F[,1,]))
-      B_f_mean = colMeans(Posterior$B_F[,1,])
+      B_f_HPD = HPDinterval(mcmc(Posterior$B2_F[,1,]))
+      B_f_mean = colMeans(Posterior$B2_F[,1,])
 
       try({
-        plot(1:length(B_f_mean),B_f_mean,xlim = c(1,length(B_f_mean)),ylim = range(B_f_HPD),xlab = '',main = 'Posterior B_F')
+        plot(1:length(B_f_mean),B_f_mean,xlim = c(1,length(B_f_mean)),ylim = range(B_f_HPD),xlab = '',main = 'Posterior B2_F')
         arrows(seq_along(B_f_mean),B_f_HPD[,1],seq_along(B_f_mean),B_f_HPD[,2],length=0)
         abline(h=0)
       },silent = TRUE)
@@ -331,13 +330,16 @@ plot_diagnostics = function(BSFG_state){
   if(BSFG_state$Posterior$total_samples > 0) {
     trace_plot_h2s(load_posterior_param(BSFG_state,'F_h2'))
     trace_plot_Lambda(load_posterior_param(BSFG_state,'Lambda'))
-    try({trace_plot_Lambda(load_posterior_param(BSFG_state,'B_F'),main='B_F')},silent=T)
-    try({trace_plot_Lambda(load_posterior_param(BSFG_state,'B_QTL_F'),main='B_QTL_F')},silent=T)
+    try({trace_plot_Lambda(load_posterior_param(BSFG_state,'B2_F'),main='B2_F')},silent=T)
     try({
-      B = load_posterior_param(BSFG_state,'B')[,-1,]
-      trace_plot_Lambda(B,main='B')},silent=T)
+      B2_R = load_posterior_param(BSFG_state,'B2_R')[,-1,]
+      trace_plot_Lambda(B2_R,main='B2_R')},silent=T)
     # try({boxplot_Bs(load_posterior_param(BSFG_state,'B'),'B')},silent=T)
-  }
+    try({
+      B1 = load_posterior_param(BSFG_state,'B1')[,-1,]
+      trace_plot_Lambda(B1,main='B1')},silent=T)
+
+}
 }
 
 

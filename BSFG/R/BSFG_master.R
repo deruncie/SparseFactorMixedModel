@@ -500,7 +500,7 @@ initialize_variables_BSFG = function(BSFG_state,...){
     B1 = matrix(rnorm(b1*p), ncol = p)
     colnames(B1) = traitnames
 
-    B2_R = 0*matrix(rnorm(b2_R*p),ncol = p)
+    B2_R = 0*matrix(rnorm(b2_R*p),b2_R,ncol = p)
     colnames(B2_R) = traitnames
 
     # Factor fixed effects
@@ -544,7 +544,7 @@ initialize_variables_BSFG = function(BSFG_state,...){
 
   # Initialize parameters for Lambda_prior, B_prior, and QTL_prior (may be model-specific)
   BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state)
-  # BSFG_state$current_state = BSFG_state$priors$B2_prior$sampler(BSFG_state)
+  BSFG_state$current_state = BSFG_state$priors$B2_prior$sampler(BSFG_state)
 
   # Initialize Eta
   observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)

@@ -150,9 +150,9 @@ update_k = function( BSFG_state) {
       F_h2          = h2s_matrix[,F_h2_index,drop=FALSE]
       tot_F_prec    = cbind(tot_F_prec,1)
       U_F           = cbind(U_F,rnorm(r,0,sqrt(sum(F_h2[,k]))))
-      B_F           = cbind(B_F,0*rnorm(b_F,0,1))
-      prec_B_F      = cbind(prec_B_F,c(tau_B_F))
-      F             = cbind(F,rnorm(n,as.matrix(X_F %*% B_F[,k]) + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
+      B2_F           = cbind(B2_F,0*rnorm(b2_F,0,1))
+      B2_F_prec      = cbind(B2_F_prec,c(tau_B_F))
+      F             = cbind(F,rnorm(n,as.matrix(X2_F %*% B2_F[,k]) + as.matrix(Z %*% U_F[,k]),sqrt(1-sum(F_h2[,k]))))
     } else if(num > 0) { # drop redundant columns
       nonred = which(vec == 0) # non-redundant loadings columns
       while(length(nonred) < 2) {
@@ -177,7 +177,7 @@ update_k = function( BSFG_state) {
       F_h2_index = F_h2_index[nonred]
       tot_F_prec = tot_F_prec[,nonred,drop=FALSE]
       U_F = U_F[,nonred,drop=FALSE]
-      B_F = B_F[,nonred,drop=FALSE]
+      B2_F = B2_F[,nonred,drop=FALSE]
       prec_B_F = prec_B_F[,nonred,drop=FALSE]
     }
   }))
@@ -234,7 +234,7 @@ reorder_factors = function(BSFG_state,factor_order = NULL){
 
   reorder_params = c('Lambda','Lambda_prec','Plam',
                      'delta','tauh',
-                     'F','B_F','U_F','F_h2','F_e_prec','tot_F_prec', 'B_F_prec'
+                     'F','B2_F','U_F','F_h2','F_e_prec','tot_F_prec', 'B2_F_prec'
   )
 
   # reorder currrent state
@@ -242,7 +242,7 @@ reorder_factors = function(BSFG_state,factor_order = NULL){
     if(! param %in% names(current_state)) next
     current_state[[param]] = current_state[[param]][,factor_order,drop=FALSE]
   }
-  current_state$delta = matrix(c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)]),nrow=1)
+  # current_state$delta = matrix(c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)]),nrow=1)
   BSFG_state$current_state = current_state
 
   # reorder Posterior
@@ -265,14 +265,13 @@ rescale_factors_F = function(BSFG_state){
   BSFG_state$current_state = within(BSFG_state$current_state,{
     F_sizes = colMeans(F^2)
     F = sweep(F,2,sqrt(F_sizes),'/')
-    B_F = sweep(B_F,2,sqrt(F_sizes),'/')
+    B2_F = sweep(B2_F,2,sqrt(F_sizes),'/')
     U_F = sweep(U_F,2,sqrt(F_sizes),'/')
-    B_F_prec = sweep(B_F_prec,2,F_sizes,'*')
+    B2_F_prec = sweep(B2_F_prec,2,F_sizes,'*')
     Lambda = sweep(Lambda,2,sqrt(F_sizes),'*')
     delta_factor = c(F_sizes[1],exp(diff(log(F_sizes))))
     delta[] = delta / delta_factor
-    tauh[] = cumprod(delta)
-    Plam[] = sweep(Lambda_prec,2,tauh,'*')
+    Lambda_prec[] = sweep(Lambda_prec,2,cumprod(delta),'*')
   })
   return(BSFG_state)
 }
@@ -303,16 +302,15 @@ save_posterior_sample = function(BSFG_state) {
     # transform variables so that the variance of each column of F is 1.
     F_var = 1/tot_F_prec
     U_F[] = sweep(U_F,2,sqrt(F_var),'/')
-    B_F[] = sweep(B_F,2,sqrt(F_var),'/')
+    B2_F[] = sweep(B2_F,2,sqrt(F_var),'/')
     F[] = sweep(F,2,sqrt(F_var),'/')
     Lambda[] = sweep(Lambda,2,sqrt(F_var),'*')
-    tauh[] = tauh * tot_F_prec
 
     # re-scale by var_Eta
     if(!'var_Eta' %in% ls()) var_Eta = rep(1,nrow(Lambda))
     U_R[] = sweep(U_R,2,sqrt(var_Eta),'*')
-    B[] = sweep(B,2,sqrt(var_Eta),'*')
-    B_QTL[] = sweep(B_QTL,2,sqrt(var_Eta),'*')
+    B1[] = sweep(B1,2,sqrt(var_Eta),'*')
+    B2_R[] = sweep(B2_R,2,sqrt(var_Eta),'*')
     Lambda[] = sweep(Lambda,1,sqrt(var_Eta),'*')
     Eta[] = sweep(Eta,2,sqrt(var_Eta),'*')
     tot_Eta_prec[] = tot_Eta_prec / var_Eta

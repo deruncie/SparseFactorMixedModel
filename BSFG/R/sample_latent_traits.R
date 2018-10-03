@@ -67,7 +67,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       }
       # beta -> B2_R and Lambda
       if(b2_R > 0) {
-        B2_R[,cols] = new_samples$beta[1:b2_r,]
+        B2_R[,cols] = new_samples$beta[1:b2_R,]
       }
       Lambda[cols,] = t(new_samples$beta[b2_R + 1:K,])
 
@@ -142,7 +142,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     prior_mean = matrix(0,b2_F,K)
 
     # temporary!!!
-    B2_F_prec = matrix(0,b2_F,K)
+    # B2_F_prec = matrix(0,b2_F,K)
 
     new_samples = regression_sampler_parallel(
       Qt_list[[1]] %**% F[rows,,drop=FALSE],
@@ -199,6 +199,8 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
     U_F[] = sample_MME_ZKZts_c(F_tilde[rows,,drop=FALSE], ZL[rows,,drop=FALSE], tot_F_prec, chol_ZtZ_Kinv_list_list[[1]], F_h2, F_h2_index,grainSize)
+
+    resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
 
     # -----Sample F----------------------- #
     #conditioning on B, U_F,U_R,Lambda, F_h2

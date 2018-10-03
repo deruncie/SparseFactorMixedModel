@@ -24,7 +24,7 @@ nRep = 10
 nTraits = 100
 nFixedEffects = 2 # fixed effects are effects on the factors
 nFactors = 10
-factor_h2s = c(rep(0,nFactors/2),rep(0.3,nFactors/2))  # factor_h2 is the % of variance in each factor trait that is explained by additive genetic variation.
+factor_h2s = c(rep(0,nFactors/2),rep(0.9,nFactors/2))  # factor_h2 is the % of variance in each factor trait that is explained by additive genetic variation.
 # The is after accounting for the fixed effects on the factors
 Va = 2 # residual genetic variance in each of the observed traits after accounting for the factors
 Ve = 2 # residual microenvironmental variance in each of the observed traits after accounting for the factors
@@ -75,7 +75,7 @@ priors = BSFG_priors(
     c2 = list(V=1,nu=1e6)
   ),
   B2_prior = list(
-    sampler = sample_Lambda_prec_reg_horseshoe,
+    sampler = sample_B2_prec_reg_horseshoe,
     prop_0 = 0.1,
     c2 = list(V=1,nu=1e6)
   ),
@@ -97,9 +97,11 @@ priors = BSFG_priors(
 ```{r}
 options(error=recover)
 BSFG_state = setup_model_BSFG(Y,~(1|animal),
-                              extra_regressions = list(X = model.matrix(~Fixed1,data),factors=T),
+                              # extra_regressions = NULL,
+                              extra_regressions = list(X = model.matrix(~Fixed1,data)[,-1,drop=FALSE],factors=T,resids=T),
                               data,relmat = list(animal = K),
-                              run_parameters=run_parameters
+                              run_parameters=run_parameters,
+                              setup = setup
                                 )
 
 BSFG_state = set_priors_BSFG(BSFG_state,priors)
@@ -108,6 +110,27 @@ BSFG_state = initialize_variables_BSFG(BSFG_state)
 
 BSFG_state = initialize_BSFG(BSFG_state)
 
+BSFG_state$Posterior$posteriorSample_params = BSFG_state$Posterior$posteriorSample_params[BSFG_state$Posterior$posteriorSample_params != 'cis_effects']
+BSFG_state = clear_Posterior(BSFG_state)
+
+```
+```{r}
+saveRDS(BSFG_state,file = 'BSFG_state.rds')
+```
+```{r}
+library(BSFG)
+BSFG_state = readRDS('BSFG_state.rds')
+```
+
+
+```{r}
+# for(i in 1:100) {
+# # BSFG_state$current_state$Lambda[1,]
+# # BSFG_state$current_state$F[1,]
+# # BSFG_state$current_state$resid_h2_index
+# # BSFG_state$current_state$F_h2_index
+#   BSFG_state$current_state = sample_latent_traits(BSFG_state,grainSize = 1)
+# }
 ```
 
 

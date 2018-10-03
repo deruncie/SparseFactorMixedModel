@@ -1,3 +1,60 @@
+sample_B2_prec_reg_horseshoe = function(BSFG_state,...) {
+  # sampling as described in Supplemental methods, except we multiply columns of Prec_lambda by delta
+  # phi2 = \lambda^2 in methods
+  # the delta sequence controls tau_k. We have tau_1~C+(0,tau_0), and tau_k = tau_1*prod_{l=1}^K(delta^{-1}_l)
+  # delta_l controls the decrease in odds of inclusion of each element for the lth factor relative to the (l-1)th
+  # Note:  Piironen and Vehtari do not include sigma^2 in prior, so I have removed
+  priors         = BSFG_state$priors
+  run_variables  = BSFG_state$run_variables
+  run_parameters = BSFG_state$run_parameters
+  current_state  = BSFG_state$current_state
+
+  current_state = with(c(priors,run_variables,run_parameters),
+                       with(B2_prior,{
+
+                         tau_0 = prop_0/(1-prop_0) * 1/sqrt(n)
+
+                         c2_shape = c2$nu-1
+                         c2_rate = c2$V*c2$nu
+
+                         within(current_state,{
+
+                           # initialize variables if needed
+                           if(!any(c('B2_R_tau2','B2_F_tau2') %in% names(current_state))){
+                             B2_tau2 = matrix(1,1,1)
+                             B2_xi = matrix(1,1,1)
+                             B2_R_phi2 = matrix(1,b2_R,p)
+                             B2_R_nu = matrix(1,b2_R,p)
+                             B2_F_phi2 = matrix(1,b2_F,K)
+                             B2_F_nu = matrix(1,b2_F,K)
+                             B2_c2 = matrix(1,1,1)
+                           }
+
+                           B2_R_2 = B2_R^2
+                           B2_R_2_std = sweep(B2_R_2,2,tot_Eta_prec[1,],'*')/2
+                           B2_F_2 = B2_F^2
+                           B2_F_2_std = sweep(B2_F_2,2,tot_F_prec[1,],'*')/2
+
+                           B2_R_nu[] = matrix(1/rgamma(b2_R*p,shape = 1, rate = 1 + 1/B2_R_phi2), nr = b2_R, nc = p)
+                           B2_R_phi2[] = matrix(1/rgamma(b2_R*p,shape = 1, rate = 1/B2_R_nu + B2_R_2_std / B2_tau2[1]),nr=b2_R,nc = p)
+                           B2_F_nu[] = matrix(1/rgamma(b2_F*K,shape = 1, rate = 1 + 1/B2_F_phi2), nr = b2_F, nc = K)
+                           B2_F_phi2[] = matrix(1/rgamma(b2_F*K,shape = 1, rate = 1/B2_F_nu + B2_F_2_std / B2_tau2[1]),nr=b2_F,nc = K)
+
+                           B2_xi[] = 1/rgamma(1,shape=1,rate=1/tau_0 + 1/B2_tau2[1])
+                           B2_tau2[] = 1/rgamma(1,shape = (b2_R*p + b2_F*K + 1)/2, rate = 1/B2_xi[1] + (sum(B2_R_2_std/B2_R_phi2) + sum(B2_F_2_std/B2_F_phi2))/2)
+
+                           B2_c2[] = 1/rgamma(1,shape = c2_shape + (b2_R*p + b2_F*K)/2,rate = c2_rate + (sum(B2_R_2) + sum(B2_F_2))/2)
+
+                           # -----Update Plam-------------------- #
+                           B2_R_prec = (B2_c2[1] + B2_tau2[1]*B2_R_phi2) / (B2_c2[1] * B2_tau2[1] * B2_R_phi2)
+                           B2_F_prec = (B2_c2[1] + B2_tau2[1]*B2_F_phi2) / (B2_c2[1] * B2_tau2[1] * B2_F_phi2)
+
+                           rm(list=c('B2_R_2','B2_R_2_std','B2_F_2','B2_F_2_std'))
+                         })
+                       }))
+  return(current_state)
+}
+
 sample_B_prec_RE = function(BSFG_state,...){
   # treats B as a random effect - no parameter-specific shrinkage
   # error if ncol(B_F)>0

@@ -45,18 +45,18 @@ BEGIN_RCPP
 END_RCPP
 }
 // regression_sampler_parallel
-Rcpp::List regression_sampler_parallel(Map<MatrixXd> Y, Map<MatrixXd> W_base, Rcpp::List W_list, Map<MatrixXd> X, SEXP V_, Rcpp::IntegerVector h2s_index, Rcpp::List chol_V_list, VectorXd Y_prec, double Y_prec_a0, double Y_prec_b0, Map<MatrixXd> prior_prec_alpha1, VectorXd prior_prec_alpha2, Map<MatrixXd> prior_mean_beta, Map<MatrixXd> prior_prec_beta, int grainSize);
-RcppExport SEXP _BSFG_regression_sampler_parallel(SEXP YSEXP, SEXP W_baseSEXP, SEXP W_listSEXP, SEXP XSEXP, SEXP V_SEXP, SEXP h2s_indexSEXP, SEXP chol_V_listSEXP, SEXP Y_precSEXP, SEXP Y_prec_a0SEXP, SEXP Y_prec_b0SEXP, SEXP prior_prec_alpha1SEXP, SEXP prior_prec_alpha2SEXP, SEXP prior_mean_betaSEXP, SEXP prior_prec_betaSEXP, SEXP grainSizeSEXP) {
+Rcpp::List regression_sampler_parallel(Map<MatrixXd> Y, Map<MatrixXd> W_base, Rcpp::List W_list_, Map<MatrixXd> X, SEXP V_, Rcpp::IntegerVector h2s_index, Rcpp::List chol_V_list_, VectorXd Y_prec, double Y_prec_a0, double Y_prec_b0, Map<MatrixXd> prior_prec_alpha1, VectorXd prior_prec_alpha2, Map<MatrixXd> prior_mean_beta, Map<MatrixXd> prior_prec_beta, int grainSize);
+RcppExport SEXP _BSFG_regression_sampler_parallel(SEXP YSEXP, SEXP W_baseSEXP, SEXP W_list_SEXP, SEXP XSEXP, SEXP V_SEXP, SEXP h2s_indexSEXP, SEXP chol_V_list_SEXP, SEXP Y_precSEXP, SEXP Y_prec_a0SEXP, SEXP Y_prec_b0SEXP, SEXP prior_prec_alpha1SEXP, SEXP prior_prec_alpha2SEXP, SEXP prior_mean_betaSEXP, SEXP prior_prec_betaSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type Y(YSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type W_base(W_baseSEXP);
-    Rcpp::traits::input_parameter< Rcpp::List >::type W_list(W_listSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type W_list_(W_list_SEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type X(XSEXP);
     Rcpp::traits::input_parameter< SEXP >::type V_(V_SEXP);
     Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type h2s_index(h2s_indexSEXP);
-    Rcpp::traits::input_parameter< Rcpp::List >::type chol_V_list(chol_V_listSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type chol_V_list_(chol_V_list_SEXP);
     Rcpp::traits::input_parameter< VectorXd >::type Y_prec(Y_precSEXP);
     Rcpp::traits::input_parameter< double >::type Y_prec_a0(Y_prec_a0SEXP);
     Rcpp::traits::input_parameter< double >::type Y_prec_b0(Y_prec_b0SEXP);
@@ -65,7 +65,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean_beta(prior_mean_betaSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec_beta(prior_prec_betaSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(regression_sampler_parallel(Y, W_base, W_list, X, V_, h2s_index, chol_V_list, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta, grainSize));
+    rcpp_result_gen = Rcpp::wrap(regression_sampler_parallel(Y, W_base, W_list_, X, V_, h2s_index, chol_V_list_, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -86,34 +86,34 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_MME_ZKZts_c
-MatrixXd sample_MME_ZKZts_c(Map<MatrixXd> Y, MSpMat Z, Map<VectorXd> tot_Eta_prec, Rcpp::List chol_ZtZ_Kinv_list, Map<MatrixXd> h2s, VectorXi h2s_index, int grainSize);
-RcppExport SEXP _BSFG_sample_MME_ZKZts_c(SEXP YSEXP, SEXP ZSEXP, SEXP tot_Eta_precSEXP, SEXP chol_ZtZ_Kinv_listSEXP, SEXP h2sSEXP, SEXP h2s_indexSEXP, SEXP grainSizeSEXP) {
+MatrixXd sample_MME_ZKZts_c(Map<MatrixXd> Y, MSpMat Z, Map<VectorXd> tot_Eta_prec, Rcpp::List chol_ZtZ_Kinv_list_, Map<MatrixXd> h2s, VectorXi h2s_index, int grainSize);
+RcppExport SEXP _BSFG_sample_MME_ZKZts_c(SEXP YSEXP, SEXP ZSEXP, SEXP tot_Eta_precSEXP, SEXP chol_ZtZ_Kinv_list_SEXP, SEXP h2sSEXP, SEXP h2s_indexSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type Y(YSEXP);
     Rcpp::traits::input_parameter< MSpMat >::type Z(ZSEXP);
     Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
-    Rcpp::traits::input_parameter< Rcpp::List >::type chol_ZtZ_Kinv_list(chol_ZtZ_Kinv_listSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type chol_ZtZ_Kinv_list_(chol_ZtZ_Kinv_list_SEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s(h2sSEXP);
     Rcpp::traits::input_parameter< VectorXi >::type h2s_index(h2s_indexSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_MME_ZKZts_c(Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list, h2s, h2s_index, grainSize));
+    rcpp_result_gen = Rcpp::wrap(sample_MME_ZKZts_c(Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }
 // log_p_h2s
-MatrixXd log_p_h2s(Map<MatrixXd> Y, Map<VectorXd> tot_Eta_prec, Rcpp::List chol_V_list, Map<VectorXd> discrete_priors, int grainSize);
-RcppExport SEXP _BSFG_log_p_h2s(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP chol_V_listSEXP, SEXP discrete_priorsSEXP, SEXP grainSizeSEXP) {
+MatrixXd log_p_h2s(Map<MatrixXd> Y, Map<VectorXd> tot_Eta_prec, Rcpp::List chol_V_list_, Map<VectorXd> discrete_priors, int grainSize);
+RcppExport SEXP _BSFG_log_p_h2s(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP chol_V_list_SEXP, SEXP discrete_priorsSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type Y(YSEXP);
     Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
-    Rcpp::traits::input_parameter< Rcpp::List >::type chol_V_list(chol_V_listSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type chol_V_list_(chol_V_list_SEXP);
     Rcpp::traits::input_parameter< Map<VectorXd> >::type discrete_priors(discrete_priorsSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(log_p_h2s(Y, tot_Eta_prec, chol_V_list, discrete_priors, grainSize));
+    rcpp_result_gen = Rcpp::wrap(log_p_h2s(Y, tot_Eta_prec, chol_V_list_, discrete_priors, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -130,8 +130,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_h2s_discrete_MH_c
-VectorXi sample_h2s_discrete_MH_c(Map<MatrixXd> Y, Map<VectorXd> tot_Eta_prec, Map<VectorXd> discrete_priors, VectorXi h2s_index, Map<MatrixXd> h2s_matrix, Rcpp::List chol_V_list, double step_size, int grainSize);
-RcppExport SEXP _BSFG_sample_h2s_discrete_MH_c(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP discrete_priorsSEXP, SEXP h2s_indexSEXP, SEXP h2s_matrixSEXP, SEXP chol_V_listSEXP, SEXP step_sizeSEXP, SEXP grainSizeSEXP) {
+VectorXi sample_h2s_discrete_MH_c(Map<MatrixXd> Y, Map<VectorXd> tot_Eta_prec, Map<VectorXd> discrete_priors, VectorXi h2s_index, Map<MatrixXd> h2s_matrix, Rcpp::List chol_V_list_, double step_size, int grainSize);
+RcppExport SEXP _BSFG_sample_h2s_discrete_MH_c(SEXP YSEXP, SEXP tot_Eta_precSEXP, SEXP discrete_priorsSEXP, SEXP h2s_indexSEXP, SEXP h2s_matrixSEXP, SEXP chol_V_list_SEXP, SEXP step_sizeSEXP, SEXP grainSizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -140,10 +140,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Map<VectorXd> >::type discrete_priors(discrete_priorsSEXP);
     Rcpp::traits::input_parameter< VectorXi >::type h2s_index(h2s_indexSEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s_matrix(h2s_matrixSEXP);
-    Rcpp::traits::input_parameter< Rcpp::List >::type chol_V_list(chol_V_listSEXP);
+    Rcpp::traits::input_parameter< Rcpp::List >::type chol_V_list_(chol_V_list_SEXP);
     Rcpp::traits::input_parameter< double >::type step_size(step_sizeSEXP);
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_h2s_discrete_MH_c(Y, tot_Eta_prec, discrete_priors, h2s_index, h2s_matrix, chol_V_list, step_size, grainSize));
+    rcpp_result_gen = Rcpp::wrap(sample_h2s_discrete_MH_c(Y, tot_Eta_prec, discrete_priors, h2s_index, h2s_matrix, chol_V_list_, step_size, grainSize));
     return rcpp_result_gen;
 END_RCPP
 }

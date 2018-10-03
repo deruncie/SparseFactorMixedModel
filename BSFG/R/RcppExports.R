@@ -13,28 +13,28 @@ find_candidate_states <- function(h2s_matrix, step_size, old_state) {
     .Call(`_BSFG_find_candidate_states`, h2s_matrix, step_size, old_state)
 }
 
-regression_sampler_parallel <- function(Y, W_base, W_list, X, V_, h2s_index, chol_V_list, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta, grainSize) {
-    .Call(`_BSFG_regression_sampler_parallel`, Y, W_base, W_list, X, V_, h2s_index, chol_V_list, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta, grainSize)
+regression_sampler_parallel <- function(Y, W_base, W_list_, X, V_, h2s_index, chol_V_list_, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta, grainSize) {
+    .Call(`_BSFG_regression_sampler_parallel`, Y, W_base, W_list_, X, V_, h2s_index, chol_V_list_, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta, grainSize)
 }
 
 sample_MME_single_diagR <- function(y, Z, chol_ZtZ_Kinv, tot_Eta_prec, pe, randn_theta) {
     .Call(`_BSFG_sample_MME_single_diagR`, y, Z, chol_ZtZ_Kinv, tot_Eta_prec, pe, randn_theta)
 }
 
-sample_MME_ZKZts_c <- function(Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list, h2s, h2s_index, grainSize) {
-    .Call(`_BSFG_sample_MME_ZKZts_c`, Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list, h2s, h2s_index, grainSize)
+sample_MME_ZKZts_c <- function(Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index, grainSize) {
+    .Call(`_BSFG_sample_MME_ZKZts_c`, Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index, grainSize)
 }
 
-log_p_h2s <- function(Y, tot_Eta_prec, chol_V_list, discrete_priors, grainSize) {
-    .Call(`_BSFG_log_p_h2s`, Y, tot_Eta_prec, chol_V_list, discrete_priors, grainSize)
+log_p_h2s <- function(Y, tot_Eta_prec, chol_V_list_, discrete_priors, grainSize) {
+    .Call(`_BSFG_log_p_h2s`, Y, tot_Eta_prec, chol_V_list_, discrete_priors, grainSize)
 }
 
 sample_h2s <- function(log_ps, grainSize) {
     .Call(`_BSFG_sample_h2s`, log_ps, grainSize)
 }
 
-sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2s_index, h2s_matrix, chol_V_list, step_size, grainSize) {
-    .Call(`_BSFG_sample_h2s_discrete_MH_c`, Y, tot_Eta_prec, discrete_priors, h2s_index, h2s_matrix, chol_V_list, step_size, grainSize)
+sample_h2s_discrete_MH_c <- function(Y, tot_Eta_prec, discrete_priors, h2s_index, h2s_matrix, chol_V_list_, step_size, grainSize) {
+    .Call(`_BSFG_sample_h2s_discrete_MH_c`, Y, tot_Eta_prec, discrete_priors, h2s_index, h2s_matrix, chol_V_list_, step_size, grainSize)
 }
 
 sample_factors_scores_c <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec) {

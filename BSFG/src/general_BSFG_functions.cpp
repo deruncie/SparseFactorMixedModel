@@ -80,31 +80,54 @@ VectorXd find_candidate_states(
 }
 
 
+// code to convert list of R matrices (sparse or dense) into a thread-safe object
+struct R_matrix {
+  Map<MatrixXd> dense;
+  MSpMat sparse;
+  bool isDense;
+  R_matrix(Map<MatrixXd> dense_, MSpMat sparse_,bool isDense_) : dense(dense_), sparse(sparse_), isDense(isDense_) {}
+};
+
+void load_R_matrices_list(const Rcpp::List X_list, std::vector<R_matrix>& X_vector){
+  // null_matrices
+  MatrixXd null_d = MatrixXd::Zero(0,0);
+  Map<MatrixXd> M_null_d(null_d.data(),0,0);
+  SpMat null_s = null_d.sparseView();
+  MSpMat M_null_s(0,0,0,null_s.outerIndexPtr(),null_s.innerIndexPtr(),null_s.valuePtr());
+
+  int p = X_list.size();
+  X_vector.reserve(p);
+  for(int i = 0; i < p; i++){
+    SEXP Xi_ = X_list[i];
+    if(Rf_isMatrix(Xi_)){
+      Map<MatrixXd> Xi = as<Map<MatrixXd> >(Xi_);
+      R_matrix Xim(Xi,M_null_s,true);
+      X_vector.push_back(Xim);
+    } else{
+      MSpMat Xi = as<MSpMat>(Xi_);
+      R_matrix Xim(M_null_d,Xi,false);
+      X_vector.push_back(Xim);
+    }
+  }
+}
 
 // -------------------------------------------- //
 // ---------- regression_sampler --------- //
 // -------------------------------------------- //
 
-
-
-MatrixXd get_RinvSqX(SEXP chol_R_, MatrixXd X){
-  MatrixXd RinvSqX;
-  if(Rf_isMatrix(chol_R_)) {
-    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
-    RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);// * sqrt(tot_Eta_prec));
-  } else{
-    MSpMat chol_R = as<MSpMat>(chol_R_);
-    RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);// * sqrt(tot_Eta_prec));
-  }
-  return(RinvSqX);
-}
-
-
 Rcpp::IntegerVector which(Rcpp::LogicalVector x) {
   Rcpp::IntegerVector v = Rcpp::seq(0, x.size()-1);
   return v[x];
 }
-
+MatrixXd get_RinvSqX(const R_matrix& chol_R, MatrixXd X){
+  MatrixXd RinvSqX;
+  if(chol_R.isDense) {
+    RinvSqX = chol_R.dense.transpose().triangularView<Lower>().solve(X);// * sqrt(tot_Eta_prec));
+  } else{
+    RinvSqX = chol_R.sparse.transpose().triangularView<Lower>().solve(X);// * sqrt(tot_Eta_prec));
+  }
+  return(RinvSqX);
+}
 
 VectorXd regression_sampler_v1(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b < n
     const Ref<const VectorXd>& y,           // nx1
@@ -114,7 +137,7 @@ VectorXd regression_sampler_v1(  // returns vector of length 1 + a + b for y_pre
     const VectorXd& prior_prec_alpha, // ax 1
     const Ref<const VectorXd>& prior_mean_beta,  // bx1
     const Ref<const VectorXd>& prior_prec_beta,  // bx1
-    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const R_matrix& chol_R,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
     double Y_prec,                    // double
     const VectorXd& randn_alpha,
     const Ref<const VectorXd>& randn_beta,
@@ -151,7 +174,7 @@ VectorXd regression_sampler_v1(  // returns vector of length 1 + a + b for y_pre
     // Sample alpha
     // Calculate A_alpha = Y_prec*W^T*Sigma_beta^{-1}*W + D_alpha^{-1}
     // We don't need to actually calculate Sigma_beta^{-1} directly.
-    MatrixXd RinvSqW = get_RinvSqX(chol_R_,W);  // n*n*a -> n x a
+    MatrixXd RinvSqW = get_RinvSqX(chol_R,W);  // n*n*a -> n x a
     MatrixXd WtRinvX = RinvSqW.transpose() * RinvSqX; // a*n*b -> a*b
     MatrixXd invSqAbXtRinvW = chol_A_beta.transpose().triangularView<Lower>().solve(WtRinvX.transpose()); // b*b*a -> b x a
 
@@ -162,7 +185,7 @@ VectorXd regression_sampler_v1(  // returns vector of length 1 + a + b for y_pre
     A_alpha_llt.compute(A_alpha);
     MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
 
-    VectorXd Rinvsqy = get_RinvSqX(chol_R_,y); // n*n*q -> n x 1;
+    VectorXd Rinvsqy = get_RinvSqX(chol_R,y); // n*n*q -> n x 1;
     VectorXd XtRinvy = RinvSqX.transpose() * Rinvsqy; // b*n*1 >- b x 1
     VectorXd invSqAbXtRinvy = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy); // b*b*1 -> b*1
 
@@ -175,7 +198,7 @@ VectorXd regression_sampler_v1(  // returns vector of length 1 + a + b for y_pre
 
   // Step 2 - sample Y_prec
   // We don't need to actually calculate Sigma_beta^{-1} directly.
-  VectorXd RinvSqy = get_RinvSqX(chol_R_,y_tilde);
+  VectorXd RinvSqy = get_RinvSqX(chol_R,y_tilde);
   VectorXd XtRinvy = RinvSqX.transpose() * RinvSqy;
   VectorXd prod1 = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy);
   double score = Y_prec_b0 + (RinvSqy.dot(RinvSqy) - prod1.dot(prod1))/2;
@@ -200,7 +223,7 @@ VectorXd regression_sampler_v2(  // returns vector of length 1 + a + b for y_pre
     const VectorXd& prior_prec_alpha, // ax 1
     const Ref<const VectorXd>& prior_mean_beta,  // bx1
     const Ref<const VectorXd>& prior_prec_beta,  // bx1
-    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const R_matrix& chol_R,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
     const MatrixXd& R,
     double Y_prec,                    // double
     const VectorXd& randn_alpha,
@@ -256,12 +279,10 @@ VectorXd regression_sampler_v2(  // returns vector of length 1 + a + b for y_pre
   // what about prior mean?
   VectorXd u = randn_beta.array() / (prior_prec_beta * Y_prec).cwiseSqrt().array() + prior_mean_beta.array();
   VectorXd v = sqrt(Y_prec) * X * u;
-  if(Rf_isMatrix(chol_R_)) {
-    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
-    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  if(chol_R.isDense) {
+    v += chol_R.dense.transpose().triangularView<Lower>() * randn_e;
   } else{
-    MSpMat chol_R = as<MSpMat>(chol_R_);
-    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+    v += chol_R.sparse.transpose().triangularView<Lower>() * randn_e;
   }
   VectorXd w = Sigma_beta_ldlt.solve(y_tilde * sqrt(Y_prec) - v);
   VectorXd beta = u + DXt * w / sqrt(Y_prec);
@@ -281,7 +302,7 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
     const VectorXd& prior_prec_alpha, // ax 1
     const Ref<const VectorXd>& prior_mean_beta,  // bx1
     const Ref<const VectorXd>& prior_prec_beta,  // bx1
-    const SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const R_matrix& chol_R,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
     const MatrixXd& Rinv,
     const MatrixXd& RinvU,
     const MatrixXd& UtRinvU,
@@ -354,12 +375,10 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
   // what about prior mean?
   VectorXd u = randn_beta.array() / (prior_prec_beta * Y_prec).cwiseSqrt().array() + prior_mean_beta.array();
   VectorXd v = sqrt(Y_prec) * X * u;
-  if(Rf_isMatrix(chol_R_)) {
-    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
-    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+  if(chol_R.isDense) {
+    v += chol_R.dense.transpose().triangularView<Lower>() * randn_e;
   } else{
-    MSpMat chol_R = as<MSpMat>(chol_R_);
-    v += chol_R.transpose().triangularView<Lower>() * randn_e;
+    v += chol_R.sparse.transpose().triangularView<Lower>() * randn_e;
   }
   // VectorXd w = Sigma_beta_inv * (y_tilde * sqrt(Y_prec) - v);
   VectorXd e = y_tilde * sqrt(Y_prec) - v;
@@ -378,15 +397,15 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
 
 struct regression_sampler_worker : public RcppParallel::Worker {
   const int sampler;  // which sampler to use?
-  const IntegerVector& trait_set;
+  const VectorXi& trait_set;
   const Map<MatrixXd> Y;           // nx1
   const Map<MatrixXd> W_base;           // nxa
-  const Rcpp::List W_list;           // nxa
+  const std::vector<R_matrix>& W_list;           // nxa
   const Map<MatrixXd> X_U;   // could be X or U.
   const Map<MatrixXd> V;
   const MatrixXd RinvSqX;                // nxb
   const MatrixXd& C;                     // bxb
-  SEXP chol_R_;                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+  const R_matrix& chol_R;                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
   const MatrixXd& R;
   const MatrixXd& Rinv;
   const MatrixXd& RinvU;
@@ -410,15 +429,15 @@ struct regression_sampler_worker : public RcppParallel::Worker {
 
   regression_sampler_worker(
     const int sampler,
-    const Rcpp::IntegerVector& trait_set,
+    const VectorXi& trait_set,
     const Map<MatrixXd> Y,           // nx1
     const Map<MatrixXd> W_base,           // nxa
-    const Rcpp::List W_list,           // nxa
+    const std::vector<R_matrix>& W_list,           // nxa
     const Map<MatrixXd> X_U,
     const Map<MatrixXd> V,
     const MatrixXd RinvSqX,                // nxb
     const MatrixXd& C,                     // bxb
-    SEXP chol_R_,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+    const R_matrix& chol_R,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
     const MatrixXd& R,
     const MatrixXd& Rinv,
     const MatrixXd& RinvU,
@@ -440,7 +459,7 @@ struct regression_sampler_worker : public RcppParallel::Worker {
   ):
     sampler(sampler), trait_set(trait_set),
     Y(Y), W_base(W_base), W_list(W_list), X_U(X_U), V(V), RinvSqX(RinvSqX),
-    C(C), chol_R_(chol_R_), R(R), Rinv(Rinv), RinvU(RinvU), UtRinvU(UtRinvU),
+    C(C), chol_R(chol_R), R(R), Rinv(Rinv), RinvU(RinvU), UtRinvU(UtRinvU),
     prior_prec_alpha1(prior_prec_alpha1), prior_prec_alpha2(prior_prec_alpha2), prior_mean_beta(prior_mean_beta), prior_prec_beta(prior_prec_beta),
     Y_prec_b0(Y_prec_b0),
     randn_alpha1(randn_alpha1), randn_alpha2(randn_alpha2), randn_beta(randn_beta), randn_e(randn_e), rgamma_1(rgamma_1),
@@ -459,13 +478,13 @@ struct regression_sampler_worker : public RcppParallel::Worker {
       int b;
       VectorXd prior_prec_alpha;
       VectorXd randn_alpha;
-      if(W_list.length() == 0) {
+      if(W_list.size() == 0) {
         W = W_base;
         a = a1;
         prior_prec_alpha = prior_prec_alpha1.col(j);
         randn_alpha = randn_alpha1.col(j);
       } else{
-        Map<MatrixXd> W2 = as<Map<MatrixXd> >(W_list[j]);
+        Map<MatrixXd> W2 = W_list[j].dense;
         a2 = W2.cols();
         a = a1+a2;
         W = MatrixXd(n,a);
@@ -482,17 +501,17 @@ struct regression_sampler_worker : public RcppParallel::Worker {
       if(sampler == 1) {
         b = RinvSqX.cols();
         samples = regression_sampler_v1(Y.col(j), W, RinvSqX, C, prior_prec_alpha, prior_mean_beta.col(j),
-                                        prior_prec_beta.col(j), chol_R_, Y_prec[j], randn_alpha,
+                                        prior_prec_beta.col(j), chol_R, Y_prec[j], randn_alpha,
                                         randn_beta.col(j), rgamma_1[j],Y_prec_b0);
       } else if(sampler == 2) {
         b = X_U.cols();
         samples = regression_sampler_v2(Y.col(j), W, X_U, prior_prec_alpha, prior_mean_beta.col(j),
-                                        prior_prec_beta.col(j), chol_R_, R, Y_prec[j], randn_alpha,
+                                        prior_prec_beta.col(j), chol_R, R, Y_prec[j], randn_alpha,
                                         randn_beta.col(j), randn_e.col(j),rgamma_1[j],Y_prec_b0);
       } else if(sampler == 3) {
         b = V.cols();
         samples = regression_sampler_v3(Y.col(j), W, X_U, V, prior_prec_alpha, prior_mean_beta.col(j),
-                                        prior_prec_beta.col(j), chol_R_, Rinv, RinvU, UtRinvU, Y_prec[j], randn_alpha,
+                                        prior_prec_beta.col(j), chol_R, Rinv, RinvU, UtRinvU, Y_prec[j], randn_alpha,
                                         randn_beta.col(j), randn_e.col(j),rgamma_1[j],Y_prec_b0);
 
       } else {
@@ -513,11 +532,11 @@ struct regression_sampler_worker : public RcppParallel::Worker {
 Rcpp::List regression_sampler_parallel(
     Map<MatrixXd> Y,               // n x p matrix of observations
     Map<MatrixXd> W_base,          // n x a1 matrix of W covariates common to all p. Can be NULL
-    Rcpp::List W_list,             // p-list of n x a2 matrices of W covariates unique to each p. Can be NULL
+    Rcpp::List W_list_,             // p-list of n x a2 matrices of W covariates unique to each p. Can be NULL
     Map<MatrixXd> X,               // either X, a n x b matrix, or U, a n x m matrix. If U, then V must be non-NULL
     SEXP V_,                       // m x b matrix if X is U
     Rcpp::IntegerVector h2s_index, // p-vector of indices for appropriate V of each trait
-    Rcpp::List chol_V_list,        // list of cholesky decompositions of V: RtR (each nxn). Can be either dense or sparse
+    Rcpp::List chol_V_list_,        // list of cholesky decompositions of V: RtR (each nxn). Can be either dense or sparse
     VectorXd Y_prec,               // p-vector of Y current precisions
     double Y_prec_a0,
     double Y_prec_b0,
@@ -535,6 +554,8 @@ Rcpp::List regression_sampler_parallel(
   int a1 = W_base.cols();
 
   // W_list
+  std::vector<R_matrix> W_list;
+  load_R_matrices_list(W_list_, W_list);
   if(W_list.size() > 0) {
     if(W_list.size() != p) stop("Wrong length of W_list");
   }
@@ -554,6 +575,8 @@ Rcpp::List regression_sampler_parallel(
   }
 
   // chol_V_list
+  std::vector<R_matrix> chol_V_list;
+  load_R_matrices_list(chol_V_list_, chol_V_list);
   if(max(h2s_index) > chol_V_list.size()) {
     stop("max(h2s_index) > length(chol_V_list)");
   }
@@ -574,8 +597,7 @@ Rcpp::List regression_sampler_parallel(
   std::vector<VectorXd> randn_alpha2;
   if(W_list.size() > 0){
     for(int i = 0; i < p; i++){
-      Map<MatrixXd> W2 = as<Map<MatrixXd> >(W_list[i]);
-      randn_alpha2.push_back(rstdnorm_mat(W2.cols(),1));
+      randn_alpha2.push_back(rstdnorm_mat(W_list[i].dense.cols(),1));
     }
   }
   MatrixXd randn_beta = rstdnorm_mat(b,p);
@@ -592,8 +614,7 @@ Rcpp::List regression_sampler_parallel(
   int alpha2_size = 0;
   if(W_list.size() > 0){
     for(int i = 0; i < W_list.size(); i++){
-      MatrixXd W2_i = as<Map<MatrixXd> >(W_list[i]);
-      int a2 = W2_i.cols();
+      int a2 = W_list[i].dense.cols();
       alpha2.push_back(VectorXd::Zero(a2));
       alpha2_size += a2;
     }
@@ -603,52 +624,46 @@ Rcpp::List regression_sampler_parallel(
   // go through h2s indices and sample columns with same index as a set
   for(int i = min(h2s_index); i <= max(h2s_index); i++) {
     int h2_index = i;
-    IntegerVector trait_set = which(h2s_index == h2_index);  // list of traits with same h2_index
+    VectorXi trait_set = as<VectorXi>(which(h2s_index == h2_index));  // list of traits with same h2_index
 
     if(trait_set.size() > 0){
       // prepare matrices for sampler
       MatrixXd RinvSqX, C, R, Rinv, RinvU, UtRinvU;
-      SEXP chol_R_ = chol_V_list[h2_index - 1];
+      R_matrix chol_R = chol_V_list[h2_index - 1];
       int which_sampler;
       // Decide which sampler to use
       if(b <= n) {
         // use regression_sampler_v1
         which_sampler = 1;
-        if(Rf_isMatrix(chol_R_)) {
-          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
-          RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);
+        if(chol_R.isDense) {
+          RinvSqX = chol_R.dense.transpose().triangularView<Lower>().solve(X);
         } else{
-          MSpMat chol_R = as<MSpMat>(chol_R_);
-          RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X);
+          RinvSqX = chol_R.sparse.transpose().triangularView<Lower>().solve(X);
         }
         C = RinvSqX.transpose() * RinvSqX;
       }
       else if(V.cols() == 0) {
         // use regression_sampler_v2
         which_sampler = 2;
-        if(Rf_isMatrix(chol_R_)) {
-          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
-          R = chol_R.transpose().triangularView<Lower>() * chol_R;
+        if(chol_R.isDense) {
+          R = chol_R.dense.transpose().triangularView<Lower>() * chol_R.dense;
         } else{
-          MSpMat chol_R = as<MSpMat>(chol_R_);
-          R = chol_R.transpose().triangularView<Lower>() * chol_R;
+          R = chol_R.sparse.transpose().triangularView<Lower>() * chol_R.sparse;
         }
       } else {
         // use regression_sampler_v3
         which_sampler = 3;
-        if(Rf_isMatrix(chol_R_)) {
-          Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
-          Rinv = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
-          RinvU = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(U));
+        if(chol_R.isDense) {
+          Rinv = chol_R.dense.triangularView<Upper>().solve(chol_R.dense.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
+          RinvU = chol_R.dense.triangularView<Upper>().solve(chol_R.dense.transpose().triangularView<Lower>().solve(U));
         } else{
-          MSpMat chol_R = as<MSpMat>(chol_R_);
-          Rinv = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
-          RinvU = chol_R.triangularView<Upper>().solve(chol_R.transpose().triangularView<Lower>().solve(U));
+          Rinv = chol_R.sparse.triangularView<Upper>().solve(chol_R.sparse.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
+          RinvU = chol_R.sparse.triangularView<Upper>().solve(chol_R.sparse.transpose().triangularView<Lower>().solve(U));
         }
         UtRinvU = U.transpose() * RinvU;
       }
       regression_sampler_worker sampler(which_sampler, trait_set,Y,W_base,W_list,X,V,RinvSqX,C,
-                                        chol_R_,R,Rinv,RinvU,UtRinvU,
+                                        chol_R,R,Rinv,RinvU,UtRinvU,
                                         prior_prec_alpha1,prior_prec_alpha2,prior_mean_beta,prior_prec_beta,Y_prec_b0,
                                         randn_alpha1,randn_alpha2,randn_beta,randn_e, rgamma_1,
                                         alpha1,alpha2,beta,Y_prec);
@@ -704,7 +719,7 @@ VectorXd sample_MME_single_diagR(
 struct sample_MME_single_diagR_worker : public RcppParallel::Worker {
   const Map<MatrixXd> Y;
   const MSpMat Z;
-  const Rcpp::List chol_ZtZ_Kinv_list;
+  const std::vector<R_matrix> chol_ZtZ_Kinv_list;
   const ArrayXd& pes;
   const Map<VectorXd> tot_Eta_prec;
   const VectorXi& h2s_index;
@@ -714,7 +729,7 @@ struct sample_MME_single_diagR_worker : public RcppParallel::Worker {
   sample_MME_single_diagR_worker(
     const Map<MatrixXd> Y,                                // nxp
     const MSpMat Z,                                  // nxr
-    const Rcpp::List chol_ZtZ_Kinv_list,     // std::vector of rxr SpMat upper-triangle
+    const std::vector<R_matrix> chol_ZtZ_Kinv_list,     // std::vector of rxr SpMat upper-triangle
     const ArrayXd& pes,                               // px1
     const Map<VectorXd> tot_Eta_prec,                     // px1
     const VectorXi& h2s_index,                        // px1, 1-based index
@@ -730,8 +745,8 @@ struct sample_MME_single_diagR_worker : public RcppParallel::Worker {
   void operator()(std::size_t begin, std::size_t end) {
     for(std::size_t j = begin; j < end; j++){
       int h2_index = h2s_index[j] - 1;
-      MSpMat chol_ZtZ_Kinv = as<MSpMat>(chol_ZtZ_Kinv_list[h2_index]);  // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
-      coefs.col(j) = sample_MME_single_diagR(Y.col(j), Z, chol_ZtZ_Kinv, tot_Eta_prec[j], pes[j],randn_theta.col(j));
+      // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
+      coefs.col(j) = sample_MME_single_diagR(Y.col(j), Z, chol_ZtZ_Kinv_list[h2_index].sparse, tot_Eta_prec[j], pes[j],randn_theta.col(j));
     }
   }
 };
@@ -747,7 +762,7 @@ MatrixXd sample_MME_ZKZts_c(
     Map<MatrixXd> Y,                    // nxp
     MSpMat Z,                           // nxr
     Map<VectorXd> tot_Eta_prec,         // px1
-    Rcpp::List chol_ZtZ_Kinv_list,      // List or R st RtR = ZtZ_Kinv
+    Rcpp::List chol_ZtZ_Kinv_list_,      // List or R st RtR = ZtZ_Kinv
     Map<MatrixXd> h2s,                  // n_RE x p
     VectorXi h2s_index,                 // px1
     int grainSize) {
@@ -757,11 +772,8 @@ MatrixXd sample_MME_ZKZts_c(
 
   MatrixXd randn_theta = rstdnorm_mat(r,p);
 
-  // std::vector<MSpMat> chol_C_list;
-  // for(int i = 0; i < h2s_index.maxCoeff(); i++){
-  //   Rcpp::List randomEffect_C_Cholesky_i = Rcpp::as<Rcpp::List>(randomEffect_C_Choleskys[i]);
-  //   chol_C_list.push_back(Rcpp::as<MSpMat>(randomEffect_C_Cholesky_i["chol_C"]));
-  // }
+  std::vector<R_matrix> chol_ZtZ_Kinv_list;
+  load_R_matrices_list(chol_ZtZ_Kinv_list_, chol_ZtZ_Kinv_list);
 
   MatrixXd U(r,p);
   ArrayXd h2_e = 1.0 - h2s.colwise().sum().array();
@@ -779,14 +791,14 @@ MatrixXd sample_MME_ZKZts_c(
 struct log_ps_worker : public RcppParallel::Worker {
   const Map<MatrixXd> Y;
   const Map<VectorXd> tot_Eta_prec;
-  const Rcpp::List chol_V_list;
+  const std::vector<R_matrix>& chol_V_list;
   const Map<VectorXd> discrete_priors;
   MatrixXd &log_ps;
 
   log_ps_worker(
     const Map<MatrixXd> Y,                           // nxp
     const Map<VectorXd> tot_Eta_prec,                 // px1
-    const Rcpp::List chol_V_list, // std::vector of nxn SpMat, upper-triangular
+    const std::vector<R_matrix>& chol_V_list, // std::vector of nxn SpMat, upper-triangular
     const Map<VectorXd> discrete_priors,              // n_h2 x 1
     MatrixXd &log_ps                       // n_h2 x p
   ):
@@ -794,22 +806,19 @@ struct log_ps_worker : public RcppParallel::Worker {
     discrete_priors(discrete_priors), log_ps(log_ps) {}
 
   void operator()(std::size_t begin, std::size_t end) {
-    int p = Y.cols();
     int n = Y.rows();
     for(std::size_t i = begin; i < end; i++){
-      SEXP chol_R_ = chol_V_list[i];
+      R_matrix chol_R = chol_V_list[i];
       MatrixXd y_std(n,end-begin);
       double log_det_V;
-      if(Rf_isMatrix(chol_R_)){
-        Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
-        y_std = chol_R.transpose().triangularView<Lower>().solve(Y);
-        log_det_V = 2*chol_R.diagonal().array().log().sum();
+      if(chol_R.isDense){
+        y_std = chol_R.dense.transpose().triangularView<Lower>().solve(Y);
+        log_det_V = 2*chol_R.dense.diagonal().array().log().sum();
       } else{
-        MSpMat chol_R = as<MSpMat>(chol_R_);
-        y_std = chol_R.transpose().triangularView<Lower>().solve(Y);
+        y_std = chol_R.sparse.transpose().triangularView<Lower>().solve(Y);
         log_det_V = 0;
-        for(int j = 0; j < chol_R.rows(); j++) {
-          log_det_V += 2*std::log(chol_R.coeffRef(j,j));
+        for(int j = 0; j < chol_R.sparse.rows(); j++) {
+          log_det_V += 2*std::log(chol_R.sparse.coeffRef(j,j));
         }
       }
       VectorXd scores2 = (y_std.transpose() * y_std).diagonal().array() * tot_Eta_prec.array();
@@ -823,20 +832,15 @@ struct log_ps_worker : public RcppParallel::Worker {
 MatrixXd log_p_h2s(
     Map<MatrixXd> Y,              // nxp
     Map<VectorXd> tot_Eta_prec,   // px1
-    Rcpp::List chol_V_list,       // List. Each element contains: R st RtR = V. may be sparse or dense
+    Rcpp::List chol_V_list_,       // List. Each element contains: R st RtR = V. may be sparse or dense
     Map<VectorXd> discrete_priors,// n_h2 x 1
     int grainSize)
 {
   int b = discrete_priors.size();
   int p = Y.cols();
 
-  // std::vector<MSpMat> chol_R_list;
-  // VectorXd log_det_Sigmas(b);
-  // for(int i = 0; i < b; i++){
-  //   Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
-  //   chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
-  //   log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
-  // }
+  std::vector<R_matrix> chol_V_list;
+  load_R_matrices_list(chol_V_list_, chol_V_list);
 
   MatrixXd log_ps(b,p);
 
@@ -898,24 +902,22 @@ VectorXi sample_h2s(
 // -------------------------------------------- //
 
 double log_prob_h2_c(
-    VectorXd y,           // nx1
-    SEXP chol_R_,         // nxn dgCMatrix upper-triangular
+    const Ref<const VectorXd>& y,           // nx1
+    R_matrix chol_R,     // nxn upper-triangular. Dense or sparse
     int n,                // int
     double tot_Eta_prec,  // double
     double discrete_prior // double
 ){
   VectorXd y_std;
   double log_det_V;
-  if(Rf_isMatrix(chol_R_)){
-    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
-    y_std = chol_R.transpose().triangularView<Lower>().solve(y);
-    log_det_V = 2*chol_R.diagonal().array().log().sum();
+  if(chol_R.isDense){
+    y_std = chol_R.dense.transpose().triangularView<Lower>().solve(y);
+    log_det_V = 2*chol_R.dense.diagonal().array().log().sum();
   } else{
-    MSpMat chol_R = as<MSpMat>(chol_R_);
-    y_std = chol_R.transpose().triangularView<Lower>().solve(y);
+    y_std = chol_R.sparse.transpose().triangularView<Lower>().solve(y);
     log_det_V = 0;
-    for(int j = 0; j < chol_R.rows(); j++) {
-      log_det_V += 2*std::log(chol_R.coeffRef(j,j));
+    for(int j = 0; j < chol_R.sparse.rows(); j++) {
+      log_det_V += 2*std::log(chol_R.sparse.coeffRef(j,j));
     }
   }
   double score2 = tot_Eta_prec * y_std.dot(y_std);
@@ -927,7 +929,7 @@ double log_prob_h2_c(
 struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
   const Map<MatrixXd> Y;
   const MatrixXd h2s_matrix;
-  const Rcpp::List chol_V_list;
+  const std::vector<R_matrix>& chol_V_list;
   const VectorXd tot_Eta_prec;
   const VectorXd discrete_priors;
   const VectorXd r_draws;
@@ -938,7 +940,7 @@ struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
 
   sample_h2s_discrete_MH_worker(const Map<MatrixXd> Y,                 // nxp
                                 const MatrixXd h2s_matrix,        // n_RE x n_h2
-                                const Rcpp::List chol_V_list,     // List of R st RtR = V
+                                const std::vector<R_matrix>& chol_V_list,     // List of R st RtR = V
                                 const VectorXd tot_Eta_prec,      // p x 1
                                 const VectorXd discrete_priors,   // n_h2 x 1
                                 const VectorXd r_draws,           // px1
@@ -992,27 +994,20 @@ VectorXi sample_h2s_discrete_MH_c(
     Map<VectorXd> discrete_priors,  // n_h2 x 1
     VectorXi h2s_index,              // px1
     Map<MatrixXd> h2s_matrix,       // n_RE x n_h2
-    Rcpp::List chol_V_list,         // List of R st RtR = V, can be dense or sparse
+    Rcpp::List chol_V_list_,         // List of R st RtR = V, can be dense or sparse
     double step_size,               // double
     int grainSize
 ){
 
   int p = Y.cols();
-  int b = discrete_priors.size();
+
   VectorXd r_draws = as<VectorXd>(runif(p));
   VectorXd state_draws = as<VectorXd>(runif(p));
 
   VectorXi new_index(p);
-//
-//   std::vector<MSpMat> chol_R_list;
-//   VectorXd log_det_Sigmas(b);
-//   for(int i = 0; i < b; i++){
-//     Rcpp::List Sigma_Choleskys_i = Rcpp::as<Rcpp::List>(Sigma_Choleskys[i]);
-//
-//     chol_R_list.push_back(Rcpp::as<MSpMat>(Sigma_Choleskys_i["chol_Sigma"]));
-//     log_det_Sigmas[i] = Rcpp::as<double>(Sigma_Choleskys_i["log_det"]);
-//   }
 
+  std::vector<R_matrix> chol_V_list;
+  load_R_matrices_list(chol_V_list_, chol_V_list);
 
   sample_h2s_discrete_MH_worker sampler(Y,h2s_matrix,chol_V_list,tot_Eta_prec,
                                         discrete_priors,r_draws,state_draws,h2s_index,step_size,new_index);
@@ -1090,25 +1085,25 @@ Rcpp::List sample_tau2_delta_c_Eigen_v2(
 ) {
 
   int K = scores.size();
-  if(scores.size() != K) stop("Wrong size of delta");
+  if(delta.size() != K) stop("Wrong size of delta");
   double shape;
   double rate;
   VectorXd cumprod_delta = cumprod(delta);
   for(int i = 0; i < times; i++){
     // sample tau2
     shape = (p*K + 1)/2.0;
-    rate = 1.0/xi + cumprod_delta.dot(scores)/2.0;
+    rate = 1.0/xi + cumprod_delta.dot(scores);
     tau2 = 1.0/R::rgamma(shape,1.0/rate);
 
     // sample xi
     shape = 1.0;
-    rate = 1.0/tau_0*tau_0 + 1.0/tau2;
+    rate = 1.0/(tau_0*tau_0) + 1.0/tau2;
     xi = 1.0/R::rgamma(shape,1.0/rate);
 
     for(int h = 1; h < K; h++) {
       // delta_h
-      shape = delta_shape + p*(K-h+1)/2.0;
-      rate = delta_rate + (1.0/delta(h))*cumprod_delta.tail(K-h).dot(scores.tail(K-h)) / (2.0*tau2);
+      shape = delta_shape + p*(K-h)/2.0;
+      rate = delta_rate + cumprod_delta.tail(K-h).dot(scores.tail(K-h)) / (tau2 * delta(h));
       delta[h] = R::rgamma(shape,1.0/rate);
       cumprod_delta = cumprod(delta);
     }
