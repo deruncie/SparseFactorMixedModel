@@ -1,6 +1,8 @@
+#include <math.h>
+#include <iostream>
 #include "BSFG_types.h"
 
-using namespace Rcpp;
+// [[Rcpp::depends(RcppEigen)]]
 using namespace Eigen;
 using namespace RcppParallel;
 
@@ -167,7 +169,7 @@ struct make_chol_R_worker : public RcppParallel::Worker {
 };
 
 // [[Rcpp::export()]]
-Rcpp::List make_chol_R_list(Rcpp::List ZKZts,
+Rcpp::List make_chol_V_list(Rcpp::List ZKZts,
                             Map<MatrixXd> h2s_matrix,
                             double drop0_tol,
                             SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar,

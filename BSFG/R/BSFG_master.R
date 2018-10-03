@@ -108,13 +108,14 @@ BSFG_priors = function(
                         h2_priors_resids_fun = function(h2s, n) 1,
                         h2_priors_factors_fun = function(h2s, n) 1,
                         Lambda_prior = list(
-                          sampler = sample_Lambda_reg_horseshoe,
+                          sampler = sample_Lambda_prec_reg_horseshoe,
                           prop_0 = 0.1,
                           delta_l = list(shape = 3, rate = 1),
-                          delta_iterations_factor = 100
+                          delta_iterations_factor = 100,
+                          c2 = list(V=1,nu=1e6)
                         ),
                         B2_prior = list(
-                          sampler = sample_B2_reg_horseshoe,
+                          sampler = sample_B2_prec_reg_horseshoe,
                           prop_0 = 0.1,
                           c2 = list(V=1,nu=1e6)
                         ),
@@ -123,14 +124,18 @@ BSFG_priors = function(
                         )
 
                     ) {
-  all_args = lapply(formals(),function(x) eval(x))
   passed_args = lapply(as.list(match.call())[-1],function(x) eval(x))
-  all_args[names(passed_args)] = passed_args
+  default_args = formals()
+  default_args = lapply(default_args[names(default_args) %in% names(passed_args) == F],function(x) eval(x))
+  all_args = c(passed_args,default_args)
   return(all_args)
 }
 
 
-setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotypes = NULL,run_parameters = BSFG_control(),setup=NULL,run_ID = 'BSFG_run'){
+setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotypes = NULL,run_parameters = BSFG_control(),
+                            posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B1', 'B2_F','B2_R','U_R','cis_effects'),
+                            posteriorMean_params = c(),
+                            setup=NULL,run_ID = 'BSFG_run'){
   # creates model matrices, RE_setup, current_state
   # returns BSFG_state
 
@@ -174,53 +179,55 @@ setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotyp
 
   # X1 is the "fixed effects", un-shrunk covariates that only affect residuals
   X1 = model_setup$lmod$X
-  b1_R = ncol(X1)
+  b1 = ncol(X1)
 
   # -------- regressions ---------- #
   # X2_F and X2_R (and V_F and V_R) are the coefficient matrices for the regularized regression coefficients
   # these are specifed as lists with either X (n x b) or {U(nxm),V(mxp)}
-  if(!is.list(factors_regression)) stop("factors_regression should be a list")
-  if('X' %in% names(factors_regression)){
-    X2_F = factors_regression
-    U2_F = X2_F
-    V2_F = NULL
-    b2_F = ncol(X2_F)
-  } else{
-    if(!all(c('U','V') %in% names(factors_regression))){
-      U2_F = factors_regression$U
-      V2_F = factors_regression$V
-      X2_F = U2_F %*% V2_F
-      b2_F = ncol(V2_F)
-    } else{
-      stop("missing U or V in factors_regression")
+  X2_R = matrix(0,n,0)
+  X2_F = matrix(0,n,0)
+  U2_F = X2_F
+  V2_F = NULL
+  b2_R = 0
+  b2_F = 0
+  if(!is.null(extra_regressions)) {
+    if(!is.null(extra_regressions$factors) && extra_regressions$factors == TRUE){
+      if('X' %in% names(extra_regressions)){
+        X2_F = extra_regressions$X
+        U2_F = X2_F
+        V2_F = NULL
+        b2_F = ncol(X2_F)
+      } else{
+        if(!all(c('U','V') %in% names(extra_regressions))){
+          U2_F = extra_regressions$U
+          V2_F = extra_regressions$V
+          X2_F = U2_F %*% V2_F
+          b2_F = ncol(V2_F)
+        } else{
+          stop("missing U or V in extra_regressions")
+        }
+      }
     }
-  } else{
-    X2_F = matrix(0,n,0)
-    U2_F = X2_F
-    V2_F = NULL
-    b2_F = 0
-  }
-  if(!nrow(X2_F) == n) stop("Wrong dimension of X in factors_regression")
-
-  if(!is.list(resids_regression)) stop("resids_regression should be a list")
-  if('X' %in% names(resids_regression)){
-    X2_R = resids_regression
-    b2_R = ncol(X2_R)
-  } else{
-    if(!all(c('U','V') %in% names(resids_regression))){
-      X2_R = resids_regression$U %*% resids_regression$V
-      b2_R = ncol(V2_R)
-    }else{
-      stop("missing U or V in factors_regression")
+    if(!is.null(extra_regressions$resids) && extra_regressions$resids == TRUE){
+      if('X' %in% names(extra_regressions)){
+        X2_R = extra_regressions$X
+        b2_R = ncol(X2_R)
+      } else{
+        if(!all(c('U','V') %in% names(extra_regressions))){
+          X2_R = extra_regressions$U %*% extra_regressions$V
+          b2_R = ncol(V2_R)
+        } else{
+          stop("missing U or V in extra_regressions")
+        }
+      }
     }
-  } else{
-    X2_R = matrix(0,n,0)
-    b2_R = 0
   }
-  if(!nrow(X2_R) == n) stop("Wrong dimension of X in resids_regression")
+  if(!nrow(X2_F) == n) stop("Wrong dimension of X2_F")
+  if(!nrow(X2_R) == n) stop("Wrong dimension of X2_R")
 
   # -------- cis genotypes ---------- #
   if(is.null(cis_genotypes)){
+    cis_genotypes = list()
     n_cis_effects = NULL
     cis_effects_index = NULL
   } else{
@@ -270,12 +277,12 @@ setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotyp
           # if need to use reduced rank model, then use D of K in place of K and merge L into Z
           # otherwise, use original K, set L = Diagonal(1,r)
           if(r_eff < length(ldl_k$d)) {
-            K = as(diag(ldl_k$d[large_d]),'CsparseMatrix')
-            K_inv = as(diag(1/ldl_k$d[large_d]),'CsparseMatrix')
+            K = as(diag(ldl_k$d[large_d]),'dgCMatrix')
+            K_inv = as(diag(1/ldl_k$d[large_d]),'dgCMatrix')
             L = t(ldl_k$P) %*% ldl_k$L[,large_d]
           } else{
-            L = as(diag(1,nrow(K)),'CsparseMatrix')
-            K_inv = as(with(ldl_k,t(P) %*% crossprod(diag(1/sqrt(d)) %*% solve(L)) %*% P),'CsparseMatrix')
+            L = as(diag(1,nrow(K)),'dgCMatrix')
+            K_inv = as(with(ldl_k,t(P) %*% crossprod(diag(1/sqrt(d)) %*% solve(L)) %*% P),'dgCMatrix')
           }
           if(is.null(rownames(K))) rownames(K) = 1:nrow(K)
           rownames(K_inv) = rownames(K)
@@ -285,13 +292,13 @@ setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotyp
           if(is.null(rownames(K_inv))) rownames(K_inv) = 1:nrow(K_inv)
           K = solve(K_inv)
           rownames(K) = rownames(K_inv)
-          L = as(diag(1,nrow(K)),'CsparseMatrix')
+          L = as(diag(1,nrow(K)),'dgCMatrix')
         } else{
-          K = as(diag(1,ncol(Z)),'CsparseMatrix')
+          K = as(diag(1,ncol(Z)),'dgCMatrix')
           rownames(K) = colnames(Z)
           id_names = rownames(K)
           K_inv = K
-          L = as(diag(1,nrow(K)),'CsparseMatrix')
+          L = as(diag(1,nrow(K)),'dgCMatrix')
         }
         if(is.null(id_names)) id_names = 1:length(id_names)
         rownames(L) = paste(id_names,re_name,sep='::')
@@ -379,6 +386,15 @@ setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotyp
   )
   class(BSFG_state) = append('BSFG_state',class(BSFG_state))
 
+
+  BSFG_state$Posterior = list(
+    posteriorSample_params = posteriorSample_params,
+    posteriorMean_params = posteriorMean_params,
+    total_samples = 0,
+    folder = sprintf('%s/Posterior',run_ID),
+    files = c()
+  )
+
   BSFG_state
 }
 
@@ -386,6 +402,7 @@ set_priors_BSFG = function(BSFG_state,priors = BSFG_priors()) {
   # returns BSFG_state
 
   p = BSFG_state$run_variables$p
+  h2s_matrix = BSFG_state$data_matrices$h2s_matrix
 
   # ----------------------------- #
   # ----- re-formulate priors --- #
@@ -420,6 +437,7 @@ set_priors_BSFG = function(BSFG_state,priors = BSFG_priors()) {
   priors$h2_priors_factors = priors$h2_priors_factors/sum(priors$h2_priors_factors)
 
   BSFG_state$priors = priors
+  BSFG_state
 
 }
 
@@ -435,13 +453,13 @@ initialize_variables_BSFG = function(BSFG_state,...){
 
     # Factors loadings:
 
-    Plam = matrix(1,p,K)
+    Lambda_prec = matrix(1,p,K)
 
     # Lambda - factor loadings
     #   Prior: Normal distribution for each element.
     #       mu = 0
-    #       sd = sqrt(1/Plam)
-    Lambda = matrix(rnorm(p*K,0,sqrt(1/Plam)),nr = p,nc = K)
+    #       sd = sqrt(1/Lambda_prec)
+    Lambda = matrix(rnorm(p*K,0,sqrt(1/Lambda_prec)),nr = p,nc = K)
     rownames(Lambda) = traitnames
 
     # residuals
@@ -480,7 +498,7 @@ initialize_variables_BSFG = function(BSFG_state,...){
 
     # Fixed effects
     B1 = matrix(rnorm(b1*p), ncol = p)
-    colnames(B) = traitnames
+    colnames(B1) = traitnames
 
     B2_R = 0*matrix(rnorm(b2_R*p),ncol = p)
     colnames(B2_R) = traitnames
@@ -526,11 +544,19 @@ initialize_variables_BSFG = function(BSFG_state,...){
 
   # Initialize parameters for Lambda_prior, B_prior, and QTL_prior (may be model-specific)
   BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state)
-  BSFG_state$current_state = BSFG_state$priors$B2_prior$sampler(BSFG_state)
+  # BSFG_state$current_state = BSFG_state$priors$B2_prior$sampler(BSFG_state)
 
   # Initialize Eta
   observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)
   BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
+
+
+  # ----------------------------- #
+  # --- Initialize BSFG_state --- #
+  # ----------------------------- #
+
+  Posterior = reset_Posterior(BSFG_state$Posterior,BSFG_state)
+  BSFG_state$Posterior = Posterior
 
   BSFG_state$Posterior$posteriorSample_params = unique(c(BSFG_state$Posterior$posteriorSample_params,observation_model_state$posteriorSample_params))
   BSFG_state$Posterior$posteriorMean_params = unique(c(BSFG_state$Posterior$posteriorMean_params,observation_model_state$posteriorMean_params))
@@ -540,19 +566,24 @@ initialize_variables_BSFG = function(BSFG_state,...){
 
 
 
-initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL, chol_R_list = NULL, chol_ZKZt_list = NULL) {
+initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL, chol_R_list = NULL, chol_ZKZt_list = NULL,verbose=TRUE) {
   # calculates Qt_list, chol_R_list and chol_ZKZt_list
   # returns BSFG_state
 
   run_parameters = BSFG_state$run_parameters
   data_matrices = BSFG_state$data_matrices
-  Y_missing = BSFG_state$observation_model_parameters$observation_setup$Y_missing
+  Y_missing = run_parameters$observation_model_parameters$observation_setup$Y_missing
   h2s_matrix = BSFG_state$data_matrices$h2s_matrix
 
   RE_setup = data_matrices$RE_setup
   ZL = data_matrices$ZL
 
+
+  n = BSFG_state$run_variables$n
+  p = BSFG_state$run_variables$p
   n_RE = length(RE_setup)
+  RE_names = names(RE_setup)
+
 
   # ------------------------------------ #
   # ----Precalculate ZKZts, chol_Ks ---- #
@@ -639,13 +670,14 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
   }
 
   X1   = data_matrices$X1
-  X2_F = data_matrices$X2_F
   X2_R = data_matrices$X2_R
+  U2_F = data_matrices$U2_F
   ZL   = data_matrices$ZL
+  cis_genotypes = data_matrices$cis_genotypes
 
 
   # cholesky decompositions (RtR) of each K_inverse matrix
-  chol_Ki_mats = lapply(RE_setup,function(re) as(chol(as.matrix(re$K_inv)),'CsparseMatrix'))
+  chol_Ki_mats = lapply(RE_setup,function(re) as(chol(as.matrix(re$K_inv)),'dgCMatrix'))
 
 
   Qt_list = list()
@@ -682,18 +714,20 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
         result = svd(ZKZt)
         Qt = t(result$u)
       }
-      Qt = as(drop0(as(Qt,'CsparseMatrix'),tol = run_parameters$drop0_tol),'CsparseMatrix')
+      Qt = as(drop0(as(Qt,'dgCMatrix'),tol = run_parameters$drop0_tol),'dgCMatrix')
       if(nnzero(Qt)/length(Qt) > 0.5) Qt = as.matrix(Qt)  # only store as sparse if it is sparse
     } else{
-      Qt = as(diag(1,length(x)),'CsparseMatrix')
+      Qt = as(diag(1,length(x)),'dgCMatrix')
     }
     QtZL_matrices_set = lapply(RE_setup,function(re) Qt %*% re$ZL[x,,drop=FALSE])
     QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
-    if(nnzero(QtZL_set)/length(QtZL_set) > 0.5)  QtZL_set = as(QtZL_set,'CsparseMatrix')
+    if(nnzero(QtZL_set)/length(QtZL_set) > 0.5)  QtZL_set = as(QtZL_set,'dgCMatrix')
     QtX1_set = Qt %**% X1[x,,drop=FALSE]
     QtX2_R_set = Qt %**% X2_R[x,,drop=FALSE]
 
-    Qt_cis_genotypes[set] = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
+    if(length(cis_genotypes) == p) {
+      Qt_cis_genotypes[set] = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
+    }
 
     Qt_list[[set]]   = Qt
     QtZL_list[[set]]  = QtZL_set
@@ -705,10 +739,10 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
       ZKZts_set[[i]] = as.matrix(forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% RE_setup[[i]]$K %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol)))
     }
 
-    ZtZ_set = as(forceSymmetric(drop0(crossprod(ZL[x,]),tol = run_parameters$drop0_tol)),'CsparseMatrix')
+    ZtZ_set = as(forceSymmetric(drop0(crossprod(ZL[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
 
-    chol_V_list_list[[set]] = make_chol_V_list(ZKZts_set,h2s_matrix,run_parameters$drop0_tol,bp,setTxtProgressBar,getTxtProgressBar,ncores)
-    chol_ZtZ_Kinv_list_list[[set]] = make_chol_ZtZ_Kinv_list(chol_Ki_mats,h2s_matrix,ZtZ_set,run_parameters$drop0_tol,bp,setTxtProgressBar,getTxtProgressBar,ncores)
+    chol_V_list_list[[set]] = make_chol_V_list(ZKZts_set,h2s_matrix,run_parameters$drop0_tol,pb,setTxtProgressBar,getTxtProgressBar,ncores)
+    chol_ZtZ_Kinv_list_list[[set]] = make_chol_ZtZ_Kinv_list(chol_Ki_mats,h2s_matrix,ZtZ_set,run_parameters$drop0_tol,pb,setTxtProgressBar,getTxtProgressBar,ncores)
   }
   if(verbose) close(pb)
 
@@ -725,30 +759,11 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     QtX2_R_list = QtX2_R_list,
     Qt1_U2_F = Qt1_U2_F,
     Qt_cis_genotypes = Qt_cis_genotypes,
-    Qt_cis_genotypes_list = Qt_cis_genotypes_list,
     Missing_data_map      = Missing_data_map,
     Missing_row_data_map  = Missing_row_data_map,
     chol_V_list_list          = chol_V_list_list,
     chol_ZtZ_Kinv_list_list = chol_ZtZ_Kinv_list_list
   ))
-
-  # ----------------------------- #
-  # --- Initialize BSFG_state --- #
-  # ----------------------------- #
-
-  BSFG_state$Posterior = list(
-    posteriorSample_params = posteriorSample_params,
-    posteriorMean_params = posteriorMean_params,
-    total_samples = 0,
-    folder = sprintf('%s/Posterior',run_ID),
-    files = c()
-  )
-
-  BSFG_state = initialize_variables(BSFG_state)
-
-  Posterior = reset_Posterior(BSFG_state$Posterior,BSFG_state)
-  BSFG_state$Posterior = Posterior
-
 
   return(BSFG_state)
 }

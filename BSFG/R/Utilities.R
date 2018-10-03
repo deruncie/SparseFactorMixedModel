@@ -32,13 +32,15 @@ make_model_setup = function(formula,data,relmat = NULL) {
     if(!all(data[[re]] %in% RE_levels[[re]])) stop(sprintf('Levels of random effect %s missing.',re))
     data[[re]] = factor(data[[re]],levels = RE_levels[[re]]) # add levels to data[[re]]
   }
-  if(!is.null(X_ID)) {
-    if(!X_ID %in% colnames(data)) stop(sprintf('X_ID column %s not in data',X_ID))
-    data[[X_ID]] = as.factor(data[[X_ID]])
-    # if(is.null(rownames(X)) || !all(data[[X_ID]] %in% rownames(X))) stop('X must have rownames and all levels of data[[X_ID]] must be in rownames(X)')
-  }
 
   # Use lme4 to evaluate formula in data
+  # ensure there is a response
+  response = 'y'
+  while(response %in% all.vars(formula)){
+    response = paste0(response,response)
+  }
+  formula = update(formula,sprintf('%s~.',response))
+  data[[response]] = 1
   lmod <- lme4::lFormula(formula,data=data,#weights=weights,
                          control = lme4::lmerControl(check.nobs.vs.nlev = 'ignore',check.nobs.vs.nRE = 'ignore'))
 
@@ -62,6 +64,7 @@ make_model_setup = function(formula,data,relmat = NULL) {
     K = NULL
     if(term %in% names(relmat)) {
       K = relmat[[term]]
+      if(is(K,'dsCMatrix')) K = as(K,'dgCMatrix')
     }
 
     if(!is.null(K)) {

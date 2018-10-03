@@ -1,7 +1,6 @@
 #include <RcppEigen.h>
 #include <RcppParallel.h>
 #include <ZigguratR.h>
-using namespace Rcpp;
 
 
 using Eigen::Map;               	      // 'Eigen::Maps' rather than copies

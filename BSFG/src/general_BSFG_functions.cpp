@@ -100,7 +100,6 @@ MatrixXd get_RinvSqX(SEXP chol_R_, MatrixXd X){
 }
 
 
-// [[Rcpp::export]]
 Rcpp::IntegerVector which(Rcpp::LogicalVector x) {
   Rcpp::IntegerVector v = Rcpp::seq(0, x.size()-1);
   return v[x];
@@ -564,25 +563,25 @@ Rcpp::List regression_sampler_parallel(
     stop("Wrong length of Y_prec");
   }
   if(prior_prec_alpha1.rows() != a1 || prior_prec_alpha1.cols() != p) stop("Wrong dimensions of prior_prec_alpha1");
-  if(prior_prec_alpha2.size() != p) {
+  if(W_list.size() > 0 && prior_prec_alpha2.size() != p) {
     stop("Wrong length of prior_prec_alpha2");
   }
   if(prior_mean_beta.rows() != b || prior_mean_beta.cols() != p) stop("Wrong dimensions of prior_mean_beta");
   if(prior_prec_beta.rows() != b || prior_prec_beta.cols() != p) stop("Wrong dimensions of prior_prec_beta");
 
   // generate random numbers
-  MatrixXd randn_alpha1 = rstdnorm_mat2(a1,p);
+  MatrixXd randn_alpha1 = rstdnorm_mat(a1,p);
   std::vector<VectorXd> randn_alpha2;
   if(W_list.size() > 0){
     for(int i = 0; i < p; i++){
       Map<MatrixXd> W2 = as<Map<MatrixXd> >(W_list[i]);
-      randn_alpha2.push_back(rstdnorm_mat2(W2.cols(),1));
+      randn_alpha2.push_back(rstdnorm_mat(W2.cols(),1));
     }
   }
-  MatrixXd randn_beta = rstdnorm_mat2(b,p);
+  MatrixXd randn_beta = rstdnorm_mat(b,p);
   MatrixXd randn_e;
   if(b > n) {
-    randn_e = rstdnorm_mat2(n,p);
+    randn_e = rstdnorm_mat(n,p);
   }
   VectorXd rgamma_1 = as<VectorXd>(rgamma(p,Y_prec_a0 + n/2.0,1.0));
 
@@ -708,8 +707,8 @@ struct sample_MME_single_diagR_worker : public RcppParallel::Worker {
   const Rcpp::List chol_ZtZ_Kinv_list;
   const ArrayXd& pes;
   const Map<VectorXd> tot_Eta_prec;
-  const Map<VectorXi> h2s_index;
-  const Map<MatrixXd> randn_theta;
+  const VectorXi& h2s_index;
+  const MatrixXd& randn_theta;
   MatrixXd &coefs;
 
   sample_MME_single_diagR_worker(
@@ -718,8 +717,8 @@ struct sample_MME_single_diagR_worker : public RcppParallel::Worker {
     const Rcpp::List chol_ZtZ_Kinv_list,     // std::vector of rxr SpMat upper-triangle
     const ArrayXd& pes,                               // px1
     const Map<VectorXd> tot_Eta_prec,                     // px1
-    const Map<VectorXi> h2s_index,                        // px1, 1-based index
-    const Map<MatrixXd> randn_theta,                      // rxp
+    const VectorXi& h2s_index,                        // px1, 1-based index
+    const MatrixXd& randn_theta,                      // rxp
     MatrixXd &coefs                            // rxp
   ):
     Y(Y), Z(Z),
@@ -731,8 +730,8 @@ struct sample_MME_single_diagR_worker : public RcppParallel::Worker {
   void operator()(std::size_t begin, std::size_t end) {
     for(std::size_t j = begin; j < end; j++){
       int h2_index = h2s_index[j] - 1;
-      MSpMat chol_ZtZ_Kinv = as<MSpMat>chol_ZtZ_Kinv_list[h2_index];  // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
-      coefs.col(j) = sample_MME_single_diagR(Y.col(j), Zt, chol_ZtZ_Kinv, tot_Eta_prec[j], pes[j],randn_theta.col(j));
+      MSpMat chol_ZtZ_Kinv = as<MSpMat>(chol_ZtZ_Kinv_list[h2_index]);  // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
+      coefs.col(j) = sample_MME_single_diagR(Y.col(j), Z, chol_ZtZ_Kinv, tot_Eta_prec[j], pes[j],randn_theta.col(j));
     }
   }
 };
@@ -801,14 +800,17 @@ struct log_ps_worker : public RcppParallel::Worker {
       SEXP chol_R_ = chol_V_list[i];
       MatrixXd y_std(n,end-begin);
       double log_det_V;
-      if(Rf_isMatrix(chol_R)){
-        Map<MatrixXd> chol_R(chol_R_);
+      if(Rf_isMatrix(chol_R_)){
+        Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
         y_std = chol_R.transpose().triangularView<Lower>().solve(Y);
         log_det_V = 2*chol_R.diagonal().array().log().sum();
       } else{
         MSpMat chol_R = as<MSpMat>(chol_R_);
         y_std = chol_R.transpose().triangularView<Lower>().solve(Y);
-        log_det_V = 2*chol_R.diagonal().array().log().sum();
+        log_det_V = 0;
+        for(int j = 0; j < chol_R.rows(); j++) {
+          log_det_V += 2*std::log(chol_R.coeffRef(j,j));
+        }
       }
       VectorXd scores2 = (y_std.transpose() * y_std).diagonal().array() * tot_Eta_prec.array();
       log_ps.row(i) = (-n/2.0 * log(2*M_PI) - 0.5 * (log_det_V - n*tot_Eta_prec.array().log()) -
@@ -898,33 +900,34 @@ VectorXi sample_h2s(
 double log_prob_h2_c(
     VectorXd y,           // nx1
     SEXP chol_R_,         // nxn dgCMatrix upper-triangular
-    double log_det_Sigma, // double
     int n,                // int
     double tot_Eta_prec,  // double
     double discrete_prior // double
 ){
-  VectorXd x_std;
+  VectorXd y_std;
   double log_det_V;
-  if(Rf_isMatrix(chol_R)){
-    Map<MatrixXd> chol_R(chol_R_);
+  if(Rf_isMatrix(chol_R_)){
+    Map<MatrixXd> chol_R = as<Map<MatrixXd> >(chol_R_);
     y_std = chol_R.transpose().triangularView<Lower>().solve(y);
     log_det_V = 2*chol_R.diagonal().array().log().sum();
   } else{
     MSpMat chol_R = as<MSpMat>(chol_R_);
     y_std = chol_R.transpose().triangularView<Lower>().solve(y);
-    log_det_V = 2*chol_R.diagonal().array().log().sum();
+    log_det_V = 0;
+    for(int j = 0; j < chol_R.rows(); j++) {
+      log_det_V += 2*std::log(chol_R.coeffRef(j,j));
+    }
   }
-  double score2 = tot_Eta_prec * x_std.dot(x_std);
+  double score2 = tot_Eta_prec * y_std.dot(y_std);
 
-  double log_p = -n/2.0 * log(2*M_PI) - 0.5*(log_det_Sigma - n*log(tot_Eta_prec)) - 0.5 * score2 + log(discrete_prior);
+  double log_p = -n/2.0 * log(2*M_PI) - 0.5*(log_det_V - n*log(tot_Eta_prec)) - 0.5 * score2 + log(discrete_prior);
   return log_p;
 }
 
 struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
-  const MatrixXd Y;
+  const Map<MatrixXd> Y;
   const MatrixXd h2s_matrix;
   const Rcpp::List chol_V_list;
-  const VectorXd log_det_Sigmas;
   const VectorXd tot_Eta_prec;
   const VectorXd discrete_priors;
   const VectorXd r_draws;
@@ -933,10 +936,9 @@ struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
   const double step_size;
   VectorXi &new_index;
 
-  sample_h2s_discrete_MH_worker(const MatrixXd Y,                 // nxp
+  sample_h2s_discrete_MH_worker(const Map<MatrixXd> Y,                 // nxp
                                 const MatrixXd h2s_matrix,        // n_RE x n_h2
                                 const Rcpp::List chol_V_list,     // List of R st RtR = V
-                                const VectorXd log_det_Sigmas,    // n_h2 x 1
                                 const VectorXd tot_Eta_prec,      // p x 1
                                 const VectorXd discrete_priors,   // n_h2 x 1
                                 const VectorXd r_draws,           // px1
@@ -947,7 +949,7 @@ struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
   ):
 
     Y(Y), h2s_matrix(h2s_matrix),
-    chol_V_list(chol_V_list), log_det_Sigmas(log_det_Sigmas),
+    chol_V_list(chol_V_list),
     tot_Eta_prec(tot_Eta_prec),  discrete_priors(discrete_priors),
     r_draws(r_draws),state_draws(state_draws),h2_index(h2_index),step_size(step_size),new_index(new_index) {}
 
@@ -962,8 +964,8 @@ struct sample_h2s_discrete_MH_worker : public RcppParallel::Worker {
       if(discrete_priors[proposed_state] == 0.0) {
         new_index[j] = old_state;  // don't bother with calculations if prior == 0.0
       } else{
-        double old_log_p = log_prob_h2_c(Y.col(j),chol_V_list[old_state],log_det_Sigmas[old_state],n,tot_Eta_prec[j],discrete_priors[old_state]);
-        double new_log_p = log_prob_h2_c(Y.col(j),chol_V_list[proposed_state],log_det_Sigmas[proposed_state],n,tot_Eta_prec[j],discrete_priors[proposed_state]);
+        double old_log_p = log_prob_h2_c(Y.col(j),chol_V_list[old_state],n,tot_Eta_prec[j],discrete_priors[old_state]);
+        double new_log_p = log_prob_h2_c(Y.col(j),chol_V_list[proposed_state],n,tot_Eta_prec[j],discrete_priors[proposed_state]);
 
         VectorXd candidate_states_from_new_state = find_candidate_states(h2s_matrix,step_size,proposed_state);
 
@@ -1012,7 +1014,8 @@ VectorXi sample_h2s_discrete_MH_c(
 //   }
 
 
-  sample_h2s_discrete_MH_worker sampler(Y,h2s_matrix,chol_V_list,tot_Eta_prec,discrete_priors,r_draws,state_draws,h2s_index,step_size,new_index);
+  sample_h2s_discrete_MH_worker sampler(Y,h2s_matrix,chol_V_list,tot_Eta_prec,
+                                        discrete_priors,r_draws,state_draws,h2s_index,step_size,new_index);
   RcppParallel::parallelFor(0,p,sampler,grainSize);
   return new_index;
 }
@@ -1054,6 +1057,67 @@ MatrixXd sample_factors_scores_c( // returns nxk matrix
   return Ft.transpose();
 }
 
+
+
+// -------------------------------------------------- //
+// -- Sample tau2 and delta scores --- //
+// -------------------------------------------------- //
+
+VectorXd cumprod(const VectorXd& x) {
+  int n = x.size();
+  VectorXd res(n);
+  res[0] = x[0];
+  if(n > 1) {
+    for(int i = 1; i < n; i++){
+      res[i] = res[i-1]*x[i];
+    }
+  }
+  return(res);
+}
+
+
+// [[Rcpp::export()]]
+Rcpp::List sample_tau2_delta_c_Eigen_v2(
+    double tau2,
+    double xi,
+    VectorXd delta,
+    Map<VectorXd> scores,
+    double tau_0,
+    double delta_shape,
+    double delta_rate,
+    int p,
+    int times
+) {
+
+  int K = scores.size();
+  if(scores.size() != K) stop("Wrong size of delta");
+  double shape;
+  double rate;
+  VectorXd cumprod_delta = cumprod(delta);
+  for(int i = 0; i < times; i++){
+    // sample tau2
+    shape = (p*K + 1)/2.0;
+    rate = 1.0/xi + cumprod_delta.dot(scores)/2.0;
+    tau2 = 1.0/R::rgamma(shape,1.0/rate);
+
+    // sample xi
+    shape = 1.0;
+    rate = 1.0/tau_0*tau_0 + 1.0/tau2;
+    xi = 1.0/R::rgamma(shape,1.0/rate);
+
+    for(int h = 1; h < K; h++) {
+      // delta_h
+      shape = delta_shape + p*(K-h+1)/2.0;
+      rate = delta_rate + (1.0/delta(h))*cumprod_delta.tail(K-h).dot(scores.tail(K-h)) / (2.0*tau2);
+      delta[h] = R::rgamma(shape,1.0/rate);
+      cumprod_delta = cumprod(delta);
+    }
+  }
+
+  return(Rcpp::List::create(Named("tau2") = tau2,
+                            Named("xi") = xi,
+                            Named("delta") = delta));
+}
 
 
 

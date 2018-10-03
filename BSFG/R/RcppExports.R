@@ -13,10 +13,6 @@ find_candidate_states <- function(h2s_matrix, step_size, old_state) {
     .Call(`_BSFG_find_candidate_states`, h2s_matrix, step_size, old_state)
 }
 
-which <- function(x) {
-    .Call(`_BSFG_which`, x)
-}
-
 regression_sampler_parallel <- function(Y, W_base, W_list, X, V_, h2s_index, chol_V_list, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta, grainSize) {
     .Call(`_BSFG_regression_sampler_parallel`, Y, W_base, W_list, X, V_, h2s_index, chol_V_list, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta, grainSize)
 }
@@ -45,28 +41,8 @@ sample_factors_scores_c <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_pre
     .Call(`_BSFG_sample_factors_scores_c`, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec)
 }
 
-sample_delta_c_Eigen <- function(delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws) {
-    .Call(`_BSFG_sample_delta_c_Eigen`, delta, tauh, scores, delta_1_rate, delta_2_rate, randg_draws)
-}
-
-sample_trunc_delta_c_Eigen <- function(delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point) {
-    .Call(`_BSFG_sample_trunc_delta_c_Eigen`, delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point)
-}
-
-sample_delta_omega_c_Eigen <- function(delta, tauh, omega2, xi, scores, delta_1_rate, delta_2_rate, randg_draws) {
-    .Call(`_BSFG_sample_delta_omega_c_Eigen`, delta, tauh, omega2, xi, scores, delta_1_rate, delta_2_rate, randg_draws)
-}
-
-sample_trunc_delta_omega_c_Eigen <- function(delta, tauh, omega2, xi, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point) {
-    .Call(`_BSFG_sample_trunc_delta_omega_c_Eigen`, delta, tauh, omega2, xi, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point)
-}
-
-rgig_multiple <- function(n, lambda, chi, psi) {
-    .Call(`_BSFG_rgig_multiple`, n, lambda, chi, psi)
-}
-
-sample_MME_fixedEffects_hierarchical_c <- function(Y, Z, X, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, grainSize) {
-    .Call(`_BSFG_sample_MME_fixedEffects_hierarchical_c`, Y, Z, X, Sigma_Choleskys, h2s_index, tot_Eta_prec, prior_mean, prior_prec, grainSize)
+sample_tau2_delta_c_Eigen_v2 <- function(tau2, xi, delta, scores, tau_0, delta_shape, delta_rate, p, times) {
+    .Call(`_BSFG_sample_tau2_delta_c_Eigen_v2`, tau2, xi, delta, scores, tau_0, delta_shape, delta_rate, p, times)
 }
 
 LDLt <- function(A_) {
@@ -77,7 +53,7 @@ make_chol_ZtZ_Kinv_list <- function(chol_Ki_mats, h2s_matrix, ZtZ, drop0_tol, pb
     .Call(`_BSFG_make_chol_ZtZ_Kinv_list`, chol_Ki_mats, h2s_matrix, ZtZ, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores)
 }
 
-make_chol_R_list <- function(ZKZts, h2s_matrix, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores) {
-    .Call(`_BSFG_make_chol_R_list`, ZKZts, h2s_matrix, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores)
+make_chol_V_list <- function(ZKZts, h2s_matrix, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores) {
+    .Call(`_BSFG_make_chol_V_list`, ZKZts, h2s_matrix, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores)
 }
 

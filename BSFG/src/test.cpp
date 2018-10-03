@@ -6,6 +6,127 @@
 // using namespace Eigen;
 // using namespace RcppParallel;
 //
+// // [[Rcpp::export()]]
+// VectorXd rgamma2(int n,double shape,double scale){
+//   VectorXd res(n);
+//   for(int i = 0; i< n; i++){
+//     res[i] = R::rgamma(shape,scale);
+//   }
+//   return(res);
+// }
+//
+
+//
+//
+// // [[Rcpp::export()]]
+// Rcpp::List sample_trunc_delta_omega_c_Eigen(
+//     VectorXd delta,
+//     VectorXd tauh,
+//     double omega2,
+//     double xi,
+//     Map<VectorXd> scores,
+//     Map<VectorXd> shapes,
+//     double delta_1_rate,
+//     double delta_2_rate,
+//     Map<MatrixXd> randu_draws,
+//     double trunc_point
+// ) {
+//   int times = randu_draws.rows();
+//   int k = tauh.size();
+//
+//   double rate,delta_old, u,p;
+//   for(int i = 0; i < times; i++){
+//
+//     rate = 1.0/xi + tauh.dot(scores);
+//     u = randu_draws(i,0); // don't truncate delta(0)
+//     omega2 = 1.0 / R::qgamma(u,shapes(0),1.0/rate,1,0);
+//
+//     rate = 1.0 + 1.0 / omega2;
+//     u = randu_draws(i,1); // don't truncate delta(0)
+//     xi = 1.0 / R::qgamma(u,shapes(1),1.0/rate,1,0);
+//
+//     VectorXd std_scores = scores / omega2;
+//
+//     delta_old = delta(0);
+//     rate = delta_1_rate + (1/delta(0)) * tauh.dot(std_scores);
+//     u = randu_draws(i,2); // don't truncate delta(0)
+//     delta(0) = R::qgamma(u,shapes(2),1.0/rate,1,0);
+//     // tauh = cumprod(delta);
+//     tauh *= delta(0)/delta_old;   // replaces re-calculating cumprod
+//
+//     for(int h = 1; h < k; h++) {
+//       delta_old = delta(h);
+//       rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(std_scores.tail(k-h));
+//       p = R::pgamma(trunc_point,shapes(2+h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
+//       if(p > 0.999) p = 0.999;  // prevent over-flow.
+//       u = p + (1.0-p)*randu_draws(i,2+h);
+//       delta(h) = R::qgamma(u,shapes(2+h),1.0/rate,1,0);
+//       // tauh = cumprod(delta);
+//       tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
+//       // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
+//     }
+//   }
+//   return(Rcpp::List::create(omega2,xi,delta));
+// }
+//
+//
+//
+//
+//
+//
+// // [[Rcpp::export()]]
+// VectorXd sample_delta_c_Eigen_v2(
+//     VectorXd delta,
+//     Map<VectorXd> scores,
+//     double delta_rate,
+//     Map<MatrixXd> randg_draws  // all done with rate = 1;
+// ) {
+//   int times = randg_draws.rows();
+//   int k = delta.size();
+//
+//   VectorXd cumprod_delta = cumprod(delta);
+//   double rate,delta_old;
+//   for(int i = 0; i < times; i++){
+//     for(int h = 0; h < k; h++){
+//       rate = delta_rate + (1/delta[h]) * cumprod_delta.tail(k-h).dot(scores.tail(k-h));
+//       delta[h] = randg_draws(i,h) / rate;
+//       cumprod_delta = cumprod(delta);
+//     }
+//   }
+//   return(delta);
+// }
+//
+//
+// // [[Rcpp::export()]]
+// VectorXd sample_trunc_delta_c_Eigen_v2(
+//     VectorXd delta,
+//     Map<VectorXd> scores,
+//     Map<VectorXd> shapes,
+//     double delta_rate,
+//     Map<MatrixXd> randu_draws,
+//     double trunc_point
+// ) {
+//   int times = randu_draws.rows();
+//   int k = delta.size();
+//   double p,u;
+//   VectorXd cumprod_delta = cumprod(delta);
+//
+//   double rate,delta_old;
+//   for(int i = 0; i < times; i++){
+//     for(int h = 0; h < k; h++) {
+//       rate = delta_rate + (1/delta[h]) * cumprod_delta.tail(k-h).dot(scores.tail(k-h));
+//       p = R::pgamma(trunc_point,shapes(h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
+//       if(p > 0.999) p = 0.999;  // prevent over-flow.
+//       u = p + (1.0-p)*randu_draws(i,h);
+//       delta(h) = R::qgamma(u,shapes(h),1.0/rate,1,0);
+//       cumprod_delta = cumprod(delta);
+//     }
+//   }
+//   return(delta);
+// }
+
+
+//
 // // [[Rcpp::depends(RcppZiggurat)]]
 //
 // // [[Rcpp::export()]]
@@ -1600,167 +1721,7 @@
 // // // }
 // //
 // //
-// // VectorXd cumprod(const VectorXd& x) {
-// //   int n = x.size();
-// //   VectorXd res(n);
-// //   res[0] = x[0];
-// //   if(n > 1) {
-// //     for(int i = 1; i < n; i++){
-// //       res[i] = res[i-1]*x[i];
-// //     }
-// //   }
-// //   return(res);
-// // }
-// //
-// //
-// // // // [[Rcpp::export()]]
-// // // Rcpp::List sample_tau2_delta_c_Eigen(
-// // //     double tau2,
-// // //     duble xi,
-// // //     VectorXd delta,
-// // //     Map<VectorXd> scores,
-// // //     double delta_rate,
-// // //     Map<MatrixXd> randg_draws  // all done with rate = 1;
-// // // ) {
-// // //   int times = randg_draws.rows();
-// // //   int k = tauh.size();
-// // //
-// // //   double rate,delta_old;
-// // //   for(int i = 0; i < times; i++){
-// // //
-// // //     rate = 1.0/xi + tauh.dot(scores);
-// // //     omega2 = rate / randg_draws(i,0);
-// // //
-// // //     rate = 1.0 + 1.0 / omega2;
-// // //     xi = rate / randg_draws(i,1);
-// // //
-// // //     VectorXd std_scores = scores / omega2;
-// // //
-// // //     delta_old = delta(0);
-// // //     rate = delta_1_rate + (1/delta(0)) * tauh.dot(std_scores);
-// // //     delta(0) = randg_draws(i,2) / rate;
-// // //     // tauh = cumprod(delta);
-// // //     tauh *= delta(0)/delta_old;   // replaces re-calculating cumprod
-// // //
-// // //     for(int h = 1; h < k; h++) {
-// // //       delta_old = delta(h);
-// // //       rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(std_scores.tail(k-h));
-// // //       delta(h) = randg_draws(i,2+h) / rate;
-// // //       // tauh = cumprod(delta);
-// // //       tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
-// // //       // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
-// // //     }
-// // //   }
-// // //   return(Rcpp::List::create(omega2,xi,delta));
-// // // }
-// //
-// //
-// // // // [[Rcpp::export()]]
-// // // Rcpp::List sample_trunc_delta_omega_c_Eigen(
-// // //     VectorXd delta,
-// // //     VectorXd tauh,
-// // //     double omega2,
-// // //     double xi,
-// // //     Map<VectorXd> scores,
-// // //     Map<VectorXd> shapes,
-// // //     double delta_1_rate,
-// // //     double delta_2_rate,
-// // //     Map<MatrixXd> randu_draws,
-// // //     double trunc_point
-// // // ) {
-// // //   int times = randu_draws.rows();
-// // //   int k = tauh.size();
-// // //
-// // //   double rate,delta_old, u,p;
-// // //   for(int i = 0; i < times; i++){
-// // //
-// // //     rate = 1.0/xi + tauh.dot(scores);
-// // //     u = randu_draws(i,0); // don't truncate delta(0)
-// // //     omega2 = 1.0 / R::qgamma(u,shapes(0),1.0/rate,1,0);
-// // //
-// // //     rate = 1.0 + 1.0 / omega2;
-// // //     u = randu_draws(i,1); // don't truncate delta(0)
-// // //     xi = 1.0 / R::qgamma(u,shapes(1),1.0/rate,1,0);
-// // //
-// // //     VectorXd std_scores = scores / omega2;
-// // //
-// // //     delta_old = delta(0);
-// // //     rate = delta_1_rate + (1/delta(0)) * tauh.dot(std_scores);
-// // //     u = randu_draws(i,2); // don't truncate delta(0)
-// // //     delta(0) = R::qgamma(u,shapes(2),1.0/rate,1,0);
-// // //     // tauh = cumprod(delta);
-// // //     tauh *= delta(0)/delta_old;   // replaces re-calculating cumprod
-// // //
-// // //     for(int h = 1; h < k; h++) {
-// // //       delta_old = delta(h);
-// // //       rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(std_scores.tail(k-h));
-// // //       p = R::pgamma(trunc_point,shapes(2+h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
-// // //       if(p > 0.999) p = 0.999;  // prevent over-flow.
-// // //       u = p + (1.0-p)*randu_draws(i,2+h);
-// // //       delta(h) = R::qgamma(u,shapes(2+h),1.0/rate,1,0);
-// // //       // tauh = cumprod(delta);
-// // //       tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
-// // //       // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
-// // //     }
-// // //   }
-// // //   return(Rcpp::List::create(omega2,xi,delta));
-// // // }
-// //
-// //
-// //
-// //
-// //
-// //
-// // // [[Rcpp::export()]]
-// // VectorXd sample_delta_c_Eigen_v2(
-// //     VectorXd delta,
-// //     Map<VectorXd> scores,
-// //     double delta_rate,
-// //     Map<MatrixXd> randg_draws  // all done with rate = 1;
-// // ) {
-// //   int times = randg_draws.rows();
-// //   int k = delta.size();
-// //
-// //   VectorXd cumprod_delta = cumprod(delta);
-// //   double rate,delta_old;
-// //   for(int i = 0; i < times; i++){
-// //     for(int h = 0; h < k; h++){
-// //       rate = delta_rate + (1/delta[h]) * cumprod_delta.tail(k-h).dot(scores.tail(k-h));
-// //       delta[h] = randg_draws(i,h) / rate;
-// //       cumprod_delta = cumprod(delta);
-// //     }
-// //   }
-// //   return(delta);
-// // }
-// //
-// //
-// // // [[Rcpp::export()]]
-// // VectorXd sample_trunc_delta_c_Eigen_v2(
-// //     VectorXd delta,
-// //     Map<VectorXd> scores,
-// //     Map<VectorXd> shapes,
-// //     double delta_rate,
-// //     Map<MatrixXd> randu_draws,
-// //     double trunc_point
-// // ) {
-// //   int times = randu_draws.rows();
-// //   int k = delta.size();
-// //   double p,u;
-// //   VectorXd cumprod_delta = cumprod(delta);
-// //
-// //   double rate,delta_old;
-// //   for(int i = 0; i < times; i++){
-// //     for(int h = 0; h < k; h++) {
-// //       rate = delta_rate + (1/delta[h]) * cumprod_delta.tail(k-h).dot(scores.tail(k-h));
-// //       p = R::pgamma(trunc_point,shapes(h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
-// //       if(p > 0.999) p = 0.999;  // prevent over-flow.
-// //       u = p + (1.0-p)*randu_draws(i,h);
-// //       delta(h) = R::qgamma(u,shapes(h),1.0/rate,1,0);
-// //       cumprod_delta = cumprod(delta);
-// //     }
-// //   }
-// //   return(delta);
-// // }
+
 // //
 // // // [[Rcpp::export()]]
 // // NumericVector my_gamma(int n, NumericVector shape, NumericVector scale) {

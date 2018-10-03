@@ -21,7 +21,7 @@ library(BSFG)
 seed = 1  # for reproducibility
 nSire = 50 # simulation design is a half-sib design: each of nSire fathers has nRep children, each with a different female
 nRep = 10
-nTraits = 10000
+nTraits = 100
 nFixedEffects = 2 # fixed effects are effects on the factors
 nFactors = 10
 factor_h2s = c(rep(0,nFactors/2),rep(0.3,nFactors/2))  # factor_h2 is the % of variance in each factor trait that is explained by additive genetic variation.
@@ -53,7 +53,7 @@ run_parameters = BSFG_control(
   h2_divisions = 20, # Each variance component is allowed to explain between 0% and 100% of the total variation. How many segments should the range [0,100) be divided into for each random effect?
   h2_step_size = NULL, # if NULL, all possible values of random effects are tried each iteration. If in (0,1), a new candidate set of random effect proportional variances is drawn uniformily with a range of this size
   burn = 00,  # number of burn in samples before saving posterior samples
-  k_init = 150 # number of factors
+  K = 15 # number of factors
 )
 ```
 
@@ -67,18 +67,20 @@ run_parameters = BSFG_control(
 priors = BSFG_priors(
   tot_Y_var = list(V = 0.5,   nu = 5),      # Prior variance of trait residuals after accounting for fixed effects and factors
   tot_F_var = list(V = 18/20, nu = 20),     # Prior variance of factor traits. This is included to improve MCMC mixing, but can be turned off by setting nu very large
-  Lambda_prior = list(      # prior for factor loadings
-    sampler = sample_Lambda_prec_ARD,
-    Lambda_df = 3,
-    delta_1   = list(shape = 2,  rate = 1),
-    delta_2   = list(shape = 3, rate = 1)
+  Lambda_prior = list(
+    sampler = sample_Lambda_prec_reg_horseshoe,
+    prop_0 = 0.1,
+    delta_l = list(shape = 3, rate = 1),
+    delta_iterations_factor = 100,
+    c2 = list(V=1,nu=1e6)
   ),
-  B_prior = list(           # prior for fixed effects. Supersedes fixed_var above.
-    sampler = sample_B_prec_ARD,  # class of priors. ARD is default
-    global   = list(V = 1,nu = 3),  # global shrinkage hyperparameters
-    global_F = list(V = 1,nu = 3), # global shrinkage hyperparameters for factors
-    B_df      = 3,          # degrees of freedom of t-distribution for residual fixed effects
-    B_F_df    = 2           # degrees of freedom of t-distribution for factor fixed effects
+  B2_prior = list(
+    sampler = sample_Lambda_prec_reg_horseshoe,
+    prop_0 = 0.1,
+    c2 = list(V=1,nu=1e6)
+  ),
+  cis_effects_prior = list(
+    prec = 1
   ),
   h2_priors_resids_fun = function(h2s,n)  1,  # Function that returns the prior density for any value of the h2s vector (ie the vector of random effect proportional variances across all random effects. 1 means constant prior. Alternative: pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
   h2_priors_factors_fun = function(h2s,n) 1 # See above. Another choice is one that gives 50% weight to h2==0: ifelse(h2s == 0,n,n/(n-1))
@@ -91,17 +93,35 @@ priors = BSFG_priors(
 # Construct the model
 # see ?BSFG_init
 # ---------------------------------------------------------- #
+
 ```{r}
-BSFG_state = BSFG_init(Y,
-                       model=~Fixed1+(1+Fixed1|animal), # This model has one fixed and two random terms. The random terms are NOT correlated
-                       #factor_model_fixed = ~0, # we could specify a different fixed effect model for the factors
-                       data = data, # the data.frame with information for constructing the model matrices
-                       K_mats = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated
-                       run_parameters=run_parameters,
-                       priors=priors,
-                       run_ID = 'BSFG_example', # folder to store run outputs
-                       setup = setup  # only if running simulated data. Stores simulated values for comparison
-                       )
+options(error=recover)
+BSFG_state = setup_model_BSFG(Y,~(1|animal),
+                              extra_regressions = list(X = model.matrix(~Fixed1,data),factors=T),
+                              data,relmat = list(animal = K),
+                              run_parameters=run_parameters
+                                )
+
+BSFG_state = set_priors_BSFG(BSFG_state,priors)
+
+BSFG_state = initialize_variables_BSFG(BSFG_state)
+
+BSFG_state = initialize_BSFG(BSFG_state)
+
+```
+
+
+```{r}
+# BSFG_state = BSFG_init(Y,
+#                        model=~Fixed1+(1+Fixed1|animal), # This model has one fixed and two random terms. The random terms are NOT correlated
+#                        #factor_model_fixed = ~0, # we could specify a different fixed effect model for the factors
+#                        data = data, # the data.frame with information for constructing the model matrices
+#                        K_mats = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated
+#                        run_parameters=run_parameters,
+#                        priors=priors,
+#                        run_ID = 'BSFG_example', # folder to store run outputs
+#                        setup = setup  # only if running simulated data. Stores simulated values for comparison
+#                        )
 ```
 
 
