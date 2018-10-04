@@ -191,6 +191,17 @@ setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotyp
   b2_R = 0
   b2_F = 0
   if(!is.null(extra_regressions)) {
+    # project out intercept
+    if('X' %in% names(extra_regressions)){
+      M = diag(1,n) - matrix(1/n,n,n)
+      extra_regressions$X = M %*% extra_regressions$X
+      extra_regressions$X = extra_regressions$X[,colSums(abs(extra_regressions$X))>1e-10,drop=FALSE]
+    } else if('V' %in% names(extra_regressions)){
+      m = nrow(extra_regressions$V)
+      M = diag(1,m) - matrix(1/m,m,m)
+      extra_regressions$V = M %*% extra_regressions$V
+      extra_regressions$V = extra_regressions$V[,colSums(abs(extra_regressions$V))>1e-10,drop=FALSE]
+    }
     if(!is.null(extra_regressions$factors) && extra_regressions$factors == TRUE){
       if('X' %in% names(extra_regressions)){
         X2_F = extra_regressions$X

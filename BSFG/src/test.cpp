@@ -6,6 +6,25 @@
 // using namespace Eigen;
 // using namespace RcppParallel;
 //
+// // [[Rcpp::export()]]
+// void record_sample_Posterior_array(Map<MatrixXd> current_sample, Map<MatrixXd> Posterior_array_, int sp_num) {
+//   int nrow_sample = current_sample.rows();
+//   int ncol_sample = current_sample.cols();
+//
+//   int length_array = Posterior_array_.size();
+//   int nr = length_array / ncol_sample;
+//   if(nr * ncol_sample != length_array) stop("Wrong dimensions of Posterior_array");
+//   Map<MatrixXd> Posterior_array(Posterior_array_.data(),nr,ncol_sample);
+//
+//   int n_samples = nr / nrow_sample;
+//   if(sp_num < 1 || sp_num > n_samples) stop("Array out of bounds");
+//
+//   for(int i = 0; i < nrow_sample; i++){
+//     Posterior_array.row(i*n_samples + sp_num-1) = current_sample.row(i);
+//   }
+// }
+
+//
 //
 // // [[Rcpp::export()]]
 // MatrixXd rstdnorm_mat2(int n,int p) {  // returns nxp matrix

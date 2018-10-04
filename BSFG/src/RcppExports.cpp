@@ -227,3 +227,15 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// record_sample_Posterior_array
+void record_sample_Posterior_array(Map<MatrixXd> current_sample, Map<MatrixXd> Posterior_array_, int sp_num);
+RcppExport SEXP _BSFG_record_sample_Posterior_array(SEXP current_sampleSEXP, SEXP Posterior_array_SEXP, SEXP sp_numSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type current_sample(current_sampleSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Posterior_array_(Posterior_array_SEXP);
+    Rcpp::traits::input_parameter< int >::type sp_num(sp_numSEXP);
+    record_sample_Posterior_array(current_sample, Posterior_array_, sp_num);
+    return R_NilValue;
+END_RCPP
+}

@@ -319,15 +319,17 @@ save_posterior_sample = function(BSFG_state) {
   sp = dim(Posterior$Lambda)[1]
 
   for(param in Posterior$posteriorSample_params){
-    ncol_current = ncol(current_state[[param]])
-    ncol_Posterior = dim(Posterior[[param]])[3]
-    if(ncol_current > ncol_Posterior){
-      Posterior[[param]] = abind(Posterior[[param]],array(0,dim = c(sp,nrow(current_state[[param]]),ncol_current-ncol_Posterior)),along=3)
-    }
-    if(ncol_current < ncol_Posterior) {
-      Posterior[[param]] = Posterior[[param]][,,1:ncol_current,drop=F]
-    }
-    Posterior[[param]][sp_num,,] = current_state[[param]]
+    # parameters shouldn't change dimension here
+    # ncol_current = ncol(current_state[[param]])
+    # ncol_Posterior = dim(Posterior[[param]])[3]
+    # if(ncol_current > ncol_Posterior){
+    #   Posterior[[param]] = abind(Posterior[[param]],array(0,dim = c(sp,nrow(current_state[[param]]),ncol_current-ncol_Posterior)),along=3)
+    # }
+    # if(ncol_current < ncol_Posterior) {
+    #   Posterior[[param]] = Posterior[[param]][,,1:ncol_current,drop=F]
+    # }
+    record_sample_Posterior_array(current_state[[param]],Posterior[[param]],sp_num)
+    # Posterior[[param]][sp_num,,] = current_state[[param]]
   }
 
   for(param in Posterior$posteriorMean_params){

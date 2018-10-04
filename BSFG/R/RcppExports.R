@@ -57,3 +57,7 @@ make_chol_V_list <- function(ZKZts, h2s_matrix, drop0_tol, pb, setTxtProgressBar
     .Call(`_BSFG_make_chol_V_list`, ZKZts, h2s_matrix, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores)
 }
 
+record_sample_Posterior_array <- function(current_sample, Posterior_array_, sp_num) {
+    invisible(.Call(`_BSFG_record_sample_Posterior_array`, current_sample, Posterior_array_, sp_num))
+}
+
