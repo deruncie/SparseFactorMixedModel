@@ -36,6 +36,7 @@ sample_Lambda_prec_reg_horseshoe = function(BSFG_state,...) {
                              delta = with(priors,matrix(c(1,rgamma(K-1,shape = delta_l_shape,rate = delta_l_rate)),nrow=1))
                              Lambda_prec = matrix(1,p,K)
                              trunc_point_delta = 1
+                             Lambda_m_eff = matrix(1,1,K)
                            }
 
                            Lambda2 = Lambda^2
@@ -68,7 +69,11 @@ sample_Lambda_prec_reg_horseshoe = function(BSFG_state,...) {
                            Lambda_phi2_std_tau2_tilde = Lambda_tau2[1] * sweep(Lambda_phi2,2,cumprod(delta),'/')
                            Lambda_prec[] = (Lambda_c2[1] + Lambda_phi2_std_tau2_tilde) / (Lambda_c2[1] * Lambda_phi2_std_tau2_tilde)
 
-                           rm(list = c('Lambda2','Lambda2_std','Lambda2_std_delta','scores','new_samples','Lambda_phi2_std_tau2_tilde'))
+                           # ----- Calcualte m_eff -------------- #
+                           kappa = 1/(1+n/Lambda_prec)
+                           Lambda_m_eff[] = colSums(1-kappa)
+
+                           rm(list = c('Lambda2','Lambda2_std','Lambda2_std_delta','scores','new_samples','Lambda_phi2_std_tau2_tilde','kappa'))
                          })
                        }))
   return(current_state)

@@ -228,12 +228,16 @@ reorder_factors = function(BSFG_state,factor_order = NULL){
 
   # size is sum lambda_ij^2 * var(F_i)
   if(is.null(factor_order)) {
-    sizes = colSums(Lambda^2) * colMeans(F^2)
-    factor_order = order(sizes,decreasing=T)
+    if('Lambda_m_eff' %in% names(current_state)) {
+      factor_order = order(BSFG_state$current_state$Lambda_m_eff,decreasing = TRUE)
+    } else{
+      sizes = colSums(Lambda^2) * colMeans(F^2)
+      factor_order = order(sizes,decreasing=TRUE)
+    }
   }
 
   reorder_params = c('Lambda','Lambda_prec','Plam',
-                     'delta','tauh',
+                     'delta',
                      'F','B2_F','U_F','F_h2','F_e_prec','tot_F_prec', 'B2_F_prec'
   )
 
@@ -242,6 +246,7 @@ reorder_factors = function(BSFG_state,factor_order = NULL){
     if(! param %in% names(current_state)) next
     current_state[[param]] = current_state[[param]][,factor_order,drop=FALSE]
   }
+  current_state$delta[1] = 1
   # current_state$delta = matrix(c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)]),nrow=1)
   BSFG_state$current_state = current_state
 

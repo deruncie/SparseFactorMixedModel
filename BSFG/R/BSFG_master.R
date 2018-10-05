@@ -133,7 +133,8 @@ BSFG_priors = function(
 
 
 setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotypes = NULL,run_parameters = BSFG_control(),
-                            posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B1', 'B2_F','B2_R','U_R','cis_effects'),
+                            posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec',
+                                                       'resid_h2', 'B1', 'B2_F','B2_R','U_R','cis_effects','Lambda_m_eff'),
                             posteriorMean_params = c(),
                             setup=NULL,run_ID = 'BSFG_run'){
   # creates model matrices, RE_setup, current_state
