@@ -34,7 +34,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       Y_set = Qt_list[[set]] %**% Eta[rows,cols,drop=FALSE]
       X_set = cbind(QtX2_R_list[[set]],Qt_list[[set]] %**% F[rows,,drop=FALSE])
       if(length(Qt_cis_genotypes) == p) {
-        Qt_cis_genotypes_set = Qt_cis_genotypes[set]
+        Qt_cis_genotypes_set = Qt_cis_genotypes[cols]
       } else{
         Qt_cis_genotypes_set = list()
       }
@@ -62,8 +62,9 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       B1[,cols] = new_samples$alpha1
       # alpha2 -> cis_effects
       if(!is.null(cis_effects_index)) {
-        cis_index = do.call(c,lapply(cols,function(x) if(n_cis_effects[x] > 0) cis_effects_index[x] + 1:n_cis_effects[x]-1))
-        cis_effects[cis_index] = new_samples$alpha2
+        cis_effects[1,cols %in% cis_effects_index] = new_samples$alpha2
+        # cis_index = do.call(c,lapply(cols,function(x) if(n_cis_effects[x] > 0) cis_effects_index[x] + 1:n_cis_effects[x]-1))
+        # cis_effects[cis_index] = new_samples$alpha2
       }
       # beta -> B2_R and Lambda
       if(b2_R > 0) {
@@ -81,11 +82,11 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       for(j in 1:p){
         if(n_cis_effects[j] > 0){
           cis_X_j = cis_genotypes[[j]]
-          XB[,j] = XB[,j] + cis_X_j %*% cis_effects[cis_effects_index[j]:(cis_effects_index[j+1]-1)]
+          XB[,j] = XB[,j] + cis_X_j %*% cis_effects[cis_effects_index == j]
         }
       }
     }
-    Eta_tilde = Eta - XB - F %*% t(Lambda)
+    Eta_tilde = Eta - XB - F %**% t(Lambda)
 
 
     # ------------------------------------------------------------#
@@ -140,9 +141,6 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
     rows = Missing_data_map[[1]]$Y_obs
 
     prior_mean = matrix(0,b2_F,K)
-
-    # temporary!!!
-    # B2_F_prec = matrix(0,b2_F,K)
 
     new_samples = regression_sampler_parallel(
       Qt_list[[1]] %**% F[rows,,drop=FALSE],

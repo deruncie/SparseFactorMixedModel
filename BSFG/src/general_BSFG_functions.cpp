@@ -327,15 +327,19 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
   if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
   if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
   if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+  if(randn_e.size() != n) stop("Wrong length of randn_e");
 
   // Calculate inverse of Sigma_beta
   // MatrixXd Sigma_beta_inv;
+  // Using Ainv - Ainv * U * (I + BVAinvU)inv * BVAinv in case B = VDVt is singular
   MatrixXd DVt = prior_prec_beta.cwiseInverse().asDiagonal() * V.transpose();
+  MatrixXd VDVt = V * DVt;
   if(RinvU.rows() != n) stop("Wrong dimensions of RinvU");
-  MatrixXd inner = (V * DVt).inverse() + UtRinvU;
+  MatrixXd inner = VDVt * UtRinvU;
+  inner.diagonal().array() += 1.0;
   LDLT<MatrixXd> inner_ldlt;
   inner_ldlt.compute(inner);
-  // Sigma_beta_inv = Rinv - RinvU * inner.ldlt().solve(RinvU.transpose());  // Don't actually calculate this. Stay in mxm space
+  // Sigma_beta_inv = Rinv - RinvU * inner.ldlt().solve(VDVt * RinvU.transpose());  // Don't actually calculate this. Stay in mxm space
 
   // Step 1
   VectorXd alpha(a);
@@ -346,7 +350,7 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
     // MatrixXd A_alpha = Y_prec * SbinvW.transpose() * W;
     MatrixXd RinvW = Rinv * W;
     MatrixXd UtRinvW = U.transpose() * RinvW;
-    MatrixXd A_alpha = Y_prec * (W.transpose() * RinvW - UtRinvW.transpose() * inner_ldlt.solve(UtRinvW));
+    MatrixXd A_alpha = Y_prec * (W.transpose() * RinvW - UtRinvW.transpose() * inner_ldlt.solve(VDVt * UtRinvW));
     A_alpha.diagonal() += prior_prec_alpha;
 
     LLT<MatrixXd> A_alpha_llt;
@@ -355,7 +359,7 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
 
     // VectorXd WtSbinvy = SbinvW.transpose() * y;
     VectorXd UtRinvy = RinvU.transpose() * y;
-    VectorXd WtSbinvy = RinvW.transpose() * y - UtRinvW.transpose() * inner_ldlt.solve(UtRinvy);
+    VectorXd WtSbinvy = RinvW.transpose() * y - UtRinvW.transpose() * inner_ldlt.solve(VDVt * UtRinvy);
 
     alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
     alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
@@ -366,7 +370,7 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
   // VectorXd e2 = y_tilde.transpose() * Sigma_beta_inv * y_tilde;
   VectorXd Rinv_y = Rinv * y_tilde;
   VectorXd UtRinvy = RinvU.transpose() * y_tilde;
-  VectorXd e2 = y_tilde.transpose() * Rinv_y - UtRinvy.transpose() * inner_ldlt.solve(UtRinvy);
+  VectorXd e2 = y_tilde.transpose() * Rinv_y - UtRinvy.transpose() * inner_ldlt.solve(VDVt * UtRinvy);
 
   double score = Y_prec_b0 + e2[0]/2;
   Y_prec = rgamma_1/score;
@@ -383,7 +387,7 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
   // VectorXd w = Sigma_beta_inv * (y_tilde * sqrt(Y_prec) - v);
   VectorXd e = y_tilde * sqrt(Y_prec) - v;
   VectorXd UtRinve = RinvU.transpose() * e;
-  VectorXd w = Rinv * e - RinvU * inner_ldlt.solve(UtRinve);
+  VectorXd w = Rinv * e - RinvU * inner_ldlt.solve(VDVt * UtRinve);
 
   VectorXd beta = u + DVt * (U.transpose() * w) / sqrt(Y_prec); //b*b*1 + b*n*1
 
@@ -659,6 +663,9 @@ Rcpp::List regression_sampler_parallel(
         } else{
           Rinv = chol_R.sparse.triangularView<Upper>().solve(chol_R.sparse.transpose().triangularView<Lower>().solve(MatrixXd::Identity(n,n)));
           RinvU = chol_R.sparse.triangularView<Upper>().solve(chol_R.sparse.transpose().triangularView<Lower>().solve(U));
+          // RinvU = Rinv * U;
+          // Rcout << i << std::endl;
+          // Rcout << Rinv.diagonal().transpose() << std::endl;
         }
         UtRinvU = U.transpose() * RinvU;
       }

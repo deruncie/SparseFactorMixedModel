@@ -11,6 +11,8 @@ using namespace RcppParallel;
 void record_sample_Posterior_array(Map<MatrixXd> current_sample, Map<MatrixXd> Posterior_array_, int sp_num) {
   int nrow_sample = current_sample.rows();
   int ncol_sample = current_sample.cols();
+  if(nrow_sample == 0) return;
+  if(ncol_sample == 0) return;
 
   int length_array = Posterior_array_.size();
   int nr = length_array / ncol_sample;

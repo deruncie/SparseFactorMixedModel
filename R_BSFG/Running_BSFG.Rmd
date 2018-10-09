@@ -98,7 +98,7 @@ priors = BSFG_priors(
 options(error=recover)
 BSFG_state = setup_model_BSFG(Y,~(1|animal),
                               # extra_regressions = NULL,
-                              extra_regressions = list(X = model.matrix(~Fixed1,data)[,-1,drop=FALSE],factors=T,resids=T),
+                              extra_regressions = list(X = model.matrix(~Fixed1,data)[,-1,drop=FALSE],factors=T,resids=F),
                               data,relmat = list(animal = K),
                               run_parameters=run_parameters,
                               setup = setup

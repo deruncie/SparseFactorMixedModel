@@ -86,3 +86,41 @@ beta = matrix(rnorm(n_c*p,0,sqrt(vars)),nrow = p)
 plot(jitter(cs[1,]),log(colSums(vars)));lines(cs[1,],log(cs[1,]^2*p_0))
 # plot(cs[1,seq(1,n_c*n_r,by=n_r)],colMeans(matrix(colSums(vars),n_r)>.1*cs[1,seq(1,n_c*n_r,by=n_r)]^2*p_0))
 boxplot((matrix(colSums(vars),n_r)))
+
+
+
+
+# m_eff
+D = 1000
+n = 200
+p0 = 1000/D
+s2=1
+
+nI = 1000
+r=c()
+d = 1.5
+for(k in 1:20) {
+  tau_0 = p0/sqrt(n) * d^-k
+  meff = rep(0,nI)
+  for(i in 1:nI) {
+    tau = abs(rcauchy(1,0,tau_0))
+    lambdas = abs(rcauchy(D,0,1))
+    ks = 1/(1+n/s2*tau^2*lambdas^2)
+    meff[i] = sum(1-ks)
+  }
+  r[k] = median(meff)
+}
+plot((diff(log(r/(D-r)))),type='l');abline(h=log(1/d))
+
+hist(meff,breaks=100,xlim=c(0,D))
+mean(meff)
+tau*sqrt(n)/(1+tau*sqrt(n))*D
+var(meff)
+tau*sqrt(n)/(2*(1+tau*sqrt(n))^2)*D
+
+
+p0 = 1000/D
+k=1:10
+tau = p0/sqrt(n) * 2^-seq(k)
+plot(k,tau*sqrt(n)/(1+tau*sqrt(n))*D)
+

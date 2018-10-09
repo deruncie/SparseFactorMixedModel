@@ -52,6 +52,7 @@ BSFG_control = function(
                         burn = 100,thin = 2,
                         num_NA_groups = Inf,
                         svd_K = TRUE,
+                        verbose = TRUE,
                         ...
                         ) {
 
@@ -132,13 +133,15 @@ BSFG_priors = function(
 }
 
 
-setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotypes = NULL,run_parameters = BSFG_control(),
+setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat=NULL, cis_genotypes = NULL,run_parameters = BSFG_control(),
                             posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec',
                                                        'resid_h2', 'B1', 'B2_F','B2_R','U_R','cis_effects','Lambda_m_eff'),
                             posteriorMean_params = c(),
                             setup=NULL,run_ID = 'BSFG_run'){
   # creates model matrices, RE_setup, current_state
   # returns BSFG_state
+
+  try(dir.create(run_ID),silent=T)
 
   # ----------------------------- #
   # -------- observation model ---------- #
@@ -210,7 +213,7 @@ setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotyp
         V2_F = NULL
         b2_F = ncol(X2_F)
       } else{
-        if(!all(c('U','V') %in% names(extra_regressions))){
+        if(all(c('U','V') %in% names(extra_regressions))){
           U2_F = extra_regressions$U
           V2_F = extra_regressions$V
           X2_F = U2_F %*% V2_F
@@ -225,7 +228,7 @@ setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotyp
         X2_R = extra_regressions$X
         b2_R = ncol(X2_R)
       } else{
-        if(!all(c('U','V') %in% names(extra_regressions))){
+        if(all(c('U','V') %in% names(extra_regressions))){
           X2_R = extra_regressions$U %*% extra_regressions$V
           b2_R = ncol(V2_R)
         } else{
@@ -244,7 +247,7 @@ setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat, cis_genotyp
     cis_effects_index = NULL
   } else{
     n_cis_effects = sapply(cis_genotypes,ncol)
-    cis_effects_index = c(0,cumsum(n_cis_effects))+1
+    cis_effects_index = rep(seq_len(p),n_cis_effects)
   }
 
   # -------- Random effects ---------- #
@@ -523,7 +526,7 @@ initialize_variables_BSFG = function(BSFG_state,...){
     F = X2_F %*% B2_F + ZL %*% U_F + matrix(rnorm(n * K, 0, sqrt((1-colSums(F_h2)) / tot_F_prec)),ncol = K, byrow = T)
     F = as.matrix(F)
 
-    cis_effects = rnorm(length(cis_effects_index))
+    cis_effects = matrix(rnorm(length(cis_effects_index)),1,length(cis_effects_index))
 
     # var_Eta
     if(!'var_Eta' %in% ls()) var_Eta = rep(1,p)
@@ -578,7 +581,7 @@ initialize_variables_BSFG = function(BSFG_state,...){
 
 
 
-initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL, chol_R_list = NULL, chol_ZKZt_list = NULL,verbose=TRUE) {
+initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL, chol_R_list = NULL, chol_ZKZt_list = NULL) {
   # calculates Qt_list, chol_R_list and chol_ZKZt_list
   # returns BSFG_state
 
@@ -586,6 +589,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
   data_matrices = BSFG_state$data_matrices
   Y_missing = run_parameters$observation_model_parameters$observation_setup$Y_missing
   h2s_matrix = BSFG_state$data_matrices$h2s_matrix
+  verbose = run_parameters$verbose
 
   RE_setup = data_matrices$RE_setup
   ZL = data_matrices$ZL
@@ -738,7 +742,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     QtX2_R_set = Qt %**% X2_R[x,,drop=FALSE]
 
     if(length(cis_genotypes) == p) {
-      Qt_cis_genotypes[set] = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
+      Qt_cis_genotypes[cols] = lapply(cis_genotypes[cols],function(X) Qt %**% X[x,,drop=FALSE])
     }
 
     Qt_list[[set]]   = Qt

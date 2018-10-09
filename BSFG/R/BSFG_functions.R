@@ -302,8 +302,8 @@ save_posterior_sample = function(BSFG_state) {
 
   current_state = within(current_state,{
     # re-transform random effects using RE_L (RE_L %*% diag(D) %*% t(RE_L) = bdiag(K_mats))
-    U_R = as.matrix(BSFG_state$data_matrices$RE_L %*% U_R)
-    U_F = as.matrix(BSFG_state$data_matrices$RE_L %*% U_F)
+    U_R = BSFG_state$data_matrices$RE_L %**% U_R
+    U_F = BSFG_state$data_matrices$RE_L %**% U_F
     # transform variables so that the variance of each column of F is 1.
     F_var = 1/tot_F_prec
     U_F[] = sweep(U_F,2,sqrt(F_var),'/')
@@ -325,16 +325,7 @@ save_posterior_sample = function(BSFG_state) {
 
   for(param in Posterior$posteriorSample_params){
     # parameters shouldn't change dimension here
-    # ncol_current = ncol(current_state[[param]])
-    # ncol_Posterior = dim(Posterior[[param]])[3]
-    # if(ncol_current > ncol_Posterior){
-    #   Posterior[[param]] = abind(Posterior[[param]],array(0,dim = c(sp,nrow(current_state[[param]]),ncol_current-ncol_Posterior)),along=3)
-    # }
-    # if(ncol_current < ncol_Posterior) {
-    #   Posterior[[param]] = Posterior[[param]][,,1:ncol_current,drop=F]
-    # }
     record_sample_Posterior_array(current_state[[param]],Posterior[[param]],sp_num)
-    # Posterior[[param]][sp_num,,] = current_state[[param]]
   }
 
   for(param in Posterior$posteriorMean_params){
@@ -352,13 +343,25 @@ reset_Posterior = function(Posterior,BSFG_state){
   current_state$U_R = BSFG_state$data_matrices$RE_L %*% current_state$U_R
 
   for(param in Posterior$posteriorSample_params){
-    Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
-    dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
+    if(param %in% names(current_state) && length(dim(current_state[[param]])) == 2) {
+      Posterior[[param]] = array(0,dim = c(0,dim(current_state[[param]])))
+      dimnames(Posterior[[param]])[2:3] = dimnames(current_state[[param]])
+    } else{
+      # drop param from Posterior$posteriorSample_params
+      Posterior$posteriorSample_params = Posterior$posteriorSample_params[Posterior$posteriorSample_params != param]
+      Posterior[[param]] = NULL
+    }
   }
   for(param in Posterior$posteriorMean_params) {
-    if(Posterior$total_samples == 0) {
-      Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
-      dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
+    if(param %in% names(current_state) && length(dim(current_state[[param]])) == 2) {
+      if(Posterior$total_samples == 0) {
+        Posterior[[param]] = array(0,dim = dim(current_state[[param]]))
+        dimnames(Posterior[[param]]) = dimnames(current_state[[param]])
+      }
+    } else{
+      # drop param from Posterior$posteriorMean_params
+      Posterior$posteriorMean_params = Posterior$posteriorMean_params[Posterior$posteriorMean_params != param]
+      Posterior[[param]] = NULL
     }
   }
   Posterior$sp_num = 0

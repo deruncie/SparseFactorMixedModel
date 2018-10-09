@@ -71,7 +71,7 @@ make_model_setup = function(formula,data,relmat = NULL) {
       if(!all(colnames(Zs_term[[1]]) %in% rownames(K))) stop('rownames of K not lining up with Z')
       K = K[colnames(Zs_term[[1]]),colnames(Zs_term[[1]])]
     } else {
-      K = Diagonal(ncol(Zs_term[[1]]),1)
+      K = as(diag(1,ncol(Zs_term[[1]])),'dgCMatrix')
       rownames(K) = colnames(K) = colnames(Zs_term[[1]])
     }
 

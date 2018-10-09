@@ -28,6 +28,7 @@ sample_Lambda_prec_reg_horseshoe = function(BSFG_state,...) {
 
                            # initialize variables if needed
                            if(!'Lambda_tau2' %in% names(current_state)){
+                             if(verbose) print('initializing Lambda_prec regularized horseshoe')
                              Lambda_tau2 = matrix(1,1,1)
                              Lambda_xi = matrix(1,1,1)
                              Lambda_phi2 = matrix(1,p,K)
