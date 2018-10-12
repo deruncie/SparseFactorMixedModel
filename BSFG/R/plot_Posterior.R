@@ -34,11 +34,10 @@ trace_plot_h2s = function(F_h2_samples, n_factors = 8, device = NULL){
   # for(k in 1:min(n_factors,dim(F_h2_samples)[3])){
   for(k in 1:dim(F_h2_samples)[3]){
     trace_plot(matrix(F_h2_samples[,,k],ncol = n_h2),main = sprintf('Factor %d h2s',k),ylim = c(0,1))
-    if(n_h2 == 1){
-      hist(F_h2_samples[,1,k],breaks=seq(0,1,length=100),xlim = c(-0.1,1),main = sprintf('Factor %d',k))
-    } else{
-      for(i in 1:n_h2){
-        hist(F_h2_samples[,i,k],breaks=seq(0,1,length=100),col = i,main = sprintf('%s(%d)',h2_names[i],k))
+    hist(F_h2_samples[,1,k],breaks=seq(0,1,length=100),xlim = c(-0.1,1),main = sprintf('Factor %d',k))
+    if(n_h2 > 1){
+      for(i in 2:n_h2){
+        hist(F_h2_samples[,i,k],breaks=seq(0,1,length=100),col = i,border=i,add=T)
       }
     }
   }

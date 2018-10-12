@@ -133,7 +133,7 @@ BSFG_priors = function(
 }
 
 
-setup_model_BSFG = function(Y,formula,extra_regressions,data,relmat=NULL, cis_genotypes = NULL,run_parameters = BSFG_control(),
+setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, cis_genotypes = NULL,run_parameters = BSFG_control(),
                             posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec',
                                                        'resid_h2', 'B1', 'B2_F','B2_R','U_R','cis_effects','Lambda_m_eff'),
                             posteriorMean_params = c(),
@@ -496,12 +496,12 @@ initialize_variables_BSFG = function(BSFG_state,...){
 
     # Resid discrete variances
     # p-matrix of n_RE x p with
-    resid_h2_index = sample(1:ncol(h2s_matrix),p,replace=T)
+    resid_h2_index = sample(c(1:ncol(h2s_matrix))[h2_priors_resids>0],p,replace=T)
     resid_h2 = h2s_matrix[,resid_h2_index,drop=FALSE]
 
     # Factor discrete variances
     # K-matrix of n_RE x K with
-    F_h2_index = sample(1:ncol(h2s_matrix),K,replace=T)
+    F_h2_index = sample(c(1:ncol(h2s_matrix))[h2_priors_factors>0],K,replace=T)
     F_h2 = h2s_matrix[,F_h2_index,drop=FALSE]
 
     U_F = matrix(rnorm(sum(r_RE) * K, 0, sqrt(F_h2[1,] / tot_F_prec)),ncol = K, byrow = T)
@@ -697,7 +697,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
 
 
   Qt_list = list()
-  QtZL_list = list()
+  # QtZL_list = list()
   QtX1_list = list()
   QtX2_R_list = list()
   Qt_cis_genotypes = list()
@@ -705,39 +705,37 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
   chol_V_list_list = list()
   chol_ZtZ_Kinv_list_list = list()
 
-  if(n_RE == 1 && run_parameters$svd_K == TRUE){
-    svd_K1 = svd(RE_setup[[1]]$K)
-  }
-
+  svd_K1 = NULL
   for(set in seq_along(Missing_data_map)){
     x = Missing_data_map[[set]]$Y_obs
     cols = Missing_data_map[[set]]$Y_cols
     if(length(x) == 0) next
 
-    if(n_RE == 1){
-      if(run_parameters$svd_K == TRUE) {
-        # a faster way of taking the SVD of ZLKZLt, particularly if ncol(ZL) < nrow(ZL). Probably no benefit if ncol(K) > nrow(ZL)
-        qr_ZU = qr(ZL[x,,drop=FALSE] %*% svd_K1$u)
-        R_ZU = drop0(qr.R(qr_ZU,complete=F),tol=run_parameters$drop0_tol)
-        Q_ZU = drop0(qr.Q(qr_ZU,complete=T),tol=run_parameters$drop0_tol)
-        RKRt = R_ZU %*% diag(svd_K1$d) %*% t(R_ZU)
-        svd_RKRt = svd(RKRt)
-        RKRt_U = svd_RKRt$u
-        if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
-        Qt = t(Q_ZU %*% RKRt_U)
-      } else{
-        ZKZt = ZL[x,,drop=FALSE] %*% RE_setup[[1]]$K %*% t(ZL[x,,drop=FALSE])
-        result = svd(ZKZt)
-        Qt = t(result$u)
+    # find Qt = svd(ZLKLtZt)$u
+    if(ncol(ZL) < nrow(ZL)) {
+      # a faster way of taking the SVD of ZLKZLt, particularly if ncol(ZL) < nrow(ZL). Probably no benefit if ncol(K) > nrow(ZL)
+      if(is.null(svd_K1)){
+        svd_K1 = svd(RE_setup[[1]]$K)
       }
-      Qt = as(drop0(as(Qt,'dgCMatrix'),tol = run_parameters$drop0_tol),'dgCMatrix')
-      if(nnzero(Qt)/length(Qt) > 0.5) Qt = as.matrix(Qt)  # only store as sparse if it is sparse
+      qr_ZU = qr(RE_setup[[1]]$ZL[x,,drop=FALSE] %*% svd_K1$u)
+      R_ZU = drop0(qr.R(qr_ZU,complete=F),tol=run_parameters$drop0_tol)
+      Q_ZU = drop0(qr.Q(qr_ZU,complete=T),tol=run_parameters$drop0_tol)
+      RKRt = R_ZU %*% diag(svd_K1$d) %*% t(R_ZU)
+      svd_RKRt = svd(RKRt)
+      RKRt_U = svd_RKRt$u
+      if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
+      Qt = t(Q_ZU %*% RKRt_U)
     } else{
-      Qt = as(diag(1,length(x)),'dgCMatrix')
+      ZKZt = with(RE_setup[[1]],ZL[x,,drop=FALSE] %*% K %*% t(ZL[x,,drop=FALSE]))
+      result = svd(ZKZt)
+      Qt = t(result$u)
     }
+    Qt = as(drop0(as(Qt,'dgCMatrix'),tol = run_parameters$drop0_tol),'dgCMatrix')
+    if(nnzero(Qt)/length(Qt) > 0.5) Qt = as.matrix(Qt)  # only store as sparse if it is sparse
+
     QtZL_matrices_set = lapply(RE_setup,function(re) Qt %*% re$ZL[x,,drop=FALSE])
-    QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
-    if(nnzero(QtZL_set)/length(QtZL_set) > 0.5)  QtZL_set = as(QtZL_set,'dgCMatrix')
+    # QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
+    # if(nnzero(QtZL_set)/length(QtZL_set) > 0.5)  QtZL_set = as(QtZL_set,'dgCMatrix')
     QtX1_set = Qt %**% X1[x,,drop=FALSE]
     QtX2_R_set = Qt %**% X2_R[x,,drop=FALSE]
 
@@ -746,7 +744,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     }
 
     Qt_list[[set]]   = Qt
-    QtZL_list[[set]]  = QtZL_set
+    # QtZL_list[[set]]  = QtZL_set
     QtX1_list[[set]]  = QtX1_set
     QtX2_R_list[[set]]  = QtX2_R_set
 
@@ -758,6 +756,12 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     ZtZ_set = as(forceSymmetric(drop0(crossprod(ZL[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
 
     chol_V_list_list[[set]] = make_chol_V_list(ZKZts_set,h2s_matrix,run_parameters$drop0_tol,pb,setTxtProgressBar,getTxtProgressBar,ncores)
+    # convert any to dense if possible
+    for(i in 1:length(chol_V_list_list[[set]])){
+      if(nnzero(chol_V_list_list[[set]][[i]])/length(chol_V_list_list[[set]][[i]]) > 0.25){
+        chol_V_list_list[[set]][[i]] = as.matrix(chol_V_list_list[[set]][[i]])
+      }
+    }
     chol_ZtZ_Kinv_list_list[[set]] = make_chol_ZtZ_Kinv_list(chol_Ki_mats,h2s_matrix,ZtZ_set,run_parameters$drop0_tol,pb,setTxtProgressBar,getTxtProgressBar,ncores)
   }
   if(verbose) close(pb)
@@ -770,7 +774,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
   BSFG_state$run_variables = c(BSFG_state$run_variables,
     list(
     Qt_list    = Qt_list,
-    QtZL_list   = QtZL_list,
+    # QtZL_list   = QtZL_list,
     QtX1_list   = QtX1_list,
     QtX2_R_list = QtX2_R_list,
     Qt1_U2_F = Qt1_U2_F,

@@ -419,7 +419,7 @@ save_posterior_chunk = function(BSFG_state){
       saveRDS(samples,file = file_name,compress = FALSE)
     }
   })
-  print(sprintf('%d files',length(grep(file_suffix,list.files(path = folder)))))
+  # print(sprintf('%d files',length(grep(file_suffix,list.files(path = folder)))))
   if(length(grep(file_suffix,list.files(path = folder)))>0) {
     Posterior$files = unique(c(Posterior$files,file_suffix))
   }

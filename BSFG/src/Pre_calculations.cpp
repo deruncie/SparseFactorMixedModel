@@ -35,13 +35,16 @@ List LDLt(SEXP A_) {
   }
 }
 
-SpMat make_chol_K_inv(Rcpp::List chol_Ki_mats, VectorXd h2s,double tol){
+SpMat make_chol_K_inv(const std::vector<R_matrix>& chol_Ki_mats, VectorXd h2s,double tol){
   int h = h2s.size();
   VectorXd sizes(h);
   int total_size = 0;
   for(int i = 0; i < h; i++){
-    MSpMat chol_Ki = as<MSpMat>(chol_Ki_mats[i]);
-    sizes(i) = chol_Ki.rows();
+    if(chol_Ki_mats[i].isDense) {
+      sizes(i) = chol_Ki_mats[i].dense.rows();
+    } else{
+      sizes(i) = chol_Ki_mats[i].sparse.rows();
+    }
     total_size += sizes(i);
   }
   MatrixXd chol_K_inv_dense(total_size,total_size);
@@ -53,8 +56,12 @@ SpMat make_chol_K_inv(Rcpp::List chol_Ki_mats, VectorXd h2s,double tol){
       chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)).diagonal().setOnes();
       chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)).diagonal() /= 0;
     } else{
-      MSpMat chol_Ki = as<MSpMat>(chol_Ki_mats[i]);
-      chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)) = chol_Ki;
+      // MSpMat chol_Ki = chol_Ki_mats[i].sparse;
+      if(chol_Ki_mats[i].isDense) {
+        chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)) = chol_Ki_mats[i].dense;
+      } else{
+        chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)) = chol_Ki_mats[i].sparse;
+      }
       chol_K_inv_dense.block(curr_row,curr_col,sizes(i),sizes(i)) /= sqrt(h2s[i]);
     }
     curr_row += sizes(i);
@@ -65,14 +72,14 @@ SpMat make_chol_K_inv(Rcpp::List chol_Ki_mats, VectorXd h2s,double tol){
 }
 
 struct make_chol_ZtZ_Kinv_worker : public RcppParallel::Worker {
-  const Rcpp::List chol_Ki_mats;
+  const std::vector<R_matrix>& chol_Ki_mats;
   const Map<MatrixXd> h2s_matrix;
   const MSpMat ZtZ;
   const double tol;
   std::vector<SpMat>& chol_ZtZ_Kinv_list;
 
   make_chol_ZtZ_Kinv_worker(
-    const Rcpp::List chol_Ki_mats,
+    const std::vector<R_matrix>& chol_Ki_mats,
     const Map<MatrixXd> h2s_matrix,
     const MSpMat ZtZ,
     const double tol,
@@ -94,13 +101,17 @@ struct make_chol_ZtZ_Kinv_worker : public RcppParallel::Worker {
 };
 
 // [[Rcpp::export()]]
-Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats,
+Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats_,
                                    Map<MatrixXd> h2s_matrix,
                                    MSpMat ZtZ,
                                    double drop0_tol,
                                    SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar,
                                    int ncores) {
   int s = h2s_matrix.cols();
+
+
+  std::vector<R_matrix> chol_Ki_mats;
+  load_R_matrices_list(chol_Ki_mats_,chol_Ki_mats);
 
   std::vector<SpMat> chol_ZtZ_Kinv_list;
   chol_ZtZ_Kinv_list.reserve(s);
@@ -127,15 +138,23 @@ Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats,
 }
 
 
-SpMat make_chol_R(Rcpp::List ZKZts, const VectorXd h2s, const double tol){  //std::vector<Map<MatrixXd> > ZKZts
-  Map<MatrixXd> ZKZts_0 = as<Map<MatrixXd> >(ZKZts[0]);
-  int n = ZKZts_0.rows();
+SpMat make_chol_R(const std::vector<R_matrix>& ZKZts, const VectorXd h2s, const double tol){  //std::vector<Map<MatrixXd> > ZKZts
+  // Map<MatrixXd> ZKZts_0 = as<Map<MatrixXd> >(ZKZts[0]);
+  int n;
+  if(ZKZts[0].isDense) {
+    n = ZKZts[0].dense.rows();
+  } else{
+    n = ZKZts[0].sparse.rows();
+  }
   int h = h2s.size();
   MatrixXd R(n,n);
   R.setZero();
   for(int i = 0; i < h; i++){
-    Map<MatrixXd> ZKZts_i = as<Map<MatrixXd> >(ZKZts[i]);
-    R += h2s[i] * ZKZts_i;
+    if(ZKZts[i].isDense) {
+      R += h2s[i] * ZKZts[i].dense;
+    } else{
+      R += h2s[i] * ZKZts[i].sparse;
+    }
   }
   R.diagonal().array() += (1.0-h2s.sum());
 
@@ -146,14 +165,13 @@ SpMat make_chol_R(Rcpp::List ZKZts, const VectorXd h2s, const double tol){  //st
 
 
 struct make_chol_R_worker : public RcppParallel::Worker {
-  // const std::vector<Map<MatrixXd> > ZKZts;
-  const Rcpp::List ZKZts;
+  const std::vector<R_matrix>& ZKZts;
   const Map<MatrixXd> h2s_matrix;
   const double tol;
   std::vector<SpMat>& chol_R_list;
 
   make_chol_R_worker(
-    const Rcpp::List ZKZts, //const std::vector<Map<MatrixXd> > ZKZts,
+    const std::vector<R_matrix>& ZKZts, //const std::vector<Map<MatrixXd> > ZKZts,
     const Map<MatrixXd> h2s_matrix,
     const double tol,
     std::vector<SpMat>& chol_R_list
@@ -169,12 +187,15 @@ struct make_chol_R_worker : public RcppParallel::Worker {
 };
 
 // [[Rcpp::export()]]
-Rcpp::List make_chol_V_list(Rcpp::List ZKZts,
+Rcpp::List make_chol_V_list(Rcpp::List ZKZts_,
                             Map<MatrixXd> h2s_matrix,
                             double drop0_tol,
                             SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar,
                             int ncores) {
   int s = h2s_matrix.cols();
+
+  std::vector<R_matrix> ZKZts;
+  load_R_matrices_list(ZKZts_,ZKZts);
 
   std::vector<SpMat> chol_R_list;
   chol_R_list.reserve(s);

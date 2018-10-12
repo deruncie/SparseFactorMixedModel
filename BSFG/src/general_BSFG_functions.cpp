@@ -81,12 +81,12 @@ VectorXd find_candidate_states(
 
 
 // code to convert list of R matrices (sparse or dense) into a thread-safe object
-struct R_matrix {
-  Map<MatrixXd> dense;
-  MSpMat sparse;
-  bool isDense;
-  R_matrix(Map<MatrixXd> dense_, MSpMat sparse_,bool isDense_) : dense(dense_), sparse(sparse_), isDense(isDense_) {}
-};
+// struct R_matrix {
+//   Map<MatrixXd> dense;
+//   MSpMat sparse;
+//   bool isDense;
+//   R_matrix(Map<MatrixXd> dense_, MSpMat sparse_,bool isDense_) : dense(dense_), sparse(sparse_), isDense(isDense_) {}
+// };
 
 void load_R_matrices_list(const Rcpp::List X_list, std::vector<R_matrix>& X_vector){
   // null_matrices

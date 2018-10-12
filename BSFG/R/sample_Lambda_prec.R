@@ -33,7 +33,7 @@ sample_Lambda_prec_reg_horseshoe = function(BSFG_state,...) {
                              Lambda_xi = matrix(1,1,1)
                              Lambda_phi2 = matrix(1,p,K)
                              Lambda_nu = matrix(1,p,K)
-                             Lambda_c2 = matrix(1,1,1)
+                             Lambda_c2 = matrix(1,1,K)
                              delta = with(priors,matrix(c(1,rgamma(K-1,shape = delta_l_shape,rate = delta_l_rate)),nrow=1))
                              Lambda_prec = matrix(1,p,K)
                              trunc_point_delta = 1
@@ -64,11 +64,12 @@ sample_Lambda_prec_reg_horseshoe = function(BSFG_state,...) {
                            Lambda_xi[] = new_samples$xi
                            delta[] = new_samples$delta
 
-                           Lambda_c2[] = 1/rgamma(1,shape = c2_shape + p*K/2,rate = c2_rate + sum(Lambda2)/2)
+                           # separate c2 for each factor
+                           Lambda_c2[] = 1/rgamma(K,shape = c2_shape + p/2,rate = c2_rate + colSums(Lambda2)/2)
 
                            # -----Update Plam-------------------- #
                            Lambda_phi2_std_tau2_tilde = Lambda_tau2[1] * sweep(Lambda_phi2,2,cumprod(delta),'/')
-                           Lambda_prec[] = (Lambda_c2[1] + Lambda_phi2_std_tau2_tilde) / (Lambda_c2[1] * Lambda_phi2_std_tau2_tilde)
+                           Lambda_prec[] = sweep(Lambda_phi2_std_tau2_tilde,2,Lambda_c2,'+') / sweep(Lambda_phi2_std_tau2_tilde,2,Lambda_c2,'*')
 
                            # ----- Calcualte m_eff -------------- #
                            kappa = 1/(1+n/Lambda_prec)
