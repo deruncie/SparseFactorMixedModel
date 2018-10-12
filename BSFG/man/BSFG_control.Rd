@@ -4,11 +4,10 @@
 \alias{BSFG_control}
 \title{Set BSFG run parameters}
 \usage{
-BSFG_control(simulation = c(F, T), scale_Y = c(T, F),
-  lambda_propto_Vp = TRUE, cauchy_sigma_tot = FALSE, b0 = 1, b1 = 5e-04,
-  epsilon = 0.1, prop = 1, k_init = 20, h2_divisions = 100,
-  h2_step_size = NULL, drop0_tol = 1e-14, K_eigen_tol = 1e-10,
-  burn = 100, thin = 2, num_NA_groups = Inf, svd_K = TRUE, ...)
+BSFG_control(simulation = c(F, T), scale_Y = c(T, F), K = 20,
+  h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
+  K_eigen_tol = 1e-10, burn = 100, thin = 2, num_NA_groups = Inf,
+  svd_K = TRUE, verbose = TRUE, ...)
 }
 \arguments{
 \item{simulation}{Is this a fit to simulated data? If so, a setup list will be expected providing
@@ -16,21 +15,7 @@ the true values}
 
 \item{scale_Y}{Should the Y values be centered and scaled? Recommend, except for simulated data.}
 
-\item{lambda_propto_Vp}{Should the prior for lambda include tot_Eta_prec?}
-
-\item{cauchy_sigma_tot}{Should the prior on sigma_j be half-cauchy?}
-
-\item{b0}{parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011}
-
-\item{b1}{parameter of the \code{update_k} function. See Bhattacharya and Dunson 2011}
-
-\item{epsilon}{parameter of the \code{update_k} function. Smallest \eqn{\lambda_{ij}} that is
-considered "large", signifying a factor should be kept. See Bhattacharya and Dunson 2011}
-
-\item{prop}{proportion of \eqn{\lambda{ij}} elements in a column of \eqn{\Lambda} that must be smaller than
-\code{epsilon} before factor is dropped. See Bhattacharya and Dunson 2011}
-
-\item{k_init}{initial number of factors}
+\item{K}{number of factors}
 
 \item{h2_divisions}{A scalar or vector of length equal to number of random effects. In BSFG, random
 effects are re-scaled as percentages of the total variation. Then a discrete prior spanning [0,1)
@@ -62,14 +47,9 @@ untransformed.}
 If in (0,Inf), up to this many groups of columns will be separately sampled.
 The minimum number of NAs in each column not in one of these groups will be imputed.}
 
-\item{svd_K}{If TRUE, and a 1-random effect model is specified, the the diagonalization of ZKZt is accomplished using this algorithm:
+\item{svd_K}{If TRUE, the the diagonalization of ZKZt for the first random effect is accomplished using this algorithm:
 https://math.stackexchange.com/questions/67231/singular-value-decomposition-of-product-of-matrices which doesn't require forming ZKTt.
-If FALSE, the SVD of ZKZt is calculated directly. TRUE is generally faster if the same genomes are repeated several times.}
-
-\item{Posterior_folder}{path to folder to save posterior samples. Samples of each parameter
-are saved in chuncks to limit memory requirements.}
-
-\item{delta_iteractions_factor}{Number of times to iterate through sample_delta per iteration of the other parameters}
+If FALSE, the SVD of ZKZt for the first random effect is calculated directly. TRUE is generally faster if the same genomes are repeated several times.}
 }
 \description{
 Function to create run_parameters list for initializing BSFG model

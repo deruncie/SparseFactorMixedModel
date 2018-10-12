@@ -72,7 +72,7 @@ priors = BSFG_priors(
     prop_0 = 0.1,
     delta_l = list(shape = 3, rate = 1),
     delta_iterations_factor = 100,
-    c2 = list(V=1,nu=1e6)
+    c2 = list(V=1,nu=1e10)
   ),
   B2_prior = list(
     sampler = sample_B2_prec_reg_horseshoe,
@@ -96,57 +96,22 @@ priors = BSFG_priors(
 
 ```{r}
 options(error=recover)
-BSFG_state = setup_model_BSFG(Y,~(1|animal),
-                              # extra_regressions = NULL,
-                              extra_regressions = list(X = model.matrix(~Fixed1,data)[,-1,drop=FALSE],factors=T,resids=F),
-                              data,relmat = list(animal = K),
+BSFG_state = setup_model_BSFG(Y,            # n x p data matrix
+                              ~(1|animal),  # RHS of base model for factors and residuals
+                              extra_regressions = list(X = model.matrix(~Fixed1,data)[,-1,drop=FALSE],factors=T,resids=F), # design matrix for additional fixed effects. These coefficients will be regularized with the B2_prior above. The same model can be used for both factors and resids
+                              data,         # the data.frame with information for constructing the model matrices
+                              relmat = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated
                               run_parameters=run_parameters,
-                              setup = setup
+                              setup = setup, # only if running simulated data. Stores simulated values for comparison
+                              run_ID = 'BSFG_example'
                                 )
 
 BSFG_state = set_priors_BSFG(BSFG_state,priors)
-
 BSFG_state = initialize_variables_BSFG(BSFG_state)
-
 BSFG_state = initialize_BSFG(BSFG_state)
-
-BSFG_state$Posterior$posteriorSample_params = BSFG_state$Posterior$posteriorSample_params[BSFG_state$Posterior$posteriorSample_params != 'cis_effects']
 BSFG_state = clear_Posterior(BSFG_state)
 
 ```
-```{r}
-saveRDS(BSFG_state,file = 'BSFG_state.rds')
-```
-```{r}
-library(BSFG)
-BSFG_state = readRDS('BSFG_state.rds')
-```
-
-
-```{r}
-# for(i in 1:100) {
-# # BSFG_state$current_state$Lambda[1,]
-# # BSFG_state$current_state$F[1,]
-# # BSFG_state$current_state$resid_h2_index
-# # BSFG_state$current_state$F_h2_index
-#   BSFG_state$current_state = sample_latent_traits(BSFG_state,grainSize = 1)
-# }
-```
-
-
-```{r}
-# BSFG_state = BSFG_init(Y,
-#                        model=~Fixed1+(1+Fixed1|animal), # This model has one fixed and two random terms. The random terms are NOT correlated
-#                        #factor_model_fixed = ~0, # we could specify a different fixed effect model for the factors
-#                        data = data, # the data.frame with information for constructing the model matrices
-#                        K_mats = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated
-#                        run_parameters=run_parameters,
-#                        priors=priors,
-#                        run_ID = 'BSFG_example', # folder to store run outputs
-#                        setup = setup  # only if running simulated data. Stores simulated values for comparison
-#                        )
-```
-
 
 
 # ---------------------------------------------------------- #
@@ -187,8 +152,6 @@ for(i  in 1:70) {
   if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn || i < 10) {
     BSFG_state = reorder_factors(BSFG_state) # Factor order doesn't "mix" well in the MCMC. We can help it by manually re-ordering from biggest to smallest
     BSFG_state = clear_Posterior(BSFG_state)
-    # BSFG_state$current_state = update_k(BSFG_state) # use to drop insignificant factors
-    # BSFG_state$run_parameters$burn = max(BSFG_state$run_parameters$burn,BSFG_state$current_state$nrun+100) # if you made changes, set a new burn-in period
     print(BSFG_state$run_parameters$burn)
   }
 }
@@ -215,7 +178,7 @@ boxplot(BSFG_state$Posterior$F_h2[,1,])
 
 # get posterior distribution on a function of parameters
 # This is how to calculate the G-matrix for random effect #1 (ie animal above.)
-G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2['animal.(Intercept)',]) %*% t(Lambda) + diag(resid_h2['animal.(Intercept)',]/tot_Eta_prec[1,]))
+G_samples = get_posterior_FUN(BSFG_state,Lambda %*% diag(F_h2['animal',]) %*% t(Lambda) + diag(resid_h2['animal',]/tot_Eta_prec[1,]))
 
 # get posterior mean of a parameter
 G = get_posterior_mean(G_samples)
@@ -223,8 +186,8 @@ G = get_posterior_mean(G_samples)
 # get Highest Posterior Density intervals for paramters
 F_h2_HPD = get_posterior_HPDinterval(BSFG_state,F_h2)
 
-boxplot(BSFG_state$Posterior$B[,2,],outline=F);abline(h=0)
-boxplot(BSFG_state$Posterior$B_F[,2,],outline=F);abline(h=0)
+boxplot(BSFG_state$Posterior$B1[,1,],outline=F);abline(h=0)
+boxplot(BSFG_state$Posterior$B2_F[,1,],outline=F);abline(h=0)
 ```
 
 

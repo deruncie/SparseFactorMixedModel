@@ -7,12 +7,10 @@
 BSFG_priors(tot_Y_var = list(V = 0.5, nu = 3), tot_F_var = list(V = 18/20,
   nu = 20), h2_priors_resids_fun = function(h2s, n) 1,
   h2_priors_factors_fun = function(h2s, n) 1, Lambda_prior = list(sampler =
-  sample_Lambda_prec_ARD, Lambda_df = 3, delta_1 = list(shape = 2, rate = 1),
-  delta_2 = list(shape = 3, rate = 1), delta_iteractions_factor = 100),
-  B_prior = list(sampler = sample_B_prec_ARD, global = list(V = 1, nu = 3),
-  global_F = list(V = 1, nu = 3), B_df = 3, B_F_df = 3),
-  QTL_prior = list(sampler = sample_QTL_prec_horseshoe, separate_QTL_shrinkage
-  = T, cauchy_iteractions_factor = 10))
+  sample_Lambda_prec_reg_horseshoe, prop_0 = 0.1, delta_l = list(shape = 3, rate
+  = 1), delta_iterations_factor = 100, c2 = list(V = 1, nu = 1e+06)),
+  B2_prior = list(sampler = sample_B2_prec_reg_horseshoe, prop_0 = 0.1, c2 =
+  list(V = 1, nu = 1e+06)), cis_effects_prior = list(prec = 1))
 }
 \arguments{
 \item{tot_Y_var}{List of parameters of inverse gamma distribution for residual variances, specifically:
@@ -31,15 +29,13 @@ discrete prior.}
 \item{h2_priors_factors_fun}{see \code{h2_priors_resids_fun}. Same, but for the h2s of the factors.}
 
 \item{Lambda_prior}{A list with elements:
-1) \code{sampler}: a function that draws samples of the precision matrix for Lambda. Ex: \code{sample_Lambda_prec_ARD}; 2)
+1) \code{sampler}: a function that draws samples of the precision matrix for Lambda. Ex: \code{sample_Lambda_prec_reg_horseshoe}; 2)
 any other hyperparameters and control parameters for \code{sampler}}
+
+\item{cis_effects_prior}{Currently accepts a list with a single value giving the precision of each cis_effect variable}
 
 \item{B_prior}{A list with elements:
-1) \code{sampler}: a function that draws samples of the precision matrix for B and B_F Ex: \code{sample_B_prec_ARD}; 2)
-any other hyperparameters and control parameters for \code{sampler}}
-
-\item{QTL_prior}{A list with elements:
-1) \code{sampler}: a function that draws samples of the precision matrix for B_QTL and B_QTL_F Ex: \code{sample_QTL_prec_horseshoe}; 2)
+1) \code{sampler}: a function that draws samples of the precision matrix for B and B_F Ex: \code{sample_B2_prec_reg_horseshoe}; 2)
 any other hyperparameters and control parameters for \code{sampler}}
 }
 \value{
