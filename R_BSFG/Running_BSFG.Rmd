@@ -97,7 +97,7 @@ priors = BSFG_priors(
 ```{r}
 options(error=recover)
 BSFG_state = setup_model_BSFG(Y,            # n x p data matrix
-                              ~(1|animal),  # RHS of base model for factors and residuals
+                              ~(1|animal),  # RHS of base model for factors and residuals. Fixed effects defined here only apply to the factor residuals.
                               extra_regressions = list(X = model.matrix(~Fixed1,data)[,-1,drop=FALSE],factors=T,resids=F), # design matrix for additional fixed effects. These coefficients will be regularized with the B2_prior above. The same model can be used for both factors and resids
                               data,         # the data.frame with information for constructing the model matrices
                               relmat = list(animal = K), # covariance matrices for the random effects. If not provided, assume uncorrelated

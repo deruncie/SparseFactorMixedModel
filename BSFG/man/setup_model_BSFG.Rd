@@ -31,7 +31,8 @@ Unlike in \code{lmer}, each variable or covariate in the design matrix is given 
 independent random effect (ie no covariance among random effects is modeled), so two bars '||'
 gives an identical model to one bar.
 Note: the speed of the model will decrease dramatically with the number of random effects (multiplied
-by h2_divisions)}
+by h2_divisions).
+Fixed effects only apply to the model residuals (ie X1) below, and are not regularized (prior precision = 0)}
 
 \item{extra_regressions}{Optional. A list including either:
 i) the matrix X (n x b) of regression coeffients, or
@@ -85,12 +86,15 @@ the Gibbs sampler can be run with \link{sample_BSFG}.
 The model is specified as:
 
 y_i = g(eta_i)
+
 Eta = rbind(eta_1,...,eta_n) = X1*B1 + X2_R*B2_R + F*t(Lambda) + Z*U_R + E_R
+
 F = X2_F * B2_F + Z*U_F + E_F
 
 For sampling, we reparameterize as:
 
 Qt*Eta = Qt*X*B + Qt*F*t(Lambda) + Qt*ZL*U_R + Qt*E_R
+
 Qt*F = Qt*X_F * B_F + Qt*ZL*U_F + Qt*E_F
 
 where LTL = K and ZL = Z*L

@@ -166,7 +166,8 @@ BSFG_priors = function(
 #'     independent random effect (ie no covariance among random effects is modeled), so two bars '||'
 #'     gives an identical model to one bar.
 #'     Note: the speed of the model will decrease dramatically with the number of random effects (multiplied
-#'     by h2_divisions)
+#'     by h2_divisions).
+#'     Fixed effects only apply to the model residuals (ie X1) below, and are not regularized (prior precision = 0)
 #' @param extra_regressions Optional. A list including either:
 #'     i) the matrix X (n x b) of regression coeffients, or
 #'     ii) two matrices U (n x m) and V (m x b) such that X = U*V
@@ -185,9 +186,9 @@ BSFG_priors = function(
 #'     posterior samples and diagnostic information during the run.
 #'
 #' @return An object of class BSFG_state with components:
-#' @return current_state: a list of parameters in the current iteration of the sampler
-#' @return Posterior: a list of arrays of posterior samples
-#' @return RNG current state of R's Random number generator (for re-starting chaings)
+#' @return current_state: a list of parameters in the current iteration of the sampler. Initially empty
+#' @return Posterior: a list of arrays of posterior samples. Initially empty
+#' @return RNG: current state of R's Random number generator (for re-starting chaings)
 #' @return traitnames: vector of trait names (from colnames of Y)
 #' @return run_parameters, run_variables, data_matrices, priors, simulation: input data and
 #'   parameters
