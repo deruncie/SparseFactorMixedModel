@@ -25,11 +25,8 @@ Imports:
   foreach,
   abind,
   reshape2,
-  compiler,
-  caret,
   coda,
   splines,
-  pbs,
   MASS
 Suggests:
   knitr, 
