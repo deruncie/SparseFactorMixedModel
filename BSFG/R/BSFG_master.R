@@ -96,16 +96,14 @@ BSFG_priors = function(
                         h2_priors_resids_fun = function(h2s, n) 1,
                         h2_priors_factors_fun = function(h2s, n) 1,
                         Lambda_prior = list(
-                          sampler = sample_Lambda_prec_reg_horseshoe,
+                          sampler = sample_Lambda_prec_horseshoe,
                           prop_0 = 0.1,
                           delta_l = list(shape = 3, rate = 1),
-                          delta_iterations_factor = 100,
-                          c2 = list(V=1,nu=1e6)
+                          delta_iterations_factor = 100
                         ),
                         B2_prior = list(
-                          sampler = sample_B2_prec_reg_horseshoe,
-                          prop_0 = 0.1,
-                          c2 = list(V=1,nu=1e6)
+                          sampler = sample_B2_prec_horseshoe,
+                          prop_0 = 0.1
                         ),
                         cis_effects_prior = list(
                           prec = 1

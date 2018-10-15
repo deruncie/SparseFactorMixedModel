@@ -30,7 +30,6 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
                              Lambda_xi = matrix(1,1,1)
                              Lambda_phi2 = matrix(1,p,K)
                              Lambda_nu = matrix(1,p,K)
-                             Lambda_c2 = matrix(1,1,K)
                              delta = with(priors,matrix(c(1,rgamma(K-1,shape = delta_l_shape,rate = delta_l_rate)),nrow=1))
                              Lambda_prec = matrix(1,p,K)
                              trunc_point_delta = 1
@@ -74,90 +73,6 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
   return(current_state)
 }
 
-# sample_Lambda_prec_reg_horseshoe = function(BSFG_state,...) {
-#   # this is wrong! Can't sample lambda_phi2, Lambda_tau2, etc this way. Particularly if c<Infty
-#   # sampling as described in Supplemental methods, except we multiply columns of Prec_lambda by delta
-#   # phi2 = \lambda^2 in methods
-#   # the delta sequence controls tau_k. We have tau_1~C+(0,tau_0), and tau_k = tau_1*prod_{l=1}^K(delta^{-1}_l)
-#   # delta_l controls the decrease in odds of inclusion of each element for the lth factor relative to the (l-1)th
-#   # Note:  Piironen and Vehtari do not include sigma^2 in prior, so I have removed
-#   priors         = BSFG_state$priors
-#   run_variables  = BSFG_state$run_variables
-#   run_parameters = BSFG_state$run_parameters
-#   current_state  = BSFG_state$current_state
-#
-#   current_state = with(c(priors,run_variables,run_parameters),
-#                        with(Lambda_prior,{
-#
-#                          if(!exists('delta_iterations_factor')) delta_iterations_factor = 100
-#
-#                          # delta_1_shape = delta_1$shape  delta_1 = 1
-#                          # delta_1_rate  = delta_1$rate
-#                          delta_l_shape = delta_l$shape
-#                          delta_l_rate  = delta_l$rate
-#
-#                          tau_0 = prop_0/(1-prop_0) * 1/sqrt(n)
-#
-#                          c2_shape = c2$nu-1
-#                          c2_rate = c2$V*c2$nu
-#
-#                          within(current_state,{
-#
-#                            # initialize variables if needed
-#                            if(!'Lambda_tau2' %in% names(current_state)){
-#                              if(verbose) print('initializing Lambda_prec regularized horseshoe')
-#                              Lambda_tau2 = matrix(1,1,1)
-#                              Lambda_xi = matrix(1,1,1)
-#                              Lambda_phi2 = matrix(1,p,K)
-#                              Lambda_nu = matrix(1,p,K)
-#                              Lambda_c2 = matrix(1,1,K)
-#                              delta = with(priors,matrix(c(1,rgamma(K-1,shape = delta_l_shape,rate = delta_l_rate)),nrow=1))
-#                              Lambda_prec = matrix(1,p,K)
-#                              trunc_point_delta = 1
-#                              Lambda_m_eff = matrix(1,1,K)
-#                            }
-#
-#                            Lambda2 = Lambda^2
-#                            Lambda2_std = Lambda2 * (tot_Eta_prec[1,]) / 2
-#
-#                            Lambda_nu[] = matrix(1/rgamma(p*K,shape = 1, rate = 1 + 1/Lambda_phi2), nr = p, nc = K)
-#                            Lambda2_std_delta = sweep(Lambda2_std,2, cumprod(delta),'*')
-#                            Lambda_phi2[] = matrix(1/rgamma(p*K,shape = 1, rate = 1/Lambda_nu + Lambda2_std_delta / Lambda_tau2[1]),nr=p,nc = K)
-#
-#                            scores = colSums(Lambda2_std / Lambda_phi2)
-#                            # for(i in 1:delta_iterations_factor) {
-#                            #   cumprod_delta = cumprod(delta[1,])
-#                            #   Lambda_tau2[] = 1/rgamma(1,shape = (p*K+1)/2, rate = 1/Lambda_xi[1] + sum(cumprod_delta*scores))
-#                            #   Lambda_xi[] = 1/rgamma(1,shape = 1,rate = 1/tau_0^2 + 1/Lambda_tau2[1])
-#                            #   for(h in 2:K) {
-#                            #     delta[h] = rgamma(1,shape = delta_l_shape + p/2*(K-h+1),rate = delta_l_rate + sum(cumprod_delta[h:K]*scores[h:K])/(Lambda_tau2[1]*delta[h]))
-#                            #     cumprod_delta = cumprod(delta[1,])
-#                            #   }
-#                            # }
-#                            new_samples = sample_tau2_delta_c_Eigen_v2(Lambda_tau2[1],Lambda_xi[1],delta,scores,
-#                                                                       tau_0,delta_l_shape,delta_l_rate,
-#                                                                       p,delta_iterations_factor)
-#                            Lambda_tau2[] = new_samples$tau2
-#                            Lambda_xi[] = new_samples$xi
-#                            delta[] = new_samples$delta
-#
-#                            recover()
-#                            # separate c2 for each factor
-#                            Lambda_c2[] = 1/rgamma(K,shape = c2_shape + p/2,rate = c2_rate + colSums(Lambda2)/2)
-#
-#                            # -----Update Plam-------------------- #
-#                            Lambda_phi2_std_tau2_tilde = Lambda_tau2[1] * sweep(Lambda_phi2,2,cumprod(delta),'/')
-#                            Lambda_prec[] = sweep(Lambda_phi2_std_tau2_tilde,2,Lambda_c2,'+') / sweep(Lambda_phi2_std_tau2_tilde,2,Lambda_c2,'*')
-#
-#                            # ----- Calcualte m_eff -------------- #
-#                            kappa = 1/(1+n/Lambda_prec)
-#                            Lambda_m_eff[] = colSums(1-kappa)
-#
-#                            rm(list = c('Lambda2','Lambda2_std','Lambda2_std_delta','scores','new_samples','Lambda_phi2_std_tau2_tilde','kappa'))
-#                          })
-#                        }))
-#   return(current_state)
-# }
 
 sample_Lambda_prec_ARD = function(BSFG_state,...) {
   priors         = BSFG_state$priors

@@ -1,4 +1,4 @@
-sample_B2_prec_reg_horseshoe = function(BSFG_state,...) {
+sample_B2_prec_horseshoe = function(BSFG_state,...) {
   # sampling as described in Supplemental methods, except we multiply columns of Prec_lambda by delta
   # phi2 = \lambda^2 in methods
   # the delta sequence controls tau_k. We have tau_1~C+(0,tau_0), and tau_k = tau_1*prod_{l=1}^K(delta^{-1}_l)
@@ -14,9 +14,6 @@ sample_B2_prec_reg_horseshoe = function(BSFG_state,...) {
 
                          tau_0 = prop_0/(1-prop_0) * 1/sqrt(n)
 
-                         c2_shape = c2$nu-1
-                         c2_rate = c2$V*c2$nu
-
                          within(current_state,{
 
                            # initialize variables if needed
@@ -28,7 +25,6 @@ sample_B2_prec_reg_horseshoe = function(BSFG_state,...) {
                              B2_R_nu = matrix(1,b2_R,p)
                              B2_F_phi2 = matrix(1,b2_F,K)
                              B2_F_nu = matrix(1,b2_F,K)
-                             B2_c2 = matrix(1,1,1)
                            }
 
                            B2_R_2 = B2_R^2
@@ -44,11 +40,9 @@ sample_B2_prec_reg_horseshoe = function(BSFG_state,...) {
                            B2_xi[] = 1/rgamma(1,shape=1,rate=1/tau_0^2 + 1/B2_tau2[1])
                            B2_tau2[] = 1/rgamma(1,shape = (b2_R*p + b2_F*K + 1)/2, rate = 1/B2_xi[1] + (sum(B2_R_2_std/B2_R_phi2) + sum(B2_F_2_std/B2_F_phi2))/2)
 
-                           B2_c2[] = 1/rgamma(1,shape = c2_shape + (b2_R*p + b2_F*K)/2,rate = c2_rate + (sum(B2_R_2) + sum(B2_F_2))/2)
-
                            # -----Update Plam-------------------- #
-                           B2_R_prec = (B2_c2[1] + B2_tau2[1]*B2_R_phi2) / (B2_c2[1] * B2_tau2[1] * B2_R_phi2)
-                           B2_F_prec = (B2_c2[1] + B2_tau2[1]*B2_F_phi2) / (B2_c2[1] * B2_tau2[1] * B2_F_phi2)
+                           B2_R_prec = 1 / (B2_tau2[1] * B2_R_phi2)
+                           B2_F_prec = 1 / (B2_tau2[1] * B2_F_phi2)
 
                            rm(list=c('B2_R_2','B2_R_2_std','B2_F_2','B2_F_2_std'))
                          })
