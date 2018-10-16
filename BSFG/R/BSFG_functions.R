@@ -265,6 +265,21 @@ reorder_factors = function(BSFG_state,factor_order = NULL){
   return(BSFG_state)
 }
 
+drop_correlated_factors = function(BSFG_state,cor_threshold = 0.6){
+  cor_F = abs(cor(BSFG_state$current_state$F))
+  cor_F[lower.tri(cor_F,diag = T)] = 0
+  K = ncol(cor_F)
+  for(i in 1:(K-1)) {
+    drop_cols = which(cor_F[i,]>cor_threshold)
+    if(length(drop_cols) > 0) {
+      print(sprintf('dropping cols: %s',paste(drop_cols,collapse=',')))
+      BSFG_state$current_state$F[,drop_cols] = 0
+      cor_F[,drop_cols] = 0
+    }
+  }
+  return(BSFG_state)
+}
+
 
 rescale_factors_F = function(BSFG_state){
   # rescale factors based on F
@@ -386,7 +401,7 @@ clear_Posterior = function(BSFG_state) {
   Posterior = BSFG_state$Posterior
   run_parameters = BSFG_state$run_parameters
 
-  run_parameters$burn = run_parameters$burn + run_parameters$thin*Posterior$total_samples
+  run_parameters$burn = max(run_parameters$burn,BSFG_state$current_state$nrun)
 
   Posterior$total_samples = 0
   Posterior = reset_Posterior(Posterior,BSFG_state)
