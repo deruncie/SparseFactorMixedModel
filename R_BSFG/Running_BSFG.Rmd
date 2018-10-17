@@ -148,7 +148,7 @@ for(i  in 1:70) {
 
   # set of commands to run during burn-in period to help chain converge
   if(BSFG_state$current_state$nrun < BSFG_state$run_parameters$burn || i < 10) {
-    BSFG_state = reorder_factors(BSFG_state) # Factor order doesn't "mix" well in the MCMC. We can help it by manually re-ordering from biggest to smallest
+    BSFG_state = reorder_factors(BSFG_state,drop_cor_threshold = 0.6) # Factor order doesn't "mix" well in the MCMC. We can help it by manually re-ordering from biggest to smallest
     BSFG_state = clear_Posterior(BSFG_state)
     print(BSFG_state$run_parameters$burn)
   }

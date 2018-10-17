@@ -216,8 +216,11 @@ get_meff = function(BSFG_state){
 #' Re-orders factors in decreasing order of magnitude
 #'
 #' @seealso \code{\link{sample_BSFG}}, \code{\link{plot.BSFG_state}}
-reorder_factors = function(BSFG_state,factor_order = NULL){
-  # re-orders factors in decreasing size of Lambda %*% F
+reorder_factors = function(BSFG_state,factor_order = NULL, drop_cor_threshold = 0.6){
+  # first drop factors where F is correlated beyond a threshold
+  BSFG_state = drop_correlated_factors(BSFG_state,cor_threshold = drop_cor_threshold)
+
+  # Now, re-orders factors in decreasing size of Lambda %*% F
   # based on current state
   # also re-orders Posterior
 
@@ -251,6 +254,15 @@ reorder_factors = function(BSFG_state,factor_order = NULL){
   # current_state$delta = matrix(c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)]),nrow=1)
   BSFG_state$current_state = current_state
 
+  # reset Lambda_prec and B_prec
+  for(i in 1:10){
+    # -----Sample Lambda_prec ------------- #
+    BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state,1)
+
+    # -----Sample B2_prec ------------- #
+    BSFG_state$current_state = BSFG_state$priors$B2_prior$sampler(BSFG_state,1)
+  }
+
   # reorder Posterior
   Posterior = BSFG_state$Posterior
 
@@ -266,7 +278,10 @@ reorder_factors = function(BSFG_state,factor_order = NULL){
 }
 
 drop_correlated_factors = function(BSFG_state,cor_threshold = 0.6){
-  cor_F = abs(cor(BSFG_state$current_state$F))
+  # drop factors correlated beyond abs(cor_threshold)
+  # also set Lambda_m_eff to 0
+  F = BSFG_state$current_state$F - BSFG_state$data_matrices$X2_F %*% BSFG_state$current_state$B2_F
+  cor_F = abs(cor(F))
   cor_F[lower.tri(cor_F,diag = T)] = 0
   K = ncol(cor_F)
   for(i in 1:(K-1)) {
@@ -274,6 +289,7 @@ drop_correlated_factors = function(BSFG_state,cor_threshold = 0.6){
     if(length(drop_cols) > 0) {
       print(sprintf('dropping cols: %s',paste(drop_cols,collapse=',')))
       BSFG_state$current_state$F[,drop_cols] = 0
+      if('Lambda_m_eff' %in% names(BSFG_state$current_state)) BSFG_state$current_state$Lambda_m_eff[drop_cols] = 0
       cor_F[,drop_cols] = 0
     }
   }
