@@ -1121,5 +1121,275 @@ Rcpp::List sample_tau2_delta_c_Eigen_v2(
                             Named("delta") = delta));
 }
 
+// [[Rcpp::export()]]
+VectorXd sample_trunc_delta_c_Eigen(
+    VectorXd delta,
+    VectorXd tauh,
+    Map<VectorXd> scores,
+    Map<VectorXd> shapes,
+    double delta_1_rate,
+    double delta_2_rate,
+    Map<MatrixXd> randu_draws,
+    double trunc_point
+) {
+  int times = randu_draws.rows();
+  int k = tauh.size();
+  double p,u;
+
+  double rate,delta_old;
+  for(int i = 0; i < times; i++){
+    delta_old = delta(0);
+    rate = delta_1_rate + (1/delta(0)) * tauh.dot(scores);
+    u = randu_draws(i,0); // don't truncate delta(0)
+    delta(0) = R::qgamma(u,shapes(0),1.0/rate,1,0);
+    // tauh = cumprod(delta);
+    tauh *= delta(0)/delta_old;   // replaces re-calculating cumprod
+
+    for(int h = 1; h < k; h++) {
+      delta_old = delta(h);
+      rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(scores.tail(k-h));
+      p = R::pgamma(trunc_point,shapes(h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
+      if(p > 0.999) p = 0.999;  // prevent over-flow.
+      u = p + (1.0-p)*randu_draws(i,h);
+      delta(h) = R::qgamma(u,shapes(h),1.0/rate,1,0);
+      // tauh = cumprod(delta);
+      tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
+      // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
+    }
+  }
+  return(delta);
+}
+
+
+
+/// old functions to be replaced
+
+// [[Rcpp::export()]]
+VectorXd sample_MME_single_diagK(  // returns b x 1 vector
+    VectorXd y,           // nx1
+    MatrixXd X,           // nxb
+    VectorXd prior_mean,  // bx1
+    VectorXd prior_prec,  // bx1
+    MSpMat chol_R,        // nxn upper triangular Cholesky decomposition of R. Format: dgCMatrix
+    double tot_Eta_prec, // double
+    VectorXd randn_theta, // bx1
+    VectorXd randn_e      // 0x1 or nx1. 0x1 if b<n
+){
+  if(randn_e.size() == 0){
+    MatrixXd RinvSqX = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+    VectorXd XtRinvy = RinvSqX.transpose() * chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
+    VectorXd XtRinvy_std_mu = XtRinvy + prior_prec.asDiagonal()*prior_mean;
+    MatrixXd C = RinvSqX.transpose() * RinvSqX;
+    C.diagonal() += prior_prec;
+    LLT<MatrixXd> C_llt;
+    C_llt.compute(C);
+    MatrixXd chol_C = C_llt.matrixU();
+
+    VectorXd b = chol_C.transpose().triangularView<Lower>().solve(XtRinvy_std_mu);
+    b += randn_theta;
+    b = chol_C.triangularView<Upper>().solve(b);
+    return(b);
+  } else {
+    // Using algorithm from Bhattacharya et al 2016 Biometrika. https://academic.oup.com/biomet/article/103/4/985/2447851
+    MatrixXd Phi = chol_R.transpose().triangularView<Lower>().solve(X * sqrt(tot_Eta_prec));
+    VectorXd alpha = chol_R.transpose().triangularView<Lower>().solve(y * sqrt(tot_Eta_prec));
+
+    VectorXd u = randn_theta.array() / prior_prec.cwiseSqrt().array();
+    u += prior_mean;
+    VectorXd v = Phi * u + randn_e;
+    VectorXd alpha_v = alpha-v;
+
+    MatrixXd D_PhiT = prior_prec.cwiseInverse().asDiagonal() * Phi.transpose();
+    MatrixXd cov = Phi * D_PhiT;
+    cov.diagonal().array() += 1.0;
+
+    VectorXd w = cov.ldlt().solve(alpha_v);
+
+    VectorXd theta = u + D_PhiT * w;
+
+    return(theta);
+  }
+}
+
+
+
+struct sample_coefs_set_worker : public RcppParallel::Worker {
+  std::vector<MatrixXd> y_list;
+  std::vector<MatrixXd> X_list;
+  std::vector<MatrixXd> tot_Y_prec_list;
+  std::vector<ArrayXi> nonZero_cols_X;
+  std::vector<MatrixXd> randn_theta_list;
+  MatrixXd prior_mean,prior_prec;
+  int n_traits;
+  MatrixXd &coefs;
+
+  sample_coefs_set_worker(
+    std::vector<MatrixXd> &y_list,
+    std::vector<MatrixXd> &X_list,
+    std::vector<MatrixXd> &tot_Y_prec_list,
+    std::vector<ArrayXi>  &nonZero_cols_X,
+    std::vector<MatrixXd> &randn_theta_list,
+    MatrixXd prior_mean,
+    MatrixXd prior_prec,
+    int n_traits,
+    MatrixXd &coefs) :
+    y_list(y_list), X_list(X_list), tot_Y_prec_list(tot_Y_prec_list), nonZero_cols_X(nonZero_cols_X), randn_theta_list(randn_theta_list),
+    prior_mean(prior_mean), prior_prec(prior_prec),n_traits(n_traits),
+    coefs(coefs)
+  {}
+
+  void operator()(std::size_t begin, std::size_t end) {
+    for(std::size_t j = begin; j < end; j++){
+      MatrixXd Y = y_list[j];
+      MatrixXd X = X_list[j];
+      MatrixXd tot_Y_prec = tot_Y_prec_list[j];
+      int b = randn_theta_list[j].rows();
+      int b_X = X.cols();
+      MatrixXd randn_e = MatrixXd::Zero(0,n_traits);
+      for(int t = 0; t < n_traits; t++) {
+        // Create cholesky decomposition of the residual variance matrix using tot_Y_prec.
+        SpMat Rsqrt = tot_Y_prec.col(t).cwiseSqrt().cwiseInverse().asDiagonal().toDenseMatrix().sparseView();
+        MSpMat chol_R(Rsqrt.rows(),Rsqrt.cols(), Rsqrt.nonZeros(),Rsqrt.outerIndexPtr(),Rsqrt.innerIndexPtr(),Rsqrt.valuePtr());
+
+        // first assign the result vector to prior_mean + randn/sqrt(prec)
+        // will then replace values with sampled values.
+        VectorXd prior_mean_tj = prior_mean.block(t*b,j,b,1);
+        VectorXd prior_prec_tj = prior_prec.block(t*b,j,b,1);
+        VectorXd randn_theta_tj = randn_theta_list[j].col(t);
+        coefs.block(t*b,j,b,1) = prior_mean_tj.array() + randn_theta_tj.array() / prior_prec_tj.array().sqrt();
+
+        // now, pull out parameters for the coefficients corresponding to the columns of X
+        VectorXd prior_mean_tj_X(b_X);
+        VectorXd prior_prec_tj_X(b_X);
+        VectorXd randn_theta_tj_X(b_X);
+        for(int k = 0; k < b_X; k++){
+          int element = nonZero_cols_X[j][k]-1;
+          prior_mean_tj_X.coeffRef(k) = prior_mean_tj.coeffRef(element);
+          prior_prec_tj_X.coeffRef(k) = prior_prec_tj.coeffRef(element);
+          randn_theta_tj_X.coeffRef(k) = randn_theta_tj.coeffRef(element);
+        }
+        VectorXd coefs_X = sample_MME_single_diagK(Y.col(t), X,
+                                                   prior_mean_tj_X, prior_prec_tj_X,
+                                                   chol_R,1.0,
+                                                   randn_theta_tj_X,randn_e.col(t));
+
+        // now replace the values in coef with the corresponding ones in coefs_X
+        for(int k = 0; k < b_X; k++){
+          int element = nonZero_cols_X[j][k]-1;
+          coefs.coeffRef(t*b + element,j) = coefs_X.coeffRef(k);
+        }
+      }
+    }
+  }
+};
+
+// [[Rcpp::export()]]
+MatrixXd sample_coefs_set_c(    // return pxn matrix
+    Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x p), nonZero_cols_X.
+    Map<MatrixXd> prior_mean,   // pxn
+    Map<MatrixXd> prior_prec,   // pxn
+    int grainSize){
+
+  int n = model_matrices.size();
+  int p = prior_mean.rows();
+
+  std::vector<MatrixXd> y_list;
+  std::vector<MatrixXd> X_list;
+  std::vector<MatrixXd> tot_Y_prec_list;
+  std::vector<ArrayXi> nonZero_cols_X;
+  std::vector<MatrixXd> randn_theta_list;
+  for(int i = 0; i < n; i++){
+    Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
+    y_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["y"]));                    // matrix of observations (n_i x t)
+    X_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));                    // design matrix (n_i x b_X), only including columns that are non-zero
+    tot_Y_prec_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["tot_Y_prec"]));                    // matrix of residual precisions (n_i x t)
+    nonZero_cols_X.push_back(Rcpp::as<ArrayXi>(model_matrix_i["nonZero_cols_X"])); // list of which columns b_X correspond to in full X matrix
+
+    int t = y_list[i].cols();
+    MatrixXd randn_theta = rstdnorm_mat(p/t,t);
+    randn_theta_list.push_back(randn_theta);
+  }
+
+  int n_traits = y_list[0].cols();
+
+  MatrixXd coefs(p,n);
+
+  sample_coefs_set_worker sampler(y_list, X_list,tot_Y_prec_list, nonZero_cols_X,randn_theta_list,prior_mean,prior_prec,n_traits,coefs);
+  RcppParallel::parallelFor(0,n,sampler,grainSize);
+
+  return(coefs);
+}
+
+// [[Rcpp::export()]]
+MatrixXd get_fitted_set_c(  // returns n_tot x p matrix in same order as data
+    Rcpp::List model_matrices,  // List. Each element contains: y (n_i x t), X (n_i x b), s (n_i x 1), position (n_i x 1)
+    Map<MatrixXd> coefs,  // b x n matrix
+    int grainSize){
+
+  std::vector<MatrixXd> X_list;
+  std::vector<ArrayXi> position_list;
+  std::vector<ArrayXi> nonZero_cols_X;
+  int total_obs = 0;
+  int n = model_matrices.size();
+  for(int i = 0; i < n; i++){
+    Rcpp::List model_matrix_i = Rcpp::as<Rcpp::List>(model_matrices[i]);
+    X_list.push_back(Rcpp::as<MatrixXd>(model_matrix_i["X"]));
+    position_list.push_back(Rcpp::as<ArrayXi>(model_matrix_i["position"]));
+    nonZero_cols_X.push_back(Rcpp::as<ArrayXi>(model_matrix_i["nonZero_cols_X"])); // list of which columns b_X correspond to in full X matrix
+
+    int n_obs = X_list[i].rows();
+    total_obs += n_obs;
+  }
+
+  Rcpp::List model_matrix_1 = Rcpp::as<Rcpp::List>(model_matrices[0]);
+  MatrixXd Y = Rcpp::as<MatrixXd>(model_matrix_1["y"]);
+  int n_traits = Y.cols();
+
+  MatrixXd Y_fitted(total_obs,n_traits);
+
+  struct sampleColumn : public RcppParallel::Worker {
+    std::vector<MatrixXd> X_list;
+    std::vector<ArrayXi> position_list;
+    std::vector<ArrayXi> nonZero_cols_X;
+    int n_traits;
+    MatrixXd coefs;
+    MatrixXd &Y_fitted;
+
+    sampleColumn(
+      std::vector<MatrixXd> &X_list,
+      std::vector<ArrayXi>  &position_list,
+      std::vector<ArrayXi>  &nonZero_cols_X,
+      int n_traits,
+      MatrixXd coefs,
+      MatrixXd &Y_fitted) :
+      X_list(X_list), position_list(position_list),nonZero_cols_X(nonZero_cols_X),
+      n_traits(n_traits),
+      coefs(coefs),Y_fitted(Y_fitted)
+    {}
+
+    void operator()(std::size_t begin, std::size_t end) {
+      for(std::size_t j = begin; j < end; j++){
+        int b_X = X_list[j].cols();
+        int b_tot = coefs.rows() / n_traits;
+        VectorXd coefs_j(b_X * n_traits);
+        for(int t = 0; t < n_traits; t++){
+          for(int k = 0; k < b_X; k++){
+            coefs_j[t*b_X+k] = coefs.coeffRef(t*b_tot+nonZero_cols_X[j][k]-1,j);
+          }
+        }
+        Map<MatrixXd> Eta_i(coefs_j.data(),b_X,n_traits);
+        MatrixXd Y_fitted_j = X_list[j] * Eta_i;
+        for(int i = 0; i < position_list[j].size(); i++) {
+          Y_fitted.row(position_list[j][i]-1) = Y_fitted_j.row(i);
+        }
+      }
+    }
+  };
+
+  sampleColumn sampler(X_list,position_list,nonZero_cols_X,n_traits,coefs,Y_fitted);
+  RcppParallel::parallelFor(0,n,sampler,grainSize);
+
+  return(Y_fitted);
+}
 
 

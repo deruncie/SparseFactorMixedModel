@@ -479,7 +479,17 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
   current_state = BSFG_state$current_state
   data_matrices = BSFG_state$data_matrices
   new_variables = c('Eta','resid_Y_prec','mu_probe')
-  observation_model_state = with(c(observation_model_parameters,data_matrices,current_state),{
+
+  if(!'observation_setup' %in% names(observation_model_parameters)) {
+    observation_setup = with(c(observation_model_parameters,data_matrices,current_state),{
+      list(n = nrow(Y),
+           p = nrow(Z_Y))
+
+    })
+    return(observation_setup)
+  }
+
+  observation_model_state = with(c(observation_model_parameters,observation_model_parameters$observation_setup,data_matrices,current_state),{
     p = nrow(Z_Y)
     n = nrow(Y)
 
@@ -499,7 +509,7 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
       resid = sweep(matrix(rnorm(n*p),n,p),2,sqrt(prec),'/')
     } else{
       resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
-      Eta_mean = X %*% B + F %*% t(Lambda) + ZL %*% E_a
+      Eta_mean = XB + F %*% t(Lambda) + ZL %**% U_R
 
       Eta_mean_std = sweep(Eta_mean,2,resid_Eta_prec,'*')
       sum_Y_prec = Z_Y %*% resid_Y_prec

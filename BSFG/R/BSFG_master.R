@@ -229,7 +229,7 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
   traitnames = observation_model_parameters$observation_setup$traitnames
   if(is.null(traitnames)) traitnames = paste('trait',1:p,sep='_')
   if(is.null(observation_model_parameters$observation_setup$Y_missing)) {
-    observation_model_parameters$observation_setup$Y_missing = matrix(0,n,p)
+    observation_model_parameters$observation_setup$Y_missing = matrix(F,n,p)
   }
   if(!is(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')){
     observation_model_parameters$observation_setup$Y_missing = as(observation_model_parameters$observation_setup$Y_missing,'lgTMatrix')

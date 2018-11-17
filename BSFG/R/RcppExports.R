@@ -45,6 +45,22 @@ sample_tau2_delta_c_Eigen_v2 <- function(tau2, xi, delta, scores, tau_0, delta_s
     .Call(`_BSFG_sample_tau2_delta_c_Eigen_v2`, tau2, xi, delta, scores, tau_0, delta_shape, delta_rate, p, times)
 }
 
+sample_trunc_delta_c_Eigen <- function(delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point) {
+    .Call(`_BSFG_sample_trunc_delta_c_Eigen`, delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point)
+}
+
+sample_MME_single_diagK <- function(y, X, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e) {
+    .Call(`_BSFG_sample_MME_single_diagK`, y, X, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e)
+}
+
+sample_coefs_set_c <- function(model_matrices, prior_mean, prior_prec, grainSize) {
+    .Call(`_BSFG_sample_coefs_set_c`, model_matrices, prior_mean, prior_prec, grainSize)
+}
+
+get_fitted_set_c <- function(model_matrices, coefs, grainSize) {
+    .Call(`_BSFG_get_fitted_set_c`, model_matrices, coefs, grainSize)
+}
+
 LDLt <- function(A_) {
     .Call(`_BSFG_LDLt`, A_)
 }

@@ -87,29 +87,29 @@ run_parameters = BSFG_control(
   h2_divisions = 20,
   h2_step_size = NULL,
   burn = 1000,
-  thin=10
+  thin=10,
+  K = 10
 )
 
 priors = BSFG_priors(
-  # tot_Y_var = list(V = 0.5,   nu = 3),
-  tot_Y_var = list(V = 0.5,   nu = 10),
-  tot_F_var = list(V = 18/20, nu = 20),
+  tot_Y_var = list(V = 1,   nu = 3),
+  tot_F_var = list(V = 18/20, nu = 20e6),
   h2_priors_resids_fun = function(h2s,n) 1,#pmax(pmin(ddirichlet(c(h2s,1-sum(h2s)),rep(2,length(h2s)+1)),10),1e-10),
-  h2_priors_factors_fun = function(h2s,n) 1,#ifelse(h2s == 0,n,n/(n-1)),
-  Lambda_prior = list(
-    sampler = sample_Lambda_prec_ARD,
-    Lambda_df = 3,
-    delta_1   = list(shape = 2.1,  rate = 20),
-    delta_2   = list(shape = 2, rate = 1)
+  h2_priors_factors_fun = function(h2s,n) 1#ifelse(h2s == 0 | h2s >= .99,n,n/(n-1))
+  ,Lambda_prior = list(
+    sampler = sample_Lambda_prec_horseshoe,
+    prop_0 = 0.5,
+    delta_l = list(shape = 3, rate = 1),
+    delta_iterations_factor = 100
   ),
-  B_prior = list(
-    sampler = sample_B_prec_ARD,
-    global   = list(V = 1,nu = 3),
-    global_F = list(V = 1,nu = 3),
-    B_df      = 3,
-    B_F_df    = 3
+  B2_prior = list(
+    sampler = sample_B2_prec_horseshoe,
+    prop_0 = 0.1
+  ),
+  cis_effects_prior = list(
+    prec = 1e-6
   )
-  )
+)
 
 
 print('Initializing')
@@ -149,12 +149,23 @@ setup$data$ID = unique(setup$observations$ID)
 
 
 # options(error=recover)
-BSFG_state = with(setup,BSFG_init(observation_setup, model=~group+(1|animal), data, #factor_model_fixed = ~1,
-# BSFG_state = with(setup,BSFG_init(Eta, model=~1+(1|animal), data, #factor_model_fixed = ~1,
-                                  priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
-                                  posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'B_tau','B_F_tau','cis_effects','U_R'),
-                                  posteriorMean_params = c()
-                                  ))
+data = setup$data
+BSFG_state = setup_model_BSFG(observation_setup,formula = ~group+(1|animal),
+                              data = data,
+                              run_parameters = run_parameters,
+                              run_ID = 'spline_1')
+BSFG_state = set_priors_BSFG(BSFG_state,priors)
+BSFG_state = initialize_variables_BSFG(BSFG_state)
+BSFG_state = initialize_BSFG(BSFG_state)
+BSFG_state$Posterior$posteriorSample_params = c(BSFG_state$Posterior$posteriorSample_params,'Lambda_c2')
+BSFG_state = clear_Posterior(BSFG_state)
+
+# BSFG_state = with(setup,BSFG_init(observation_setup, model=~group+(1|animal), data, #factor_model_fixed = ~1,
+# # BSFG_state = with(setup,BSFG_init(Eta, model=~1+(1|animal), data, #factor_model_fixed = ~1,
+#                                   priors=priors,run_parameters=run_parameters,K_mats = list(animal = K),
+#                                   posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec','resid_h2', 'B', 'B_F', 'B_tau','B_F_tau','cis_effects','U_R'),
+#                                   posteriorMean_params = c()
+#                                   ))
 # BSFG_state$current_state$F_h2
 # BSFG_state$priors$h2_priors_resids
 # BSFG_state$priors$h2_priors_factors
@@ -190,8 +201,8 @@ for(i  in 1:70) {
         var_Eta = var_Eta * var_Eta_factor
         Eta = sweep(Eta,2,sqrt(var_Eta_factor),'/')
         Lambda = sweep(Lambda,1,sqrt(var_Eta_factor),'/')
-        Plam = sweep(Plam,1,sqrt(var_Eta_factor),'*')
-        B = sweep(B,2,sqrt(var_Eta_factor),'/')
+        # Plam = sweep(Plam,1,sqrt(var_Eta_factor),'*')
+        # B = sweep(B,2,sqrt(var_Eta_factor),'/')
         U_R = sweep(U_R,2,sqrt(var_Eta_factor),'/')
         tot_Eta_prec = tot_Eta_prec * var_Eta_factor
         delta = delta * sqrt(mean(var_Eta_factor))
@@ -226,10 +237,12 @@ data$Y_fitted_low = apply(Posterior$Y_fitted[,,trait],2,function(x) HPDinterval(
 data$Y_fitted_high = apply(Posterior$Y_fitted[,,trait],2,function(x) HPDinterval(mcmc(x))[2])
 # data$Y_fitted = BSFG_state$current_state$Y_fitted
 ggplot(data,aes(x=covariate,y=Y)) + geom_line(aes(group = ID)) + geom_line(aes(y=Y_fitted,group=ID),color ='red')
-ggplot(subset(data,ID %in% sample(unique(data$ID),4)),aes(x=covariate,y=Y)) + geom_ribbon(aes(ymin = Y_fitted_low,ymax = Y_fitted_high,group = ID),alpha = 0.2) + geom_line(aes(group = ID)) + geom_line(aes(y=Y_fitted,group=ID),color ='red')
+ggplot(subset(data,ID %in% sample(unique(data$ID),1)),aes(x=covariate,y=Y)) + geom_ribbon(aes(ymin = Y_fitted_low,ymax = Y_fitted_high,group = ID),alpha = 0.2) + geom_line(aes(group = ID)) + geom_line(aes(y=Y_fitted,group=ID),color ='red')
+
+Lambda = get_posterior_mean(BSFG_state,Lambda)
 
 newx = seq(15,50,length=100)
-new_MM = model.matrix(BSFG_state$run_parameters$observation_model_parameters$observation_setup$Terms,data.frame(covariate=newx)) %*% BSFG_state$run_parameters$observation_model_parameters$observation_setup$mm_rotation
+new_MM = model.matrix(BSFG_state$run_parameters$observation_model_parameters$observation_setup$Terms,data.frame(covariate=newx)) #%*% BSFG_state$run_parameters$observation_model_parameters$observation_setup$mm_rotation
 # new_MM = model.matrix(BSFG_state$run_parameters$observation_model_parameters$observation_setup$Terms,data.frame(Time=newx))
 new_MM = sweep(new_MM,2,sqrt(BSFG_state$current_state$var_Eta),'*')
 a=new_MM %*% t(BSFG_state$current_state$Eta)
@@ -237,6 +250,8 @@ ids = sample(1:ncol(a),1)
 plot(NA,NA,xlim = range(newx),ylim = range(a))
 aa=sapply(ids,function(i) lines(newx,a[,i]))
 with(subset(data,ID %in% ids),points(covariate,Y))
+
+
 
 Eta = BSFG_state$current_state$Eta[1:10,]
 plot(NA,NA,xlim = c(1,ncol(Eta)),ylim = range(Eta))

@@ -96,17 +96,18 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
                          if(!exists('delta')){
                            delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(K-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
                            # tauh  = matrix(cumprod(delta),nrow=1)
-                           Lambda_prec = matrix(1,p,K)
+                           Lambda_phi = Lambda_prec = matrix(1,p,K)
                            # Plam = sweep(Lambda_prec,2,tauh,'*')
                            # Lambda[] = Lambda / sqrt(Plam)
                            trunc_point_delta = 1
                          }
 
                          Lambda2 = Lambda^2
-                         Lambda2_std = Lambda2 * (tot_Eta_prec[1,]) / 2
+                         Lambda2_std = Lambda2 * (tot_Eta_prec[1,]) #/ 2
                          tauh = cumprod(delta)
 
-                         Lambda_phi[] = matrix(rgamma(p*K,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = K)
+                         # Lambda_phi[] = matrix(rgamma(p*K,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2,2,tauh,'*'))/2),nr = p,nc = K)
+                         Lambda_phi[] = matrix(rgamma(p*K,shape = (Lambda_df + 1)/2,rate = (Lambda_df + sweep(Lambda2_std,2,tauh,'*'))/2),nr = p,nc = K)
                          # if(lambda_propto_Vp){
                          #   Lambda2 = Lambda2 * tot_Eta_prec[1,]
                          # }
@@ -116,7 +117,7 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
                          # Lambda_prec[1,] = 1e-10
 
                          # # -----Sample delta, update tauh------ #
-                         scores = 0.5*colSums(Lambda2*Lambda_prec)
+                         scores = 0.5*colSums(Lambda2_std*Lambda_phi)
                          shapes = c(delta_1_shape + 0.5*p*K,
                                     delta_2_shape + 0.5*p*((K-1):1))
                          times = delta_iteractions_factor
@@ -126,11 +127,12 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
                          delta[] = sample_trunc_delta_c_Eigen( delta,tauh,scores,shapes,delta_1_rate,delta_2_rate,randu_draws,trunc_point_delta)
                          tauh[]  = matrix(cumprod(delta),nrow=1)
 
-                         # # -----Update Plam-------------------- #
-                         Plam[] = sweep(Lambda_prec,2,tauh,'*')
-                         if(lambda_propto_Vp){
-                          Plam[] = Plam * tot_Eta_prec[1,]
-                         }
+                         Lambda_prec[] = sweep(Lambda_phi,2,tauh,'*')
+                         # # # -----Update Plam-------------------- #
+                         # Plam[] = sweep(Lambda_prec,2,tauh,'*')
+                         # if(lambda_propto_Vp){
+                         #  Plam[] = Plam * tot_Eta_prec[1,]
+                         # }
                        })
                 }))
   return(current_state)

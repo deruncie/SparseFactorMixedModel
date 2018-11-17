@@ -181,6 +181,69 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sample_trunc_delta_c_Eigen
+VectorXd sample_trunc_delta_c_Eigen(VectorXd delta, VectorXd tauh, Map<VectorXd> scores, Map<VectorXd> shapes, double delta_1_rate, double delta_2_rate, Map<MatrixXd> randu_draws, double trunc_point);
+RcppExport SEXP _BSFG_sample_trunc_delta_c_Eigen(SEXP deltaSEXP, SEXP tauhSEXP, SEXP scoresSEXP, SEXP shapesSEXP, SEXP delta_1_rateSEXP, SEXP delta_2_rateSEXP, SEXP randu_drawsSEXP, SEXP trunc_pointSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< VectorXd >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type tauh(tauhSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type scores(scoresSEXP);
+    Rcpp::traits::input_parameter< Map<VectorXd> >::type shapes(shapesSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_1_rate(delta_1_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_2_rate(delta_2_rateSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type randu_draws(randu_drawsSEXP);
+    Rcpp::traits::input_parameter< double >::type trunc_point(trunc_pointSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_trunc_delta_c_Eigen(delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_MME_single_diagK
+VectorXd sample_MME_single_diagK(VectorXd y, MatrixXd X, VectorXd prior_mean, VectorXd prior_prec, MSpMat chol_R, double tot_Eta_prec, VectorXd randn_theta, VectorXd randn_e);
+RcppExport SEXP _BSFG_sample_MME_single_diagK(SEXP ySEXP, SEXP XSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP chol_RSEXP, SEXP tot_Eta_precSEXP, SEXP randn_thetaSEXP, SEXP randn_eSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< VectorXd >::type y(ySEXP);
+    Rcpp::traits::input_parameter< MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type prior_mean(prior_meanSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type prior_prec(prior_precSEXP);
+    Rcpp::traits::input_parameter< MSpMat >::type chol_R(chol_RSEXP);
+    Rcpp::traits::input_parameter< double >::type tot_Eta_prec(tot_Eta_precSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type randn_theta(randn_thetaSEXP);
+    Rcpp::traits::input_parameter< VectorXd >::type randn_e(randn_eSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_MME_single_diagK(y, X, prior_mean, prior_prec, chol_R, tot_Eta_prec, randn_theta, randn_e));
+    return rcpp_result_gen;
+END_RCPP
+}
+// sample_coefs_set_c
+MatrixXd sample_coefs_set_c(Rcpp::List model_matrices, Map<MatrixXd> prior_mean, Map<MatrixXd> prior_prec, int grainSize);
+RcppExport SEXP _BSFG_sample_coefs_set_c(SEXP model_matricesSEXP, SEXP prior_meanSEXP, SEXP prior_precSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type model_matrices(model_matricesSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_mean(prior_meanSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type prior_prec(prior_precSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(sample_coefs_set_c(model_matrices, prior_mean, prior_prec, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_fitted_set_c
+MatrixXd get_fitted_set_c(Rcpp::List model_matrices, Map<MatrixXd> coefs, int grainSize);
+RcppExport SEXP _BSFG_get_fitted_set_c(SEXP model_matricesSEXP, SEXP coefsSEXP, SEXP grainSizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type model_matrices(model_matricesSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type coefs(coefsSEXP);
+    Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(get_fitted_set_c(model_matrices, coefs, grainSize));
+    return rcpp_result_gen;
+END_RCPP
+}
 // LDLt
 List LDLt(SEXP A_);
 RcppExport SEXP _BSFG_LDLt(SEXP A_SEXP) {
