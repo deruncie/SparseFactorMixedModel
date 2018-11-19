@@ -216,7 +216,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                            resid_Eta_prec[cols],
                                            F_e_prec)
       } else{
-        F[rows,] = prior_mean[rows,,drop=FALSE] + sweep(rstdnorm_mat(length(rows),k),2,sqrt(F_e_prec[1,]),'/')
+        F[rows,] = prior_mean[rows,,drop=FALSE] + sweep(rstdnorm_mat(length(rows),K),2,sqrt(F_e_prec[1,]),'/')
       }
     }
 

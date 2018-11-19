@@ -508,7 +508,7 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
       post_mean = sweep(Y_std %*% t(Z_Y),2,prec,'/')
       resid = sweep(matrix(rnorm(n*p),n,p),2,sqrt(prec),'/')
     } else{
-      resid_Eta_prec = tot_Eta_prec / (1-resid_h2)
+      resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
       Eta_mean = XB + F %*% t(Lambda) + ZL %**% U_R
 
       Eta_mean_std = sweep(Eta_mean,2,resid_Eta_prec,'*')
