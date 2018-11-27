@@ -878,7 +878,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
   # Qt matrices for factors are only used with row set 1
   x = Missing_data_map[[1]]$Y_obs
   Qt1_U2_F = Qt_list[[1]] %**% U2_F[x,,drop=FALSE]
-  Qt1_X2_F = Qt_list[[1]] %**% X2_F
+  Qt1_X2_F = Qt_list[[1]] %**% X2_F[x,,drop=FALSE]
 
 
   BSFG_state$run_variables = c(BSFG_state$run_variables,
