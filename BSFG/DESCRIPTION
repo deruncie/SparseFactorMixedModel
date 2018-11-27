@@ -20,6 +20,7 @@ Imports:
   RcppZiggurat,
   Matrix,
   lme4,
+  caret,
   parallel,
   doParallel,
   foreach,

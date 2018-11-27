@@ -141,26 +141,49 @@ Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats_,
 SpMat make_chol_R(const std::vector<R_matrix>& ZKZts, const VectorXd h2s, const double tol){  //std::vector<Map<MatrixXd> > ZKZts
   // Map<MatrixXd> ZKZts_0 = as<Map<MatrixXd> >(ZKZts[0]);
   int n;
+  bool dense = false;
   if(ZKZts[0].isDense) {
     n = ZKZts[0].dense.rows();
+    dense = true;
   } else{
     n = ZKZts[0].sparse.rows();
   }
   int h = h2s.size();
-  MatrixXd R(n,n);
-  R.setZero();
+  MatrixXd Rd(n,n);
+  SpMat Rs(n,n);
+  Rs.setZero();
+  if(dense) {
+    Rd.setZero();
+  }
   for(int i = 0; i < h; i++){
     if(ZKZts[i].isDense) {
-      R += h2s[i] * ZKZts[i].dense;
+      if(!dense) {
+        Rd = Rs.toDense();
+        dense = true;
+      }
+      Rd += h2s[i] * ZKZts[i].dense;
     } else{
-      R += h2s[i] * ZKZts[i].sparse;
+      if(dense) {
+        Rd += h2s[i] * ZKZts[i].sparse;
+      } else{
+        Rs += h2s[i] * ZKZts[i].sparse;
+      }
     }
   }
-  R.diagonal().array() += (1.0-h2s.sum());
-
-  Eigen::LLT<MatrixXd> chol_R(R);
-  MatrixXd chol_R_U = chol_R.matrixU();
-  return chol_R_U.sparseView(0,tol);
+  if(dense) {
+    Rd.diagonal().array() += (1.0-h2s.sum());
+    Eigen::LLT<MatrixXd> chol_R(Rd);
+    MatrixXd chol_R_U = chol_R.matrixU();
+    return chol_R_U.sparseView(0,tol);
+  } else{
+    for(int i = 0; i < n; i++){
+      Rs.coeffRef(i,i) += (1.0-h2s.sum());
+    }
+    // diagonal().array() += (1.0-h2s.sum());
+    Eigen::SimplicialLLT<SpMat> chol_R(Rs);
+    MatrixXd chol_R_U = chol_R.matrixU();
+    return chol_R_U.sparseView(0,tol);
+  }
 }
 
 

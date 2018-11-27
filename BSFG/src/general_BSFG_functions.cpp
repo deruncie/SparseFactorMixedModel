@@ -194,15 +194,6 @@ VectorXd regression_sampler_v1(  // returns vector of length 1 + a + b for y_pre
     alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
     alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
 
-    // LDLT<MatrixXd> A_alpha_ldlt;
-    // A_alpha_ldlt.compute(A_alpha);
-    // VectorXd d_sq = A_alpha_ldlt.vectorD().diagonal().array().sqrt();
-    // MatrixXd L = A_alpha_ldlt.matrixL();
-    // Transpositions<Dynamic> P = A_alpha_ldlt.transpositionsP();
-    //
-    // alpha = d_sq.inverse().asDiagonal() * L.triangularView<Lower>().solve(P * WtSbinvy)* Y_prec + randn_alpha;
-    // alpha = P.inverse() * L.transpose().triangularView<Upper>().solve(alpha);
-
     y_tilde = y - W * alpha;
   }
 
@@ -373,16 +364,6 @@ VectorXd regression_sampler_v3(  // returns vector of length 1 + a + b for y_pre
 
     alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
     alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
-//
-//     LDLT<MatrixXd> A_alpha_ldlt;
-//     A_alpha_ldlt.compute(A_alpha);
-//     // MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
-//
-//     VectorXd d_sq = A_alpha_ldlt.vectorD().diagonal().array().sqrt();
-//     MatrixXd L = A_alpha_ldlt.matrixL();
-//     Transpositions<Dynamic> P = A_alpha_ldlt.transpositionsP();
-//     alpha = d_sq.inverse().asDiagonal() * L.triangularView<Lower>().solve(P * WtSbinvy)* Y_prec + randn_alpha;
-//     alpha = P.inverse() * L.transpose().triangularView<Upper>().solve(alpha);
 
     y_tilde = y - W * alpha;
   }

@@ -786,6 +786,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
 
   X1   = data_matrices$X1
   X2_R = data_matrices$X2_R
+  X2_F = data_matrices$X2_F
   U2_F = data_matrices$U2_F
   ZL   = data_matrices$ZL
   cis_genotypes = data_matrices$cis_genotypes
@@ -846,7 +847,6 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     }
 
     Qt_list[[set]]   = Qt
-    # QtZL_list[[set]]  = QtZL_set
     QtX1_list[[set]] = list( X1 = QtX1_set,
                              keepColumns = QtX1_keepColumns
                             )
@@ -854,7 +854,11 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
 
     ZKZts_set = list()
     for(i in 1:n_RE){
-      ZKZts_set[[i]] = as.matrix(forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% RE_setup[[i]]$K %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol)))
+      ZKZts_set[[i]] = forceSymmetric(drop0(QtZL_matrices_set[[i]] %*% RE_setup[[i]]$K %*% t(QtZL_matrices_set[[i]]),tol = run_parameters$drop0_tol))
+      ZKZts_set[[i]] = as(as(ZKZts_set[[i]],'CsparseMatrix'),'dgCMatrix')
+      if(nnzero(ZKZts_set[[i]])/length(ZKZts_set[[i]]) > 0.5) {
+        ZKZts_set[[i]] = as.matrix(ZKZts_set[[i]])
+      }
     }
 
     ZtZ_set = as(forceSymmetric(drop0(crossprod(ZL[x,]),tol = run_parameters$drop0_tol)),'dgCMatrix')
@@ -864,7 +868,6 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     for(i in 1:length(chol_V_list_list[[set]])){
       chol_V_list_list[[set]][[i]] = drop0(chol_V_list_list[[set]][[i]],tol = run_parameters$drop0_tol)
       if(nnzero(chol_V_list_list[[set]][[i]])/length(chol_V_list_list[[set]][[i]]) > 0.25){
-        recover()
         chol_V_list_list[[set]][[i]] = as.matrix(chol_V_list_list[[set]][[i]])
       }
     }
@@ -875,6 +878,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
   # Qt matrices for factors are only used with row set 1
   x = Missing_data_map[[1]]$Y_obs
   Qt1_U2_F = Qt_list[[1]] %**% U2_F[x,,drop=FALSE]
+  Qt1_X2_F = Qt_list[[1]] %**% X2_F
 
 
   BSFG_state$run_variables = c(BSFG_state$run_variables,
@@ -884,6 +888,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     QtX1_list   = QtX1_list,
     QtX2_R_list = QtX2_R_list,
     Qt1_U2_F = Qt1_U2_F,
+    Qt1_X2_F = Qt1_X2_F,
     Qt_cis_genotypes = Qt_cis_genotypes,
     Missing_data_map      = Missing_data_map,
     Missing_row_data_map  = Missing_row_data_map,
