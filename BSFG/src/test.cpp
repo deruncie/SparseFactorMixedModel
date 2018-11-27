@@ -6,6 +6,215 @@
 // using namespace Eigen;
 // using namespace RcppParallel;
 //
+//
+// // [[Rcpp::export]]
+// get_
+//
+// // [[Rcpp::export]]
+// VectorXd regression_sampler_v1a(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b < n
+//    VectorXd y,           // nx1
+//    MatrixXd W,           // nxa
+//    MatrixXd RinvSqX,                // nxb
+//    MatrixXd C,                     // bxb
+//    VectorXd prior_prec_alpha, // ax 1
+//    VectorXd prior_mean_beta,  // bx1
+//    VectorXd prior_prec_beta,  // bx1
+//    MSpMat chol_R,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+//     double Y_prec,                    // double
+//     VectorXd randn_alpha,
+//     VectorXd randn_beta,
+//     const double rgamma_1,
+//     const double Y_prec_b0
+// ){
+//   int n = y.size();
+//   int a = W.cols();
+//   int b = RinvSqX.cols();
+//
+//   // Check inputs
+//   if(W.rows() != n) stop("Wrong dimension of W");
+//   if(RinvSqX.rows() != n) stop("Wrong dimension of X");
+//   if(C.rows() != b || C.cols() != b) stop("Wrong dimension of C");
+//   if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+//   if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+//   if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+//   if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+//   if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+//
+//   // Calculate cholesky of A_beta
+//   // C = Xt(RtR)^-1X
+//   MatrixXd C_beta = C;
+//   C_beta.diagonal() += prior_prec_beta;
+//   LLT<MatrixXd> A_beta_llt;
+//   A_beta_llt.compute(C_beta);
+//   MatrixXd chol_A_beta = A_beta_llt.matrixU();
+//   // Y_prec * chol_A_beta^\T * chol_A_beta = A_beta
+//
+//   // Step 1
+//   VectorXd alpha(a);
+//   VectorXd y_tilde = y;
+//   if(a > 0) {
+//     // Sample alpha
+//     // Calculate A_alpha = Y_prec*W^T*Sigma_beta^{-1}*W + D_alpha^{-1}
+//     // We don't need to actually calculate Sigma_beta^{-1} directly.
+//     MatrixXd RinvSqW = chol_R.transpose().triangularView<Lower>().solve(W);
+//     // MatrixXd RinvSqW = get_RinvSqX(chol_R,W);  // n*n*a -> n x a
+//     MatrixXd WtRinvX = RinvSqW.transpose() * RinvSqX; // a*n*b -> a*b
+//     MatrixXd invSqAbXtRinvW = chol_A_beta.transpose().triangularView<Lower>().solve(WtRinvX.transpose()); // b*b*a -> b x a
+//
+//     MatrixXd A_alpha = Y_prec * (RinvSqW.transpose() * RinvSqW - invSqAbXtRinvW.transpose() * invSqAbXtRinvW);
+//     A_alpha.diagonal() += prior_prec_alpha;
+//
+//     VectorXd Rinvsqy = chol_R.transpose().triangularView<Lower>().solve(y); // n*n*q -> n x 1;
+//     // VectorXd Rinvsqy = get_RinvSqX(chol_R,y); // n*n*q -> n x 1;
+//     VectorXd XtRinvy = RinvSqX.transpose() * Rinvsqy; // b*n*1 >- b x 1
+//     VectorXd invSqAbXtRinvy = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy); // b*b*1 -> b*1
+//
+//     VectorXd WtSbinvy = RinvSqW.transpose() * Rinvsqy - invSqAbXtRinvW.transpose() * invSqAbXtRinvy;
+//
+//     LLT<MatrixXd> A_alpha_llt;
+//     A_alpha_llt.compute(A_alpha);
+//     MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+//
+//     alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+//     alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+//
+//     // LDLT<MatrixXd> A_alpha_ldlt;
+//     // A_alpha_ldlt.compute(A_alpha);
+//     // VectorXd d_sq = A_alpha_ldlt.vectorD().diagonal().array().sqrt();
+//     // MatrixXd L = A_alpha_ldlt.matrixL();
+//     // Transpositions<Dynamic> P = A_alpha_ldlt.transpositionsP();
+//
+//     // alpha = d_sq.inverse().asDiagonal() * L.triangularView<Lower>().solve(P * WtSbinvy)* Y_prec + randn_alpha;
+//     // alpha = P.inverse() * L.transpose().triangularView<Upper>().solve(alpha);
+//
+//     y_tilde = y - W * alpha;
+//   }
+//
+//   // Step 2 - sample Y_prec
+//   // We don't need to actually calculate Sigma_beta^{-1} directly.
+//   VectorXd RinvSqy = chol_R.transpose().triangularView<Lower>().solve(y_tilde);
+//   // VectorXd RinvSqy = get_RinvSqX(chol_R,y_tilde);
+//   VectorXd XtRinvy = RinvSqX.transpose() * RinvSqy;
+//   VectorXd prod1 = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy);
+//   double score = Y_prec_b0 + (RinvSqy.dot(RinvSqy) - prod1.dot(prod1))/2;
+//   Y_prec = rgamma_1/score;
+//
+//   // Step 3 - sample beta
+//   VectorXd XtRinvy_std_mu = XtRinvy*Y_prec + prior_prec_beta.asDiagonal()*prior_mean_beta;
+//   VectorXd beta = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy_std_mu) / sqrt(Y_prec) + randn_beta;
+//   beta = chol_A_beta.triangularView<Upper>().solve(beta) / sqrt(Y_prec);
+//
+//   VectorXd result(1+a+b);
+//   result << Y_prec,alpha,beta;
+//
+//   return(result);
+// }
+//
+//
+// // [[Rcpp::export]]
+// VectorXd regression_sampler_v1b(  // returns vector of length 1 + a + b for y_prec, alpha, beta, useful when b < n
+//     VectorXd y,           // nx1
+//     MatrixXd W,           // nxa
+//     MatrixXd RinvSqX,                // nxb
+//     MatrixXd C,                     // bxb
+//     VectorXd prior_prec_alpha, // ax 1
+//     VectorXd prior_mean_beta,  // bx1
+//     VectorXd prior_prec_beta,  // bx1
+//     MSpMat chol_R,                    // either a upper-triangular matrix or upper-triangular CsparseMatrix
+//     double Y_prec,                    // double
+//     VectorXd randn_alpha,
+//     VectorXd randn_beta,
+//     const double rgamma_1,
+//     const double Y_prec_b0
+// ){
+//   int n = y.size();
+//   int a = W.cols();
+//   int b = RinvSqX.cols();
+//
+//   // Check inputs
+//   if(W.rows() != n) stop("Wrong dimension of W");
+//   if(RinvSqX.rows() != n) stop("Wrong dimension of X");
+//   if(C.rows() != b || C.cols() != b) stop("Wrong dimension of C");
+//   if(prior_prec_alpha.size() != a) stop("Wrong length of prior_prec_alpha");
+//   if(prior_mean_beta.size() != b) stop("Wrong length of prior_mean_beta");
+//   if(prior_prec_beta.size() != b) stop("Wrong length of prior_prec_beta");
+//   if(randn_alpha.size() != a) stop("Wrong length of randn_alpha");
+//   if(randn_beta.size() != b) stop("Wrong length of randn_beta");
+//
+//   // Calculate cholesky of A_beta
+//   // C = Xt(RtR)^-1X
+//   MatrixXd C_beta = C;
+//   C_beta.diagonal() += prior_prec_beta;
+//   LLT<MatrixXd> A_beta_llt;
+//   A_beta_llt.compute(C_beta);
+//   MatrixXd chol_A_beta = A_beta_llt.matrixU();
+//   // Y_prec * chol_A_beta^\T * chol_A_beta = A_beta
+//
+//   // Step 1
+//   VectorXd alpha(a);
+//   VectorXd y_tilde = y;
+//   if(a > 0) {
+//     // Sample alpha
+//     // Calculate A_alpha = Y_prec*W^T*Sigma_beta^{-1}*W + D_alpha^{-1}
+//     // We don't need to actually calculate Sigma_beta^{-1} directly.
+//     MatrixXd RinvSqW = chol_R.transpose().triangularView<Lower>().solve(W);
+//     // MatrixXd RinvSqW = get_RinvSqX(chol_R,W);  // n*n*a -> n x a
+//     MatrixXd WtRinvX = RinvSqW.transpose() * RinvSqX; // a*n*b -> a*b
+//     MatrixXd invSqAbXtRinvW = chol_A_beta.transpose().triangularView<Lower>().solve(WtRinvX.transpose()); // b*b*a -> b x a
+//
+//     MatrixXd A_alpha = Y_prec * (RinvSqW.transpose() * RinvSqW - invSqAbXtRinvW.transpose() * invSqAbXtRinvW);
+//     A_alpha.diagonal() += prior_prec_alpha;
+//
+//     VectorXd Rinvsqy = chol_R.transpose().triangularView<Lower>().solve(y); // n*n*q -> n x 1;
+//     // VectorXd Rinvsqy = get_RinvSqX(chol_R,y); // n*n*q -> n x 1;
+//     VectorXd XtRinvy = RinvSqX.transpose() * Rinvsqy; // b*n*1 >- b x 1
+//     VectorXd invSqAbXtRinvy = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy); // b*b*1 -> b*1
+//
+//     VectorXd WtSbinvy = RinvSqW.transpose() * Rinvsqy - invSqAbXtRinvW.transpose() * invSqAbXtRinvy;
+//
+//     // LLT<MatrixXd> A_alpha_llt;
+//     // A_alpha_llt.compute(A_alpha);
+//     // MatrixXd chol_A_alpha = A_alpha_llt.matrixU();
+//     //
+//     // alpha = chol_A_alpha.transpose().triangularView<Lower>().solve(WtSbinvy) * Y_prec + randn_alpha;
+//     // alpha = chol_A_alpha.triangularView<Upper>().solve(alpha);
+//
+//     LDLT<MatrixXd> A_alpha_ldlt;
+//     A_alpha_ldlt.compute(A_alpha);
+//     VectorXd d_sq = A_alpha_ldlt.vectorD().diagonal().array().sqrt();
+//     MatrixXd L = A_alpha_ldlt.matrixL();
+//     Transpositions<Dynamic> P = A_alpha_ldlt.transpositionsP();
+//     int nnzero = sum(d_sq > 1e-10);
+//     MatrixXd
+//
+//     alpha = d_sq.inverse().asDiagonal() * L.triangularView<Lower>().solve(P * WtSbinvy)* Y_prec + randn_alpha;
+//     alpha = P.inverse() * L.transpose().triangularView<Upper>().solve(alpha);
+//
+//     y_tilde = y - W * alpha;
+//   }
+//
+//   // Step 2 - sample Y_prec
+//   // We don't need to actually calculate Sigma_beta^{-1} directly.
+//   VectorXd RinvSqy = chol_R.transpose().triangularView<Lower>().solve(y_tilde);
+//   // VectorXd RinvSqy = get_RinvSqX(chol_R,y_tilde);
+//   VectorXd XtRinvy = RinvSqX.transpose() * RinvSqy;
+//   VectorXd prod1 = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy);
+//   double score = Y_prec_b0 + (RinvSqy.dot(RinvSqy) - prod1.dot(prod1))/2;
+//   Y_prec = rgamma_1/score;
+//
+//   // Step 3 - sample beta
+//   VectorXd XtRinvy_std_mu = XtRinvy*Y_prec + prior_prec_beta.asDiagonal()*prior_mean_beta;
+//   VectorXd beta = chol_A_beta.transpose().triangularView<Lower>().solve(XtRinvy_std_mu) / sqrt(Y_prec) + randn_beta;
+//   beta = chol_A_beta.triangularView<Upper>().solve(beta) / sqrt(Y_prec);
+//
+//   VectorXd result(1+a+b);
+//   result << Y_prec,alpha,beta;
+//
+//   return(result);
+// }
+
+
+//
 // // [[Rcpp::export()]]
 // void record_sample_Posterior_array(Map<MatrixXd> current_sample, Map<MatrixXd> Posterior_array_, int sp_num) {
 //   int nrow_sample = current_sample.rows();

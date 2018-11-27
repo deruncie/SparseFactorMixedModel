@@ -836,6 +836,9 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     # QtZL_set = do.call(cbind,QtZL_matrices_set[RE_names])
     # if(nnzero(QtZL_set)/length(QtZL_set) > 0.5)  QtZL_set = as(QtZL_set,'dgCMatrix')
     QtX1_set = Qt %**% X1[x,,drop=FALSE]
+    QtX1_keepColumns = c(1:ncol(X1)) %in% caret::findLinearCombos(QtX1_set)$remove == F # assess which columns of X1 are identifiable in this data set
+    QtX1_set = QtX1_set[,QtX1_keepColumns,drop=FALSE]  # drop extra columns
+
     QtX2_R_set = Qt %**% X2_R[x,,drop=FALSE]
 
     if(length(cis_genotypes) == p) {
@@ -844,7 +847,9 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
 
     Qt_list[[set]]   = Qt
     # QtZL_list[[set]]  = QtZL_set
-    QtX1_list[[set]]  = QtX1_set
+    QtX1_list[[set]] = list( X1 = QtX1_set,
+                             keepColumns = QtX1_keepColumns
+                            )
     QtX2_R_list[[set]]  = QtX2_R_set
 
     ZKZts_set = list()
@@ -857,7 +862,9 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
     chol_V_list_list[[set]] = make_chol_V_list(ZKZts_set,h2s_matrix,run_parameters$drop0_tol,pb,setTxtProgressBar,getTxtProgressBar,ncores)
     # convert any to dense if possible
     for(i in 1:length(chol_V_list_list[[set]])){
+      chol_V_list_list[[set]][[i]] = drop0(chol_V_list_list[[set]][[i]],tol = run_parameters$drop0_tol)
       if(nnzero(chol_V_list_list[[set]][[i]])/length(chol_V_list_list[[set]][[i]]) > 0.25){
+        recover()
         chol_V_list_list[[set]][[i]] = as.matrix(chol_V_list_list[[set]][[i]])
       }
     }

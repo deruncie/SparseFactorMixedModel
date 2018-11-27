@@ -38,10 +38,72 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       } else{
         Qt_cis_genotypes_set = list()
       }
+      # X1_nzero_cols = colSums(QtX1_list[[set]]^2) > 1e-10
+
+      # i = 1
+      # col_i = cols[i]
+      # chol_R = chol_V_list_list[[set]][[resid_h2_index[col_i]]]
+      # chol_R = drop0(chol_R)
+      # randn_alpha = rnorm(sum(X1_nzero_cols))
+      # randn_beta = rnorm(n_coefs)
+      # RinvSqX = as.matrix(solve(t(chol_R),X_set))
+      # C = crossprod(RinvSqX)
+      # rgamma1 = rgamma(1,shape=tot_Eta_prec_shape + nrow(Y_set)/2,rate=1)
+      #
+      # C_beta = C
+      # diag(C_beta) = diag(C_beta) + prior_prec[,col_i,drop=FALSE]
+      # chol_A_beta = chol(C_beta)
+      #
+      # RinvSqW = as.matrix(solve(t(chol_R),QtX1_list[[set]][,X1_nzero_cols,drop=FALSE]))
+      # WtRinvX = crossprod(RinvSqW,RinvSqX)
+      # invSqAbXtRinvW = solve(t(chol_A_beta),t(WtRinvX))
+      # A_alpha = tot_Eta_prec[col_i] * (t(RinvSqW) %*% RinvSqW - t(invSqAbXtRinvW) %*% invSqAbXtRinvW)
+      # diag(A_alpha) = diag(A_alpha) + rep(0,sum(X1_nzero_cols))
+      #
+      # Rinvsqy = as.matrix(solve(t(chol_R),Y_set[,i]))
+      # XtRinvy = t(RinvSqX) %*% Rinvsqy
+      # invSqAbXtRinvy = solve(t(chol_A_beta),XtRinvy)
+      # WtSbinvy = t(RinvSqW) %*% Rinvsqy - t(invSqAbXtRinvW) %*% invSqAbXtRinvy
+      #
+      # chol_A_alpha = chol(A_alpha)
+      # ldlt_A_alpha = LDLt(A_alpha)
+      # regression_sampler_v1a(
+      #   Y_set[,i],
+      #   QtX1_list[[set]][,X1_nzero_cols,drop=FALSE],
+      #   RinvSqX,
+      #   C,
+      #   rep(0,sum(X1_nzero_cols)),
+      #   prior_mean[,col_i,drop=FALSE],
+      #   prior_prec[,col_i,drop=FALSE],
+      #   chol_R,
+      #   tot_Eta_prec[col_i],
+      #   randn_alpha,
+      #   randn_beta,
+      #   rgamma1,
+      #   tot_Eta_prec_rate[1]
+      # )
+      # regression_sampler_v1b(
+      #   Y_set[,1],
+      #   QtX1_list[[set]][,X1_nzero_cols,drop=FALSE],
+      #   RinvSqX,
+      #   C,
+      #   rep(0,sum(X1_nzero_cols)),
+      #   prior_mean[,col_i,drop=FALSE],
+      #   prior_prec[,col_i,drop=FALSE],
+      #   chol_R,
+      #   tot_Eta_prec[col_i],
+      #   randn_alpha,
+      #   randn_beta,
+      #   rgamma1,
+      #   tot_Eta_prec_rate[1]
+      # )
+#
+#       a=caret::findLinearCombos(QtX1_list[[set]])
+#       X1_nzero_cols = (1:b1) %in% a$remove == FALSE
 
       new_samples = regression_sampler_parallel(
         Y_set,
-        QtX1_list[[set]],
+        QtX1_list[[set]]$X1,
         Qt_cis_genotypes_set,
         X_set,
         NULL,
@@ -49,7 +111,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
         chol_V_list_list[[set]],
         tot_Eta_prec[cols],
         tot_Eta_prec_shape, tot_Eta_prec_rate[1],
-        matrix(0,nr = b1,ncol = length(cols)),
+        matrix(0,nr = sum(QtX1_list[[set]]$keepColumns),ncol = length(cols)),
         rep(priors$cis_effects_prior$prec,sum(cis_effects_index %in% cols)),
         prior_mean[,cols,drop=FALSE],
         prior_prec[,cols,drop=FALSE],
@@ -59,7 +121,9 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       # extract samples
 
       # alpha1 -> un-shunk rows of B
-      B1[,cols] = new_samples$alpha1
+      B1[QtX1_list[[set]]$keepColumns,cols] = new_samples$alpha1
+      B1[!QtX1_list[[set]]$keepColumns,cols] = 0
+
       # alpha2 -> cis_effects
       if(!is.null(cis_effects_index)) {
         cis_effects[1,cols %in% cis_effects_index] = new_samples$alpha2
@@ -73,6 +137,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       Lambda[cols,] = t(new_samples$beta[b2_R + 1:K,])
 
       # Y_prec -> tot_Eta_prec
+      if(any(is.na(new_samples$Y_prec))) break
       tot_Eta_prec[cols] = new_samples$Y_prec
     }
 
