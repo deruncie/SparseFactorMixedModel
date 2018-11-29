@@ -173,7 +173,11 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       B2_F = new_samples$beta
       XFBF = X2_F %*% B2_F
       F_tilde = F - XFBF
-      Qt_F_tilde = Qt_F - Qt1_X2_F %*% B2_F
+      if( b2_F > length(rows)) {
+        Qt_F_tilde = Qt_list[[1]] %**% F_tilde[rows,,drop=FALSE]
+      } else{
+        Qt_F_tilde = Qt_F - Qt1_X2_F %*% B2_F
+      }
     }
 
     # Y_prec -> tot_F_prec
