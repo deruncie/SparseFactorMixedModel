@@ -7,6 +7,46 @@
 // using namespace RcppParallel;
 //
 //
+// // [[Rcpp::export()]]
+// List LDLt2(SEXP A_) {
+//   if(Rf_isMatrix(A_)){
+//     Map<MatrixXd> A = as<Map<MatrixXd> >(A_);
+//     Eigen::LDLT<MatrixXd> ldlt_A;
+//     ldlt_A.compute(A);
+//     MatrixXd I = MatrixXd::Identity(ldlt_A.rows(), ldlt_A.rows());
+//     MatrixXd P = ldlt_A.transpositionsP() * I;
+//     VectorXd d = ldlt_A.vectorD();
+//     MatrixXd L = ldlt_A.matrixL();
+//     SpMat Lsp = L.sparseView();
+//     if(static_cast<double>(Lsp.nonZeros()) / I.size() > 0.25) {
+//       return(List::create(
+//           Named("P") = P.sparseView(),
+//           Named("L") = L,
+//           Named("d") = d
+//       ));
+//     } else{
+//       return(List::create(
+//           Named("P") = P.sparseView(),
+//           Named("L") = Lsp,
+//           Named("d") = d
+//       ));
+//     }
+//   } else{
+//     MSpMat A = as<MSpMat>(A_);
+//     Eigen::SimplicialLDLT<SpMat> ldlt_A;
+//     ldlt_A.compute(A);
+//     MatrixXd I = MatrixXd::Identity(ldlt_A.rows(), ldlt_A.rows());
+//     MatrixXd P = ldlt_A.permutationP() * I;
+//     return(List::create(
+//         Named("P") = P.sparseView(),
+//         Named("L") = ldlt_A.matrixL(),
+//         Named("d") = ldlt_A.vectorD()
+//     ));
+//   }
+// }
+
+//
+//
 // void load_R_matrices_list2(const Rcpp::List X_list, std::vector<R_matrix>& X_vector){
 //   // null_matrices
 //   MatrixXd null_d = MatrixXd::Zero(0,0);

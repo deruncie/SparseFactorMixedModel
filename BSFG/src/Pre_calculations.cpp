@@ -16,11 +16,20 @@ List LDLt(SEXP A_) {
     MatrixXd P = ldlt_A.transpositionsP() * I;
     VectorXd d = ldlt_A.vectorD();
     MatrixXd L = ldlt_A.matrixL();
-    return(List::create(
-        Named("P") = P.sparseView(),
-        Named("L") = L.sparseView(),
-        Named("d") = d
-    ));
+    SpMat Lsp = L.sparseView();
+    if(static_cast<double>(Lsp.nonZeros()) / I.size() > 0.25) {
+      return(List::create(
+          Named("P") = P.sparseView(),
+          Named("L") = L,
+          Named("d") = d
+      ));
+    } else{
+      return(List::create(
+          Named("P") = P.sparseView(),
+          Named("L") = Lsp,
+          Named("d") = d
+      ));
+    }
   } else{
     MSpMat A = as<MSpMat>(A_);
     Eigen::SimplicialLDLT<SpMat> ldlt_A;
@@ -34,6 +43,7 @@ List LDLt(SEXP A_) {
     ));
   }
 }
+
 
 SpMat make_chol_K_inv(const std::vector<R_matrix>& chol_Ki_mats, VectorXd h2s,double tol){
   int h = h2s.size();

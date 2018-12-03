@@ -65,6 +65,7 @@ make_model_setup = function(formula,data,relmat = NULL) {
     if(term %in% names(relmat)) {
       K = relmat[[term]]
       if(is(K,'dsCMatrix')) K = as(K,'dgCMatrix')
+      if(nnzero(K)/length(K) > .5) K = as.matrix(K)  # if not really sparse
     }
 
     if(!is.null(K)) {

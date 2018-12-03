@@ -391,6 +391,11 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
   } else{
     RE_L = RE_setup[[1]]$L
   }
+  if(nnzero(RE_L)/length(RE_L) < 0.5) {
+    RE_L = as(RE_L,'dgCMatrix')
+  } else{
+    RE_L = as.matrix(RE_L)
+  }
   r_RE = sapply(RE_setup,function(re) ncol(re$ZL))
 
   h2_divisions = run_parameters$h2_divisions
