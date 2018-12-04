@@ -28,7 +28,7 @@ factor_h2s = c(rep(0,nFactors/2),rep(0.9,nFactors/2))  # factor_h2 is the % of v
 # The is after accounting for the fixed effects on the factors
 Va = 2 # residual genetic variance in each of the observed traits after accounting for the factors
 Ve = 2 # residual microenvironmental variance in each of the observed traits after accounting for the factors
-Vb = 2 # magnitude of the fixed effects (just factors)
+Vb = 0 # magnitude of the fixed effects (just factors)
 new_halfSib_simulation('Sim_FE_1', nSire=nSire,nRep=nRep,p=nTraits, b=nFixedEffects, factor_h2s= factor_h2s,Va = Va, Ve = Ve,Vb = Vb)
 set.seed(seed)
 load('setup.RData')
@@ -39,6 +39,10 @@ load('setup.RData')
 Y = setup$Y
 data = setup$data
 K = setup$K
+Y[1:(nrow(Y)*3/4),1:(ncol(Y)/4)] = NA
+Y[(nrow(Y)/4)+1:(nrow(Y)/4),(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
+Y[2*(nrow(Y)/4)+1:(nrow(Y)/4),2*(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
+Y[3*(nrow(Y)/4)+1:(nrow(Y)/4),3*(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
 ```
 
 
@@ -48,6 +52,7 @@ K = setup$K
 # ---------------------------------------------------------- #
 ```{r}
 run_parameters = BSFG_control(
+  num_NA_groups = 3,
   scale_Y = FALSE,   # should the columns of Y be re-scaled to have mean=0 and sd=1?
   simulation = TRUE, # Are you running against simulated data (ex from a call to new_halfSib_simulation above)? If so, you can provide the setup list and it will make some QC plots
   h2_divisions = 20, # Each variance component is allowed to explain between 0% and 100% of the total variation. How many segments should the range [0,100) be divided into for each random effect?
@@ -137,7 +142,7 @@ BSFG_state = clear_Posterior(BSFG_state)
 # BSFG_state = reorder_factors(BSFG_state)
 
 ```{r}
-n_samples = 100;  # how many samples to collect at once?
+n_samples = 200;  # how many samples to collect at once?
 for(i  in 1:70) {
   print(sprintf('Run %d',i))
   BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)  # run MCMC chain n_samples iterations. grainSize is a paramter for parallelization (smaller = more parallelization)
