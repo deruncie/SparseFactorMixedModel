@@ -106,3 +106,162 @@ make_model_setup = function(formula,data,relmat = NULL) {
   }
   return(list(lmod = lmod, RE_setup = RE_setup))
 }
+
+make_Missing_data_map = function(BSFG_state,max_NA_groups = Inf, min_perc_drop = 0,verbose=FALSE) {
+  Y_missing = BSFG_state$run_parameters$observation_model_parameters$observation_setup$Y_missing
+  Y_missing_mat = as.matrix(Y_missing)
+  non_missing_rows = unname(which(rowSums(!Y_missing)>0))
+
+  Missing_data_map = list(list(
+    Y_obs = non_missing_rows,
+    Y_cols = 1:ncol(Y_missing)
+  ))
+
+  # if no groups allowed, just return base map
+  if(max_NA_groups <= 1) {
+    return(list(Missing_data_map_list = list(Missing_data_map),map_results=c()))
+  }
+  if(is.infinite(max_NA_groups)) {
+    Y_col_obs = lapply(1:ncol(Y_missing_mat),function(x) {
+      obs = which(!Y_missing_mat[,x],useNames=F)
+      names(obs) = NULL
+      obs
+    })
+    non_missing_rows = unname(which(rowSums(!Y_missing_mat)>0))
+    unique_Y_col_obs = unique(c(list(non_missing_rows),Y_col_obs))
+    unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
+    Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
+
+    Missing_data_map = lapply(1:max(unique(Y_col_obs_index)),function(i) {
+      Y_cols = which(Y_col_obs_index==i)
+      if(length(Y_cols) == 0) {
+        return(list(
+          Y_obs = non_missing_rows,
+          Y_cols = Y_cols
+        ))
+      } else{
+        return(list(
+          Y_obs = unname(which(rowSums(!Y_missing[,Y_cols,drop=FALSE])>0)),  # now find the rows with any non-missing data in this set of columns
+          Y_cols = Y_cols
+        ))
+      }
+    })
+    Missing_data_map_list = list(Missing_data_map)
+    return(list(
+      Missing_data_map_list = Missing_data_map_list,
+      map_results = c()
+    ))
+  }
+
+  # otherwise, use kmeans to sequentially split map with the most non-excluded NAs
+  # save the sequence of maps so the user can select the best
+
+  Missing_data_map_list = list(
+    Missing_data_map
+  )
+
+  iter = 1
+  map_results = c()
+  while(length(Missing_data_map) < max_NA_groups && iter < 2*max_NA_groups){
+    iter = iter+1
+    # count the number of non-excluded NAs in each group
+    group_NAs = sapply(Missing_data_map,function(x) {
+      if(length(x$Y_cols)<= 1) return(0) # don't split a group with only one column
+      sum(Y_missing_mat[x$Y_obs,x$Y_cols])
+    })
+    if(max(group_NAs) == 1) break
+
+    target = which.max(group_NAs)  # group with the most NAs
+    group = Missing_data_map[[target]]
+
+    # split this cluster into two
+    if(length(group$Y_cols) == 2) {
+      clusters = list(cluster = c(1,2))
+    } else{
+      clusters = with(group,kmeans(t(Y_missing[Y_obs,Y_cols]),centers=2))
+    }
+
+    new_groups = lapply(seq_len(max(clusters$cluster)),function(i) {
+      Y_cols = group$Y_cols[which(clusters$cluster==i)]
+      Y_obs = unname(which(rowSums(!Y_missing_mat[,Y_cols,drop=FALSE])>0))  # now find the rows with any non-missing data in this set of columns
+      if((length(non_missing_rows)-length(Y_obs))/length(non_missing_rows) <= min_perc_drop) {
+        Y_obs = non_missing_rows  # if Y_obs is too big, not worth keeping this cluster
+        # this might make an infinite loop!
+      }
+      list(
+        Y_obs = Y_obs,
+        Y_cols = Y_cols
+      )
+    })
+    new_groups = new_groups[order(sapply(new_groups,function(x) length(x$Y_obs)),decreasing=T)]
+
+    if(target == 1) {
+      if(length(new_groups[[1]]$Y_obs) == length(non_missing_rows)) {
+        Missing_data_map[1] = new_groups[1]
+        new_groups = new_groups[-1]
+      } else{
+        Missing_data_map[[1]]$Y_cols = c()
+      }
+      Missing_data_map = c(Missing_data_map,new_groups)
+    } else{
+      Missing_data_map = c(Missing_data_map[-target],new_groups)
+    }
+
+    Missing_data_map_list[[iter]] = Missing_data_map
+
+    results_i = data.frame(
+      iter = iter,
+      N_groups = length(Missing_data_map),
+      max_group_size = max(sapply(Missing_data_map,function(x) length(x$Y_obs))[-1]),
+      total_kept_NAs = sum(sapply(Missing_data_map,function(x) {
+        if(length(x$Y_cols) == 0) return(0)
+        sum(Y_missing_mat[x$Y_obs,x$Y_cols])
+      }))
+      )
+
+    if(verbose) print(results_i)
+
+    map_results = rbind(map_results,results_i)
+  }
+
+  return(list(
+    Missing_data_map_list = Missing_data_map_list,
+    map_results = map_results
+  ))
+}
+
+
+set_Missing_data_map = function(BSFG_state,Missing_data_map) {
+
+  BSFG_state$run_variables$Missing_data_map = Missing_data_map
+
+  # find the values that are excluded by the groups in Missing_data_map
+  Y_missing_map = matrix(1,BSFG_state$run_variables$n,BSFG_state$run_variables$p)
+  for(map in Missing_data_map) {
+    Y_missing_map[map$Y_obs,map$Y_cols] = 0
+  }
+
+  # create an object that indexes the non-missing values by row
+  Y_row_obs = lapply(1:nrow(Y_missing_mat),function(x) {
+    obs = which(!Y_missing_mat[x,],useNames=F)
+    names(obs) = NULL
+    obs
+  })
+  non_missing_cols = unname(which(colSums(!Y_missing_mat)>0))
+  unique_Y_row_obs = unique(c(list(non_missing_cols),Y_row_obs))
+  unique_Y_row_obs_str = lapply(unique_Y_row_obs,paste,collapse='')
+  Y_row_obs_index = sapply(Y_row_obs,function(x) which(unique_Y_row_obs_str == paste(x,collapse='')))
+
+  Missing_row_data_map = lapply(seq_along(unique_Y_row_obs),function(i) {
+    x = unique_Y_row_obs[[i]]
+    return(list(
+      Y_cols = x,
+      Y_obs = which(Y_row_obs_index == i)
+    ))
+  })
+
+  BSFG_state$run_variables$Missing_row_data_map = Missing_row_data_map
+
+  return(BSFG_state)
+
+}

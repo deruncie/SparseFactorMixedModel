@@ -411,93 +411,18 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
   h2s_matrix = t(h2s_matrix[rowSums(h2s_matrix) < 1,,drop=FALSE])
   colnames(h2s_matrix) = NULL
 
-  # -------------------------------------------#
-  # identify groups of traits with same pattern of missingness
-  # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
-  Y_missing = observation_model_parameters$observation_setup$Y_missing
+  # # -------------------------------------------#
+  # # identify groups of traits with same pattern of missingness
+  # # ideally, want to be able to restrict the number of sets. Should be possible to merge sets of columngs together.
 
-  if(run_parameters$num_NA_groups > 0) {
-    # columns with same patterns of missing data
-    Y_missing_mat = as.matrix(Y_missing)
-    Y_col_obs = lapply(1:ncol(Y_missing_mat),function(x) {
-      obs = which(!Y_missing_mat[,x],useNames=F)
-      names(obs) = NULL
-      obs
-    })
-    non_missing_rows = unname(which(rowSums(!Y_missing_mat)>0))
-    unique_Y_col_obs = unique(c(list(non_missing_rows),Y_col_obs))
-    unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
-    Y_col_obs_index = sapply(Y_col_obs,function(x) which(unique_Y_col_obs_str == paste(x,collapse='')))
-
-    if(max(Y_col_obs_index) <= run_parameters$num_NA_groups) {
-      Missing_data_map = lapply(1:max(unique(Y_col_obs_index)),function(i) {
-        Y_cols = which(Y_col_obs_index==i)
-        if(length(Y_cols) == 0) {
-          return(list(
-            Y_obs = non_missing_rows,
-            Y_cols = Y_cols
-          ))
-        } else{
-          return(list(
-            Y_obs = unname(which(rowSums(!Y_missing[,Y_cols,drop=FALSE])>0)),  # now find the rows with any non-missing data in this set of columns
-            Y_cols = Y_cols
-          ))
-        }
-      })
-    } else{
-      clusters = kmeans(t(Y_missing),run_parameters$num_NA_groups,nstart = 3)  # use k-means clustering to get clusters
-      Missing_data_map_temp = lapply(seq_len(max(clusters$cluster)),function(i) {
-        Y_cols = which(clusters$cluster==i)
-        list(
-          Y_obs = unname(which(rowSums(!Y_missing[,Y_cols,drop=FALSE])>0)),  # now find the rows with any non-missing data in this set of columns
-          Y_cols = Y_cols
-        )
-      })
-
-      unique_Y_col_obs = unique(c(list(non_missing_rows),lapply(Missing_data_map_temp,function(x) x$Y_obs)))
-      unique_Y_col_obs_str = lapply(unique_Y_col_obs,paste,collapse='')
-      Missing_data_map_index = sapply(Missing_data_map_temp,function(x) which(unique_Y_col_obs_str == paste(x$Y_obs,collapse=''))[1])
-
-      Missing_data_map = lapply(1:max(Missing_data_map_index),function(i) {
-        maps = which(Missing_data_map_index == i)
-        Y_cols = unlist(lapply(maps,function(x) Missing_data_map_temp[[x]]$Y_cols))
-        if(length(Y_cols) == 0) {
-          Y_obs = non_missing_rows
-        } else{
-          Y_obs = unname(which(rowSums(!Y_missing[,Y_cols,drop=FALSE])>0))
-        }
-        list(Y_obs = Y_obs,Y_cols = Y_cols)
-      })
-    }
-
-    # rows with same patterns of missing data
-    Y_row_obs = lapply(1:nrow(Y_missing_mat),function(x) {
-      obs = which(!Y_missing_mat[x,],useNames=F)
-      names(obs) = NULL
-      obs
-    })
-    non_missing_cols = unname(which(colSums(!Y_missing_mat)>0))
-    unique_Y_row_obs = unique(c(list(non_missing_cols),Y_row_obs))
-    unique_Y_row_obs_str = lapply(unique_Y_row_obs,paste,collapse='')
-    Y_row_obs_index = sapply(Y_row_obs,function(x) which(unique_Y_row_obs_str == paste(x,collapse='')))
-
-    Missing_row_data_map = lapply(seq_along(unique_Y_row_obs),function(i) {
-      x = unique_Y_row_obs[[i]]
-      return(list(
-        Y_cols = x,
-        Y_obs = which(Y_row_obs_index == i)
-      ))
-    })
-  } else{
-    Missing_data_map = list(list(
-      Y_obs = 1:n,
-      Y_cols = 1:p
-    ))
-    Missing_row_data_map = list(list(
-      Y_obs = 1:n,
-      Y_cols = 1:p
-    ))
-  }
+  Missing_data_map = list(list(
+    Y_obs = 1:n,
+    Y_cols = 1:p
+  ))
+  Missing_row_data_map = list(list(
+    Y_obs = 1:n,
+    Y_cols = 1:p
+  ))
 
 
   run_variables = list(
