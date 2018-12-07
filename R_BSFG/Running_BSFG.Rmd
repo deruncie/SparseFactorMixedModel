@@ -52,7 +52,7 @@ Y[1:(nrow(Y)*3/4),1:(ncol(Y)/4)] = NA
 # ---------------------------------------------------------- #
 ```{r}
 run_parameters = BSFG_control(
-  num_NA_groups = 3,
+  max_NA_groups = 3,
   scale_Y = FALSE,   # should the columns of Y be re-scaled to have mean=0 and sd=1?
   simulation = TRUE, # Are you running against simulated data (ex from a call to new_halfSib_simulation above)? If so, you can provide the setup list and it will make some QC plots
   h2_divisions = 20, # Each variance component is allowed to explain between 0% and 100% of the total variation. How many segments should the range [0,100) be divided into for each random effect?
@@ -108,8 +108,8 @@ BSFG_state = setup_model_BSFG(Y,            # n x p data matrix
                               setup = setup, # only if running simulated data. Stores simulated values for comparison
                               run_ID = 'BSFG_example'
                                 )
-maps = make_Missing_data_map(BSFG_state,50,0,T)
-BSFG_state = set_Missing_data_map(BSFG_state,maps$Missing_data_map_list[[maps$map_results$iter[which(maps$map_results$total_kept_NAs ==0)[1]]]])
+maps = make_Missing_data_map(BSFG_state)
+BSFG_state = set_Missing_data_map(BSFG_state,maps$Missing_data_map)
 
 BSFG_state = set_priors_BSFG(BSFG_state,priors)
 BSFG_state = initialize_variables_BSFG(BSFG_state)
