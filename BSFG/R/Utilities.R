@@ -124,7 +124,7 @@ make_Missing_data_map = function(BSFG_state,max_NA_groups = NULL, starting_group
 
   # if no groups allowed, just return base map
   if(max_NA_groups <= 1) {
-    return(list(Missing_data_map_list = list(Missing_data_map),map_results=c()))
+    return(list(Missing_data_map = Missing_data_map, Missing_data_map_list = NULL,map_results=c()))
   }
   if(is.infinite(max_NA_groups)) {
     Y_col_obs = lapply(1:ncol(Y_missing_mat),function(x) {
@@ -151,9 +151,9 @@ make_Missing_data_map = function(BSFG_state,max_NA_groups = NULL, starting_group
         ))
       }
     })
-    Missing_data_map_list = list(Missing_data_map)
     return(list(
-      Missing_data_map_list = Missing_data_map_list,
+      Missing_data_map = Missing_data_map,
+      Missing_data_map_list = NULL,
       map_results = c()
     ))
   }

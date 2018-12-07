@@ -40,9 +40,9 @@ Y = setup$Y
 data = setup$data
 K = setup$K
 Y[1:(nrow(Y)*3/4),1:(ncol(Y)/4)] = NA
-Y[(nrow(Y)/4)+1:(nrow(Y)/4),(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
-Y[2*(nrow(Y)/4)+1:(nrow(Y)/4),2*(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
-Y[3*(nrow(Y)/4)+1:(nrow(Y)/4),3*(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
+# Y[(nrow(Y)/4)+1:(nrow(Y)/4),(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
+# Y[2*(nrow(Y)/4)+1:(nrow(Y)/4),2*(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
+# Y[3*(nrow(Y)/4)+1:(nrow(Y)/4),3*(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
 ```
 
 
@@ -108,6 +108,8 @@ BSFG_state = setup_model_BSFG(Y,            # n x p data matrix
                               setup = setup, # only if running simulated data. Stores simulated values for comparison
                               run_ID = 'BSFG_example'
                                 )
+maps = make_Missing_data_map(BSFG_state,50,0,T)
+BSFG_state = set_Missing_data_map(BSFG_state,maps$Missing_data_map_list[[maps$map_results$iter[which(maps$map_results$total_kept_NAs ==0)[1]]]])
 
 BSFG_state = set_priors_BSFG(BSFG_state,priors)
 BSFG_state = initialize_variables_BSFG(BSFG_state)

@@ -26,7 +26,7 @@
 #'     untransformed.
 #' @param burn burnin length of the MCMC chain
 #' @param thin thinning rate of the MCMC chain
-#' @param num_NA_groups If 0, all NAs will be imputed during sampling. If Inf, all NAs will be marginalized over.
+#' @param max_NA_groups If 0, all NAs will be imputed during sampling. If Inf, all NAs will be marginalized over.
 #'     If in (0,Inf), up to this many groups of columns will be separately sampled.
 #'     The minimum number of NAs in each column not in one of these groups will be imputed.
 #' @param svd_K If TRUE, the the diagonalization of ZKZt for the first random effect is accomplished using this algorithm:
@@ -39,7 +39,7 @@ BSFG_control = function(
                         K = 20, h2_divisions = 100, h2_step_size = NULL,
                         drop0_tol = 1e-14, K_eigen_tol = 1e-10,
                         burn = 100,thin = 2,
-                        num_NA_groups = Inf,
+                        max_NA_groups = Inf,
                         svd_K = TRUE,
                         verbose = TRUE,
                         ...
