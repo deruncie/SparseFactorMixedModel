@@ -236,9 +236,9 @@ set_Missing_data_map = function(BSFG_state,Missing_data_map) {
   BSFG_state$run_variables$Missing_data_map = Missing_data_map
 
   # find the values that are excluded by the groups in Missing_data_map
-  Y_missing_map = matrix(1,BSFG_state$run_variables$n,BSFG_state$run_variables$p)
+  Y_missing_mat = matrix(1,BSFG_state$run_variables$n,BSFG_state$run_variables$p)
   for(map in Missing_data_map) {
-    Y_missing_map[map$Y_obs,map$Y_cols] = 0
+    Y_missing_mat[map$Y_obs,map$Y_cols] = 0
   }
 
   # create an object that indexes the non-missing values by row
