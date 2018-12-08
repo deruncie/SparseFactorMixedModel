@@ -14,7 +14,7 @@ make_model_setup = function(formula,data,relmat = NULL) {
   if(is.null(relmat)) relmat = list()
   for(re in names(relmat)) {
     # check that K is a matrix, then convert to Matrix
-    if(is.list(relmat[[re]])){
+    if(is.list(relmat[[re]]) && !is.data.frame(relmat[[re]])){
       if(is.data.frame(relmat[[re]]$K)) relmat[[re]]$K = as.matrix(relmat[[re]]$K)
       if(is.matrix(relmat[[re]]$K)) relmat[[re]]$K = Matrix(relmat[[re]]$K,sparse=T)
       if(is.null(rownames(relmat[[re]]$K))) stop(sprintf('K %s must have rownames',re))
@@ -70,6 +70,7 @@ make_model_setup = function(formula,data,relmat = NULL) {
 
     if(!is.null(K)) {
       if(!all(colnames(Zs_term[[1]]) %in% rownames(K))) stop('rownames of K not lining up with Z')
+      colnames(K) = rownames(K)
       K = K[colnames(Zs_term[[1]]),colnames(Zs_term[[1]])]
     } else {
       K = as(diag(1,ncol(Zs_term[[1]])),'dgCMatrix')
