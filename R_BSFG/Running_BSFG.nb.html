@@ -205,22 +205,113 @@ $(document).ready(function () {
 <h1>———————————————————-</h1>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc2VlZCA9IDEgICMgZm9yIHJlcHJvZHVjaWJpbGl0eVxublNpcmUgPSA1MCAjIHNpbXVsYXRpb24gZGVzaWduIGlzIGEgaGFsZi1zaWIgZGVzaWduOiBlYWNoIG9mIG5TaXJlIGZhdGhlcnMgaGFzIG5SZXAgY2hpbGRyZW4sIGVhY2ggd2l0aCBhIGRpZmZlcmVudCBmZW1hbGVcbm5SZXAgPSAxMFxublRyYWl0cyA9IDEwMFxubkZpeGVkRWZmZWN0cyA9IDIgIyBmaXhlZCBlZmZlY3RzIGFyZSBlZmZlY3RzIG9uIHRoZSBmYWN0b3JzXG5uRmFjdG9ycyA9IDEwXG5mYWN0b3JfaDJzID0gYyhyZXAoMCxuRmFjdG9ycy8yKSxyZXAoMC45LG5GYWN0b3JzLzIpKSAgIyBmYWN0b3JfaDIgaXMgdGhlICUgb2YgdmFyaWFuY2UgaW4gZWFjaCBmYWN0b3IgdHJhaXQgdGhhdCBpcyBleHBsYWluZWQgYnkgYWRkaXRpdmUgZ2VuZXRpYyB2YXJpYXRpb24uXG4jIFRoZSBpcyBhZnRlciBhY2NvdW50aW5nIGZvciB0aGUgZml4ZWQgZWZmZWN0cyBvbiB0aGUgZmFjdG9yc1xuVmEgPSAyICMgcmVzaWR1YWwgZ2VuZXRpYyB2YXJpYW5jZSBpbiBlYWNoIG9mIHRoZSBvYnNlcnZlZCB0cmFpdHMgYWZ0ZXIgYWNjb3VudGluZyBmb3IgdGhlIGZhY3RvcnNcblZlID0gMiAjIHJlc2lkdWFsIG1pY3JvZW52aXJvbm1lbnRhbCB2YXJpYW5jZSBpbiBlYWNoIG9mIHRoZSBvYnNlcnZlZCB0cmFpdHMgYWZ0ZXIgYWNjb3VudGluZyBmb3IgdGhlIGZhY3RvcnNcblZiID0gMCAjIG1hZ25pdHVkZSBvZiB0aGUgZml4ZWQgZWZmZWN0cyAoanVzdCBmYWN0b3JzKVxubmV3X2hhbGZTaWJfc2ltdWxhdGlvbignU2ltX0ZFXzEnLCBuU2lyZT1uU2lyZSxuUmVwPW5SZXAscD1uVHJhaXRzLCBiPW5GaXhlZEVmZmVjdHMsIGZhY3Rvcl9oMnM9IGZhY3Rvcl9oMnMsVmEgPSBWYSwgVmUgPSBWZSxWYiA9IFZiKVxuc2V0LnNlZWQoc2VlZClcbmxvYWQoJ3NldHVwLlJEYXRhJylcbmBgYCJ9 -->
-<pre class="r"><code>seed = 1  # for reproducibility
-nSire = 50 # simulation design is a half-sib design: each of nSire fathers has nRep children, each with a different female
-nRep = 10
-nTraits = 100
-nFixedEffects = 2 # fixed effects are effects on the factors
-nFactors = 10
-factor_h2s = c(rep(0,nFactors/2),rep(0.9,nFactors/2))  # factor_h2 is the % of variance in each factor trait that is explained by additive genetic variation.
-# The is after accounting for the fixed effects on the factors
-Va = 2 # residual genetic variance in each of the observed traits after accounting for the factors
-Ve = 2 # residual microenvironmental variance in each of the observed traits after accounting for the factors
-Vb = 0 # magnitude of the fixed effects (just factors)
-new_halfSib_simulation('Sim_FE_1', nSire=nSire,nRep=nRep,p=nTraits, b=nFixedEffects, factor_h2s= factor_h2s,Va = Va, Ve = Ve,Vb = Vb)
-set.seed(seed)
-load('setup.RData')</code></pre>
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxubmV3X2hhbGZTaWJfc2ltdWxhdGlvblxuXG5gYGAifQ== -->
+<pre class="r"><code>new_halfSib_simulation
+</code></pre>
 <!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiZnVuY3Rpb24obmFtZSwgblNpcmUsblJlcCxwLCBiLCBmYWN0b3JfaDJzLCBWYSA9IDAuMiwgVmUgPSAwLjIsVmIgPSAwLCBudW1lZmYgPSBOVUxMKXtcbiAgblRvdCA9IG1lYW4oblJlcCkgKiBuU2lyZVxuICBuUmVwID0gcmVwKG5SZXAsblNpcmUvbGVuZ3RoKG5SZXApKVxuICBTaXJlID0gYXMuZmFjdG9yKGRvLmNhbGwoYyxsYXBwbHkoMTpuU2lyZSxmdW5jdGlvbih4KSByZXAoeCxuUmVwW3hdKSkpKVxuICBLID0gLjI1KnRjcm9zc3Byb2QoTWF0cml4KG1vZGVsLm1hdHJpeCh+MCtTaXJlKSkpICsgZGlhZyguNzUsbGVuZ3RoKFNpcmUpKVxuICByb3duYW1lcyhLKSA9IDE6bnJvdyhLKVxuXG4gICMgZm9yIG1vcmUgaW5mb3JtYXRpdmUgS1xuICAjIEtbSz4wICYgSzwxXSA9IDFcblxuICAjIGZvciBsb3ctcmFuayBLXG4gICMgcm93bmFtZXNfSyA9IHJvd25hbWVzKEspXG4gICMgSyA9IHRjcm9zc3Byb2QobWF0cml4KHJub3JtKG5yb3coSykqMTAwKSxuY29sPTEwMCkpXG4gICMgc2RfSyA9IHNxcnQoZGlhZyhLKSlcbiAgIyBLID0gdChLIC8gc2RfSykvc2RfS1xuICAjIHJvd25hbWVzKEspID0gcm93bmFtZXNfS1xuXG4gICMgaW4gY2FzZSBLIGlzIGxvdy1yYW5rXG4gIEtfY2hvbCA9IGNob2woSytkaWFnKDFlLTYsbnJvdyhLKSkpXG5cbiAgIyBMYW1iZGEgbWF0cml4XG4gICMgZmFjdG9yX2gycyA9IHJlcCgwLGspXG4gICMgZmFjdG9yX2gyc1syKzE6a19HXSA9IHJ1bmlmKGtfRylcbiAgayA9IGxlbmd0aChmYWN0b3JfaDJzKVxuICBMYW1iZGEgPSBtYXRyaXgoMCxwLGspXG4gIGlmKGlzLm51bGwobnVtZWZmKSkgbnVtZWZmID0gc2FtcGxlKChwLzMwKToocC80KSxrLHJlcGxhY2U9VClcbiAgZm9yKGggaW4gMTprKXtcbiAgICBMYW1iZGFbc2FtcGxlKDE6cCxudW1lZmZbaF0pLGhdID0gcm5vcm0obnVtZWZmW2hdKVxuICB9XG4gIExhbWJkYSA9IExhbWJkYVssb3JkZXIoLWRpYWcodChMYW1iZGEpICUqJSBMYW1iZGEpKV1cbiAgY29scz0xOmtcbiAgZ19jb2xzID0gZmFjdG9yX2gycz4wXG4gIGlmKHN1bShnX2NvbHMpID09IDApIGdfY29scyA9IDE6a1xuICBMYW1iZGEgPSBMYW1iZGFbZG8uY2FsbChcIm9yZGVyXCIsIHVubmFtZShzcGxpdCgtYWJzKExhbWJkYVssY29sc1tnX2NvbHNdXSksIGNvbChMYW1iZGFbLGNvbHNbZ19jb2xzXV0pKSkpLF1cblxuICAjIHJlc2lkIHZhcmlhbmNlc1xuICAjIHRvdF9ZX3ByZWMgPSByZXAoMC41LHApXG4gICMgcmVzaWRfaDIgPSBydW5pZihwLDAsMC42KVxuICByZXNpZF9WYSA9IHJlcChWYSxwKVxuICByZXNpZF9WZSA9IHJlcChWZSxwKVxuICByZXNpZF9oMiA9IHJlc2lkX1ZhLyhyZXNpZF9WYStyZXNpZF9WZSlcbiAgdG90X1lfcHJlYyA9IDEvKHJlc2lkX1ZhK3Jlc2lkX1ZlKVxuXG4gICMgRywgUiBtYXRyaWNlc1xuICBHID0gdGNyb3NzcHJvZChzd2VlcChMYW1iZGEsMixzcXJ0KGZhY3Rvcl9oMnMpLCcqJykpICsgZGlhZyhyZXNpZF9oMi90b3RfWV9wcmVjKVxuICBSID0gdGNyb3NzcHJvZChzd2VlcChMYW1iZGEsMixzcXJ0KDEtZmFjdG9yX2gycyksJyonKSkgKyBkaWFnKCgxLXJlc2lkX2gyKS90b3RfWV9wcmVjKVxuXG4gICMgZml4ZWQgZWZmZWN0IGRlc2lnblxuICBuID0gbnJvdyhLKVxuICBYID0gY2JpbmQoMSxtYXRyaXgocm5vcm0obiooYi0xKSksbnJvdz1uKSlcbiAgY29sbmFtZXNfWCA9ICdpbnRlcmNlcHQnXG4gIGlmKGIgPiAxKSBjb2xuYW1lc19YID0gYyhjb2xuYW1lc19YLHBhc3RlMCgnRml4ZWQnLDE6bWF4KDEsKGItMSkpKSlcbiAgY29sbmFtZXMoWCkgPSBjb2xuYW1lc19YXG4gIFhfRiA9IFhbLC0xXVxuXG4gICMgUkUgZGVzaWduXG4gIGRhdGEgPSBkcm9wbGV2ZWxzKGRhdGEuZnJhbWUoWCxTaXJlPVNpcmUsYW5pbWFsID0gcm93bmFtZXMoSykpKVxuICBaID0gZGlhZygxLG4pXG4gICMgWiA9IG1vZGVsLm1hdHJpeCh+MCtTaXJlLGRhdGEpXG4gICMgciA9IG5jb2woWilcblxuICBCX0YgPSBtYXRyaXgocm5vcm0oKGItMSkqayksbnJvdyA9IChiLTEpLG5jb2w9aykgKiBzcXJ0KFZiKVxuICBCID0gcmJpbmQocm5vcm0ocCksbWF0cml4KDAsKGItMSkscCkpICogc3FydChWYilcblxuICBVX0YgPSB0KEtfY2hvbCkgJSolIG1hdHJpeChybm9ybShuKmssMCxzcXJ0KGZhY3Rvcl9oMnMpKSxuLGssYnlyb3c9VClcbiAgRV9GID0gbWF0cml4KHJub3JtKG4qaywwLHNxcnQoMS1mYWN0b3JfaDJzKSksbixrLGJ5cm93PVQpXG4gIEYgPSBYX0YgJSolIEJfRiArIFogJSolIFVfRiArIEVfRlxuXG4gIFVfUiA9IHQoS19jaG9sKSAlKiUgbWF0cml4KHJub3JtKG4qcCwwLHNxcnQocmVzaWRfaDIvdG90X1lfcHJlYykpLG4scCxieXJvdz1UKVxuICBFX1IgPSBtYXRyaXgocm5vcm0obipwLDAsc3FydCgoMS1yZXNpZF9oMikvdG90X1lfcHJlYykpLG4scCxieXJvdz1UKVxuICBZID0gWCAlKiUgQiArIEYgJSolIHQoTGFtYmRhKSArIFVfUiArIEVfUlxuXG4gICMgcmVjb3ZlcigpXG4gIFkgPSBhcy5tYXRyaXgoWSlcbiAgY29sbmFtZXMoWSkgPSBwYXN0ZTAoJ2dlbmUnLDE6cClcblxuXG4gIHNldHVwID0gbGlzdChcbiAgICBZID0gWSxcbiAgICBkYXRhID0gZGF0YSxcbiAgICBLID0gSyxcbiAgICBCID0gQixcbiAgICBCX0YgPSBCX0YsXG4gICAgZXJyb3JfZmFjdG9yX0xhbWJkYSA9IExhbWJkYSxcbiAgICBoMiA9IHJlc2lkX2gyLFxuICAgIGZhY3Rvcl9oMnMgPSBmYWN0b3JfaDJzLFxuICAgIEcgPSBHLFxuICAgIFIgPSBSLFxuICAgIFggPSBYLFxuICAgIFhfRiA9IFhfRixcbiAgICBVX0YgPSBVX0YsXG4gICAgVV9SID0gVV9SLFxuICAgIEYgPSBGLFxuICAgICMgRV9GID0gRV9GLFxuICAgICMgRV9SID0gRV9SLFxuICAgIG5hbWUgPSBuYW1lXG4gIClcbiAgc2F2ZShzZXR1cCxmaWxlPSdzZXR1cC5SRGF0YScpXG59XG48Ynl0ZWNvZGU6IDB4MTEwMzg2YjUwPlxuPGVudmlyb25tZW50OiBuYW1lc3BhY2U6QlNGRz5cbiJ9 -->
+<pre><code>function(name, nSire,nRep,p, b, factor_h2s, Va = 0.2, Ve = 0.2,Vb = 0, numeff = NULL){
+  nTot = mean(nRep) * nSire
+  nRep = rep(nRep,nSire/length(nRep))
+  Sire = as.factor(do.call(c,lapply(1:nSire,function(x) rep(x,nRep[x]))))
+  K = .25*tcrossprod(Matrix(model.matrix(~0+Sire))) + diag(.75,length(Sire))
+  rownames(K) = 1:nrow(K)
+
+  # for more informative K
+  # K[K&gt;0 &amp; K&lt;1] = 1
+
+  # for low-rank K
+  # rownames_K = rownames(K)
+  # K = tcrossprod(matrix(rnorm(nrow(K)*100),ncol=100))
+  # sd_K = sqrt(diag(K))
+  # K = t(K / sd_K)/sd_K
+  # rownames(K) = rownames_K
+
+  # in case K is low-rank
+  K_chol = chol(K+diag(1e-6,nrow(K)))
+
+  # Lambda matrix
+  # factor_h2s = rep(0,k)
+  # factor_h2s[2+1:k_G] = runif(k_G)
+  k = length(factor_h2s)
+  Lambda = matrix(0,p,k)
+  if(is.null(numeff)) numeff = sample((p/30):(p/4),k,replace=T)
+  for(h in 1:k){
+    Lambda[sample(1:p,numeff[h]),h] = rnorm(numeff[h])
+  }
+  Lambda = Lambda[,order(-diag(t(Lambda) %*% Lambda))]
+  cols=1:k
+  g_cols = factor_h2s&gt;0
+  if(sum(g_cols) == 0) g_cols = 1:k
+  Lambda = Lambda[do.call(&quot;order&quot;, unname(split(-abs(Lambda[,cols[g_cols]]), col(Lambda[,cols[g_cols]])))),]
+
+  # resid variances
+  # tot_Y_prec = rep(0.5,p)
+  # resid_h2 = runif(p,0,0.6)
+  resid_Va = rep(Va,p)
+  resid_Ve = rep(Ve,p)
+  resid_h2 = resid_Va/(resid_Va+resid_Ve)
+  tot_Y_prec = 1/(resid_Va+resid_Ve)
+
+  # G, R matrices
+  G = tcrossprod(sweep(Lambda,2,sqrt(factor_h2s),'*')) + diag(resid_h2/tot_Y_prec)
+  R = tcrossprod(sweep(Lambda,2,sqrt(1-factor_h2s),'*')) + diag((1-resid_h2)/tot_Y_prec)
+
+  # fixed effect design
+  n = nrow(K)
+  X = cbind(1,matrix(rnorm(n*(b-1)),nrow=n))
+  colnames_X = 'intercept'
+  if(b &gt; 1) colnames_X = c(colnames_X,paste0('Fixed',1:max(1,(b-1))))
+  colnames(X) = colnames_X
+  X_F = X[,-1]
+
+  # RE design
+  data = droplevels(data.frame(X,Sire=Sire,animal = rownames(K)))
+  Z = diag(1,n)
+  # Z = model.matrix(~0+Sire,data)
+  # r = ncol(Z)
+
+  B_F = matrix(rnorm((b-1)*k),nrow = (b-1),ncol=k) * sqrt(Vb)
+  B = rbind(rnorm(p),matrix(0,(b-1),p)) * sqrt(Vb)
+
+  U_F = t(K_chol) %*% matrix(rnorm(n*k,0,sqrt(factor_h2s)),n,k,byrow=T)
+  E_F = matrix(rnorm(n*k,0,sqrt(1-factor_h2s)),n,k,byrow=T)
+  F = X_F %*% B_F + Z %*% U_F + E_F
+
+  U_R = t(K_chol) %*% matrix(rnorm(n*p,0,sqrt(resid_h2/tot_Y_prec)),n,p,byrow=T)
+  E_R = matrix(rnorm(n*p,0,sqrt((1-resid_h2)/tot_Y_prec)),n,p,byrow=T)
+  Y = X %*% B + F %*% t(Lambda) + U_R + E_R
+
+  # recover()
+  Y = as.matrix(Y)
+  colnames(Y) = paste0('gene',1:p)
+
+
+  setup = list(
+    Y = Y,
+    data = data,
+    K = K,
+    B = B,
+    B_F = B_F,
+    error_factor_Lambda = Lambda,
+    h2 = resid_h2,
+    factor_h2s = factor_h2s,
+    G = G,
+    R = R,
+    X = X,
+    X_F = X_F,
+    U_F = U_F,
+    U_R = U_R,
+    F = F,
+    # E_F = E_F,
+    # E_R = E_R,
+    name = name
+  )
+  save(setup,file='setup.RData')
+}
+&lt;bytecode: 0x110386b50&gt;
+&lt;environment: namespace:BSFG&gt;</code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->

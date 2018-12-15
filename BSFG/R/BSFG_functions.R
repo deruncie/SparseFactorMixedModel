@@ -81,7 +81,7 @@ Image = function(X,dimnames=FALSE,title = NULL,include_zero = TRUE,...) {
   if(!is.null(rownames(X))) X_tall$Var1 = factor(X_tall$Var1,levels = rev(rownames(X)))
   X_tall$value = as.numeric(X_tall$value)
   X_tall = X_tall[X_tall$value != 0,,drop=FALSE] # make it sparse again
-  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile(alpha = 0.8) + xlab('') + ylab('') + theme_minimal() +
+  p <- ggplot(X_tall,aes(x=Var2,y=Var1,fill=value)) + geom_tile(alpha = 0.8,height=1,width=1) + xlab('') + ylab('') + theme_minimal() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1))
   if(include_zero) p <- p + expand_limits(fill=0)
   if(!is.null(title)) p <- p + ggtitle(title)
