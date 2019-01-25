@@ -95,7 +95,7 @@ sample_Lambda_prec_ARD = function(BSFG_state,...) {
                          # initialize variables if needed
                          if(!exists('delta')){
                            delta = with(priors,matrix(c(rgamma(1,shape = delta_1_shape,rate = delta_1_rate),rgamma(K-1,shape = delta_2_shape,rate = delta_2_rate)),nrow=1))
-                           # tauh  = matrix(cumprod(delta),nrow=1)
+                           tauh  = matrix(cumprod(delta),nrow=1)
                            Lambda_phi = Lambda_prec = matrix(1,p,K)
                            # Plam = sweep(Lambda_prec,2,tauh,'*')
                            # Lambda[] = Lambda / sqrt(Plam)

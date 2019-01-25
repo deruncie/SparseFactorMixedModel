@@ -1,5 +1,5 @@
 my_detectCores = function() {
-  ncores = suppressWarnings(as.numeric(system('printenv SLURM_CPUS_PER_TASK',intern=T)))
+  ncores = try(suppressWarnings(as.numeric(system('printenv SLURM_CPUS_PER_TASK',intern=T))),silent=T)
   if(length(ncores) == 0 || is.na(ncores)) ncores = parallel::detectCores()
   ncores
 }
