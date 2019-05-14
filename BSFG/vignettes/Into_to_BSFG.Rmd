@@ -52,7 +52,7 @@ run_parameters = BSFG_control(
   h2_divisions = 20, # Each variance component is allowed to explain between 0% and 100% of the total variation. How many segments should the range [0,100) be divided into for each random effect?
   h2_step_size = NULL, # if NULL, all possible values of random effects are tried each iteration. If in (0,1), a new candidate set of random effect proportional variances is drawn uniformily with a range of this size
   burn = 00,  # number of burn in samples before saving posterior samples
-  k_init = 15, # number of factors
+  K = 15, # number of factors
   simulation = TRUE # Are you running against simulated data (ex from a call to new_halfSib_simulation above)? If so, you can provide the setup list and it will make some QC plots
 )
 ```
@@ -70,7 +70,7 @@ priors = BSFG_priors(
     delta_1   = list(shape = 2,  rate = 1),
     delta_2   = list(shape = 3, rate = 1)
   ),
-  B_prior = list(           # prior for fixed effects. Supersedes fixed_var above.
+  B2_prior = list(           # prior for fixed effects. Supersedes fixed_var above.
     sampler = sample_B_prec_ARD,  # class of priors. ARD is default
     global   = list(V = 1,nu = 3),  # global shrinkage hyperparameters
     global_F = list(V = 1,nu = 3), # global shrinkage hyperparameters for factors

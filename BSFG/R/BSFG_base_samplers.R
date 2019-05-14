@@ -15,8 +15,9 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
   # ----------------------------------------------- #
   # -----------Reset Global Random Number Stream--- #
   # ----------------------------------------------- #
-  do.call("RNGkind",as.list(BSFG_state$RNG$RNGkind))  ## must be first!
-  assign(".Random.seed", BSFG_state$RNG$Random.seed, .GlobalEnv)
+  RNG = BSFG_state$current_state$RNG
+  do.call("RNGkind",as.list(RNG$RNGkind))  ## must be first!
+  assign(".Random.seed", RNG$Random.seed, .GlobalEnv)
 
   # ----------------------------------------------- #
   # ----------------Set up run--------------------- #
@@ -75,13 +76,13 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
   # ----------------------------------------------- #
   # ------------Save state for restart------------- #
   # ----------------------------------------------- #
+  BSFG_state$current_state$RNG = list(
+      Random.seed = .Random.seed,
+      RNGkind = RNGkind()
+    )
 
   current_state = BSFG_state$current_state
   saveRDS(current_state,file=sprintf('%s/current_state.rds',BSFG_state$run_ID))
 
-  BSFG_state$RNG = list(
-    Random.seed = .Random.seed,
-    RNGkind = RNGkind()
-  )
   return(BSFG_state)
 }

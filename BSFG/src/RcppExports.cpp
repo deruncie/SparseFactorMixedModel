@@ -7,6 +7,64 @@
 
 using namespace Rcpp;
 
+// LDLt
+List LDLt(SEXP A_);
+RcppExport SEXP _BSFG_LDLt(SEXP A_SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type A_(A_SEXP);
+    rcpp_result_gen = Rcpp::wrap(LDLt(A_));
+    return rcpp_result_gen;
+END_RCPP
+}
+// make_chol_ZtZ_Kinv_list
+Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats_, Map<MatrixXd> h2s_matrix, MSpMat ZtZ, double drop0_tol, SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar, int ncores);
+RcppExport SEXP _BSFG_make_chol_ZtZ_Kinv_list(SEXP chol_Ki_mats_SEXP, SEXP h2s_matrixSEXP, SEXP ZtZSEXP, SEXP drop0_tolSEXP, SEXP pbSEXP, SEXP setTxtProgressBarSEXP, SEXP getTxtProgressBarSEXP, SEXP ncoresSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type chol_Ki_mats_(chol_Ki_mats_SEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s_matrix(h2s_matrixSEXP);
+    Rcpp::traits::input_parameter< MSpMat >::type ZtZ(ZtZSEXP);
+    Rcpp::traits::input_parameter< double >::type drop0_tol(drop0_tolSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type pb(pbSEXP);
+    Rcpp::traits::input_parameter< Function >::type setTxtProgressBar(setTxtProgressBarSEXP);
+    Rcpp::traits::input_parameter< Function >::type getTxtProgressBar(getTxtProgressBarSEXP);
+    Rcpp::traits::input_parameter< int >::type ncores(ncoresSEXP);
+    rcpp_result_gen = Rcpp::wrap(make_chol_ZtZ_Kinv_list(chol_Ki_mats_, h2s_matrix, ZtZ, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores));
+    return rcpp_result_gen;
+END_RCPP
+}
+// make_chol_V_list
+Rcpp::List make_chol_V_list(Rcpp::List ZKZts_, Map<MatrixXd> h2s_matrix, double drop0_tol, SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar, int ncores);
+RcppExport SEXP _BSFG_make_chol_V_list(SEXP ZKZts_SEXP, SEXP h2s_matrixSEXP, SEXP drop0_tolSEXP, SEXP pbSEXP, SEXP setTxtProgressBarSEXP, SEXP getTxtProgressBarSEXP, SEXP ncoresSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type ZKZts_(ZKZts_SEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s_matrix(h2s_matrixSEXP);
+    Rcpp::traits::input_parameter< double >::type drop0_tol(drop0_tolSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type pb(pbSEXP);
+    Rcpp::traits::input_parameter< Function >::type setTxtProgressBar(setTxtProgressBarSEXP);
+    Rcpp::traits::input_parameter< Function >::type getTxtProgressBar(getTxtProgressBarSEXP);
+    Rcpp::traits::input_parameter< int >::type ncores(ncoresSEXP);
+    rcpp_result_gen = Rcpp::wrap(make_chol_V_list(ZKZts_, h2s_matrix, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores));
+    return rcpp_result_gen;
+END_RCPP
+}
+// record_sample_Posterior_array
+void record_sample_Posterior_array(Map<MatrixXd> current_sample, Map<MatrixXd> Posterior_array_, int sp_num);
+RcppExport SEXP _BSFG_record_sample_Posterior_array(SEXP current_sampleSEXP, SEXP Posterior_array_SEXP, SEXP sp_numSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type current_sample(current_sampleSEXP);
+    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Posterior_array_(Posterior_array_SEXP);
+    Rcpp::traits::input_parameter< int >::type sp_num(sp_numSEXP);
+    record_sample_Posterior_array(current_sample, Posterior_array_, sp_num);
+    return R_NilValue;
+END_RCPP
+}
 // matrix_multiply_toDense
 MatrixXd matrix_multiply_toDense(SEXP X_, SEXP Y_);
 RcppExport SEXP _BSFG_matrix_multiply_toDense(SEXP X_SEXP, SEXP Y_SEXP) {
@@ -242,63 +300,5 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type grainSize(grainSizeSEXP);
     rcpp_result_gen = Rcpp::wrap(get_fitted_set_c(model_matrices, coefs, grainSize));
     return rcpp_result_gen;
-END_RCPP
-}
-// LDLt
-List LDLt(SEXP A_);
-RcppExport SEXP _BSFG_LDLt(SEXP A_SEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< SEXP >::type A_(A_SEXP);
-    rcpp_result_gen = Rcpp::wrap(LDLt(A_));
-    return rcpp_result_gen;
-END_RCPP
-}
-// make_chol_ZtZ_Kinv_list
-Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats_, Map<MatrixXd> h2s_matrix, MSpMat ZtZ, double drop0_tol, SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar, int ncores);
-RcppExport SEXP _BSFG_make_chol_ZtZ_Kinv_list(SEXP chol_Ki_mats_SEXP, SEXP h2s_matrixSEXP, SEXP ZtZSEXP, SEXP drop0_tolSEXP, SEXP pbSEXP, SEXP setTxtProgressBarSEXP, SEXP getTxtProgressBarSEXP, SEXP ncoresSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::List >::type chol_Ki_mats_(chol_Ki_mats_SEXP);
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s_matrix(h2s_matrixSEXP);
-    Rcpp::traits::input_parameter< MSpMat >::type ZtZ(ZtZSEXP);
-    Rcpp::traits::input_parameter< double >::type drop0_tol(drop0_tolSEXP);
-    Rcpp::traits::input_parameter< SEXP >::type pb(pbSEXP);
-    Rcpp::traits::input_parameter< Function >::type setTxtProgressBar(setTxtProgressBarSEXP);
-    Rcpp::traits::input_parameter< Function >::type getTxtProgressBar(getTxtProgressBarSEXP);
-    Rcpp::traits::input_parameter< int >::type ncores(ncoresSEXP);
-    rcpp_result_gen = Rcpp::wrap(make_chol_ZtZ_Kinv_list(chol_Ki_mats_, h2s_matrix, ZtZ, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores));
-    return rcpp_result_gen;
-END_RCPP
-}
-// make_chol_V_list
-Rcpp::List make_chol_V_list(Rcpp::List ZKZts_, Map<MatrixXd> h2s_matrix, double drop0_tol, SEXP pb, Function setTxtProgressBar, Function getTxtProgressBar, int ncores);
-RcppExport SEXP _BSFG_make_chol_V_list(SEXP ZKZts_SEXP, SEXP h2s_matrixSEXP, SEXP drop0_tolSEXP, SEXP pbSEXP, SEXP setTxtProgressBarSEXP, SEXP getTxtProgressBarSEXP, SEXP ncoresSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::List >::type ZKZts_(ZKZts_SEXP);
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s_matrix(h2s_matrixSEXP);
-    Rcpp::traits::input_parameter< double >::type drop0_tol(drop0_tolSEXP);
-    Rcpp::traits::input_parameter< SEXP >::type pb(pbSEXP);
-    Rcpp::traits::input_parameter< Function >::type setTxtProgressBar(setTxtProgressBarSEXP);
-    Rcpp::traits::input_parameter< Function >::type getTxtProgressBar(getTxtProgressBarSEXP);
-    Rcpp::traits::input_parameter< int >::type ncores(ncoresSEXP);
-    rcpp_result_gen = Rcpp::wrap(make_chol_V_list(ZKZts_, h2s_matrix, drop0_tol, pb, setTxtProgressBar, getTxtProgressBar, ncores));
-    return rcpp_result_gen;
-END_RCPP
-}
-// record_sample_Posterior_array
-void record_sample_Posterior_array(Map<MatrixXd> current_sample, Map<MatrixXd> Posterior_array_, int sp_num);
-RcppExport SEXP _BSFG_record_sample_Posterior_array(SEXP current_sampleSEXP, SEXP Posterior_array_SEXP, SEXP sp_numSEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type current_sample(current_sampleSEXP);
-    Rcpp::traits::input_parameter< Map<MatrixXd> >::type Posterior_array_(Posterior_array_SEXP);
-    Rcpp::traits::input_parameter< int >::type sp_num(sp_numSEXP);
-    record_sample_Posterior_array(current_sample, Posterior_array_, sp_num);
-    return R_NilValue;
 END_RCPP
 }

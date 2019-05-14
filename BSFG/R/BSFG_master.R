@@ -464,11 +464,6 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
   # -- create BSFG_state object - #
   # ----------------------------- #
 
-  RNG = list(
-    Random.seed = .Random.seed,
-    RNGkind = RNGkind()
-  )
-
   BSFG_state = list(
     current_state  = list(),
     run_ID         = run_ID,
@@ -476,7 +471,6 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
     priors         = list,
     run_parameters = run_parameters,
     run_variables  = run_variables,
-    RNG            = RNG,
     setup          = setup
   )
   class(BSFG_state) = append('BSFG_state',class(BSFG_state))
@@ -631,6 +625,7 @@ initialize_variables_BSFG = function(BSFG_state,...){
     # var_Eta
     if(!'var_Eta' %in% ls()) var_Eta = rep(1,p)
 
+
     # ----------------------- #
     # ---Save initial values- #
     # ----------------------- #
@@ -665,6 +660,12 @@ initialize_variables_BSFG = function(BSFG_state,...){
   observation_model_state = run_parameters$observation_model(run_parameters$observation_model_parameters,BSFG_state)
   BSFG_state$current_state[names(observation_model_state$state)] = observation_model_state$state
 
+
+  # save the initial RNG state
+  BSFG_state$current_state$RNG = list(
+    Random.seed = .Random.seed,
+    RNGkind = RNGkind()
+  )
 
   # ----------------------------- #
   # --- Initialize BSFG_state --- #
