@@ -190,7 +190,7 @@ SpMat make_chol_R(const std::vector<R_matrix>& ZKZts, const VectorXd h2s, const 
       Rs.coeffRef(i,i) += (1.0-h2s.sum());
     }
     // diagonal().array() += (1.0-h2s.sum());
-    Eigen::SimplicialLLT<SpMat> chol_R(Rs);
+    Eigen::SimplicialLLT<SpMat,Lower,NaturalOrdering<int> > chol_R(Rs);
     MatrixXd chol_R_U = chol_R.matrixU();
     return chol_R_U.sparseView(0,tol);
   }
