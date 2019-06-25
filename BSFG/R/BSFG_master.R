@@ -68,7 +68,7 @@ BSFG_control = function(
 #'     if that is easier.
 #'
 #' @param tot_Y_var List of parameters of inverse gamma distribution for residual variances, specifically:
-#'     \code{V} and \code{nu}, give shape = \code{nu/2} and scale = \code{nu*V/2}, so mean = \code{\frac{V*nu}{nu-2}}
+#'     \code{V} and \code{nu}, give shape = \code{nu/2} and scale = \code{nu*V/2}, so mean = \code{(V*nu)/(nu-2)}
 #' @param tot_F_var List of parameters of inverse gamma distribution for factor variances. See \code{tot_Y_var}.
 #'     This parameter provides the parameter extension of Ghosh and Dunson (2009), but is removed
 #'     from all Factor parameters before they are saved in Posterior
@@ -89,7 +89,6 @@ BSFG_control = function(
 #' @return a list with each of the prior components specified above.
 #' @export
 #'
-#' @examples
 BSFG_priors = function(
                         tot_Y_var = list(V = 0.5,   nu = 3),
                         tot_F_var = list(V = 18/20, nu = 20),

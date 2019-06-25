@@ -63,10 +63,9 @@ load_simulation_data = function(file = NULL){
 #' @param breaks
 #' @param colors
 #'
-#' @return
+#' @return ggplot object
 #' @export
 #'
-#' @examples
 Image = function(X,dimnames=FALSE,title = NULL,include_zero = TRUE,...) {
   require(ggplot2)
   X = as.matrix(X)
@@ -795,7 +794,6 @@ get_posterior_HPDinterval = function(X,FUN = NULL,prob = 0.95,...){
 #' @return a matrix
 #' @export
 #'
-#' @examples
 toDense = function(X) {
   matrix(X@x,nrow(X))
 }

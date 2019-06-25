@@ -14,6 +14,9 @@ X1 \%**\% X2
 \value{
 matrix
 }
+\description{
+Multiply matrices
+}
 \details{
 Uses RcppEigen when one or both matrices are of class dgCMatrix
 }

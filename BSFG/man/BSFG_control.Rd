@@ -6,7 +6,7 @@
 \usage{
 BSFG_control(simulation = c(F, T), scale_Y = c(T, F), K = 20,
   h2_divisions = 100, h2_step_size = NULL, drop0_tol = 1e-14,
-  K_eigen_tol = 1e-10, burn = 100, thin = 2, num_NA_groups = Inf,
+  K_eigen_tol = 1e-10, burn = 100, thin = 2, max_NA_groups = Inf,
   svd_K = TRUE, verbose = TRUE, ...)
 }
 \arguments{
@@ -43,7 +43,7 @@ untransformed.}
 
 \item{thin}{thinning rate of the MCMC chain}
 
-\item{num_NA_groups}{If 0, all NAs will be imputed during sampling. If Inf, all NAs will be marginalized over.
+\item{max_NA_groups}{If 0, all NAs will be imputed during sampling. If Inf, all NAs will be marginalized over.
 If in (0,Inf), up to this many groups of columns will be separately sampled.
 The minimum number of NAs in each column not in one of these groups will be imputed.}
 

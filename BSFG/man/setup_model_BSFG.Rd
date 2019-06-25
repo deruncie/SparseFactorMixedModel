@@ -4,12 +4,12 @@
 \alias{setup_model_BSFG}
 \title{Set up a BSFG model}
 \usage{
-setup_model_BSFG(Y, formula, extra_regressions = NULL, data, relmat = NULL,
-  cis_genotypes = NULL, run_parameters = BSFG_control(),
-  posteriorSample_params = c("Lambda", "U_F", "F", "delta", "tot_F_prec",
-  "F_h2", "tot_Eta_prec", "resid_h2", "B1", "B2_F", "B2_R", "U_R",
-  "cis_effects", "Lambda_m_eff"), posteriorMean_params = c(), setup = NULL,
-  run_ID = "BSFG_run")
+setup_model_BSFG(Y, formula, extra_regressions = NULL, data,
+  relmat = NULL, cis_genotypes = NULL,
+  run_parameters = BSFG_control(), posteriorSample_params = c("Lambda",
+  "U_F", "F", "delta", "tot_F_prec", "F_h2", "tot_Eta_prec", "resid_h2",
+  "B1", "B2_F", "B2_R", "U_R", "cis_effects", "Lambda_m_eff"),
+  posteriorMean_params = c(), setup = NULL, run_ID = "BSFG_run")
 }
 \arguments{
 \item{Y}{either a) a n x p matrix of data (n individuals x p traits), or b) a list describing
@@ -62,11 +62,11 @@ posterior samples and diagnostic information during the run.}
 \value{
 An object of class BSFG_state with components:
 
-current_state: a list of parameters in the current iteration of the sampler
+current_state: a list of parameters in the current iteration of the sampler. Initially empty
 
-Posterior: a list of arrays of posterior samples
+Posterior: a list of arrays of posterior samples. Initially empty
 
-RNG current state of R's Random number generator (for re-starting chaings)
+RNG: current state of R's Random number generator (for re-starting chaings)
 
 traitnames: vector of trait names (from colnames of Y)
 

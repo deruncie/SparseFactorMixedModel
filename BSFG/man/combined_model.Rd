@@ -11,6 +11,16 @@ combined_model(observation_model_parameters, BSFG_state = list())
 
 \item{BSFG_state}{the current BSFG_state object. Can be just a list with \code{data}}
 }
+\value{
+list of data_model variables including:
+
+state a list of parameters associated with the data_model. Here, only the matrix Eta
+
+posteriorSample_params a list of parameter names to record posterior samples of
+
+posteriorMean_params a list of parameters to record the posterior mean, but not save individual
+    posterior samples
+}
 \description{
 Sample Eta given a list of different observation_models
 }

@@ -11,6 +11,16 @@ bs_diff(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
 \arguments{
 \item{center}{}
 }
+\value{
+list of data_model variables including:
+
+state a list of parameters associated with the data_model. Here, only the matrix Eta
+
+posteriorSample_params a list of parameter names to record posterior samples of
+
+posteriorMean_params a list of parameters to record the posterior mean, but not save individual
+    posterior samples
+}
 \description{
 parameters follow \link{bs}
 }

@@ -93,7 +93,6 @@ missing_data_model = function(observation_model_parameters,BSFG_state = list()){
 #' When running \code{voom}, a fully-specified fixed effect model for the data should be specified.
 #'
 #' @inheritParams missing_data_model
-#' @inheritSection @value
 #' @references Law, C. W., Chen, Y., Shi, W., & Smyth, G. K. (2014).
 #'     voom: precision weights unlock linear model analysis tools for RNA-seq read counts.
 #'     Genome Biology, 15(2), R29. http://doi.org/10.1186/gb-2004-5-10-r80
@@ -143,12 +142,15 @@ voom_model = function(observation_model_parameters,BSFG_state = list()){
 #' @param differences
 #' @param center
 #'
-#' @return
+#' @return list of data_model variables including:
+#' @return state a list of parameters associated with the data_model. Here, only the matrix Eta
+#' @return posteriorSample_params a list of parameter names to record posterior samples of
+#' @return posteriorMean_params a list of parameters to record the posterior mean, but not save individual
+#'     posterior samples
 #' @export
 #'
 #' @references following code from https://github.com/SurajGupta/r-source/blob/master/src/library/splines/R/splines.R
 #'
-#' @examples
 bs_diff = function(x, df = NULL, knots = NULL, degree = 3, intercept = TRUE,
                     Boundary.knots = range(x),
                     differences = 1,
@@ -540,10 +542,13 @@ probe_gene_model = function(observation_model_parameters,BSFG_state = list()){
 #' @param observation_model_parameters a list of observation_model lists
 #' @param BSFG_state the current BSFG_state object. Can be just a list with \code{data}
 #'
-#' @return
+#' @return list of data_model variables including:
+#' @return state a list of parameters associated with the data_model. Here, only the matrix Eta
+#' @return posteriorSample_params a list of parameter names to record posterior samples of
+#' @return posteriorMean_params a list of parameters to record the posterior mean, but not save individual
+#'     posterior samples
 #' @export
 #'
-#' @examples
 combined_model = function(observation_model_parameters,BSFG_state = list()){
 
   ## NOTE: Somehow need to pass a subset of the factor model to each sub-model, or maybe calculate Eta_mean once and pass a subset to each model.

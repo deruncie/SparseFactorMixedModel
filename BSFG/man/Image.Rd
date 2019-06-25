@@ -4,10 +4,13 @@
 \alias{Image}
 \title{Modification to \code{image()}.}
 \usage{
-Image(X, dimnames = TRUE, ...)
+Image(X, dimnames = FALSE, title = NULL, include_zero = TRUE, ...)
 }
 \arguments{
 \item{colors}{}
+}
+\value{
+ggplot object
 }
 \description{
 Like `image,CHMfactor-method`, but with better defaults for correlation matrices especially.
