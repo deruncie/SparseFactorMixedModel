@@ -3,10 +3,9 @@
 #' Run MCMC chain for a specified number of iterations
 #'
 #' @param BSFG_state BSFG_state object of current chain
-#' @param n_samples Number of iterations to add to the chain (not number of posterior samples to draw.
-#'     This is determined by n_samples / thin)
-#' @param grainSize Minimum size of sub-problems for dividing among processes. Sent to RcppParallel
-sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
+#' @param n_iter Number of iterations to add to the chain (not number of posterior samples to draw.
+#'     This is determined by n_iter / thin)
+sample_BSFG = function(BSFG_state,n_iter,grainSize = 1,verbose=TRUE,...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
   run_parameters = BSFG_state$run_parameters
@@ -31,21 +30,21 @@ sample_BSFG = function(BSFG_state,n_samples,grainSize = 1,verbose=TRUE,...) {
   # ---Extend posterior matrices for new samples--- #
   # ----------------------------------------------- #
 
-  sp = (start_i + n_samples - burn)/thin - BSFG_state$Posterior$total_samples
+  sp = (start_i + n_iter - burn)/thin - BSFG_state$Posterior$total_samples
   BSFG_state$Posterior = expand_Posterior(BSFG_state$Posterior,max(0,sp))
 
   # ----------------------------------------------- #
   # --------------start gibbs sampling------------- #
   # ----------------------------------------------- #
 
-  if(verbose) pb = txtProgressBar(min=start_i,max = start_i+n_samples,style=3)
+  if(verbose) pb = txtProgressBar(min=start_i,max = start_i+n_iter,style=3)
   start_time = Sys.time()
-  for(i in start_i+(1:n_samples)){
+  for(i in start_i+(1:n_iter)){
     BSFG_state$current_state$nrun = i
     BSFG_state$current_state = BSFG_state$current_state[!sapply(BSFG_state$current_state,is.null)]
 
     # ----- Sample model parameters  except precisions ---------------- #
-    BSFG_state$current_state = sample_latent_traits(BSFG_state,grainSize = grainSize,...)
+    BSFG_state$current_state = sample_latent_traits(BSFG_state,...)
 
     # -----Sample Lambda_prec ------------- #
     BSFG_state$current_state = BSFG_state$priors$Lambda_prior$sampler(BSFG_state,...)

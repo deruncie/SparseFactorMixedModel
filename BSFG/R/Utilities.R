@@ -4,6 +4,14 @@ my_detectCores = function() {
   ncores
 }
 
+optimize_n_threads = function(BSFG_state,n_threads,times = 10) {
+  exprs = lapply(n_threads,function(threads) bquote({set_BSFG_nthreads(.(threads));sample_latent_traits(BSFG_state)}))
+  names(exprs) = n_threads
+  res=microbenchmark::microbenchmark(list = exprs,times = times)
+  summary_res = summary(res)
+  list(optim = as.numeric(as.character(summary_res$expr[order(summary_res$mean)[1]])),results = summary_res)
+}
+
 
 make_model_setup = function(formula,data,relmat = NULL) {
   # ensure data has rownames

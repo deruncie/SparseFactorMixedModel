@@ -4,7 +4,6 @@
 
 // [[Rcpp::depends(RcppEigen)]]
 using namespace Eigen;
-using namespace RcppParallel;
 
 
 // [[Rcpp::export()]]
@@ -25,4 +24,11 @@ void record_sample_Posterior_array(Map<MatrixXd> current_sample, Map<MatrixXd> P
   for(int i = 0; i < nrow_sample; i++){
     Posterior_array.row(i*n_samples + sp_num-1) = current_sample.row(i);
   }
+}
+
+// [[Rcpp::export]]
+void set_BSFG_nthreads(int threads) {
+  if ( threads > 0 )
+    omp_set_num_threads( threads );
+  // REprintf("Number of threads=%i\\n", omp_get_max_threads());
 }

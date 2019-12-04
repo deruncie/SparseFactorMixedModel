@@ -27,6 +27,7 @@ extern SEXP _BSFG_sample_MME_single_diagR(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _BSFG_sample_MME_ZKZts_c(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _BSFG_sample_tau2_delta_c_Eigen_v2(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP _BSFG_sample_trunc_delta_c_Eigen(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP _BSFG_set_BSFG_nthreads(SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
     {"_BSFG_find_candidate_states",         (DL_FUNC) &_BSFG_find_candidate_states,          3},
@@ -48,6 +49,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_BSFG_sample_MME_ZKZts_c",            (DL_FUNC) &_BSFG_sample_MME_ZKZts_c,             7},
     {"_BSFG_sample_tau2_delta_c_Eigen_v2",  (DL_FUNC) &_BSFG_sample_tau2_delta_c_Eigen_v2,   9},
     {"_BSFG_sample_trunc_delta_c_Eigen",    (DL_FUNC) &_BSFG_sample_trunc_delta_c_Eigen,     8},
+    {"_BSFG_set_BSFG_nthreads",             (DL_FUNC) &_BSFG_set_BSFG_nthreads,              1},
     {NULL, NULL, 0}
 };
 

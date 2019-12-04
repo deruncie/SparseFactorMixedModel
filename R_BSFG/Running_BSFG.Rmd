@@ -39,7 +39,7 @@ load('setup.RData')
 Y = setup$Y
 data = setup$data
 K = setup$K
-Y[1:(nrow(Y)*3/4),1:(ncol(Y)/4)] = NA
+# Y[1:(nrow(Y)*3/4),1:(ncol(Y)/4)] = NA
 # Y[(nrow(Y)/4)+1:(nrow(Y)/4),(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
 # Y[2*(nrow(Y)/4)+1:(nrow(Y)/4),2*(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
 # Y[3*(nrow(Y)/4)+1:(nrow(Y)/4),3*(ncol(Y)/4)+1:(ncol(Y)/4)] = NA
@@ -144,10 +144,12 @@ BSFG_state = clear_Posterior(BSFG_state)
 # BSFG_state = reorder_factors(BSFG_state)
 
 ```{r}
-n_samples = 200;  # how many samples to collect at once?
+n_iter = 100;  # how many samples to collect at once?
+(n_threads = optimize_n_threads(BSFG_state,seq(1,RcppParallel::defaultNumThreads(),by=1),times=2))
+set_BSFG_nthreads(n_threads$optim)
 for(i  in 1:70) {
   print(sprintf('Run %d',i))
-  BSFG_state = sample_BSFG(BSFG_state,n_samples,grainSize=1)  # run MCMC chain n_samples iterations. grainSize is a paramter for parallelization (smaller = more parallelization)
+  BSFG_state = sample_BSFG(BSFG_state,n_iter)  # run MCMC chain n_samples iterations. grainSize is a paramter for parallelization (smaller = more parallelization)
   
   BSFG_state = save_posterior_chunk(BSFG_state)  # save any accumulated posterior samples in the database to release memory
   print(BSFG_state) # print status of current chain
@@ -194,5 +196,4 @@ F_h2_HPD = get_posterior_HPDinterval(BSFG_state,F_h2)
 boxplot(BSFG_state$Posterior$B1[,1,],outline=F);abline(h=0)
 boxplot(BSFG_state$Posterior$B2_F[,1,],outline=F);abline(h=0)
 ```
-
 

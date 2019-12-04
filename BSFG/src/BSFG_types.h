@@ -1,6 +1,12 @@
 #include <RcppEigen.h>
-#include <RcppParallel.h>
 #include <ZigguratR.h>
+// [[Rcpp::plugins(openmp)]]
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+
+// #include <RcppParallel.h>
 
 
 using Eigen::Map;               	      // 'Eigen::Maps' rather than copies
@@ -15,7 +21,7 @@ typedef Eigen::SparseMatrix<double> SpMat;
 typedef Eigen::Map<SpMat> MSpMat;
 
 using namespace Rcpp;
-using namespace RcppParallel;
+// using namespace RcppParallel;
 using namespace Eigen;
 
 static Ziggurat::R::ZigguratR ziggr;

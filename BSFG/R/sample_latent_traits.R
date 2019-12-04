@@ -1,4 +1,4 @@
-sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
+sample_latent_traits = function(BSFG_state,...) {
   data_matrices  = BSFG_state$data_matrices
   priors         = BSFG_state$priors
   run_parameters = BSFG_state$run_parameters
@@ -52,8 +52,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
         matrix(0,nr = sum(QtX1_list[[set]]$keepColumns),ncol = length(cols)),
         rep(priors$cis_effects_prior$prec,sum(cis_effects_index %in% cols)),
         prior_mean[,cols,drop=FALSE],
-        prior_prec[,cols,drop=FALSE],
-        grainSize
+        prior_prec[,cols,drop=FALSE]
       )
 
       # extract samples
@@ -108,9 +107,8 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
         log_ps = log_p_h2s(QtEta_tilde_set,
                            tot_Eta_prec[cols],
                            chol_V_list_list[[set]],
-                           h2_priors_resids,
-                           grainSize)
-        resid_h2_index[cols] = sample_h2s(log_ps,grainSize)
+                           h2_priors_resids)
+        resid_h2_index[cols] = sample_h2s(log_ps)
       } else{
         resid_h2_index[cols] = sample_h2s_discrete_MH_c(QtEta_tilde_set,
                                                         tot_Eta_prec[cols],
@@ -118,8 +116,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                                         resid_h2_index[cols],
                                                         h2s_matrix,
                                                         chol_V_list_list[[set]],
-                                                        h2_step_size,
-                                                        grainSize)
+                                                        h2_step_size)
       }
       resid_h2[,cols] = h2s_matrix[,resid_h2_index[cols],drop=FALSE]
 
@@ -129,8 +126,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                       tot_Eta_prec[cols],
                                       chol_ZtZ_Kinv_list_list[[set]],
                                       resid_h2[,cols,drop=FALSE],
-                                      resid_h2_index[cols],
-                                      grainSize)
+                                      resid_h2_index[cols])
     }
 
 
@@ -157,8 +153,7 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       matrix(0,nr = 0,ncol = K),
       rep(0,0),
       prior_mean,
-      B2_F_prec,
-      grainSize
+      B2_F_prec
     )
 
     # extract samples
@@ -188,9 +183,8 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
       log_ps = log_p_h2s(Qt_F_tilde,
                          tot_F_prec,
                          chol_V_list_list[[1]],
-                         h2_priors_factors,
-                         grainSize)
-      F_h2_index = sample_h2s(log_ps,grainSize)
+                         h2_priors_factors)
+      F_h2_index = sample_h2s(log_ps)
     } else{
       F_h2_index = sample_h2s_discrete_MH_c(Qt_F_tilde,
                                           tot_F_prec,
@@ -198,12 +192,11 @@ sample_latent_traits = function(BSFG_state,grainSize = 1,...) {
                                           F_h2_index,
                                           h2s_matrix,
                                           chol_V_list_list[[1]],
-                                          h2_step_size,
-                                          grainSize)
+                                          h2_step_size)
     }
     F_h2[] = h2s_matrix[,F_h2_index,drop=FALSE]
 
-    U_F[] = sample_MME_ZKZts_c(F_tilde[rows,,drop=FALSE], ZL[rows,,drop=FALSE], tot_F_prec, chol_ZtZ_Kinv_list_list[[1]], F_h2, F_h2_index,grainSize)
+    U_F[] = sample_MME_ZKZts_c(F_tilde[rows,,drop=FALSE], ZL[rows,,drop=FALSE], tot_F_prec, chol_ZtZ_Kinv_list_list[[1]], F_h2, F_h2_index)
 
     resid_Eta_prec = tot_Eta_prec / (1-colSums(resid_h2))
 

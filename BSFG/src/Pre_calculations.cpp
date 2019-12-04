@@ -4,7 +4,6 @@
 
 // [[Rcpp::depends(RcppEigen)]]
 using namespace Eigen;
-using namespace RcppParallel;
 
 // [[Rcpp::export()]]
 List LDLt(SEXP A_) {
@@ -81,35 +80,6 @@ SpMat make_chol_K_inv(const std::vector<R_matrix>& chol_Ki_mats, VectorXd h2s,do
   return chol_K_inv;
 }
 
-struct make_chol_ZtZ_Kinv_worker : public RcppParallel::Worker {
-  const std::vector<R_matrix>& chol_Ki_mats;
-  const Map<MatrixXd> h2s_matrix;
-  const MSpMat ZtZ;
-  const double tol;
-  std::vector<SpMat>& chol_ZtZ_Kinv_list;
-
-  make_chol_ZtZ_Kinv_worker(
-    const std::vector<R_matrix>& chol_Ki_mats,
-    const Map<MatrixXd> h2s_matrix,
-    const MSpMat ZtZ,
-    const double tol,
-    std::vector<SpMat>& chol_ZtZ_Kinv_list
-  ):
-    chol_Ki_mats(chol_Ki_mats), h2s_matrix(h2s_matrix), ZtZ(ZtZ), tol(tol),
-    chol_ZtZ_Kinv_list(chol_ZtZ_Kinv_list) {}
-
-  void operator()(std::size_t begin, std::size_t end) {
-    for(std::size_t j = begin; j < end; j++){
-      VectorXd h2s = h2s_matrix.col(j);
-      SpMat chol_K_inv = make_chol_K_inv(chol_Ki_mats,h2s,tol);
-      MatrixXd ZtZ_Kinv = 1.0/(1.0 - h2s.sum()) * ZtZ + chol_K_inv.transpose() * chol_K_inv;
-      Eigen::LLT<MatrixXd> chol_ZtZ_Kinv(ZtZ_Kinv);
-      MatrixXd chol_ZtZ_Kinv_R = chol_ZtZ_Kinv.matrixU();
-      chol_ZtZ_Kinv_list[j] = chol_ZtZ_Kinv_R.sparseView(0,tol);
-    }
-  }
-};
-
 // [[Rcpp::export()]]
 Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats_,
                                    Map<MatrixXd> h2s_matrix,
@@ -131,10 +101,17 @@ Rcpp::List make_chol_ZtZ_Kinv_list(Rcpp::List chol_Ki_mats_,
 
   int n_groups = s/ncores;
   for(int i = 0; i <= n_groups; i++){
-    make_chol_ZtZ_Kinv_worker make_chols(chol_Ki_mats,h2s_matrix,ZtZ,drop0_tol,chol_ZtZ_Kinv_list);
     int start = ncores*i;
     int end = std::min(static_cast<double>(s),ncores*(i+1.0));
-    RcppParallel::parallelFor(start,end,make_chols,1);
+
+    for(std::size_t j = start; j < end; j++){
+      VectorXd h2s = h2s_matrix.col(j);
+      SpMat chol_K_inv = make_chol_K_inv(chol_Ki_mats,h2s,drop0_tol);
+      MatrixXd ZtZ_Kinv = 1.0/(1.0 - h2s.sum()) * ZtZ + chol_K_inv.transpose() * chol_K_inv;
+      Eigen::LLT<MatrixXd> chol_ZtZ_Kinv(ZtZ_Kinv);
+      MatrixXd chol_ZtZ_Kinv_R = chol_ZtZ_Kinv.matrixU();
+      chol_ZtZ_Kinv_list[j] = chol_ZtZ_Kinv_R.sparseView(0,drop0_tol);
+    }
     int pb_state = as<int>(getTxtProgressBar(pb));
     setTxtProgressBar(pb,pb_state+(end-start));
   }
@@ -197,28 +174,6 @@ SpMat make_chol_R(const std::vector<R_matrix>& ZKZts, const VectorXd h2s, const 
 }
 
 
-struct make_chol_R_worker : public RcppParallel::Worker {
-  const std::vector<R_matrix>& ZKZts;
-  const Map<MatrixXd> h2s_matrix;
-  const double tol;
-  std::vector<SpMat>& chol_R_list;
-
-  make_chol_R_worker(
-    const std::vector<R_matrix>& ZKZts, //const std::vector<Map<MatrixXd> > ZKZts,
-    const Map<MatrixXd> h2s_matrix,
-    const double tol,
-    std::vector<SpMat>& chol_R_list
-  ):
-    ZKZts(ZKZts), h2s_matrix(h2s_matrix), tol(tol),
-    chol_R_list(chol_R_list) {}
-
-  void operator()(std::size_t begin, std::size_t end) {
-    for(std::size_t j = begin; j < end; j++){
-      chol_R_list[j] = make_chol_R(ZKZts, h2s_matrix.col(j), tol);
-    }
-  }
-};
-
 // [[Rcpp::export()]]
 Rcpp::List make_chol_V_list(Rcpp::List ZKZts_,
                             Map<MatrixXd> h2s_matrix,
@@ -238,10 +193,11 @@ Rcpp::List make_chol_V_list(Rcpp::List ZKZts_,
 
   int n_groups = s/ncores;
   for(int i = 0; i <= n_groups; i++){
-    make_chol_R_worker make_chols(ZKZts,h2s_matrix,drop0_tol,chol_R_list);
     int start = ncores*i;
     int end = std::min(static_cast<double>(s),ncores*(i+1.0));
-    RcppParallel::parallelFor(start,end,make_chols,1);
+    for(std::size_t j = start; j < end; j++){
+      chol_R_list[j] = make_chol_R(ZKZts, h2s_matrix.col(j), drop0_tol);
+    }
     int pb_state = as<int>(getTxtProgressBar(pb));
     setTxtProgressBar(pb,pb_state+(end-start));
   }
