@@ -191,8 +191,10 @@ get_ki = function(BSFG_state){
   # calculation is from Piironen and Vehtari - 2.4
   # adjust for emperical variance of the column of F - since this should really be set to 1
   # could adjust for 1/tot_F_prec instead, since that's actually a parameter.
+  # If sigma2 is in the prior for lambda, than I think it should cancel out here.
   get_k = function(n,sigma2,tau2,lambda2,s2=1){
-    1/(1+n/sigma2 * tau2 * s2 * lambda2)
+    # 1/(1+n/sigma2 * tau2 * s2 * lambda2)
+    1/(1+n * tau2 * s2 * lambda2)
   }
   current_state = BSFG_state$current_state
   current_state = within(current_state, {

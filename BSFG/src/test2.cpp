@@ -1,3 +1,192 @@
+// #include <math.h>
+// #include <iostream>
+// #include <RcppEigen.h>
+// // [[Rcpp::plugins(openmp)]]
+// #include <omp.h>
+// #include "BSFG_types.h"
+//
+// using namespace Rcpp;
+// using namespace Eigen;
+
+
+// Rcpp::IntegerVector which2(Rcpp::LogicalVector x) {
+//   Rcpp::IntegerVector v = Rcpp::seq(0, x.size()-1);
+//   return v[x];
+// }
+// // [[Rcpp::export()]]
+// MatrixXd rstdnorm_mat2(int n,int p) {  // returns nxp matrix
+//   VectorXd X_vec(n*p);
+//   for(int i = 0; i < n*p; i++){
+//     X_vec[i] = ziggr.norm();
+//   }
+//   MatrixXd X_mat = Map<MatrixXd>(X_vec.data(),n,p);
+//   return(X_mat);
+// }
+//
+// void load_R_matrices_list2(const Rcpp::List X_list, std::vector<R_matrix>& X_vector){
+//   // null_matrices
+//   MatrixXd null_d = MatrixXd::Zero(0,0);
+//   Map<MatrixXd> M_null_d(null_d.data(),0,0);
+//   SpMat null_s = null_d.sparseView();
+//   MSpMat M_null_s(0,0,0,null_s.outerIndexPtr(),null_s.innerIndexPtr(),null_s.valuePtr());
+//
+//   int p = X_list.size();
+//   X_vector.reserve(p);
+//   for(int i = 0; i < p; i++){
+//     SEXP Xi_ = X_list[i];
+//     if(Rf_isMatrix(Xi_)){
+//       Map<MatrixXd> Xi = as<Map<MatrixXd> >(Xi_);
+//       R_matrix Xim(Xi,M_null_s,true);
+//       X_vector.push_back(Xim);
+//     } else{
+//       MSpMat Xi = as<MSpMat>(Xi_);
+//       R_matrix Xim(M_null_d,Xi,false);
+//       X_vector.push_back(Xim);
+//     }
+//   }
+// }
+//
+//
+//
+//
+// VectorXd sample_MME_single_diagR2(
+//     const Ref<const VectorXd>& y,           // nx1
+//     MSpMat Z,             // nxr dgCMatrix
+//     MSpMat chol_ZtZ_Kinv,       // rxr CsparseMatrix upper triangular: chol(ZtRinvZ + diag(Kinv))
+//     double tot_Eta_prec,   // double
+//     double pe,            // double
+//     VectorXd randn_theta  // rx1
+// ){
+//   VectorXd b = Z.transpose() * y * pe;
+//   b = chol_ZtZ_Kinv.transpose().triangularView<Lower>().solve(b / sqrt(tot_Eta_prec));
+//   b += randn_theta;
+//   b = chol_ZtZ_Kinv.triangularView<Upper>().solve(b / sqrt(tot_Eta_prec));
+//   return(b);
+// }
+//
+//
+// // samples random effects from model:
+// // Y = ZU + E
+// // U[,j] ~ N(0,1/tot_Eta_prec[j] * h2[j] * K)
+// // E[,j] ~ N(0,1/tot_Eta_prec[j] * (1-h2[j]) * I_n)
+// // For complete data, ie no missing obs.
+// // [[Rcpp::export()]]
+// MatrixXd sample_MME_ZKZts_c2(
+//     Map<MatrixXd> Y,                    // nxp
+//     MSpMat Z,                           // nxr
+//     Map<VectorXd> tot_Eta_prec,         // px1
+//     Rcpp::List chol_ZtZ_Kinv_list_,      // List or R st RtR = ZtZ_Kinv
+//     Map<MatrixXd> h2s,                  // n_RE x p
+//     VectorXi h2s_index                 // px1
+// ) {
+//
+//   int p = Y.cols();
+//   int r = Z.cols();
+//
+//   MatrixXd randn_theta = rstdnorm_mat2(r,p);
+//
+//   std::vector<R_matrix> chol_ZtZ_Kinv_list;
+//   load_R_matrices_list2(chol_ZtZ_Kinv_list_, chol_ZtZ_Kinv_list);
+//
+//   MatrixXd U(r,p);
+//   ArrayXd h2_e = 1.0 - h2s.colwise().sum().array();
+//   ArrayXd pes = tot_Eta_prec.array() / h2_e.array();
+//
+//   // #pragma omp parallel for
+//   // for(int i = min(h2s_index); i <= max(h2s_index); i++) {
+//   //   int h2_index = i;
+//   //   VectorXi trait_set = as<VectorXi>(which(h2s_index == h2_index));  // list of traits with same h2_index
+//   // }
+//
+//
+// #pragma omp parallel for
+//   for(std::size_t j = 0; j < p; j++){
+//     int h2_index = h2s_index[j] - 1;
+//     // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
+//     U.col(j) = sample_MME_single_diagR2(Y.col(j), Z, chol_ZtZ_Kinv_list[h2_index].sparse, tot_Eta_prec[j], pes[j],randn_theta.col(j));
+//   }
+//
+//   return(U);
+// }
+//
+//
+//
+// VectorXd sample_MME_single_diagR3(
+//     VectorXd y,           // nx1
+//     MSpMat Z,             // nxr dgCMatrix
+//     MSpMat chol_ZtZ_Kinv,       // rxr CsparseMatrix upper triangular: chol(ZtRinvZ + diag(Kinv))
+//     double tot_Eta_prec,   // double
+//     double pe,            // double
+//     VectorXd randn_theta  // rx1
+// ){
+//   VectorXd b = Z.transpose() * y * pe;
+//   b = chol_ZtZ_Kinv.transpose().triangularView<Lower>().solve(b / sqrt(tot_Eta_prec));
+//   b += randn_theta;
+//   b = chol_ZtZ_Kinv.triangularView<Upper>().solve(b / sqrt(tot_Eta_prec));
+//   return(b);
+// }
+//
+//
+// // samples random effects from model:
+// // Y = ZU + E
+// // U[,j] ~ N(0,1/tot_Eta_prec[j] * h2[j] * K)
+// // E[,j] ~ N(0,1/tot_Eta_prec[j] * (1-h2[j]) * I_n)
+// // For complete data, ie no missing obs.
+// // [[Rcpp::export()]]
+// MatrixXd sample_MME_ZKZts_c3(
+//     Map<MatrixXd> Y,                    // nxp
+//     MSpMat Z,                           // nxr
+//     Map<VectorXd> tot_Eta_prec,         // px1
+//     MSpMat chol_ZtZ_Kinv,      // List or R st RtR = ZtZ_Kinv
+//     Map<MatrixXd> h2s,                  // n_RE x p
+//     VectorXi h2s_index                 // px1
+// ) {
+//
+//   int p = Y.cols();
+//   int r = Z.cols();
+//
+//   MatrixXd randn_theta = rstdnorm_mat2(r,p);
+//
+//   // std::vector<R_matrix> chol_ZtZ_Kinv_list;
+//   // load_R_matrices_list2(chol_ZtZ_Kinv_list_, chol_ZtZ_Kinv_list);
+//
+//   // MatrixXd U(r,p);
+//   ArrayXd h2_e = 1.0 - h2s.colwise().sum().array();
+//   ArrayXd pes = tot_Eta_prec.array() / h2_e.array();
+//
+//   // #pragma omp parallel for
+//   // for(int i = min(h2s_index); i <= max(h2s_index); i++) {
+//   //   int h2_index = i;
+//   //   VectorXi trait_set = as<VectorXi>(which(h2s_index == h2_index));  // list of traits with same h2_index
+//   // }
+//
+//   MatrixXd b = Z.transpose() * Y * pes.matrix().asDiagonal();
+//   b = chol_ZtZ_Kinv.transpose().triangularView<Lower>().solve(b * tot_Eta_prec.cwiseInverse().cwiseSqrt().asDiagonal());
+//   b += randn_theta;
+//   b = chol_ZtZ_Kinv.triangularView<Upper>().solve(b * tot_Eta_prec.cwiseInverse().cwiseSqrt().asDiagonal());
+//   return(b);
+//
+//
+// // #pragma omp parallel for
+// //   for(std::size_t j = 0; j < p; j++){
+// //     int h2_index = h2s_index[j] - 1;
+// //     // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
+// //     U.col(j) = sample_MME_single_diagR3(Y.col(j), Z, chol_ZtZ_Kinv_list[h2_index].sparse, tot_Eta_prec[j], pes[j],randn_theta.col(j));
+// //   }
+//
+//   // return(U);
+// }
+
+
+//
+// // [[Rcpp::export()]]
+// MatrixXd my_mult(Map<MatrixXd> X,Map<MatrixXd> Y,int n_threads) {
+//   Eigen::setNbThreads(n_threads);
+//   Rcout << Eigen::nbThreads( ) << std::endl;
+//   return(X * Y);
+// }
+
+
 //
 // // Attempt to use MatrixXf instead of MatriXd. Still slower because of data copy.
 // #include <math.h>
