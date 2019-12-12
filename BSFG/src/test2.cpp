@@ -7,7 +7,91 @@
 //
 // using namespace Rcpp;
 // using namespace Eigen;
-
+//
+//
+// VectorXd cumprod2(const VectorXd& x) {
+//   int n = x.size();
+//   VectorXd res(n);
+//   res[0] = x[0];
+//   if(n > 1) {
+//     for(int i = 1; i < n; i++){
+//       res[i] = res[i-1]*x[i];
+//     }
+//   }
+//   return(res);
+// }
+//
+// // [[Rcpp::export()]]
+// Rcpp::List sample_tau2_delta_c_Eigen_v3(
+//     double tau2,
+//     double xi,
+//     VectorXd delta,
+//     Map<VectorXd> scores,
+//     double tau_0,
+//     double delta_shape,
+//     double delta_scale,  // shape and scale for inverse gamma distribution (shape and rate for Gamma)
+//     int p,
+//     int times
+// ) {
+//
+//   int K = scores.size();
+//   if(delta.size() != K) stop("Wrong size of delta");
+//   double shape;
+//   double scale;
+//   VectorXd cumprod_delta = cumprod2(delta);
+//   for(int i = 0; i < times; i++){
+//     // sample tau2
+//     shape = (p*K + 1)/2.0;
+//     scale = 1.0/xi + cumprod_delta.cwiseInverse().dot(scores);
+//     tau2 = 1.0/R::rgamma(shape,1.0/scale);
+//
+//     // sample xi
+//     shape = 1.0;
+//     scale = 1.0/(tau_0*tau_0) + 1.0/tau2;
+//     xi = 1.0/R::rgamma(shape,1.0/scale);
+//
+//     for(int h = 1; h < K; h++) {
+//       // delta_h
+//       shape = delta_shape + p*(K-h)/2.0;
+//       scale = delta_scale + delta(h) * cumprod_delta.tail(K-h).cwiseInverse().dot(scores.tail(K-h)) / tau2;
+//       delta[h] = 1.0/R::rgamma(shape,1.0/scale);
+//       cumprod_delta = cumprod2(delta);
+//     }
+//   }
+//
+//   return(Rcpp::List::create(Named("tau2") = tau2,
+//                             Named("xi") = xi,
+//                             Named("delta") = delta));
+// }
+//
+// struct R_matrix2 {
+//   Map<MatrixXd> dense;
+//   MSpMat sparse;
+//   bool isDense;
+//   R_matrix2() {
+//     SpMat null_s = null_d.sparseView();
+//     MSpMat M_null_s(0,0,0,null_s.outerIndexPtr(),null_s.innerIndexPtr(),null_s.valuePtr());
+//   }
+//   R_matrix2(Map<MatrixXd> dense_, MSpMat sparse_,bool isDense_) : dense(dense_), sparse(sparse_), isDense(isDense_) {}
+// };
+//
+// void test(SEXP Z_) {
+//   R_matrix2 Z;
+//   MatrixXd null_d = MatrixXd::Zero(0,0);
+//   if(Rf_isMatrix(Z_)){
+//     Map<MatrixXd> Zm = as<Map<MatrixXd> >(Z_);
+//     SpMat null_s = null_d.sparseView();
+//     MSpMat M_null_s(0,0,0,null_s.outerIndexPtr(),null_s.innerIndexPtr(),null_s.valuePtr());
+//     Z = new R_matrix2(Zm,M_null_s,true);
+//     // r = Zm.cols();
+//   } else{
+//     MSpMat Zm = as<MSpMat>(Z_);
+//     Map<MatrixXd> M_null_d(null_d.data(),0,0);
+//     Z = new R_matrix2(M_null_d,Zm,false);
+//     // r = Zm.cols();
+//   }
+//   Rcout << Z.isDense << std::endl;
+// }
 
 // Rcpp::IntegerVector which2(Rcpp::LogicalVector x) {
 //   Rcpp::IntegerVector v = Rcpp::seq(0, x.size()-1);

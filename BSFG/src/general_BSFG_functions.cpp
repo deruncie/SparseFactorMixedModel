@@ -30,7 +30,13 @@ MatrixXd matrix_multiply_toDense(SEXP X_, SEXP Y_){
     if(Rf_isMatrix(Y_)) {
       Map<MatrixXd> Y = as<Map<MatrixXd> >(Y_);
       if(X.cols() != Y.rows()) stop("Wrong dimensions of matrices");
-      return(X*Y);
+      setNbThreads(0);
+      if(Eigen::nbThreads( ) > 1) {
+        SparseMatrix<double,RowMajor> Xr = X;  // Convert to RowMajor so it can be parallelized
+        return(Xr*Y);
+      } else{
+        return(X*Y);
+      }
     } else{
       MSpMat Y = as<MSpMat>(Y_);
       if(X.cols() != Y.rows()) stop("Wrong dimensions of matrices");
@@ -86,6 +92,22 @@ VectorXd find_candidate_states(
 //   R_matrix(Map<MatrixXd> dense_, MSpMat sparse_,bool isDense_) : dense(dense_), sparse(sparse_), isDense(isDense_) {}
 // };
 
+R_matrix load_R_matrix(SEXP X_) {
+  MatrixXd null_d = MatrixXd::Zero(0,0);
+  if(Rf_isMatrix(X_)){
+    Map<MatrixXd> X = as<Map<MatrixXd> >(X_);
+    SpMat null_s = null_d.sparseView();
+    MSpMat M_null_s(0,0,0,null_s.outerIndexPtr(),null_s.innerIndexPtr(),null_s.valuePtr());
+    R_matrix Xm(X,M_null_s,true);
+    return(Xm);
+  } else{
+    MSpMat X = as<MSpMat>(X_);
+    Map<MatrixXd> M_null_d(null_d.data(),0,0);
+    R_matrix Xm(M_null_d,X,false);
+    return(Xm);
+  }
+}
+
 void load_R_matrices_list(const Rcpp::List X_list, std::vector<R_matrix>& X_vector){
   // null_matrices
   MatrixXd null_d = MatrixXd::Zero(0,0);
@@ -97,15 +119,16 @@ void load_R_matrices_list(const Rcpp::List X_list, std::vector<R_matrix>& X_vect
   X_vector.reserve(p);
   for(int i = 0; i < p; i++){
     SEXP Xi_ = X_list[i];
-    if(Rf_isMatrix(Xi_)){
-      Map<MatrixXd> Xi = as<Map<MatrixXd> >(Xi_);
-      R_matrix Xim(Xi,M_null_s,true);
-      X_vector.push_back(Xim);
-    } else{
-      MSpMat Xi = as<MSpMat>(Xi_);
-      R_matrix Xim(M_null_d,Xi,false);
-      X_vector.push_back(Xim);
-    }
+    X_vector.push_back(load_R_matrix(Xi_));
+    // if(Rf_isMatrix(Xi_)){
+    //   Map<MatrixXd> Xi = as<Map<MatrixXd> >(Xi_);
+    //   R_matrix Xim(Xi,M_null_s,true);
+    //   X_vector.push_back(Xim);
+    // } else{
+    //   MSpMat Xi = as<MSpMat>(Xi_);
+    //   R_matrix Xim(M_null_d,Xi,false);
+    //   X_vector.push_back(Xim);
+    // }
   }
 }
 
@@ -623,16 +646,21 @@ Rcpp::List regression_sampler_parallel(
 // u ~ N(0,K); solve(K) = t(chol_K_inv) %*% chol_K_inv
 // e[i] ~ N(0,1/tot_Eta_prec)
 // C = ZtRinvZ + diag(Kinv)
-// [[Rcpp::export()]]
+//// [[Rcpp::export()]]
 VectorXd sample_MME_single_diagR(
     VectorXd y,           // nx1
-    MSpMat Z,             // nxr dgCMatrix
+    const R_matrix& Z,    // nxr dgCMatrix or dense
     MSpMat chol_ZtZ_Kinv,       // rxr CsparseMatrix upper triangular: chol(ZtRinvZ + diag(Kinv))
     double tot_Eta_prec,   // double
     double pe,            // double
     VectorXd randn_theta  // rx1
 ){
-  VectorXd b = Z.transpose() * y * pe;
+  VectorXd b;
+  if(Z.isDense) {
+    b = Z.dense.transpose() * y * pe;
+  } else{
+    b = Z.sparse.transpose() * y * pe;
+  }
   b = chol_ZtZ_Kinv.transpose().triangularView<Lower>().solve(b / sqrt(tot_Eta_prec));
   b += randn_theta;
   b = chol_ZtZ_Kinv.triangularView<Upper>().solve(b / sqrt(tot_Eta_prec));
@@ -648,15 +676,22 @@ VectorXd sample_MME_single_diagR(
 // [[Rcpp::export()]]
 MatrixXd sample_MME_ZKZts_c(
     Map<MatrixXd> Y,                    // nxp
-    MSpMat Z,                           // nxr
+    SEXP Z_,
     Map<VectorXd> tot_Eta_prec,         // px1
     Rcpp::List chol_ZtZ_Kinv_list_,      // List or R st RtR = ZtZ_Kinv
     Map<MatrixXd> h2s,                  // n_RE x p
     VectorXi h2s_index                 // px1
     ) {
 
+  R_matrix Z = load_R_matrix(Z_);
+
   int p = Y.cols();
-  int r = Z.cols();
+  int r;
+  if(Z.isDense) {
+    r = Z.dense.cols();
+  } else{
+    r = Z.sparse.cols();
+  }
 
   MatrixXd randn_theta = rstdnorm_mat(r,p);
 
@@ -892,7 +927,48 @@ VectorXd cumprod(const VectorXd& x) {
   return(res);
 }
 
-
+// // [[Rcpp::export()]]
+// Rcpp::List sample_tau2_delta_c_Eigen_v2(
+//     double tau2,
+//     double xi,
+//     VectorXd delta,
+//     Map<VectorXd> scores,
+//     double tau_0,
+//     double delta_shape,
+//     double delta_rate,
+//     int p,
+//     int times
+// ) {
+//
+//   int K = scores.size();
+//   if(delta.size() != K) stop("Wrong size of delta");
+//   double shape;
+//   double scale;
+//   VectorXd cumprod_delta = cumprod(delta);
+//   for(int i = 0; i < times; i++){
+//     // sample tau2
+//     shape = (p*K + 1)/2.0;
+//     scale = 1.0/xi + cumprod_delta.dot(scores);
+//     tau2 = 1.0/R::rgamma(shape,1.0/scale);
+//
+//     // sample xi
+//     shape = 1.0;
+//     scale = 1.0/(tau_0*tau_0) + 1.0/tau2;
+//     xi = 1.0/R::rgamma(shape,1.0/scale);
+//
+//     for(int h = 1; h < K; h++) {
+//       // delta_h
+//       shape = delta_shape + p*(K-h)/2.0;
+//       scale = delta_rate + cumprod_delta.tail(K-h).dot(scores.tail(K-h)) / (tau2 * delta(h));
+//       delta[h] = R::rgamma(shape,1.0/scale);
+//       cumprod_delta = cumprod(delta);
+//     }
+//   }
+//
+//   return(Rcpp::List::create(Named("tau2") = tau2,
+//                             Named("xi") = xi,
+//                             Named("delta") = delta));
+// }
 // [[Rcpp::export()]]
 Rcpp::List sample_tau2_delta_c_Eigen_v2(
     double tau2,
@@ -901,7 +977,7 @@ Rcpp::List sample_tau2_delta_c_Eigen_v2(
     Map<VectorXd> scores,
     double tau_0,
     double delta_shape,
-    double delta_rate,
+    double delta_scale,  // shape and scale for inverse gamma distribution (shape and rate for Gamma)
     int p,
     int times
 ) {
@@ -909,24 +985,24 @@ Rcpp::List sample_tau2_delta_c_Eigen_v2(
   int K = scores.size();
   if(delta.size() != K) stop("Wrong size of delta");
   double shape;
-  double rate;
+  double scale;
   VectorXd cumprod_delta = cumprod(delta);
   for(int i = 0; i < times; i++){
     // sample tau2
     shape = (p*K + 1)/2.0;
-    rate = 1.0/xi + cumprod_delta.dot(scores);
-    tau2 = 1.0/R::rgamma(shape,1.0/rate);
+    scale = 1.0/xi + cumprod_delta.cwiseInverse().dot(scores);
+    tau2 = 1.0/R::rgamma(shape,1.0/scale);
 
     // sample xi
     shape = 1.0;
-    rate = 1.0/(tau_0*tau_0) + 1.0/tau2;
-    xi = 1.0/R::rgamma(shape,1.0/rate);
+    scale = 1.0/(tau_0*tau_0) + 1.0/tau2;
+    xi = 1.0/R::rgamma(shape,1.0/scale);
 
     for(int h = 1; h < K; h++) {
       // delta_h
       shape = delta_shape + p*(K-h)/2.0;
-      rate = delta_rate + cumprod_delta.tail(K-h).dot(scores.tail(K-h)) / (tau2 * delta(h));
-      delta[h] = R::rgamma(shape,1.0/rate);
+      scale = delta_scale + delta(h) * cumprod_delta.tail(K-h).cwiseInverse().dot(scores.tail(K-h)) / tau2;
+      delta[h] = 1.0/R::rgamma(shape,1.0/scale);
       cumprod_delta = cumprod(delta);
     }
   }

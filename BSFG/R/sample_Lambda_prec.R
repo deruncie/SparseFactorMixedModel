@@ -14,10 +14,8 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
 
                          if(!exists('delta_iterations_factor')) delta_iterations_factor = 100
 
-                         # delta_1_shape = delta_1$shape  delta_1 = 1
-                         # delta_1_rate  = delta_1$rate
-                         delta_l_shape = delta_l$shape
-                         delta_l_rate  = delta_l$rate
+                         delta_shape = delta$shape
+                         delta_scale  = delta$scale
 
                          tau_0 = prop_0/(1-prop_0) * 1/sqrt(n)
 
@@ -30,7 +28,7 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
                              Lambda_xi = matrix(1,1,1)
                              Lambda_phi2 = matrix(1,p,K)
                              Lambda_nu = matrix(1,p,K)
-                             delta = with(priors,matrix(c(1,rgamma(K-1,shape = delta_l_shape,rate = delta_l_rate)),nrow=1))
+                             delta = with(priors,matrix(c(1,1/rgamma(K-1,shape = delta_shape,rate = 1/delta_scale)),nrow=1))
                              Lambda_prec = matrix(1,p,K)
                              trunc_point_delta = 1
                              Lambda_m_eff = matrix(1,1,K)
@@ -40,7 +38,8 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
                            Lambda2_std = Lambda2 * (tot_Eta_prec[1,]) / 2
 
                            Lambda_nu[] = matrix(1/rgamma(p*K,shape = 1, rate = 1 + 1/Lambda_phi2), nr = p, nc = K)
-                           Lambda2_std_delta = sweep(Lambda2_std,2, cumprod(delta),'*')
+                           # Lambda2_std_delta = sweep(Lambda2_std,2, cumprod(delta),'*')  # with delta~Ga
+                           Lambda2_std_delta = sweep(Lambda2_std,2, cumprod(delta),'/') # with delta~iG
                            Lambda_phi2[] = matrix(1/rgamma(p*K,shape = 1, rate = 1/Lambda_nu + Lambda2_std_delta / Lambda_tau2[1]),nr=p,nc = K)
 
                            scores = colSums(Lambda2_std / Lambda_phi2)
@@ -54,14 +53,16 @@ sample_Lambda_prec_horseshoe = function(BSFG_state,...) {
                            #   }
                            # }
                            new_samples = sample_tau2_delta_c_Eigen_v2(Lambda_tau2[1],Lambda_xi[1],delta,scores,
-                                                                      tau_0,delta_l_shape,delta_l_rate,
+                                                                      tau_0,delta_shape,delta_scale,
                                                                       p,delta_iterations_factor)
+
                            Lambda_tau2[] = new_samples$tau2
                            Lambda_xi[] = new_samples$xi
                            delta[] = new_samples$delta
 
                            # -----Update Plam-------------------- #
-                           Lambda_prec[] = 1/(Lambda_tau2[1] * sweep(Lambda_phi2,2,cumprod(delta),'/'))
+                           # Lambda_prec[] = 1/(Lambda_tau2[1] * sweep(Lambda_phi2,2,cumprod(delta),'/')) # with delta~Ga
+                           Lambda_prec[] = 1/(Lambda_tau2[1] * sweep(Lambda_phi2,2,cumprod(delta),'*'))  # with delta~iG
 
                            # ----- Calcualte m_eff -------------- #
                            kappa = 1/(1+n/Lambda_prec)

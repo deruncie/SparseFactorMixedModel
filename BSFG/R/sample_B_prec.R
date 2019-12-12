@@ -16,35 +16,49 @@ sample_B2_prec_horseshoe = function(BSFG_state,...) {
 
                          within(current_state,{
 
-                           # initialize variables if needed
-                           if(!'B2_tau2' %in% names(current_state)){
+                           if(!any(c('B2_R_tau2','B2_F_tau2') %in% names(current_state))){
                              if(verbose) print('initializing B_prec regularized horseshoe')
-                             B2_tau2 = matrix(1,1,1)
-                             B2_xi = matrix(1,1,1)
-                             B2_R_phi2 = matrix(1,b2_R,p)
-                             B2_R_nu = matrix(1,b2_R,p)
-                             B2_F_phi2 = matrix(1,b2_F,K)
-                             B2_F_nu = matrix(1,b2_F,K)
+                             B2_R_xi = matrix(1/rgamma(p,shape=1/2,rate=1/tau_0^2),nr=1)
+                             B2_R_tau2 = matrix(1/rgamma(p,shape = 1/2, rate = 1/B2_R_xi[1,]),nr=1)
+                             B2_R_nu = matrix(1/rgamma(b2_R*p,shape = 1/2, rate = 1), nr = b2_R, nc = p)
+                             B2_R_phi2 = matrix(1/rgamma(b2_R*p,shape = 1/2, rate = 1/B2_R_nu),nr=b2_R,nc = p)
+                             B2_R_prec = 1 / sweep(B2_R_phi2,2,B2_R_tau2[1,],'*')
+                             B2_R = rstdnorm_mat(b2_R,p)/sqrt(B2_R_prec)
+
+
+                             B2_F_xi = matrix(1/rgamma(K,shape=1/2,rate=1/tau_0^2),nr=1)
+                             B2_F_tau2 = matrix(1/rgamma(K,shape = 1/2, rate = 1/B2_F_xi[1,]),nr=1)
+                             B2_F_nu = matrix(1/rgamma(b2_F*K,shape = 1/2, rate = 1), nr = b2_F, nc = K)
+                             B2_F_phi2 = matrix(1/rgamma(b2_F*K,shape = 1/2, rate = 1/B2_F_nu),nr=b2_F,nc = K)
+                             B2_F_prec = 1 / sweep(B2_F_phi2,2,B2_F_tau2[1,],'*')
+                             B2_F = rstdnorm_mat(b2_F,K)/sqrt(B2_F_prec)
+                           } else {
+
+                             B2_R_2 = B2_R^2
+                             B2_R_2_std = sweep(B2_R_2,2,tot_Eta_prec[1,],'*')
+
+                             B2_R_nu[] = matrix(1/rgamma(b2_R*p,shape = 1, rate = 1 + 1/B2_R_phi2), nr = b2_R, nc = p)
+                             B2_R_phi2[] = matrix(1/rgamma(b2_R*p,shape = 1, rate = 1/B2_R_nu + sweep(B2_R_2_std,2,(2*B2_R_tau2),'/')),nr=b2_R,nc = p)
+                             B2_R_xi[] = 1/rgamma(p,shape=1,rate=1/tau_0^2 + 1/B2_R_tau2[1,])
+                             B2_R_tau2[] = 1/rgamma(p,shape = (b2_R + 1)/2, rate = 1/B2_R_xi[1,] + (colSums(B2_R_2_std/B2_R_phi2))/2)
+
+
+                             B2_F_2 = B2_F^2
+                             B2_F_2_std = sweep(B2_F_2,2,tot_F_prec[1,],'*')
+                             B2_F_nu[] = matrix(1/rgamma(b2_F*K,shape = 1, rate = 1 + 1/B2_F_phi2), nr = b2_F, nc = K)
+                             B2_F_phi2[] = matrix(1/rgamma(b2_F*K,shape = 1, rate = 1/B2_F_nu + sweep(B2_F_2_std,2,(2*B2_F_tau2),'/')),nr=b2_F,nc = K)
+                             B2_F_xi[] = 1/rgamma(K,shape=1,rate=1/tau_0^2 + 1/B2_F_tau2[1,])
+                             B2_F_tau2[] = 1/rgamma(K,shape = (b2_F + 1)/2, rate = 1/B2_F_xi[1,] + (colSums(B2_F_2_std/B2_F_phi2))/2)
+
+                             # -----Update Plam-------------------- #
+                             B2_R_prec = 1 / sweep(B2_R_phi2,2,B2_R_tau2[1,],'*')
+                             B2_F_prec = 1 / sweep(B2_F_phi2,2,B2_F_tau2[1,],'*')
+
+                             rm(list=c('B2_R_2','B2_R_2_std','B2_F_2','B2_F_2_std'))
                            }
 
-                           B2_R_2 = B2_R^2
-                           B2_R_2_std = sweep(B2_R_2,2,tot_Eta_prec[1,],'*')
-                           B2_F_2 = B2_F^2
-                           B2_F_2_std = sweep(B2_F_2,2,tot_F_prec[1,],'*')
 
-                           B2_R_nu[] = matrix(1/rgamma(b2_R*p,shape = 1, rate = 1 + 1/B2_R_phi2), nr = b2_R, nc = p)
-                           B2_R_phi2[] = matrix(1/rgamma(b2_R*p,shape = 1, rate = 1/B2_R_nu + B2_R_2_std / (2*B2_tau2[1])),nr=b2_R,nc = p)
-                           B2_F_nu[] = matrix(1/rgamma(b2_F*K,shape = 1, rate = 1 + 1/B2_F_phi2), nr = b2_F, nc = K)
-                           B2_F_phi2[] = matrix(1/rgamma(b2_F*K,shape = 1, rate = 1/B2_F_nu + B2_F_2_std / (2*B2_tau2[1])),nr=b2_F,nc = K)
 
-                           B2_xi[] = 1/rgamma(1,shape=1,rate=1/tau_0^2 + 1/B2_tau2[1])
-                           B2_tau2[] = 1/rgamma(1,shape = (b2_R*p + b2_F*K + 1)/2, rate = 1/B2_xi[1] + (sum(B2_R_2_std/B2_R_phi2) + sum(B2_F_2_std/B2_F_phi2))/2)
-
-                           # -----Update Plam-------------------- #
-                           B2_R_prec = 1 / (B2_tau2[1] * B2_R_phi2)
-                           B2_F_prec = 1 / (B2_tau2[1] * B2_F_phi2)
-
-                           rm(list=c('B2_R_2','B2_R_2_std','B2_F_2','B2_F_2_std'))
                          })
                        }))
   return(current_state)

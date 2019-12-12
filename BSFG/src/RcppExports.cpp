@@ -136,35 +136,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// sample_MME_single_diagR
-VectorXd sample_MME_single_diagR(VectorXd y, MSpMat Z, MSpMat chol_ZtZ_Kinv, double tot_Eta_prec, double pe, VectorXd randn_theta);
-RcppExport SEXP _BSFG_sample_MME_single_diagR(SEXP ySEXP, SEXP ZSEXP, SEXP chol_ZtZ_KinvSEXP, SEXP tot_Eta_precSEXP, SEXP peSEXP, SEXP randn_thetaSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< VectorXd >::type y(ySEXP);
-    Rcpp::traits::input_parameter< MSpMat >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< MSpMat >::type chol_ZtZ_Kinv(chol_ZtZ_KinvSEXP);
-    Rcpp::traits::input_parameter< double >::type tot_Eta_prec(tot_Eta_precSEXP);
-    Rcpp::traits::input_parameter< double >::type pe(peSEXP);
-    Rcpp::traits::input_parameter< VectorXd >::type randn_theta(randn_thetaSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_MME_single_diagR(y, Z, chol_ZtZ_Kinv, tot_Eta_prec, pe, randn_theta));
-    return rcpp_result_gen;
-END_RCPP
-}
 // sample_MME_ZKZts_c
-MatrixXd sample_MME_ZKZts_c(Map<MatrixXd> Y, MSpMat Z, Map<VectorXd> tot_Eta_prec, Rcpp::List chol_ZtZ_Kinv_list_, Map<MatrixXd> h2s, VectorXi h2s_index);
-RcppExport SEXP _BSFG_sample_MME_ZKZts_c(SEXP YSEXP, SEXP ZSEXP, SEXP tot_Eta_precSEXP, SEXP chol_ZtZ_Kinv_list_SEXP, SEXP h2sSEXP, SEXP h2s_indexSEXP) {
+MatrixXd sample_MME_ZKZts_c(Map<MatrixXd> Y, SEXP Z_, Map<VectorXd> tot_Eta_prec, Rcpp::List chol_ZtZ_Kinv_list_, Map<MatrixXd> h2s, VectorXi h2s_index);
+RcppExport SEXP _BSFG_sample_MME_ZKZts_c(SEXP YSEXP, SEXP Z_SEXP, SEXP tot_Eta_precSEXP, SEXP chol_ZtZ_Kinv_list_SEXP, SEXP h2sSEXP, SEXP h2s_indexSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< MSpMat >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type Z_(Z_SEXP);
     Rcpp::traits::input_parameter< Map<VectorXd> >::type tot_Eta_prec(tot_Eta_precSEXP);
     Rcpp::traits::input_parameter< Rcpp::List >::type chol_ZtZ_Kinv_list_(chol_ZtZ_Kinv_list_SEXP);
     Rcpp::traits::input_parameter< Map<MatrixXd> >::type h2s(h2sSEXP);
     Rcpp::traits::input_parameter< VectorXi >::type h2s_index(h2s_indexSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_MME_ZKZts_c(Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index));
+    rcpp_result_gen = Rcpp::wrap(sample_MME_ZKZts_c(Y, Z_, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -226,8 +210,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // sample_tau2_delta_c_Eigen_v2
-Rcpp::List sample_tau2_delta_c_Eigen_v2(double tau2, double xi, VectorXd delta, Map<VectorXd> scores, double tau_0, double delta_shape, double delta_rate, int p, int times);
-RcppExport SEXP _BSFG_sample_tau2_delta_c_Eigen_v2(SEXP tau2SEXP, SEXP xiSEXP, SEXP deltaSEXP, SEXP scoresSEXP, SEXP tau_0SEXP, SEXP delta_shapeSEXP, SEXP delta_rateSEXP, SEXP pSEXP, SEXP timesSEXP) {
+Rcpp::List sample_tau2_delta_c_Eigen_v2(double tau2, double xi, VectorXd delta, Map<VectorXd> scores, double tau_0, double delta_shape, double delta_scale, int p, int times);
+RcppExport SEXP _BSFG_sample_tau2_delta_c_Eigen_v2(SEXP tau2SEXP, SEXP xiSEXP, SEXP deltaSEXP, SEXP scoresSEXP, SEXP tau_0SEXP, SEXP delta_shapeSEXP, SEXP delta_scaleSEXP, SEXP pSEXP, SEXP timesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -237,10 +221,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Map<VectorXd> >::type scores(scoresSEXP);
     Rcpp::traits::input_parameter< double >::type tau_0(tau_0SEXP);
     Rcpp::traits::input_parameter< double >::type delta_shape(delta_shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type delta_rate(delta_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type delta_scale(delta_scaleSEXP);
     Rcpp::traits::input_parameter< int >::type p(pSEXP);
     Rcpp::traits::input_parameter< int >::type times(timesSEXP);
-    rcpp_result_gen = Rcpp::wrap(sample_tau2_delta_c_Eigen_v2(tau2, xi, delta, scores, tau_0, delta_shape, delta_rate, p, times));
+    rcpp_result_gen = Rcpp::wrap(sample_tau2_delta_c_Eigen_v2(tau2, xi, delta, scores, tau_0, delta_shape, delta_scale, p, times));
     return rcpp_result_gen;
 END_RCPP
 }

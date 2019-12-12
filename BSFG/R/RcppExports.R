@@ -37,12 +37,8 @@ regression_sampler_parallel <- function(Y, W_base, W_list_, X, V_, h2s_index, ch
     .Call(`_BSFG_regression_sampler_parallel`, Y, W_base, W_list_, X, V_, h2s_index, chol_V_list_, Y_prec, Y_prec_a0, Y_prec_b0, prior_prec_alpha1, prior_prec_alpha2, prior_mean_beta, prior_prec_beta)
 }
 
-sample_MME_single_diagR <- function(y, Z, chol_ZtZ_Kinv, tot_Eta_prec, pe, randn_theta) {
-    .Call(`_BSFG_sample_MME_single_diagR`, y, Z, chol_ZtZ_Kinv, tot_Eta_prec, pe, randn_theta)
-}
-
-sample_MME_ZKZts_c <- function(Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index) {
-    .Call(`_BSFG_sample_MME_ZKZts_c`, Y, Z, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index)
+sample_MME_ZKZts_c <- function(Y, Z_, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index) {
+    .Call(`_BSFG_sample_MME_ZKZts_c`, Y, Z_, tot_Eta_prec, chol_ZtZ_Kinv_list_, h2s, h2s_index)
 }
 
 log_p_h2s <- function(Y, tot_Eta_prec, chol_V_list_, discrete_priors) {
@@ -61,8 +57,8 @@ sample_factors_scores_c <- function(Eta_tilde, prior_mean, Lambda, resid_Eta_pre
     .Call(`_BSFG_sample_factors_scores_c`, Eta_tilde, prior_mean, Lambda, resid_Eta_prec, F_e_prec)
 }
 
-sample_tau2_delta_c_Eigen_v2 <- function(tau2, xi, delta, scores, tau_0, delta_shape, delta_rate, p, times) {
-    .Call(`_BSFG_sample_tau2_delta_c_Eigen_v2`, tau2, xi, delta, scores, tau_0, delta_shape, delta_rate, p, times)
+sample_tau2_delta_c_Eigen_v2 <- function(tau2, xi, delta, scores, tau_0, delta_shape, delta_scale, p, times) {
+    .Call(`_BSFG_sample_tau2_delta_c_Eigen_v2`, tau2, xi, delta, scores, tau_0, delta_shape, delta_scale, p, times)
 }
 
 sample_trunc_delta_c_Eigen <- function(delta, tauh, scores, shapes, delta_1_rate, delta_2_rate, randu_draws, trunc_point) {

@@ -382,7 +382,12 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
     })
   }
   ZL = do.call(cbind,lapply(RE_setup,function(re) re$ZL))
-  ZL = as(ZL,'dgCMatrix')
+  if(nnzero(ZL)/length(ZL) < .25) {
+    ZL = as(ZL,'dgCMatrix')
+  } else{
+    ZL = as.matrix(ZL)
+  }
+
 
   if(length(RE_setup) > 1) {
     RE_L = do.call(bdiag,lapply(RE_setup,function(re) re$L))
@@ -390,7 +395,7 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
   } else{
     RE_L = RE_setup[[1]]$L
   }
-  if(nnzero(RE_L)/length(RE_L) < 0.5) {
+  if(nnzero(RE_L)/length(RE_L) < 0.25) {
     RE_L = as(RE_L,'dgCMatrix')
   } else{
     RE_L = as.matrix(RE_L)
