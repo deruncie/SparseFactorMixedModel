@@ -231,14 +231,19 @@ reorder_factors = function(BSFG_state,factor_order = NULL, drop_cor_threshold = 
   # reorder factors based on var(Lambda) * var(F)
   Lambda = current_state$Lambda
   F = current_state$F
+  fixed_factors = BSFG_state$run_variables$fixed_factors
 
   # size is sum lambda_ij^2 * var(F_i)
   if(is.null(factor_order)) {
     if('Lambda_m_eff' %in% names(current_state)) {
       factor_order = order(BSFG_state$current_state$Lambda_m_eff,decreasing = TRUE)
     } else{
-      sizes = colSums(Lambda^2) * colMeans(F^2)
+      sizes = (colSums(Lambda^2) * colMeans(F^2))[!fixed_factors]
       factor_order = order(sizes,decreasing=TRUE)
+    }
+    factor_order_withFixed = factor_order
+    if(sum(fixed_factors)>0) {
+      factor_order_withFixed = c(1:sum(fixed_factors),sum(fixed_factors)+factor_order)
     }
   }
 
@@ -250,7 +255,11 @@ reorder_factors = function(BSFG_state,factor_order = NULL, drop_cor_threshold = 
   # reorder currrent state
   for(param in reorder_params){
     if(! param %in% names(current_state)) next
-    current_state[[param]] = current_state[[param]][,factor_order,drop=FALSE]
+    if(ncol(current_state[[param]]) == ncol(Lambda)) {
+      current_state[[param]] = current_state[[param]][,factor_order_withFixed,drop=FALSE]
+    } else{
+      current_state[[param]] = current_state[[param]][,factor_order,drop=FALSE]
+    }
   }
   current_state$delta[1] = 1
   # current_state$delta = matrix(c(current_state$tauh[1],current_state$tauh[-1]/current_state$tauh[-length(current_state$tauh)]),nrow=1)

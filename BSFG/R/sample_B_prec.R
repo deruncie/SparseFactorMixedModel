@@ -36,7 +36,6 @@ sample_B2_prec_horseshoe = function(BSFG_state,...) {
 
                              B2_R_2 = B2_R^2
                              B2_R_2_std = sweep(B2_R_2,2,tot_Eta_prec[1,],'*')
-
                              B2_R_nu[] = matrix(1/rgamma(b2_R*p,shape = 1, rate = 1 + 1/B2_R_phi2), nr = b2_R, nc = p)
                              B2_R_phi2[] = matrix(1/rgamma(b2_R*p,shape = 1, rate = 1/B2_R_nu + sweep(B2_R_2_std,2,(2*B2_R_tau2),'/')),nr=b2_R,nc = p)
                              B2_R_xi[] = 1/rgamma(p,shape=1,rate=1/tau_0^2 + 1/B2_R_tau2[1,])

@@ -17,8 +17,7 @@ sample_latent_traits = function(BSFG_state,...) {
     # conditioning on F and prior precisions
     # do sampling in groups of columns with same patterns of missing data
 
-
-    n_coefs = b2_R + K
+    n_coefs = b2_R + Kr
     prior_mean = matrix(0,n_coefs,p)
     if(b2_R > 0) {
       prior_prec = rbind(B2_R_prec,t(Lambda_prec))
@@ -32,7 +31,7 @@ sample_latent_traits = function(BSFG_state,...) {
       if(length(cols) == 0 || length(rows) == 0) next
 
       Y_set = Qt_list[[set]] %**% Eta[rows,cols,drop=FALSE]
-      X_set = cbind(QtX2_R_list[[set]],Qt_list[[set]] %**% F[rows,,drop=FALSE])
+      X_set = cbind(QtX2_R_list[[set]],Qt_list[[set]] %**% F[rows,!fixed_factors,drop=FALSE])
       if(length(Qt_cis_genotypes) == p) {
         Qt_cis_genotypes_set = Qt_cis_genotypes[cols]
       } else{
@@ -69,7 +68,7 @@ sample_latent_traits = function(BSFG_state,...) {
       if(b2_R > 0) {
         B2_R[,cols] = new_samples$beta[1:b2_R,]
       }
-      Lambda[cols,] = t(new_samples$beta[b2_R + 1:K,])
+      Lambda[cols,!fixed_factors] = t(new_samples$beta[b2_R + 1:Kr,])
 
       # Y_prec -> tot_Eta_prec
       if(any(is.na(new_samples$Y_prec))) break

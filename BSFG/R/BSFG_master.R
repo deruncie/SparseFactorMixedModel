@@ -192,7 +192,8 @@ BSFG_priors = function(
 #' @seealso \code{\link{BSFG_control}}, \code{\link{sample_BSFG}}, \code{\link{print.BSFG_state}}, \code{\link{plot.BSFG_state}}#'
 #' @export
 #'
-setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, cis_genotypes = NULL,run_parameters = BSFG_control(),
+setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, cis_genotypes = NULL, Lambda_fixed = NULL,
+                            run_parameters = BSFG_control(),
                             posteriorSample_params = c('Lambda','U_F','F','delta','tot_F_prec','F_h2','tot_Eta_prec',
                                                        'resid_h2', 'B1', 'B2_F','B2_R','U_R','cis_effects','Lambda_m_eff'),
                             posteriorMean_params = c(),
@@ -429,6 +430,20 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
   ))
 
 
+  # # -------------------------------------------#
+  # # Fixed factors
+  if(is.null(Lambda_fixed)) {
+    fixed_factors = rep(F,run_parameters$K)
+  } else{
+    Lambda_fixed = as.matrix(Lambda_fixed)
+    if(nrow(Lambda_fixed) != p) stop("wrong dimensions of Lambda_fixed")
+    if(ncol(Lambda_fixed) >= run_parameters$K) stop("ncol(Lambda_fixed) >= K")
+    fixed_factors = rep(F,run_parameters$K)
+    fixed_factors[1:ncol(Lambda_fixed)] = T
+  }
+  Kr = run_parameters$K - sum(fixed_factors)
+
+
   run_variables = list(
     p      = p,
     n      = n,
@@ -440,7 +455,9 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
     n_cis_effects     = n_cis_effects,
     cis_effects_index = cis_effects_index,
     Missing_data_map      = Missing_data_map,
-    Missing_row_data_map  = Missing_row_data_map
+    Missing_row_data_map  = Missing_row_data_map,
+    fixed_factors         = fixed_factors,
+    Kr = Kr
   )
 
   data_matrices = list(
@@ -456,6 +473,7 @@ setup_model_BSFG = function(Y,formula,extra_regressions=NULL,data,relmat=NULL, c
     RE_indices  = RE_indices,
     h2s_matrix  = h2s_matrix,
     cis_genotypes = cis_genotypes,
+    Lambda_fixed = Lambda_fixed,
     data       = data
   )
 
@@ -574,6 +592,7 @@ initialize_variables_BSFG = function(BSFG_state,...){
     #       sd = sqrt(1/Lambda_prec)
     Lambda = matrix(rnorm(p*K,0,sqrt(1/Lambda_prec)),nr = p,nc = K)
     rownames(Lambda) = traitnames
+    Lambda[,fixed_factors] = Lambda_fixed
 
     # residuals
     # p-vector of factor precisions. Note - this is a 'redundant' parameter designed to give the Gibbs sampler more flexibility
