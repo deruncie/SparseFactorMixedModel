@@ -304,6 +304,24 @@ drop_correlated_factors = function(BSFG_state,cor_threshold = 0.6){
       cor_F[,drop_cols] = 0
     }
   }
+
+  # repeat for Z %*% U_F
+  # drop factors correlated beyond abs(cor_threshold)
+  # also set Lambda_m_eff to 0
+  F = BSFG_state$data_matrices$ZL %*% BSFG_state$current_state$U_F
+  cor_F = abs(cor(F))
+  cor_F[lower.tri(cor_F,diag = T)] = 0
+  K = ncol(cor_F)
+  for(i in 1:(K-1)) {
+    drop_cols = which(cor_F[i,]>cor_threshold)
+    if(length(drop_cols) > 0) {
+      print(sprintf('dropping cols: %s',paste(drop_cols,collapse=',')))
+      BSFG_state$current_state$F[,drop_cols] = 0
+      if('Lambda_m_eff' %in% names(BSFG_state$current_state)) BSFG_state$current_state$Lambda_m_eff[drop_cols] = 0
+      cor_F[,drop_cols] = 0
+    }
+  }
+
   return(BSFG_state)
 }
 
