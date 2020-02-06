@@ -81,7 +81,7 @@ sample_BSFG = function(BSFG_state,n_iter,grainSize = 1,verbose=TRUE,...) {
     )
 
   current_state = BSFG_state$current_state
-  saveRDS(current_state,file=sprintf('%s/current_state.rds',BSFG_state$run_ID))
+  if(run_parameters$save_current_state) saveRDS(current_state,file=sprintf('%s/current_state.rds',BSFG_state$run_ID))
 
   return(BSFG_state)
 }

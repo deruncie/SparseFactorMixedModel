@@ -42,6 +42,7 @@ BSFG_control = function(
                         max_NA_groups = Inf,
                         svd_K = TRUE,
                         verbose = TRUE,
+                        save_current_state = TRUE,
                         ...
                         ) {
 
@@ -800,7 +801,7 @@ initialize_BSFG = function(BSFG_state, ncores = my_detectCores(), Qt_list = NULL
       svd_RKRt = svd(RKRt)
       RKRt_U = svd_RKRt$u
       if(ncol(Q_ZU) > ncol(RKRt_U)) RKRt_U = bdiag(RKRt_U,diag(1,ncol(Q_ZU)-ncol(RKRt_U)))
-      Qt = t(Q_ZU %*% RKRt_U)
+      Qt = t(Q_ZU %**% RKRt_U)
     } else{
       ZKZt = with(RE_setup[[1]],ZL[x,,drop=FALSE] %*% K %*% t(ZL[x,,drop=FALSE]))
       result = svd(ZKZt)
