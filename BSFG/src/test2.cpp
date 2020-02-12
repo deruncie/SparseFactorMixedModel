@@ -9,6 +9,142 @@
 // using namespace Eigen;
 //
 //
+// Rcpp::IntegerVector which2(Rcpp::LogicalVector x) {
+//   Rcpp::IntegerVector v = Rcpp::seq(0, x.size()-1);
+//   return v[x];
+// }
+// R_matrix load_R_matrix_2(SEXP X_) {
+//   MatrixXd null_d = MatrixXd::Zero(0,0);
+//   if(Rf_isMatrix(X_)){
+//     Map<MatrixXd> X = as<Map<MatrixXd> >(X_);
+//     SpMat null_s = null_d.sparseView();
+//     MSpMat M_null_s(0,0,0,null_s.outerIndexPtr(),null_s.innerIndexPtr(),null_s.valuePtr());
+//     R_matrix Xm(X,M_null_s,true);
+//     return(Xm);
+//   } else{
+//     MSpMat X = as<MSpMat>(X_);
+//     Map<MatrixXd> M_null_d(null_d.data(),0,0);
+//     R_matrix Xm(M_null_d,X,false);
+//     return(Xm);
+//   }
+// }
+//
+// // Samples from model:
+// // y = Zu + e
+// // u ~ N(0,K); solve(K) = t(chol_K_inv) %*% chol_K_inv
+// // e[i] ~ N(0,1/tot_Eta_prec)
+// // C = ZtRinvZ + diag(Kinv)
+// //// [[Rcpp::export()]]
+// VectorXd sample_MME_single_diagR2(
+//     VectorXd y,           // nx1
+//     const R_matrix& Z,    // nxr dgCMatrix or dense
+//     MSpMat chol_ZtZ_Kinv,       // rxr CsparseMatrix upper triangular: chol(ZtRinvZ + diag(Kinv))
+//     double tot_Eta_prec,   // double
+//     double pe,            // double
+//     VectorXd randn_theta  // rx1
+// ){
+//   VectorXd b;
+//   if(Z.isDense) {
+//     b = Z.dense.transpose() * y * pe;
+//   } else{
+//     b = Z.sparse.transpose() * y * pe;
+//   }
+//   b = chol_ZtZ_Kinv.transpose().triangularView<Lower>().solve(b / sqrt(tot_Eta_prec));
+//   b += randn_theta;
+//   b = chol_ZtZ_Kinv.triangularView<Upper>().solve(b / sqrt(tot_Eta_prec));
+//   return(b);
+// }
+//
+//
+// // samples random effects from model:
+// // Y = ZU + E
+// // U[,j] ~ N(0,1/tot_Eta_prec[j] * h2[j] * K)
+// // E[,j] ~ N(0,1/tot_Eta_prec[j] * (1-h2[j]) * I_n)
+// // For complete data, ie no missing obs.
+// // [[Rcpp::export()]]
+// MatrixXd sample_MME_ZKZts_c2(
+//     Map<MatrixXd> Y,                    // nxp
+//     SEXP Z_,
+//     Map<VectorXd> tot_Eta_prec,         // px1
+//     Rcpp::List chol_ZtZ_Kinv_list_,      // List or R st RtR = ZtZ_Kinv
+//     Map<MatrixXd> h2s,                  // n_RE x p
+//     VectorXi h2s_index                 // px1
+// ) {
+//
+//   R_matrix Z = load_R_matrix_2(Z_);
+//
+//   int p = Y.cols();
+//   int r;
+//   MatrixXd Zty;
+//   ArrayXd h2_e = 1.0 - h2s.colwise().sum().array();
+//   ArrayXd pes = tot_Eta_prec.array() / h2_e.array();
+//   if(Z.isDense) {
+//     r = Z.dense.cols();
+//     Zty = Z.dense.transpose() * Y * pes.asDiagonal();
+//   } else{
+//     r = Z.sparse.cols();
+//     Zty = Z.sparse.transpose() * Y * pes.asDiagonal();
+//   }
+//
+//   MatrixXd randn_theta = rstdnorm_mat(r,p);
+//
+//   std::vector<R_matrix> chol_ZtZ_Kinv_list;
+//   load_R_matrices_list(chol_ZtZ_Kinv_list_, chol_ZtZ_Kinv_list);
+//
+//   MatrixXd U(r,p);
+//
+//   for(int h2_index = min(h2s_index); h2_index <= max(h2s_index); h2_index++) {
+//     VectorXi trait_set = as<VectorXi>(which2(h2s_index == h2_index));  // list of traits with same h2_index
+//     MSpMat chol_ZtZ_Kinv = chol_ZtZ_Kinv_list[h2_index].sparse;
+//     VectorXd ones = VectorXd::Ones(r);
+//     SpMat chol_ZtZ_Kinv_inv = chol_ZtZ_Kinv.triangularView<Upper>().solve(chol_ZtZ_Kinv.transpose().triangularView<Lower>().solve(r.asDiagonal));
+//
+//     if(trait_set.size() > 0){
+//       #pragma omp parallel for
+//       for(int i = 0; i < trait_set.size(); i++){
+//         int j = trait_set[i];
+//
+//   #pragma omp parallel for
+//
+//   for(std::size_t j = 0; j < p; j++){
+//     int h2_index = h2s_index[j] - 1;
+//     // ZtZ_Kinv needs to be scaled by tot_Eta_prec[j].
+//     U.col(j) = sample_MME_single_diagR2(Y.col(j), Z, chol_ZtZ_Kinv_list[h2_index].sparse, tot_Eta_prec[j], pes[j],randn_theta.col(j));
+//   }
+//
+//   return(U);
+// }
+//
+//
+//
+//
+//
+// // [[Rcpp::export()]]
+// VectorXd solvesolve(SEXP Z_,VectorXd y) {
+//   R_matrix Z = load_R_matrix_2(Z_);
+//   if(Z.isDense) {
+//     VectorXd b = Z.dense.transpose().triangularView<Lower>().solve(y);
+//     b = Z.dense.triangularView<Upper>().solve(b);
+//     return(b);
+//   } else{
+//     VectorXd b = Z.sparse.transpose().triangularView<Lower>().solve(y);
+//     b = Z.sparse.triangularView<Upper>().solve(b);
+//     return(b);
+//   }
+// }
+//
+// // [[Rcpp::export()]]
+// VectorXd mult(SEXP Z_,VectorXd y) {
+//
+//   R_matrix Z = load_R_matrix_2(Z_);
+//   if(Z.isDense) {
+//     return( Z.dense * y);
+//   } else{
+//     return( Z.sparse * y);
+//   }
+// }
+//
+//
 // VectorXd cumprod2(const VectorXd& x) {
 //   int n = x.size();
 //   VectorXd res(n);

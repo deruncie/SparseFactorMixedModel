@@ -666,10 +666,12 @@ get_posterior_FUN = function(BSFG_state,FUN,samples = NULL,mc.cores = 1) {
   }
   terms = all.vars(FUN)
   extra_terms = terms[terms %in% with(BSFG_state,c(names(current_state),names(data_matrices),names(priors),names(Posterior))) == F]
-  extra_env = c()
+  extra_env = list()
   for(term in extra_terms){
     if(term %in% ls(parent.frame(2))) {
       extra_env[[term]] = parent.frame(2)[[term]]
+    } else if(term %in% ls(parent.frame(3))) {
+      extra_env[[term]] = parent.frame(3)[[term]]
     }
   }
   if(is.null(samples)) {  # count # available samples for the first term in terms (assuming it is in Posterior)

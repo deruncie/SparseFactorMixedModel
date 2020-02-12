@@ -208,6 +208,7 @@ sample_latent_traits = function(BSFG_state,...) {
     for(set in seq_along(Missing_row_data_map)){
       cols = Missing_row_data_map[[set]]$Y_cols
       rows = Missing_row_data_map[[set]]$Y_obs
+      if(length(rows) == 0) next
       if(length(cols) > 0) {
         F[rows,] = sample_factors_scores_c(Eta_tilde[rows,cols,drop=FALSE],
                                            prior_mean[rows,,drop=FALSE],

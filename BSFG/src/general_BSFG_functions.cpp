@@ -1040,9 +1040,13 @@ VectorXd sample_trunc_delta_c_Eigen(
       delta_old = delta(h);
       rate = delta_2_rate + (1/delta(h))*tauh.tail(k-h).dot(scores.tail(k-h));
       p = R::pgamma(trunc_point,shapes(h),1.0/rate,1,0);  // left-tuncate delta(h) at trunc_point
-      if(p > 0.999) p = 0.999;  // prevent over-flow.
-      u = p + (1.0-p)*randu_draws(i,h);
-      delta(h) = R::qgamma(u,shapes(h),1.0/rate,1,0);
+      if(p > 0.999) {
+        // p = 0.999;  // prevent over-flow.
+        delta(h) = trunc_point;
+      } else {
+        u = p + (1.0-p)*randu_draws(i,h);
+        delta(h) = R::qgamma(u,shapes(h),1.0/rate,1,0);
+      }
       // tauh = cumprod(delta);
       tauh.tail(k-h) *= delta(h)/delta_old; // replaces re-calculating cumprod
       // Rcout << (tauh - cumprod(delta)).sum() << std::endl;
