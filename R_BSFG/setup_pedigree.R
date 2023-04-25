@@ -1,5 +1,5 @@
 
-setup_pedigree = function(data=data,GenerationCode,LineCode,fixedfactor,randomfactor=TRUE){  
+setup_pedigree = function(data=data,GenerationCode,LineCode,fixedfactor,randomfactor=FALSE){  
   
   generation_pos <- data$Generation %in% GenerationCode
   LineCode_pos <- data$LineCode%in%LineCode|data$LineCode==0
@@ -34,7 +34,9 @@ setup_pedigree = function(data=data,GenerationCode,LineCode,fixedfactor,randomfa
   }
     reg=lm(as.matrix(Y)~0+X, na.action= na.omit)
     B_act = reg$coefficients
-  }else{X=matrix(0,nr=n,nc=0);B_act=matrix(0,nr=0,nc=ncol(Y))}
+  }else{
+    # there should be a column of 1 in design matrix as mean value
+    X=matrix(0,nr=n,nc=0);B_act=matrix(0,nr=0,nc=ncol(Y))}
   
   
   traitnames <- names(data)[7:ncol(data)]

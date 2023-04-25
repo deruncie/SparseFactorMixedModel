@@ -1,5 +1,6 @@
-setwd('~/Runcie Lab/SparseFactorMixedModel_v2/R_BSFG/Sim_1/R_rep_test')
-setwd('~/Runcie Lab/SparseFactorMixedModel_v2/R_BSFG/Sim_1/R_rep_fixedlambda')
+#setwd('~/Runcie Lab/SparseFactorMixedModel_v2/R_BSFG/Sim_1/R_rep_test')
+#setwd('~/Runcie Lab/SparseFactorMixedModel_v2/R_BSFG/Sim_1/R_rep_fixedlambda')
+setwd('~/../Desktop/5/Lambda1.5_delta2shape3')
 
 #function for plotting 3D plot
 rgl_add_axes <- function(x, y, z, axis.col = "grey",
@@ -46,13 +47,13 @@ F_a_old = matrix(F_a_old[,ncol(F_a_old)],nr=n_old)
 #Y_sd = apply(na.omit(BSFG_state$data_matrices$Y),2,sd)
 #F_a_old = apply(F_a_old,2,function(x) x*Y_sd+Y_mean)
 
-load('BSFG_fixedlambda2.RData')
+load('BSFG_fixedlambda65.RData')
 F_a_new2 = BSFG_state$Posterior$F_a
 n_new2 = BSFG_state$run_variables$n
 F_a_new2 = matrix(F_a_new2[,ncol(F_a_new2)],nr=n_new2)
 #F_a_new = F_a_new*Y_sd+Y_mean
 
-load('BSFG_fixedlambda3.RData')
+load('BSFG_fixedlambda75.RData')
 F_a_new3 = BSFG_state$Posterior$F_a
 n_new3 = BSFG_state$run_variables$n
 F_a_new3 = matrix(F_a_new3[,ncol(F_a_new3)],nr=n_new3)
@@ -61,7 +62,9 @@ F_a_new3 = matrix(F_a_new3[,ncol(F_a_new3)],nr=n_new3)
 
 
 
-#=======================================================
+#===========================================
+#---------- 3D plot Function----------------
+#===========================================
 factor_3Dplot = function(x1,x2,x3){
   
   if(exists('n_new3')){
@@ -94,15 +97,19 @@ factor_3Dplot = function(x1,x2,x3){
   movie3d(spin3d(axis = c(0, 0, 1)), duration = 10,dir = getwd())
 }
 
-#-------------------------------------------
-#plot~~~~~
+#---------------------------------
+#------------- 3D plot -----------
+#---------------------------------
 #latent factor we choose
 x1=1
-x2=5
-x3=10
+x2=2
+x3=3
 factor_3Dplot(x1,x2,x3)
-
-#How much contribution for each of these factors
+#---------------------------------
+#---Contribution of ith Factor----
+#---------------------------------
+# How much contribution for each of these factors
+# You can load different BSFG_state here
 load('BSFG_state.RData')
 p = BSFG_state$run_variables$p
 
@@ -113,8 +120,28 @@ Lambda = matrix(Lambda[,ncol(Lambda)],nr=p)
 Lambda_x1 = t(Lambda[,x1])%*%Lambda[,x1]
 Lambda_x2 = t(Lambda[,x2])%*%Lambda[,x2]
 Lambda_x3 = t(Lambda[,x3])%*%Lambda[,x3]
+
+# The way to get G_est:
+# Run plot_diagnostics(BSFG_state)
+# Be careful: The BSFG_state is the one you load in line113
+# a file called 'G_est.RData' will be saved in the current work-directory
+# load('G_est.RData')
 S = sum(diag(G_est))
+
 #The proportion of total sample variance explained by the i-th factor
 Lambda_x1/S
 Lambda_x2/S
 Lambda_x3/S
+
+#===================================
+#--------  Unscale G_est------------
+#===================================
+# Load setup dataset which is used for BSFG_state you load before
+load('../setup5.RData')
+Y = setup$Y
+n = nrow(Y)
+p = ncol(Y)
+Y_missing = is.na(Y)        # matrix recording missing data in Y
+Mean_Y = colMeans(Y,na.rm=T)
+VY = apply(Y,2,var,na.rm=T)
+G_est_unscale =sqrt(diag(VY))%*%G_est%*%sqrt(diag(VY))

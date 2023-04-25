@@ -43,9 +43,12 @@ sample_Lambda = function( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
 	Lambda = matrix(0,nr = p,nc = k)
 
 	for(j in 1:p) {
+	  means = c()
+	  Qlam = c()
 		FUDi = E_a_prec[j] * sweep(FtU,2,(s + E_a_prec[j]/resid_Y_prec[j]),'/')
-		means = FUDi %*% UtY[,j]
-		Qlam = FUDi %*% t(FtU) + diag(Plam[j,])
+		means = means + FUDi %*% UtY[,j]
+		Qlam = Qlam + FUDi %*% t(FtU) 
+	  Qlam = Qlam + diag(Plam[j,])
 
 		# recover()
 		Llam = t(chol(Qlam))
@@ -58,6 +61,59 @@ sample_Lambda = function( Y_tilde,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ )
 	}
 
 	return(Lambda)
+}
+
+sample_Lambda_comb = function( Y,X,B,Z_2,W,F,resid_Y_prec, E_a_prec,Plam,invert_aI_bZAZ ) {
+  
+  #Sample factor loadings Lambda while marginalizing over residual
+  #genetic effects: Y - Z_2W = F*Lambda' + E, vec(E)~N(0,kron(Psi_E,In) + kron(Psi_U, ZAZ^T))
+  #note: conditioning on F, but marginalizing over E_a.
+  #sampling is done separately by trait because each column of Lambda is
+  #independent in the conditional posterior
+  #note: invert_aI_bZAZ has parameters that diagonalize aI + bZAZ for fast
+  #inversion: inv(aI + bZAZ) = 1/b*U*diag(1./(s+a/b))*U'
+  
+  p = length(resid_Y_prec[[1]])
+  k = ncol(F[[1]])
+  
+  Zlams = matrix(rnorm(k*p),nr = k, nc = p)
+  Lambda = matrix(0,nr = p,nc = k)
+  
+  
+  for(j in 1:p) {
+    #means = matrix(0,nr=p,nc=1)
+    means = matrix(0,nr=k,nc=1)
+    Qlam = matrix(0,k,k)
+    Y_tilde = list();
+    for(pop in pops){
+      #conditioning on W, B, F, marginalizing over E _a
+      Y_tilde[[pop]] = Y[[pop]] - X[[pop]] %*% B[[pop]] - Z_2[[pop]] %*% W[[pop]]
+      Y_tilde[[pop]] = as.matrix(Y_tilde[[pop]])
+      
+      U = invert_aI_bZAZ[[pop]]$U
+      s = invert_aI_bZAZ[[pop]]$s
+      
+      FtU = t(F[[pop]]) %*% U
+      UtY = t(U) %*% Y_tilde[[pop]]
+      
+      FUDi = E_a_prec[[pop]][j] * sweep(FtU,2,(s + E_a_prec[[pop]][j]/resid_Y_prec[[pop]][j]),'/')
+      means = means + FUDi %*% UtY[,j]
+      Qlam = Qlam + FUDi %*% t(FtU) 
+      #recover()
+    }
+    Qlam = Qlam + diag(Plam[j,])
+    
+     #recover()
+    Llam = t(chol(Qlam))
+    vlam = forwardsolve(Llam,means)
+    mlam = backsolve(t(Llam),vlam)
+    ylam = backsolve(t(Llam),Zlams[,j])
+    
+    Lambda[j,] = ylam + mlam
+    
+  } 
+  
+  return(Lambda)
 }
 
 sample_prec_discrete_conditional = function(Y,h2_divisions,h2_priors,invert_aI_bZAZ,res_prec) {
@@ -201,6 +257,7 @@ sample_means = function( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDes
 	return(location_sample)
 }
 
+
 sample_F_a = function(F,Z_1,F_h2,invert_aZZt_Ainv) {
 	#samples genetic effects on factors (F_a) conditional on the factor scores F:
 	# F_i = F_{a_i} + E_i, E_i~N(0,s2*(1-h2)*I) for each latent trait i
@@ -241,6 +298,8 @@ sample_F_a = function(F,Z_1,F_h2,invert_aZZt_Ainv) {
 	return(F_a)
 }
 
+
+
 sample_factors_scores = function( Y_tilde, Z_1,Lambda,resid_Y_prec,F_a,F_h2 ) {
 #Sample factor scores given factor loadings (F_a), factor heritabilities (F_h2) and
 #phenotype residuals
@@ -267,6 +326,7 @@ sample_factors_scores = function( Y_tilde, Z_1,Lambda,resid_Y_prec,F_a,F_h2 ) {
 	F = t(backsolve(S,t(Meta + matrix(rnorm(prod(dim(Meta))),nr = nrow(Meta)))))
 	return(F)
 }
+
 
 
 sample_delta = function( delta,tauh,Lambda_prec,delta_1_shape,delta_1_rate,delta_2_shape,delta_2_rate,Lambda2 ) {
@@ -336,10 +396,12 @@ update_k = function( F,Lambda,F_a,F_h2,Lambda_prec,Plam,delta,tauh,Z_W,Lambda_df
 			tauh = cumprod(delta)
 			Plam = sweep(Lambda_prec,2,tauh,'*')
 			Lambda = cbind(Lambda,rnorm(p,0,sqrt(1/Plam[,k])))
+			
 			F_h2[k] = runif(1)
 			F_a = cbind(F_a,rnorm(r,0,sqrt(F_h2[k])))
 			F = cbind(F,rnorm(n,Z_W %*% F_a[,k],sqrt(1-F_h2[k])))
-		} else if(num > 0) { # drop redundant columns
+		
+			} else if(num > 0) { # drop redundant columns
 			nonred = which(vec == 0) # non-redundant loadings columns
 			Lambda = Lambda[,nonred]
 			Lambda_prec = Lambda_prec[,nonred]
@@ -403,10 +465,58 @@ save_posterior_samples = function( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F
 	Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
 	Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
 	Posterior$W   = (Posterior$W*(sp_num-1) + W)/sp_num
-
 	return(Posterior)
 }
-                                               
+  
+save_posterior_samples_comb = function( sp_num,Posterior,Lambda,F,F_a,B,W,E_a,delta,F_h2,resid_Y_prec,E_a_prec,W_prec) {
+  # save posteriors. Full traces are kept of the more interesting parameters.
+  # Only the posterior means are kept of less interesting parameters. These
+  # should be correctly calculated over several re-starts of the sampler.
+  
+  # first unlist F, F_a, F_h2, Y, B, E_a
+  nl = length(F_h2)
+  F = unlist(do.call("rbind", F)) # n*k
+  F_a = unlist(do.call("rbind", F_a)) #n*k
+  F_h2 = Reduce("+", F_h2)/nl # k taking average
+  B = Reduce("+",B)/nl # b*p taking average
+  E_a = unlist(do.call("rbind", E_a)) # n*k
+  W = Reduce("+",W)/nl  # k*p taking average
+  resid_Y_prec = Reduce("+",resid_Y_prec)/nl #p taking average
+  E_a_prec = Reduce("+",E_a_prec)/nl #p
+  W_prec = Reduce("+",W_prec)/nl  #p
+  
+  #sp = ncol(Posterior$Lambda)
+  sp = ncol(Posterior$Lambda)
+  #size(Posterior$Lambda,2)
+  #save factor samples
+  # change the if condition to be if sp_num == 1. So we don't need to run the update k part and we can also assign new value to out posterior variables.
+  if(sp_num==1){  
+     # expand factor sample matrix if necessary
+     Posterior$Lambda = rbind(Posterior$Lambda, 	matrix(0,nr = length(Lambda)-nrow(Posterior$Lambda),nc = sp))
+     Posterior[["F"]]      = rbind(Posterior[["F"]], 	   	matrix(0,nr = length(F)     -nrow(Posterior[["F"]]),		nc = sp))
+     Posterior[["F_a"]]    = rbind(Posterior[["F_a"]], 	matrix(0,nr = length(F_a) 	-nrow(Posterior[["F_a"]]),	nc = sp))
+     Posterior[["delta"]]  = rbind(Posterior[["delta"]], 	matrix(0,nr = length(delta) -nrow(Posterior[["delta"]]),	nc = sp))
+     Posterior[["F_h2"]]   = rbind(Posterior[["F_h2"]], 	matrix(0,nr = length(F_h2) 	-nrow(Posterior[["F_h2"]]),	nc = sp))
+   }
+  Posterior$Lambda[1:length(Lambda),sp_num] = c(Lambda)
+  Posterior$F[1:length(F),sp_num]     = c(F)
+  Posterior$F_a[1:length(F_a),sp_num] = c(F_a)
+  Posterior$delta[1:length(delta),sp_num] = delta
+  Posterior$F_h2[1:length(F_h2),sp_num] = F_h2
+  
+  Posterior$resid_Y_prec[,sp_num] = resid_Y_prec
+  Posterior$E_a_prec[,sp_num]     = E_a_prec
+  Posterior$W_prec[,sp_num]       = W_prec
+  
+  # save B,U,W
+  Posterior$B   = (Posterior$B*(sp_num-1) + B)/sp_num
+  Posterior$E_a = (Posterior$E_a*(sp_num-1) + E_a)/sp_num
+  Posterior$W   = (Posterior$W*(sp_num-1) + W)/sp_num
+  
+  return(Posterior)
+}
+
+
 save_posterior_samples_fixedlambda = function( j,Posterior,F,F_a,B,W,E_a,F_h2,resid_Y_prec,E_a_prec,W_prec) {
   # save posteriors. Full traces are kept of the more interesting parameters.
   # Only the posterior means are kept of less interesting parameters. These
@@ -430,12 +540,12 @@ save_posterior_samples_fixedlambda = function( j,Posterior,F,F_a,B,W,E_a,F_h2,re
   Posterior$E_a_prec[,j]     = E_a_prec
   Posterior$W_prec[,j]       = W_prec
   
-  # save B,U,W
+  # save U,W
 
   Posterior$E_a = (Posterior$E_a*(j-1) + E_a)/j
   Posterior$W   = (Posterior$W*(j-1) + W)/j
   
-  return(Posterior)
+  return(Posterior) 
 }
 
 
@@ -518,6 +628,54 @@ G_Matrix_Comp = function(BSFG_state){
   }
   #G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
   return(GMatrix)
+}
+
+G_Matrix_comb_Comp = function(BSFG_state){
+  Posterior      = BSFG_state$Posterior
+  traitnames     = BSFG_state$traitnames
+  run_variables  = BSFG_state$run_variables
+  sp_num = ncol(Posterior$Lambda) 
+  #n = run_variables$n
+  k = 10
+  p = run_variables$p
+  n = nrow(Posterior$F_a)/k
+  k1 = nrow(Posterior$F_a)/n;
+  k2 = nrow(Posterior$Lambda)/p;
+  if (k2 >= k1){
+    k = k1
+  }else{
+    k=k2
+  }
+  h2s = Posterior$F_h2[,1:sp_num]
+  #G_Lambdas = array(0,dim = dim(Posterior$Lambda))
+  #Lambda_est = matrix(0,p,k)
+  G_est = E_est = matrix(0,p,p)
+  #traces_G = matrix(,p*(p+1)/2,sp_num)
+  #traces_G_cor = matrix(,p*(p+1)/2,sp_num)
+  #traces_E = matrix(,p*(p+1)/2,sp_num)
+  GMatrix = NULL
+  for(j in 1:sp_num) {
+    Lj = matrix(Posterior$Lambda[,j],p,k)
+    h2j = Posterior$F_h2[,j]
+    G_Lj = Lj %*%  diag(sqrt(h2j))
+    #G_Lambdas[,j] = c(G_Lj)
+    Gj = G_Lj %*%  t(G_Lj) + diag(1/Posterior$E_a_prec[,j])
+    rownames(Gj) = traitnames
+    #posterior mean
+    GMatrix[[j]] = Gj
+    G_est = G_est + Gj/sp_num
+    #library(gdata)
+    #traces_G[,j] = lowerTriangle(Gj,diag = TRUE)
+    #traces_G_cor[,j] = lowerTriangle(CovToCor(Gj),diag = TRUE)
+    
+    #E_Lj = Lj  %*% diag(1-h2j) %*%  t(Lj) + diag(1/Posterior$resid_Y_prec[,j])
+    #E_est = E_est + E_Lj/sp_num;
+    #posterior mean for lambda
+    #Lambda_est = Lambda_est + matrix(Posterior$Lambda[,j],p,k)/sp_num;
+    #traces_E[,j] = lowerTriangle(E_Lj,diag = TRUE)
+  }
+  #G_Lambda = matrix(rowMeans(G_Lambdas),p,k)
+  return(G_est)
 }
 
 G_Traces_Comp = function(BSFG_state){

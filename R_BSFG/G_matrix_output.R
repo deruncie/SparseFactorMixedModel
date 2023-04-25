@@ -21,7 +21,7 @@ setwd(sprintf('~/Runcie Lab/SparseFactorMixedModel_v2/MCMC/%d/%d',i,i))
 setwd("Lambda1.5_delta2shape3")
 load("BSFG_state.RData")
 # Scaled G Matrix
-G_BSFG_sc[[i]] = G_Matrix_Comp(BSFG_state)
+G_BSFG_sc[i] = G_Matrix_Comp(BSFG_state)
 G_est_all = G_BSFG_sc[[i]]
 sp_num = length(G_est_all)
 p = BSFG_state$run_variables$P

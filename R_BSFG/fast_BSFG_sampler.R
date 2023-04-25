@@ -203,7 +203,11 @@ fast_BSFG_sampler = function(BSFG_state,n_samples) {
 		Y_tilde = Y - F %*% t(Lambda) - Z_2 %*% W
 		# location_sample = sample_means( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
 		location_sample = sample_means_c( Y_tilde, resid_Y_prec, E_a_prec, invert_aPXA_bDesignDesignT )
-		B   = location_sample[1:b,]
+		if(b>0) {
+		  B   = location_sample[1:b,]
+		} else {
+		  B = matrix(0,0,p)
+		}
 		E_a = location_sample[b+(1:r),]
 
 	 # -----Sample W ---------------------- #
